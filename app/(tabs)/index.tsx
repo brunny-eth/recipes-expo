@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback } from 'react';
+import { useRef } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, Keyboard, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useNavigation } from 'expo-router';
 import Animated, { FadeIn, FadeInDown, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
 import { COLORS } from '@/constants/theme';
 import { ArrowRight } from 'lucide-react-native';
@@ -11,7 +14,31 @@ export default function HomeScreen() {
   const [recipeUrl, setRecipeUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const navigation = useNavigation();
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Reset loading state when component mounts
+  useEffect(() => {
+    setIsLoading(false);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      setIsLoading(false);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    }, [])
+  );
+
+  // Update navigation options
+  useEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => null, // Remove back button
+    });
+  }, [navigation]);
 
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
@@ -40,9 +67,7 @@ export default function HomeScreen() {
     setIsLoading(true);
     
     // Simulate API call to parse recipe
-    setTimeout(() => {
-      setIsLoading(false);
-      // Navigate to recipe detail with mock ID
+    timeoutRef.current = setTimeout(() => {
       router.push('/recipe/sample-recipe');
     }, 2000);
   };
@@ -170,7 +195,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 56,
     borderWidth: 1,
-    borderColor: COLORS.lightGray,
+    borderColor: 'rgba(0, 0, 0, 0.5)',
     borderRadius: 8,
     paddingHorizontal: 16,
     fontFamily: 'Poppins-Regular',
@@ -202,7 +227,7 @@ const styles = StyleSheet.create({
   },
   loadingHint: {
     fontFamily: 'Poppins-Regular',
-    fontSize: 16,
+    fontSize: 20,
     color: COLORS.textDark,
     textAlign: 'center',
     maxWidth: '80%',

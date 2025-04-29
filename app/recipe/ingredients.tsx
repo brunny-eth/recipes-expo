@@ -1,39 +1,55 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, ChevronRight } from 'lucide-react-native';
 import Animated, { FadeIn, FadeInRight } from 'react-native-reanimated';
 import { COLORS } from '@/constants/theme';
+import IngredientSubstitutionModal from './IngredientSubstitutionModal';
 
-// Sample recipe data - in a real app, this would come from an API or local storage
-const SAMPLE_RECIPES = {
+type Recipe = {
+  id: string;
+  title: string;
+  ingredients: Array<{
+    name: string;
+    amount: string;
+    unit: string;
+    adjustable: boolean;
+  }>;
+  servings: number;
+};
+
+interface Ingredient {
+  id: string;
+  name: string;
+  amount: string;
+  unit: string;
+  isChecked: boolean;
+  substitution?: {
+    name: string;
+    description: string;
+  };
+}
+
+const SAMPLE_RECIPES: Record<string, Recipe> = {
   'sample-recipe': {
     id: 'sample-recipe',
-    title: 'Chicken Avocado Sandwich',
+    title: 'Sample Recipe',
     ingredients: [
-      { name: 'Chicken breast', amount: '4 oz', adjustable: true },
-      { name: 'Avocado', amount: '1/2', adjustable: true },
-      { name: 'Whole grain bread', amount: '2 slices', adjustable: true },
-      { name: 'Lettuce', amount: '1 leaf', adjustable: true },
-      { name: 'Tomato', amount: '2 slices', adjustable: true },
-      { name: 'Mayo', amount: '1 tbsp', adjustable: true },
-      { name: 'Salt', amount: 'to taste', adjustable: false },
-      { name: 'Pepper', amount: 'to taste', adjustable: false },
+      { name: 'Flour', amount: '2', unit: 'cups', adjustable: true },
+      { name: 'Sugar', amount: '1', unit: 'cup', adjustable: true },
+      { name: 'Eggs', amount: '2', unit: 'large', adjustable: false },
     ],
+    servings: 4,
   },
   'recipe-1': {
     id: 'recipe-1',
-    title: 'Chicken Avocado Sandwich',
+    title: 'Recipe 1',
     ingredients: [
-      { name: 'Chicken breast', amount: '4 oz', adjustable: true },
-      { name: 'Avocado', amount: '1/2', adjustable: true },
-      { name: 'Whole grain bread', amount: '2 slices', adjustable: true },
-      { name: 'Lettuce', amount: '1 leaf', adjustable: true },
-      { name: 'Tomato', amount: '2 slices', adjustable: true },
-      { name: 'Mayo', amount: '1 tbsp', adjustable: true },
-      { name: 'Salt', amount: 'to taste', adjustable: false },
-      { name: 'Pepper', amount: 'to taste', adjustable: false },
+      { name: 'Milk', amount: '1', unit: 'cup', adjustable: true },
+      { name: 'Butter', amount: '1/2', unit: 'cup', adjustable: true },
+      { name: 'Salt', amount: '1', unit: 'tsp', adjustable: true },
     ],
+    servings: 4,
   },
 };
 
@@ -104,18 +120,28 @@ const approximateFraction = (decimal: number): string => {
 export default function IngredientsScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
-  
   const recipeId = params.recipeId as string;
-  const servingsParam = params.servings as string;
-  const servings = parseInt(servingsParam, 10) || 1;
-  
+  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [adjustedIngredients, setAdjustedIngredients] = useState<Array<{name: string, amount: string}>>([]);
   const [checked, setChecked] = useState<{[key: string]: boolean}>({});
-  
+  const [substitutionModalVisible, setSubstitutionModalVisible] = useState(false);
+  const [selectedIngredient, setSelectedIngredient] = useState<Ingredient | null>(null);
+  const [servings, setServings] = useState(4);
+
   const recipe = SAMPLE_RECIPES[recipeId];
   
   useEffect(() => {
     if (recipe && recipe.ingredients) {
+      // Initialize ingredients list
+      const initialIngredients = recipe.ingredients.map((ingredient, index) => ({
+        id: `${index}`,
+        name: ingredient.name,
+        amount: ingredient.amount,
+        unit: ingredient.unit,
+        isChecked: false
+      }));
+      setIngredients(initialIngredients);
+
       // Adjust ingredient amounts based on serving size
       const adjusted = recipe.ingredients.map(ingredient => ({
         name: ingredient.name,
@@ -137,10 +163,10 @@ export default function IngredientsScreen() {
     );
   }
   
-  const toggleChecked = (index: number) => {
+  const toggleChecked = (id: string) => {
     setChecked(prev => ({
       ...prev,
-      [index]: !prev[index]
+      [id]: !prev[id]
     }));
   };
   
@@ -150,57 +176,95 @@ export default function IngredientsScreen() {
       params: { recipeId }
     });
   };
+
+  const handleSubstitutePress = (ingredient: Ingredient) => {
+    setSelectedIngredient(ingredient);
+    setSubstitutionModalVisible(true);
+  };
+
+  const handleApplySubstitution = (substitution: { name: string; description: string }) => {
+    if (selectedIngredient) {
+      const updatedIngredients = ingredients.map((ing) =>
+        ing.id === selectedIngredient.id
+          ? { ...ing, substitution }
+          : ing
+      );
+      setIngredients(updatedIngredients);
+    }
+    setSubstitutionModalVisible(false);
+    setSelectedIngredient(null);
+  };
+
+  const handleServingsChange = (value: string) => {
+    const numValue = parseInt(value, 10);
+    if (!isNaN(numValue) && numValue > 0) {
+      setServings(numValue);
+      adjustIngredients(numValue);
+    }
+  };
+
+  const adjustIngredients = (newServings: number) => {
+    const ratio = newServings / recipe.servings;
+    const adjusted = ingredients.map(ing => ({
+      name: ing.name,
+      amount: ing.amount ? `${(parseFloat(ing.amount) * ratio).toFixed(1)} ${ing.unit}` : ''
+    }));
+    setAdjustedIngredients(adjusted);
+  };
   
   return (
-    <Animated.View entering={FadeIn.duration(300)} style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={styles.container}>
+      <Animated.View entering={FadeIn.duration(300)} style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <ArrowLeft size={24} color={COLORS.textDark} />
+          <ArrowLeft size={24} color={COLORS.raisinBlack} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Ingredients</Text>
         <View style={styles.placeholder} />
-      </View>
+      </Animated.View>
       
       <View style={styles.subtitleContainer}>
         <Text style={styles.subtitle}>
-          {recipe.title} • {servings} {servings === 1 ? 'serving' : 'servings'}
+          {recipe.title}
         </Text>
       </View>
       
       <ScrollView style={styles.ingredientsList} showsVerticalScrollIndicator={false}>
-        {adjustedIngredients.map((ingredient, index) => (
-          <Animated.View 
-            key={`${ingredient.name}-${index}`}
-            entering={FadeInRight.delay(index * 50).duration(300)}
-            style={styles.ingredientItem}
-          >
-            <TouchableOpacity 
-              style={styles.checkboxContainer}
-              onPress={() => toggleChecked(index)}
+        {ingredients.map((ingredient) => (
+          <View key={ingredient.id} style={styles.ingredientItem}>
+            <TouchableOpacity
+              style={styles.checkbox}
+              onPress={() => toggleChecked(ingredient.id)}
             >
-              <View style={[styles.checkbox, checked[index] ? styles.checkboxChecked : null]}>
-                {checked[index] && <Text style={styles.checkmark}>✓</Text>}
-              </View>
+              <View
+                style={[
+                  styles.checkboxInner,
+                  ingredient.isChecked && styles.checkboxChecked,
+                ]}
+              />
             </TouchableOpacity>
-            
-            <View style={styles.ingredientContent}>
-              <Text style={[
-                styles.ingredientName,
-                checked[index] && styles.ingredientTextChecked
-              ]}>
+            <View style={styles.ingredientInfo}>
+              <Text style={styles.ingredientName}>
                 {ingredient.name}
-              </Text>
-              <Text style={[
-                styles.ingredientAmount,
-                checked[index] && styles.ingredientTextChecked
-              ]}>
-                {ingredient.amount}
+                <Text style={styles.ingredientAmount}>
+                  {' '}({ingredient.amount} {ingredient.unit})
+                </Text>
+                {ingredient.substitution && (
+                  <Text style={styles.substitutionText}>
+                    {' '}(substituted with {ingredient.substitution.name})
+                  </Text>
+                )}
               </Text>
             </View>
-          </Animated.View>
+            <TouchableOpacity
+              style={styles.substituteButton}
+              onPress={() => handleSubstitutePress(ingredient)}
+            >
+              <Text style={styles.substituteButtonText}>Substitute</Text>
+            </TouchableOpacity>
+          </View>
         ))}
       </ScrollView>
       
@@ -211,7 +275,17 @@ export default function IngredientsScreen() {
         <Text style={styles.nextButtonText}>View Cooking Steps</Text>
         <ChevronRight size={20} color={COLORS.white} />
       </TouchableOpacity>
-    </Animated.View>
+
+      <IngredientSubstitutionModal
+        visible={substitutionModalVisible}
+        onClose={() => {
+          setSubstitutionModalVisible(false);
+          setSelectedIngredient(null);
+        }}
+        ingredientName={selectedIngredient?.name || ''}
+        onApply={handleApplySubstitution}
+      />
+    </SafeAreaView>
   );
 }
 
@@ -265,14 +339,15 @@ const styles = StyleSheet.create({
   ingredientItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.lightGray,
-  },
-  checkboxContainer: {
-    marginRight: 16,
+    padding: 16,
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    marginBottom: 12,
   },
   checkbox: {
+    marginRight: 16,
+  },
+  checkboxInner: {
     width: 24,
     height: 24,
     borderRadius: 4,
@@ -284,31 +359,21 @@ const styles = StyleSheet.create({
   checkboxChecked: {
     backgroundColor: COLORS.primary,
   },
-  checkmark: {
-    color: COLORS.white,
-    fontWeight: 'bold',
-  },
-  ingredientContent: {
+  ingredientInfo: {
     flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    marginRight: 12,
   },
   ingredientName: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: 'Poppins-Regular',
     fontSize: 16,
     color: COLORS.textDark,
-    flex: 1,
   },
   ingredientAmount: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 14,
     color: COLORS.textGray,
-    marginLeft: 8,
   },
-  ingredientTextChecked: {
-    textDecorationLine: 'line-through',
-    color: COLORS.textGray,
+  substitutionText: {
+    fontFamily: 'Poppins-Italic',
+    color: COLORS.primary,
   },
   nextButton: {
     flexDirection: 'row',
@@ -341,6 +406,16 @@ const styles = StyleSheet.create({
   backButtonText: {
     fontFamily: 'Poppins-Medium',
     fontSize: 16,
+    color: COLORS.primary,
+  },
+  substituteButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: COLORS.primaryLight,
+  },
+  substituteButtonText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 14,
     color: COLORS.primary,
   },
 });
