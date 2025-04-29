@@ -96,7 +96,7 @@ export default function HomeScreen() {
             <View style={styles.inputContainer}>
               <TextInput
                 style={styles.input}
-                placeholder="Paste a recipe link here"
+                placeholder="  Paste a recipe link here"
                 placeholderTextColor={COLORS.darkGray}
                 value={recipeUrl}
                 onChangeText={setRecipeUrl}
@@ -122,7 +122,11 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    flexGrow: 1,
     backgroundColor: COLORS.background,
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingBottom: 24,
   },
   keyboardAvoidingView: {
     flex: 1,
@@ -133,10 +137,12 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
+    marginTop: 68,
     marginBottom: 40,
   },
   contentContainer: {
     alignItems: 'center',
+    paddingTop: 18,
   },
   title: {
     fontFamily: 'Poppins-Bold',
@@ -158,7 +164,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
-    marginTop: 20,
+    marginTop: 28,
   },
   input: {
     flex: 1,
