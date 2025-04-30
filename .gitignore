@@ -87,3 +87,4 @@ web-build/
 # IDE
 .vscode/
 .idea/
+.vercel

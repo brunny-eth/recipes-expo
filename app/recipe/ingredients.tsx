@@ -247,16 +247,31 @@ export default function IngredientsScreen() {
             </TouchableOpacity>
             <View style={styles.ingredientInfo}>
               <Text style={styles.ingredientName}>
-                {ingredient.name}
+                {ingredient.substitution ? ingredient.substitution.name : ingredient.name}
                 <Text style={styles.ingredientAmount}>
                   {' '}({ingredient.amount} {ingredient.unit})
                 </Text>
-                {ingredient.substitution && (
-                  <Text style={styles.substitutionText}>
-                    {' '}(substituted with {ingredient.substitution.name})
-                  </Text>
-                )}
               </Text>
+              {ingredient.substitution && (
+                <View style={styles.substitutionContainer}>
+                  <Text style={styles.substitutionText}>
+                    Substituted for {ingredient.name}
+                  </Text>
+                  <TouchableOpacity 
+                    style={styles.cancelSubstitutionButton}
+                    onPress={() => {
+                      const updatedIngredients = ingredients.map((ing) =>
+                        ing.id === ingredient.id
+                          ? { ...ing, substitution: undefined }
+                          : ing
+                      );
+                      setIngredients(updatedIngredients);
+                    }}
+                  >
+                    <Text style={styles.cancelSubstitutionText}>×</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
             <TouchableOpacity
               style={styles.substituteButton}
@@ -371,9 +386,24 @@ const styles = StyleSheet.create({
   ingredientAmount: {
     color: COLORS.textGray,
   },
+  substitutionContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
   substitutionText: {
-    fontFamily: 'Poppins-Italic',
-    color: COLORS.primary,
+    fontFamily: 'Poppins-Regular',
+    fontSize: 12,
+    color: COLORS.textGray,
+    marginRight: 4,
+  },
+  cancelSubstitutionButton: {
+    padding: 0,
+  },
+  cancelSubstitutionText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 18,
+    color: COLORS.warning,
   },
   nextButton: {
     flexDirection: 'row',

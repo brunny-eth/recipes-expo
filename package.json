@@ -14,6 +14,9 @@
     "@lucide/lab": "^0.1.2",
     "@react-navigation/bottom-tabs": "^7.2.0",
     "@react-navigation/native": "^7.0.14",
+    "@supabase/supabase-js": "^2.49.4",
+    "@vercel/node": "^2.3.0",
+    "dotenv": "^16.5.0",
     "expo": "~52.0.46",
     "expo-blur": "^14.0.3",
     "expo-camera": "^16.0.18",
@@ -28,6 +31,7 @@
     "expo-symbols": "^0.2.2",
     "expo-system-ui": "~4.0.9",
     "expo-web-browser": "^14.0.2",
+    "express": "^5.1.0",
     "lucide-react-native": "^0.475.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
@@ -40,10 +44,12 @@
     "react-native-svg-transformer": "^1.5.0",
     "react-native-url-polyfill": "^2.0.0",
     "react-native-web": "^0.19.13",
-    "react-native-webview": "13.12.5"
+    "react-native-webview": "13.12.5",
+    "serverless-http": "^3.2.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@types/express": "^5.0.1",
     "@types/react": "~18.3.12",
     "@types/react-native": "^0.72.8",
     "typescript": "^5.3.3"
