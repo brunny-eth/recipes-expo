@@ -1,394 +1,206 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, SafeAreaView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, CircleCheck as CheckCircle2 } from 'lucide-react-native';
-import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
+import { ArrowLeft } from 'lucide-react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { COLORS } from '@/constants/theme';
 
-// Sample recipe data - in a real app, this would come from an API or local storage
-const SAMPLE_RECIPES = {
-  'sample-recipe': {
-    id: 'sample-recipe',
-    title: 'Chicken Avocado Sandwich',
-    steps: [
-      'Season chicken breast with salt and pepper.',
-      'Cook chicken in a pan over medium heat until internal temperature reaches 165°F (74°C), about 6-8 minutes per side.',
-      'Toast bread slices.',
-      'Mash avocado and spread on one slice of bread.',
-      'Spread mayo on the other slice of bread.',
-      'Layer lettuce, cooked chicken, and tomato slices.',
-      'Close sandwich and cut diagonally.',
-      'Serve immediately.'
-    ]
-  },
-  'recipe-1': {
-    id: 'recipe-1',
-    title: 'Chicken Avocado Sandwich',
-    steps: [
-      'Season chicken breast with salt and pepper.',
-      'Cook chicken in a pan over medium heat until internal temperature reaches 165°F (74°C), about 6-8 minutes per side.',
-      'Toast bread slices.',
-      'Mash avocado and spread on one slice of bread.',
-      'Spread mayo on the other slice of bread.',
-      'Layer lettuce, cooked chicken, and tomato slices.',
-      'Close sandwich and cut diagonally.',
-      'Serve immediately.'
-    ]
-  },
-};
-
 export default function StepsScreen() {
-  const params = useLocalSearchParams();
+  const params = useLocalSearchParams<{ instructionsData?: string, substitutionsText?: string }>();
   const router = useRouter();
   
-  const recipeId = params.recipeId as string;
-  const recipe = SAMPLE_RECIPES[recipeId];
+  const [instructions, setInstructions] = useState<string[]>([]);
+  const [substitutions, setSubstitutions] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
-  const [completedSteps, setCompletedSteps] = useState<{[key: number]: boolean}>({});
-  const [currentStep, setCurrentStep] = useState(0);
-  
-  if (!recipe) {
+  useEffect(() => {
+    try {
+      if (params.instructionsData) {
+        const parsedInstructions = JSON.parse(params.instructionsData);
+        if (Array.isArray(parsedInstructions)) {
+            setInstructions(parsedInstructions);
+        } else {
+            throw new Error("Instructions data is not an array.");
+        }
+      } else {
+        // Allow empty instructions, maybe show placeholder later
+        setInstructions([]); 
+      }
+      
+      // Set substitutions text (it's already a string or empty/null)
+      setSubstitutions(params.substitutionsText || null);
+
+    } catch (e) {
+        console.error("Failed to parse instructions data:", e);
+        setError("Could not load recipe instructions.");
+    }
+    setIsLoading(false);
+  }, [params.instructionsData, params.substitutionsText]);
+
+  if (isLoading) {
     return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>Recipe not found</Text>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+      <SafeAreaView style={styles.centeredStatusContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.centeredStatusContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.backButtonSimple} onPress={() => router.back()}>
           <Text style={styles.backButtonText}>Go Back</Text>
         </TouchableOpacity>
-      </View>
+      </SafeAreaView>
     );
   }
   
-  const toggleStepCompleted = (index: number) => {
-    setCompletedSteps(prev => ({
-      ...prev,
-      [index]: !prev[index]
-    }));
-    
-    // If completing a step, move to the next one
-    if (!completedSteps[index] && index === currentStep && index < recipe.steps.length - 1) {
-      setCurrentStep(index + 1);
-    }
-  };
-  
-  const goToStep = (index: number) => {
-    setCurrentStep(index);
-  };
-  
   return (
-    <Animated.View entering={FadeIn.duration(300)} style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={styles.container}>
+      <Animated.View entering={FadeIn.duration(300)} style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <ArrowLeft size={24} color={COLORS.textDark} />
+          <ArrowLeft size={24} color={COLORS.raisinBlack} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Cooking Steps</Text>
+        <Text style={styles.headerTitle}>Instructions</Text>
         <View style={styles.placeholder} />
-      </View>
-      
-      <View style={styles.subtitleContainer}>
-        <Text style={styles.subtitle}>{recipe.title}</Text>
-        <Text style={styles.progress}>
-          {Object.keys(completedSteps).length} of {recipe.steps.length} steps completed
-        </Text>
-      </View>
+      </Animated.View>
       
       <ScrollView 
         style={styles.stepsContainer}
         showsVerticalScrollIndicator={false}
       >
-        {recipe.steps.map((step, index) => (
-          <Animated.View 
-            key={index}
-            entering={FadeInUp.delay(index * 50).duration(300)}
-            style={[
-              styles.stepItem,
-              currentStep === index && styles.currentStep
-            ]}
-          >
-            <TouchableOpacity
-              style={styles.stepNumberContainer}
-              onPress={() => goToStep(index)}
-            >
-              <View style={[
-                styles.stepNumber,
-                completedSteps[index] && styles.stepNumberCompleted,
-                currentStep === index && styles.stepNumberCurrent
-              ]}>
-                {completedSteps[index] ? (
-                  <CheckCircle2 size={24} color={COLORS.white} />
-                ) : (
-                  <Text style={[
-                    styles.stepNumberText,
-                    currentStep === index && styles.stepNumberTextCurrent
-                  ]}>
-                    {index + 1}
-                  </Text>
-                )}
+        {instructions.length > 0 ? (
+            instructions.map((step, index) => (
+              <View key={`step-${index}`} style={styles.stepItemSimple}>
+                 <Text style={styles.stepNumberSimple}>{`${index + 1}`}</Text>
+                 <Text style={styles.stepTextSimple}>{step}</Text>
               </View>
-              {index < recipe.steps.length - 1 && (
-                <View style={[
-                  styles.stepConnector,
-                  completedSteps[index] && styles.stepConnectorCompleted
-                ]} />
-              )}
-            </TouchableOpacity>
-            
-            <View style={styles.stepContent}>
-              <Text style={[
-                styles.stepText,
-                completedSteps[index] && styles.stepTextCompleted
-              ]}>
-                {step}
-              </Text>
-              
-              <TouchableOpacity
-                style={[
-                  styles.markCompleteButton,
-                  completedSteps[index] && styles.markCompleteButtonActive
-                ]}
-                onPress={() => toggleStepCompleted(index)}
-              >
-                <Text style={[
-                  styles.markCompleteText,
-                  completedSteps[index] && styles.markCompleteTextActive
-                ]}>
-                  {completedSteps[index] ? 'Completed' : 'Mark as Complete'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-        ))}
+            ))
+          ) : (
+            <Text style={styles.placeholderText}>No instructions found.</Text>
+          )}
         
-        {/* Add some space at the bottom for better scrolling */}
+        {substitutions && (
+            <View style={styles.substitutionsContainer}>
+                <Text style={styles.sectionTitle}>Substitution Notes</Text>
+                <Text style={styles.substitutionsText}>{substitutions}</Text>
+            </View>
+        )}
+        
         <View style={{ height: 100 }} />
       </ScrollView>
-      
-      {Object.keys(completedSteps).length === recipe.steps.length && (
-        <Animated.View 
-          entering={FadeIn.duration(500)}
-          style={styles.completionContainer}
-        >
-          <View style={styles.completionContent}>
-            <Text style={styles.completionTitle}>All Steps Completed!</Text>
-            <Text style={styles.completionText}>
-              Enjoy your {recipe.title}
-            </Text>
-            
-            <TouchableOpacity 
-              style={styles.finishButton}
-              onPress={() => router.push('/saved')}
-            >
-              <Text style={styles.finishButtonText}>Save to Favorites</Text>
-            </TouchableOpacity>
-          </View>
-        </Animated.View>
-      )}
-    </Animated.View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.white,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'ios' ? 0 : 10,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.lightGray,
+    backgroundColor: COLORS.white,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.white,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: COLORS.textDark,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    padding: 8,
   },
   headerTitle: {
-    fontFamily: 'Poppins-Bold',
-    fontSize: 20,
-    color: COLORS.textDark,
+    flex: 1,
+    textAlign: 'center',
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 18,
+    color: COLORS.raisinBlack,
+    marginHorizontal: 10,
   },
   placeholder: {
-    width: 40,
-  },
-  subtitleContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  subtitle: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 16,
-    color: COLORS.textGray,
-  },
-  progress: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 14,
-    color: COLORS.primary,
-    marginTop: 4,
+    width: 24 + 16,
   },
   stepsContainer: {
-    flex: 1,
-    paddingHorizontal: 20,
+    padding: 20,
   },
-  stepItem: {
+  stepItemSimple: {
     flexDirection: 'row',
-    marginBottom: 16,
+    marginBottom: 15,
+    alignItems: 'flex-start',
   },
-  currentStep: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: COLORS.textDark,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-    marginLeft: -16,
-    marginRight: -16,
-    paddingLeft: 16,
-  },
-  stepNumberContainer: {
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  stepNumber: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.white,
-    borderWidth: 2,
-    borderColor: COLORS.lightGray,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  stepNumberCurrent: {
-    borderColor: COLORS.primary,
-    backgroundColor: COLORS.primaryLight,
-  },
-  stepNumberCompleted: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  stepNumberText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 16,
-    color: COLORS.textDark,
-  },
-  stepNumberTextCurrent: {
-    color: COLORS.primary,
-  },
-  stepConnector: {
-    width: 2,
-    height: 30,
-    backgroundColor: COLORS.lightGray,
-    marginVertical: 4,
-  },
-  stepConnectorCompleted: {
-    backgroundColor: COLORS.primary,
-  },
-  stepContent: {
-    flex: 1,
-    paddingBottom: 20,
-  },
-  stepText: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 16,
-    color: COLORS.textDark,
-    marginBottom: 16,
-    lineHeight: 24,
-  },
-  stepTextCompleted: {
-    color: COLORS.textGray,
-    textDecorationLine: 'line-through',
-  },
-  markCompleteButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-    alignSelf: 'flex-start',
-  },
-  markCompleteButtonActive: {
-    backgroundColor: COLORS.primaryLight,
-  },
-  markCompleteText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 14,
-    color: COLORS.primary,
-  },
-  markCompleteTextActive: {
-    color: COLORS.primary,
-  },
-  completionContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    padding: 20,
-    paddingBottom: 40,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    shadowColor: COLORS.textDark,
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  completionContent: {
-    alignItems: 'center',
-  },
-  completionTitle: {
+  stepNumberSimple: {
     fontFamily: 'Poppins-Bold',
-    fontSize: 20,
+    fontSize: 16,
     color: COLORS.primary,
-    marginBottom: 8,
+    marginRight: 12,
+    minWidth: 25,
+    textAlign: 'right',
   },
-  completionText: {
+  stepTextSimple: {
     fontFamily: 'Poppins-Regular',
-    fontSize: 16,
+    fontSize: 15,
     color: COLORS.textDark,
-    marginBottom: 20,
+    flex: 1,
+    lineHeight: 22,
   },
-  finishButton: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-  },
-  finishButtonText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 16,
-    color: COLORS.white,
-  },
-  errorContainer: {
+  centeredStatusContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    backgroundColor: COLORS.white,
   },
   errorText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 18,
-    color: COLORS.textDark,
+    fontFamily: 'Poppins-Regular',
+    fontSize: 16,
+    color: COLORS.error,
+    textAlign: 'center',
     marginBottom: 20,
+  },
+  backButtonSimple: {
+     marginTop: 15,
+     paddingVertical: 10,
+     paddingHorizontal: 20,
+     backgroundColor: COLORS.lightGray,
+     borderRadius: 8,
   },
   backButtonText: {
     fontFamily: 'Poppins-Medium',
     fontSize: 16,
-    color: COLORS.primary,
+    color: COLORS.textDark,
+  },
+  placeholderText: {
+    fontFamily: 'Poppins-Italic',
+    fontSize: 14,
+    color: COLORS.darkGray,
+    marginTop: 20,
+    textAlign: 'center',
+  },
+  substitutionsContainer: {
+    marginTop: 30,
+    padding: 15,
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.secondary,
+  },
+  sectionTitle: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 16,
+    color: COLORS.textDark,
+    marginBottom: 8,
+  },
+  substitutionsText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 14,
+    color: COLORS.textDark,
+    lineHeight: 20,
   },
 });

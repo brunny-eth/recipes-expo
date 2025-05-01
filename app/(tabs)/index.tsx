@@ -82,13 +82,25 @@ export default function HomeScreen() {
       const result = await response.json();
 
       if (response.ok) {
-        console.log('Backend response:', result);
-        // TODO: Replace console.log with navigation or state update based on response
-        // For now, just log success
-        alert(`Success: ${result.message}`); 
-        // Example navigation (uncomment if needed later):
-        // router.push({ pathname: '/recipe/view', params: { recipeData: JSON.stringify(result) } });
+        console.log('Backend response:', JSON.stringify(result, null, 2));
+
+        if (result.recipe) {
+          console.log('Recipe data found in response.');
+          console.log("Attempting navigation to /recipe/ingredients..."); 
+          router.push({
+            pathname: '/recipe/ingredients', 
+            params: { 
+              recipeData: JSON.stringify(result.recipe) 
+            }
+          });
+          console.log("Navigation call finished."); 
+        } else {
+          console.error("Parsed recipe data key ('recipe') is missing in the response object:", result);
+          alert('Error: Received incomplete recipe data from server.');
+        }
+
       } else {
+        console.error(`Backend responded with status: ${response.status}`);
         console.error('Backend error:', result);
         alert(`Error: ${result.error || 'Failed to parse recipe'}`);
       }
