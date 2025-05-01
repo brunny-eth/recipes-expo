@@ -66,10 +66,40 @@ export default function HomeScreen() {
     Keyboard.dismiss();
     setIsLoading(true);
     
-    // Simulate API call to parse recipe
-    timeoutRef.current = setTimeout(() => {
-      router.push('/recipe/sample-recipe');
-    }, 2000);
+    // TODO: Replace with your actual local IP and port if different
+    const backendUrl = 'http://192.168.1.99:3000/api/recipes/parse'; 
+
+    try {
+      console.log(`Sending request to: ${backendUrl} with URL: ${recipeUrl}`);
+      const response = await fetch(backendUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: recipeUrl }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        console.log('Backend response:', result);
+        // TODO: Replace console.log with navigation or state update based on response
+        // For now, just log success
+        alert(`Success: ${result.message}`); 
+        // Example navigation (uncomment if needed later):
+        // router.push({ pathname: '/recipe/view', params: { recipeData: JSON.stringify(result) } });
+      } else {
+        console.error('Backend error:', result);
+        alert(`Error: ${result.error || 'Failed to parse recipe'}`);
+      }
+    } catch (error) {
+      console.error('Network error:', error);
+      // Handle network errors (e.g., server unreachable)
+      alert(`Network Error: ${error instanceof Error ? error.message : 'Could not connect to server'}`);
+    } finally {
+      // Ensure loading state is turned off regardless of success or failure
+      setIsLoading(false); 
+    }
   };
 
   if (isLoading) {
