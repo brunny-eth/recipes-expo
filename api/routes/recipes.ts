@@ -89,16 +89,57 @@ router.post('/parse', async (req: Request, res: Response) => {
   try {
     const { url } = req.body;
     if (!url) {
-      // Use return to ensure the function exits after sending the response
       return res.status(400).json({ error: 'Missing URL in request body' });
     }
-    // TODO: Implement actual recipe parsing logic here
-    console.log(`Received URL to parse: ${url}`); 
-    // For now, just acknowledge receipt
-    res.json({ message: 'Parsing request received', receivedUrl: url }); 
+
+    console.log(`Attempting to fetch HTML from: ${url}`);
+
+    // Define a common browser User-Agent
+    const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36';
+
+    let htmlContent = '';
+    let fetchError = null;
+
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': userAgent,
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8', // Standard accept header
+          'Accept-Language': 'en-US,en;q=0.5', // Optional: Indicate language preference
+          'Referer': 'https://www.google.com/' // Optional: Sometimes helps
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch recipe: ${response.status} ${response.statusText}`);
+      }
+
+      htmlContent = await response.text();
+      console.log(`Successfully fetched HTML. Length: ${htmlContent.length}`);
+      // Optional: Log a snippet
+      // console.log(`HTML Snippet: ${htmlContent.substring(0, 500)}...`);
+
+    } catch (err) {
+      console.error(`Error fetching URL ${url}:`, err);
+      fetchError = err instanceof Error ? err.message : 'An unknown error occurred during fetch';
+    }
+
+    if (fetchError) {
+      // Send error response if fetch failed
+      return res.status(500).json({ error: `Failed to retrieve recipe content: ${fetchError}` });
+    }
+    
+    // For now, just acknowledge successful HTML fetch
+    // TODO: Implement actual recipe parsing logic here using htmlContent
+    res.json({ 
+      message: 'HTML fetched successfully', 
+      receivedUrl: url, 
+      htmlLength: htmlContent.length 
+    }); 
+
   } catch (error) {
-    console.error('Error in /parse route:', error); // Log the error server-side
-    // Type check for error message access
+    // Catch errors related to request processing (e.g., reading req.body) rather than the external fetch
+    console.error('Error in /parse route processing:', error); 
     const message = error instanceof Error ? error.message : 'An unknown error occurred';
     res.status(500).json({ error: message });
   }
