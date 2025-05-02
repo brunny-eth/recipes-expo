@@ -8,6 +8,7 @@ type StructuredIngredient = {
   name: string;
   amount: string | null;
   unit: string | null;
+  suggested_substitutions?: Array<{ name: string; description?: string | null }> | null;
 };
 // --- ---
 
@@ -383,13 +384,14 @@ ${extractedContent.instructionsText}
       console.log(`Found ${initialParsedResult.ingredients.length} ingredient strings to parse further.`);
 
       // --- Prompt asking for object containing the array (No change needed here) ---
-      const ingredientParsingPrompt = `Parse the following array of ingredient strings into an array of JSON objects. Each object should have keys: "name" (string), "amount" (string or null), "unit" (string or null).
+      const ingredientParsingPrompt = `Parse the following array of ingredient strings into an array of JSON objects. Each object should have keys: "name" (string), "amount" (string or null), "unit" (string or null), and an optional key "suggested_substitutions" (array of objects { name: string, description?: string | null } or null).
+      For each ingredient, try to suggest 1-3 sensible culinary substitutions (e.g., different oil, different vegetable, vegan alternative like tofu for chicken). If no good substitutions come to mind, use null for "suggested_substitutions".
       Convert all fractional amounts (e.g., "1 1/2", "3/4") to their decimal representation (e.g., "1.5", "0.75").
       Handle variations like ranges, optional parts. If a part isn't clearly identifiable, use null.
       If an ingredient clearly lacks a quantity (e.g., toppings like 'fresh cilantro'), set amount to null and unit to "to taste" or "as needed".
       **IMPORTANT: Do NOT include ingredients that are variations of 'sea salt', 'salt', 'black pepper', or 'pepper' in the final array.**
       Output ONLY a single valid JSON object with one key "structured_ingredients" whose value is the array of parsed ingredient objects.
-      Example: { "structured_ingredients": [ { "name": "flour", "amount": "1.5", "unit": "cups" }, { "name": "onion", "amount": "1", "unit": null } ] }.
+      Example: { "structured_ingredients": [ { "name": "olive oil", "amount": "2", "unit": "tbsp", "suggested_substitutions": [{ "name": "avocado oil" }, { "name": "canola oil" }] }, { "name": "chicken breast", "amount": "1", "unit": "lb", "suggested_substitutions": [{ "name": "tofu", "description": "pressed, extra-firm"}, {"name": "chickpeas"}] }, { "name": "onion", "amount": "1", "unit": null, "suggested_substitutions": null } ] }.
       Ingredient Strings: ${JSON.stringify(initialParsedResult.ingredients)}`;
       // --- End Prompt ---
 
@@ -429,7 +431,14 @@ ${extractedContent.instructionsText}
              }
 
              if(Array.isArray(parsedArray)) {
-                structuredIngredients = parsedArray as StructuredIngredient[];
+                // --- Update Validation for new field ---
+                structuredIngredients = parsedArray.map((item: any) => ({ // Ensure structure
+                    name: item.name,
+                    amount: item.amount,
+                    unit: item.unit,
+                    suggested_substitutions: Array.isArray(item.suggested_substitutions) ? item.suggested_substitutions : null
+                })) as StructuredIngredient[];
+                // --- End Update Validation ---
                 console.log('Successfully parsed structured ingredients from OpenAI response (JSON mode).');
              } else {
                 console.error('Extracted ingredient data was unexpectedly not an array:', parsedArray);
@@ -454,7 +463,14 @@ ${extractedContent.instructionsText}
 
       if (structuredIngredients) {
          // Basic validation of structure before assigning
-         if (structuredIngredients.every(ing => typeof ing === 'object' && ing !== null && 'name' in ing && 'amount' in ing && 'unit' in ing)) {
+         if (structuredIngredients.every(ing => 
+             typeof ing === 'object' && 
+             ing !== null && 
+             'name' in ing && 
+             'amount' in ing && 
+             'unit' in ing &&
+             ('suggested_substitutions' in ing ? (ing.suggested_substitutions === null || Array.isArray(ing.suggested_substitutions)) : true) // Check optional field
+           )) {
             finalRecipeOutput.ingredients = structuredIngredients; // Replace string array with structured array
          } else {
             console.warn(`Parsed ingredient array did not have the expected structure. Error: ${ingredientParseError || 'Invalid structure'}. Returning original ingredient strings.`);
@@ -487,5 +503,105 @@ ${extractedContent.instructionsText}
     res.status(500).json({ error: message });
   }
 });
+
+// --- New Endpoint: Rewrite Instructions ---
+router.post('/rewrite-instructions', async (req: Request, res: Response) => {
+  try {
+    const { originalInstructions, originalIngredientName, substitutedIngredientName } = req.body;
+
+    if (!originalInstructions || !Array.isArray(originalInstructions) || originalInstructions.length === 0) {
+      return res.status(400).json({ error: 'Missing or invalid original instructions' });
+    }
+    if (!originalIngredientName || !substitutedIngredientName) {
+      return res.status(400).json({ error: 'Missing original or substituted ingredient name' });
+    }
+
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      console.error('OPENAI_API_KEY is not set for rewrite endpoint.');
+      return res.status(500).json({ error: 'Server configuration error: Missing OpenAI API key.' });
+    }
+    const openai = new OpenAI({ apiKey });
+
+    // --- Prompt for Rewriting Instructions ---
+    const rewritePrompt = `You are an expert cooking assistant. You are given recipe instructions and a specific ingredient substitution.
+Original Ingredient: ${originalIngredientName}
+Substituted Ingredient: ${substitutedIngredientName}
+
+Your task is to rewrite the original instructions to accommodate the substituted ingredient. Consider:
+- **Preparation differences:** Does the substitute need different prep (e.g., pressing tofu, soaking beans)? Add or modify steps accordingly.
+- **Cooking time/temperature:** Adjust cooking times and temperatures if the substitute cooks differently.
+- **Liquid adjustments:** Might the substitute absorb more or less liquid?
+- **Flavor profile:** Keep the core recipe goal, but account for flavor changes if necessary (though focus primarily on process).
+- **Safety:** Ensure the rewritten steps are safe and make culinary sense.
+
+Rewrite the steps clearly. Output ONLY a valid JSON object with a single key "rewrittenInstructions", where the value is an array of strings, each string being a single step without numbering.
+
+Original Instructions (Array):
+${JSON.stringify(originalInstructions)}
+`;
+    // --- End Rewrite Prompt ---
+
+    console.log(`Sending rewrite request to OpenAI for ${originalIngredientName} -> ${substitutedIngredientName}`);
+    let rewrittenInstructions: string[] | null = null;
+    let rewriteError = null;
+
+    try {
+      if (rewritePrompt.length > 150000) { // Safety limit
+           throw new Error(`Rewrite prompt too large (${rewritePrompt.length} chars).`);
+      }
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4-turbo", // Use a powerful model for this complex task
+        messages: [
+          { role: "system", content: "You are an assistant that rewrites recipe instructions based on an ingredient substitution, outputting a JSON array of steps." },
+          { role: "user", content: rewritePrompt }
+        ],
+        temperature: 0.3, // Allow a little more creativity/variation than parsing
+        response_format: { type: "json_object" },
+      });
+
+      const responseContent = completion.choices[0]?.message?.content;
+      console.log('OpenAI (Rewrite) raw JSON response content:', responseContent);
+
+      if (responseContent) {
+         try {
+           const parsedResult: any = JSON.parse(responseContent);
+           if (typeof parsedResult === 'object' && parsedResult !== null && Array.isArray(parsedResult.rewrittenInstructions)) {
+              rewrittenInstructions = parsedResult.rewrittenInstructions.filter((step: any) => typeof step === 'string'); // Ensure all elements are strings
+              console.log('Successfully parsed rewritten instructions from OpenAI response.');
+           } else {
+               console.error("Parsed JSON response did not contain expected 'rewrittenInstructions' array:", parsedResult);
+               throw new Error("Parsed JSON result did not have the expected structure.");
+           }
+         } catch (parseErr) {
+           console.error('Failed to parse rewritten instructions JSON from OpenAI response:', parseErr);
+           console.error('Raw content that failed parsing:', responseContent);
+           rewriteError = 'Invalid JSON format received from AI instruction rewriter.';
+         }
+      } else {
+        rewriteError = 'Empty response received from AI instruction rewriter.';
+      }
+    } catch (err) {
+      console.error('Error calling OpenAI API (Rewrite) or processing result:', err);
+      rewriteError = err instanceof Error ? err.message : 'An unknown error occurred calling OpenAI for rewrite';
+      if ((err as any)?.code === 'rate_limit_exceeded') {
+           rewriteError = `OpenAI rate limit exceeded. Please try again later. Details: ${rewriteError}`;
+       }
+    }
+
+    if (rewriteError || !rewrittenInstructions) {
+      return res.status(500).json({ error: `Failed to rewrite instructions: ${rewriteError || 'Unknown error'}` });
+    }
+
+    res.json({ rewrittenInstructions });
+
+  } catch (error) {
+    console.error('Error in /rewrite-instructions route processing:', error);
+    const message = error instanceof Error ? error.message : 'An unknown server error occurred';
+    res.status(500).json({ error: message });
+  }
+});
+// --- End New Endpoint ---
 
 export const recipeRouter = router
