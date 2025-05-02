@@ -164,7 +164,7 @@ router.post('/parse', async (req: Request, res: Response) => {
     }
 
     // --- Refined Prompt for GPT-4-Turbo (No Step Numbers) --- 
-    const initialPrompt = `From the following webpage HTML, extract only the recipe information. Ignore surrounding text like introductions, author notes, comments, and ads. Output ONLY valid JSON matching this exact structure: { "title": "string | null", "ingredients": "array of strings | null", "instructions": "array of strings, where each string is a single step without any numbering | null", "substitutions_text": "string describing ingredient substitutions explicitly mentioned in the recipe text | null" }. If a field cannot be extracted from the text, use null for its value. Ensure the output is strictly valid JSON. HTML: ${truncatedHtml}`;
+    const initialPrompt = `From the following webpage HTML, extract only the recipe information. Ignore surrounding text like introductions, author notes, comments, ads, and any concluding remarks or calls to action after the main recipe steps (e.g., requests for reviews, sharing prompts, etc.). Output ONLY valid JSON matching this exact structure: { "title": "string | null", "ingredients": "array of strings | null", "instructions": "array of strings, where each string is a single cooking step without any numbering | null", "substitutions_text": "string describing ingredient substitutions explicitly mentioned in the recipe text | null" }. If a field cannot be extracted from the text, use null for its value. Ensure the output is strictly valid JSON. HTML: ${truncatedHtml}`;
     // --- End Refined Prompt ---
 
     console.log('Sending initial request to OpenAI (GPT-4 Turbo with JSON mode)...');
@@ -220,9 +220,10 @@ router.post('/parse', async (req: Request, res: Response) => {
       const ingredientParsingPrompt = `Parse the following array of ingredient strings into an array of JSON objects. Each object should have keys: "name" (string), "amount" (string or null), "unit" (string or null). 
       Convert all fractional amounts (e.g., "1 1/2", "3/4") to their decimal representation (e.g., "1.5", "0.75"). 
       Handle variations like ranges, optional parts. If a part isn't clearly identifiable, use null. 
-      If an ingredient clearly lacks a quantity (e.g., toppings like 'fresh cilantro', 'salt', 'pepper'), set amount to null and unit to "to taste" or "as needed". 
+      If an ingredient clearly lacks a quantity (e.g., toppings like 'fresh cilantro'), set amount to null and unit to "to taste" or "as needed". 
+      **IMPORTANT: Do NOT include ingredients that are variations of 'sea salt', 'salt', 'black pepper', or 'pepper' in the final array.** 
       Output ONLY a single valid JSON object with one key "structured_ingredients" whose value is the array of parsed ingredient objects. 
-      Example: { "structured_ingredients": [ { "name": "flour", "amount": "1.5", "unit": "cups" }, { "name": "salt", "amount": null, "unit": "to taste" } ] }. 
+      Example: { "structured_ingredients": [ { "name": "flour", "amount": "1.5", "unit": "cups" }, { "name": "onion", "amount": "1", "unit": null } ] }. 
       Ingredient Strings: ${JSON.stringify(initialParsedResult.ingredients)}`;
 
       console.log('Sending ingredient parsing request to OpenAI (GPT-4 Turbo with JSON mode)...');

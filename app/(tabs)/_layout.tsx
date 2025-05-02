@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
 import { PhoneIncoming as HomeIcon, Bookmark as BookmarkIcon, Settings } from 'lucide-react-native';
 import { COLORS } from '@/constants/theme';
 import ChefIcon from '@/assets/images/Chef.svg';
@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: COLORS.lightGray,
     height: 60,
-    paddingBottom: 8,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 8,
     paddingTop: 8,
   },
   tabBarLabel: {

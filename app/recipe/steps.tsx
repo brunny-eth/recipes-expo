@@ -155,9 +155,9 @@ export default function StepsScreen() {
           style={styles.completionContainer}
         >
           <View style={styles.completionContent}>
-            <Text style={styles.completionTitle}>All Steps Completed!</Text>
+            <Text style={styles.completionTitle}>Recipe Completed!</Text>
             <Text style={styles.completionText}>
-              Ready to cook!
+              Enjoy!
             </Text>
           </View>
         </Animated.View>

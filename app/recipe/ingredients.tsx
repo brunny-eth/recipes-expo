@@ -14,6 +14,51 @@ type StructuredIngredient = {
 };
 // --- End Define Structured Ingredient Type ---
 
+// --- Helper function for unit abbreviation ---
+const abbreviateUnit = (unit: string | null): string | null => {
+  if (!unit) return null;
+  const lowerUnit = unit.toLowerCase();
+  switch (lowerUnit) {
+    case 'teaspoon':
+    case 'teaspoons':
+      return 'tsp';
+    case 'tablespoon':
+    case 'tablespoons':
+      return 'tbsp';
+    case 'pound':
+    case 'pounds':
+      return 'lb';
+    case 'kilogram':
+    case 'kilograms':
+      return 'kg';
+    case 'gram':
+    case 'grams':
+      return 'g';
+    case 'ounce':
+    case 'ounces':
+      return 'oz';
+    case 'milliliter':
+    case 'milliliters':
+      return 'ml';
+    case 'liter':
+    case 'liters':
+      return 'l';
+    case 'cup':
+    case 'cups':
+        return 'cup'; // Or keep as 'cup'
+    case 'pinch':
+    case 'pinches':
+        return 'pinch'; // Or keep as 'pinch'
+    case 'dash':
+    case 'dashes':
+        return 'dash'; // Or keep as 'dash'
+    // Add more common units as needed
+    default:
+      return unit; // Return original if no abbreviation found
+  }
+};
+// --- End Helper function ---
+
 // --- Type for data received from OpenAI ---
 type ParsedRecipe = {
   title: string | null;
@@ -171,7 +216,7 @@ export default function IngredientsScreen() {
                           {/* Display amount and unit ONLY if they exist */} 
                           <Text style={[styles.ingredientAmountUnit, isChecked && styles.ingredientTextChecked]}>
                             {String(ingredient.amount ? `${ingredient.amount} ` : '')}
-                            {String(ingredient.unit ? `${ingredient.unit} ` : '')}
+                            {String(ingredient.unit ? `${abbreviateUnit(ingredient.unit)} ` : '')}
                           </Text>
                           <Text style={[styles.ingredientName, isChecked && styles.ingredientTextChecked]}>
                             {String(ingredient.name)}
@@ -350,23 +395,22 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   ingredientAmountUnit: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: 'Poppins-Regular',
     fontSize: 16,
-    color: COLORS.textDark,
+    color: COLORS.darkGray,
     lineHeight: 24,
-    width: 80,
     textAlign: 'right',
     marginRight: 10,
   },
   ingredientName: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: 'Poppins-SemiBold',
     fontSize: 16,
     color: COLORS.textDark,
     lineHeight: 24,
     flex: 1,
   },
   ingredientNameFullWidth: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: 'Poppins-SemiBold',
     fontSize: 16,
     color: COLORS.textDark,
     lineHeight: 24,
