@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, ChevronRight } from 'lucide-react-native';
@@ -44,6 +44,9 @@ export default function IngredientsScreen() {
   // const [substitutionModalVisible, setSubstitutionModalVisible] = useState(false);
   // const [selectedIngredient, setSelectedIngredient] = useState<Ingredient | null>(null);
   // const [servings, setServings] = useState(4);
+  // --- Add state for checked ingredients --- 
+  const [checkedIngredients, setCheckedIngredients] = useState<{ [key: number]: boolean }>({});
+  // --- End state add ---
 
   useEffect(() => {
     if (params.recipeData) {
@@ -70,6 +73,8 @@ export default function IngredientsScreen() {
       setError("Recipe data not provided.");
     }
     setIsLoading(false);
+    // Reset checked state when data changes
+    setCheckedIngredients({}); 
   }, [params.recipeData]);
 
   
@@ -106,6 +111,15 @@ export default function IngredientsScreen() {
     }
   };
   
+  // --- Add function to toggle checked state --- 
+  const toggleCheckIngredient = (index: number) => {
+    setCheckedIngredients(prev => ({
+      ...prev,
+      [index]: !prev[index] // Toggle the boolean value for the given index
+    }));
+  };
+  // --- End toggle function --- 
+
   // --- Log before rendering --- 
   console.log("State before render - isLoading:", isLoading);
   console.log("State before render - error:", error);
@@ -132,23 +146,48 @@ export default function IngredientsScreen() {
               console.log(`Rendering ingredient ${index}:`, JSON.stringify(ingredient));
               // --- End logging ---
               
+              const isChecked = !!checkedIngredients[index]; // Get checked status
+
               // Check if ingredient is an object (structured) or string (fallback)
               if (typeof ingredient === 'object' && ingredient !== null) {
+                // Check if BOTH amount and unit are effectively missing
+                const hasQuantity = !!ingredient.amount || !!ingredient.unit;
+
                 return (
-                  <View key={`ing-${index}`} style={styles.ingredientItemStructured}>
-                     {/* Display amount and unit if they exist - Explicitly cast to String */}
-                     <Text style={styles.ingredientAmountUnit}>
-                       {String(ingredient.amount ? `${ingredient.amount} ` : '')}
-                       {String(ingredient.unit ? `${ingredient.unit} ` : '')}
-                     </Text>
-                     {/* Display name - Explicitly cast to String */}
-                     <Text style={styles.ingredientName}>
-                       {String(ingredient.name)}
-                     </Text>
-                  </View>
+                  <TouchableOpacity 
+                    key={`ing-${index}`} 
+                    style={styles.ingredientItemContainer} 
+                    onPress={() => toggleCheckIngredient(index)}
+                    activeOpacity={0.7} 
+                  >
+                    {/* Checkbox Visual */}
+                    <View style={[styles.checkboxBase, isChecked && styles.checkboxChecked]}>
+                      {isChecked && <View style={styles.checkboxInnerCheck} />}
+                    </View>
+                    {/* Ingredient Text Container */}
+                    <View style={styles.ingredientTextContainer}>
+                      {hasQuantity ? (
+                        <> 
+                          {/* Display amount and unit ONLY if they exist */} 
+                          <Text style={[styles.ingredientAmountUnit, isChecked && styles.ingredientTextChecked]}>
+                            {String(ingredient.amount ? `${ingredient.amount} ` : '')}
+                            {String(ingredient.unit ? `${ingredient.unit} ` : '')}
+                          </Text>
+                          <Text style={[styles.ingredientName, isChecked && styles.ingredientTextChecked]}>
+                            {String(ingredient.name)}
+                          </Text>
+                        </>
+                      ) : (
+                        // Render name taking full width if no quantity
+                        <Text style={[styles.ingredientNameFullWidth, isChecked && styles.ingredientTextChecked]}>
+                          {String(ingredient.name)}
+                        </Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
                 );
               } else if (typeof ingredient === 'string') {
-                 // Fallback display for simple strings
+                 // Fallback display for simple strings (no checkbox for simplicity)
                  return (
                     <View key={`ing-${index}`} style={styles.ingredientItemSimple}>
                         <Text style={styles.ingredientTextSimple}>{`\u2022 ${ingredient}`}</Text>
@@ -270,6 +309,41 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: 20, 
   },
+  ingredientItemContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15, 
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  checkboxBase: {
+    width: 24,
+    height: 24,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    marginRight: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  checkboxInnerCheck: {
+      width: 12,
+      height: 12,
+      backgroundColor: COLORS.white,
+  },
+  ingredientTextContainer: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+  },
+  ingredientTextChecked: {
+      color: COLORS.darkGray,
+      textDecorationLine: 'line-through',
+  },
   ingredientItemStructured: {
     flexDirection: 'row',
     marginBottom: 12,
@@ -285,6 +359,13 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   ingredientName: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 16,
+    color: COLORS.textDark,
+    lineHeight: 24,
+    flex: 1,
+  },
+  ingredientNameFullWidth: {
     fontFamily: 'Poppins-Regular',
     fontSize: 16,
     color: COLORS.textDark,

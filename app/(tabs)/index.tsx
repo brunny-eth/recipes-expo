@@ -116,7 +116,7 @@ export default function HomeScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { justifyContent: 'center' }]}>
         <Animated.View 
           entering={FadeIn.duration(500)}
           style={styles.logoContainer}
@@ -152,7 +152,7 @@ export default function HomeScreen() {
             entering={FadeInDown.delay(300).duration(500)}
             style={styles.contentContainer}
           >
-            <View style={{ height: 32 }} />
+            <View style={{ height: 16 }} />
             <Text style={styles.title}>Transform recipes</Text>
             <View style={styles.featuresContainer}>
               <Text style={styles.featureText}>No ads</Text>
@@ -189,7 +189,6 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    flexGrow: 1,
     backgroundColor: COLORS.background,
     paddingTop: 60,
     paddingHorizontal: 20,
@@ -205,7 +204,7 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: 'center',
     marginTop: 68,
-    marginBottom: 40,
+    marginBottom: 30,
   },
   contentContainer: {
     alignItems: 'center',
@@ -215,11 +214,11 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-Bold',
     fontSize: 28,
     color: COLORS.textDark,
-    marginBottom: 24,
+    marginBottom: 16,
   },
   featuresContainer: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 30,
   },
   featureText: {
     fontFamily: 'Poppins-Medium',
@@ -231,7 +230,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
-    marginTop: 28,
+    marginTop: 8,
   },
   input: {
     flex: 1,
