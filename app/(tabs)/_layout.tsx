@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import { StyleSheet, Platform } from 'react-native';
-import { PhoneIncoming as HomeIcon, Bookmark as BookmarkIcon, Settings } from 'lucide-react-native';
+import { Bookmark as BookmarkIcon } from 'lucide-react-native';
 import { COLORS } from '@/constants/theme';
 import ChefIcon from '@/assets/images/Chef.svg';
 
@@ -27,13 +27,6 @@ export default function TabLayout() {
         options={{
           title: 'Saved',
           tabBarIcon: ({ color, size }) => <BookmarkIcon size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: 'Settings',
-          tabBarIcon: ({ color, size }) => <Settings size={size} color={color} />,
         }}
       />
     </Tabs>

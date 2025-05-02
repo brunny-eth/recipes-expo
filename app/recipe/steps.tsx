@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, SafeAreaView, Platform } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, SafeAreaView, Platform, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, CircleCheck as CheckCircle2 } from 'lucide-react-native';
+import { ArrowLeft, CircleCheck as CheckCircle2, Hammer as ToolsIcon } from 'lucide-react-native';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 import { COLORS } from '@/constants/theme';
+import ToolsSidePanel from '@/components/ToolsSidePanel';
+import MiniTimerDisplay from '@/components/MiniTimerDisplay';
 
 export default function StepsScreen() {
   const params = useLocalSearchParams<{ instructionsData?: string, substitutionsText?: string }>();
@@ -14,6 +16,13 @@ export default function StepsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [completedSteps, setCompletedSteps] = useState<{[key: number]: boolean}>({});
+  const [isToolsPanelVisible, setIsToolsPanelVisible] = useState(false);
+  
+  // --- Lifted Timer State --- 
+  const [timerTimeRemaining, setTimerTimeRemaining] = useState(0); // Time in seconds
+  const [isTimerActive, setIsTimerActive] = useState(false);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // --- End Lifted Timer State ---
   
   useEffect(() => {
     try {
@@ -38,6 +47,58 @@ export default function StepsScreen() {
     }
     setIsLoading(false);
   }, [params.instructionsData, params.substitutionsText]);
+
+  // --- Lifted Timer Logic --- 
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
+
+  const addTime = (secondsToAdd: number) => {
+    if (!isTimerActive) {
+        setTimerTimeRemaining(prev => Math.max(0, prev + secondsToAdd));
+    }
+  };
+
+  useEffect(() => {
+    if (isTimerActive && timerTimeRemaining > 0) {
+      timerIntervalRef.current = setInterval(() => {
+        setTimerTimeRemaining(prev => prev - 1);
+      }, 1000);
+    } else if (timerTimeRemaining === 0 && isTimerActive) {
+      setIsTimerActive(false);
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+      // Optional: Add sound/vibration feedback here
+      Alert.alert("Timer Finished!"); 
+    }
+
+    // Cleanup interval
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, [isTimerActive, timerTimeRemaining]);
+
+  const handleTimerStartPause = () => {
+    if (timerTimeRemaining > 0) {
+      setIsTimerActive(prev => !prev);
+      // Clear interval when pausing explicitly
+      if (isTimerActive && timerIntervalRef.current) {
+           clearInterval(timerIntervalRef.current);
+      }
+    }
+  };
+
+  const handleTimerReset = () => {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+    }
+    setIsTimerActive(false);
+    setTimerTimeRemaining(0);
+  };
+  // --- End Lifted Timer Logic ---
 
   if (isLoading) {
     return (
@@ -65,6 +126,16 @@ export default function StepsScreen() {
     }));
   };
 
+  const openToolsPanel = () => {
+      console.log("Opening tools panel");
+      setIsToolsPanelVisible(true);
+  };
+
+  // Function to close panel (passed down)
+  const closeToolsPanel = () => {
+      setIsToolsPanelVisible(false);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <Animated.View entering={FadeIn.duration(300)} style={styles.header}>
@@ -75,7 +146,9 @@ export default function StepsScreen() {
           <ArrowLeft size={24} color={COLORS.raisinBlack} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Instructions</Text>
-        <View style={styles.placeholder} />
+        <TouchableOpacity style={styles.toolsButton} onPress={openToolsPanel}>
+            <ToolsIcon size={24} color={COLORS.raisinBlack} />
+        </TouchableOpacity>
       </Animated.View>
       
       <ScrollView 
@@ -162,6 +235,24 @@ export default function StepsScreen() {
           </View>
         </Animated.View>
       )}
+      
+      <ToolsSidePanel 
+          isVisible={isToolsPanelVisible} 
+          onClose={closeToolsPanel} 
+          timeRemaining={timerTimeRemaining}
+          isActive={isTimerActive}
+          formatTime={formatTime}
+          addTime={addTime}
+          handleStartPause={handleTimerStartPause}
+          handleReset={handleTimerReset}
+      />
+
+      {!isToolsPanelVisible && isTimerActive && timerTimeRemaining > 0 && (
+          <MiniTimerDisplay 
+              timeRemaining={timerTimeRemaining} 
+              formatTime={formatTime} 
+          />
+      )}
     </SafeAreaView>
   );
 }
@@ -193,7 +284,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
   },
   placeholder: {
-    width: 24 + 16,
+    // width: 24 + 16, // Can be removed if tools button is sized correctly
   },
   stepsContainer: {
     paddingHorizontal: 20,
@@ -354,5 +445,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.textDark,
     lineHeight: 20,
+  },
+  toolsButton: {
+    padding: 8,
+    position: 'absolute',
+    right: 16,
+    top: Platform.OS === 'ios' ? 0 : 10,
   },
 });
