@@ -6,14 +6,26 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { COLORS } from '@/constants/theme';
 import IngredientSubstitutionModal from './IngredientSubstitutionModal';
 
-// --- Define Structured Ingredient Type (matching backend output) ---
+// --- Types ---
+// Match local type or import if shared
 type StructuredIngredient = {
   name: string;
   amount: string | null;
   unit: string | null;
   suggested_substitutions?: Array<{ name: string; description?: string | null }> | null;
 };
-// --- End Define Structured Ingredient Type ---
+
+// Type for data received via navigation params
+type IngredientsNavParams = {
+    title: string | null;
+    originalIngredients: StructuredIngredient[] | string[] | null; 
+    scaledIngredients: StructuredIngredient[] | null; // This is what we display primarily
+    instructions: string[] | null;
+    substitutions_text: string | null;
+    originalYield: string | null;
+    selectedServings: number;
+};
+// --- End Types ---
 
 // --- Helper function for unit abbreviation ---
 const abbreviateUnit = (unit: string | null): string | null => {
@@ -60,22 +72,11 @@ const abbreviateUnit = (unit: string | null): string | null => {
 };
 // --- End Helper function ---
 
-// --- Type for data received from OpenAI ---
-type ParsedRecipe = {
-  title: string | null;
-  ingredients: StructuredIngredient[] | null;
-  instructions: string[] | null;
-  substitutions_text: string | null; 
-};
-// --- End Type Definition ---
-
 // --- Comment out old types/data ---
 /*
 type Recipe = { ... };
 interface Ingredient { ... };
 const SAMPLE_RECIPES: Record<string, Recipe> = { ... };
-const adjustIngredientAmount = (...) => { ... };
-const approximateFraction = (...) => { ... };
 */
 // --- End Comment Out ---
 
@@ -83,81 +84,66 @@ export default function IngredientsScreen() {
   const params = useLocalSearchParams<{ recipeData?: string }>();
   const router = useRouter();
   
-  const [parsedRecipe, setParsedRecipe] = useState<ParsedRecipe | null>(null);
+  // State for the data received via navigation
+  const [navData, setNavData] = useState<IngredientsNavParams | null>(null);
+  // State specifically for the ingredients being displayed (initially the scaled ones)
+  const [displayIngredients, setDisplayIngredients] = useState<StructuredIngredient[] | null>(null);
+  // State to hold the original, unscaled ingredients for scaling instructions
+  const [originalIngredientsList, setOriginalIngredientsList] = useState<StructuredIngredient[] | string[] | null>(null);
+  // State for servings
+  const [originalServings, setOriginalServings] = useState<number | null>(null);
+  const [selectedServings, setSelectedServings] = useState<number | null>(null);
+  
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [checkedIngredients, setCheckedIngredients] = useState<{ [key: number]: boolean }>({});
   const [substitutionModalVisible, setSubstitutionModalVisible] = useState(false);
   const [selectedIngredient, setSelectedIngredient] = useState<StructuredIngredient | null>(null);
   const [appliedSubstitution, setAppliedSubstitution] = useState<{ originalIndex: number; originalName: string; substitution: { name: string } } | null>(null);
-  const [isRewriting, setIsRewriting] = useState(false);
+  const [isRewriting, setIsRewriting] = useState(false); // For substitution rewrite
+  const [isScalingInstructions, setIsScalingInstructions] = useState(false); // For scaling instructions
 
   useEffect(() => {
+    setIsLoading(true); 
     if (params.recipeData) {
       try {
-        console.log("Raw recipeData param:", params.recipeData);
-        // Parse the raw data
-        const rawRecipe = JSON.parse(params.recipeData) as ParsedRecipe;
-        
-        let processedIngredients: StructuredIngredient[] | null = null;
+        console.log("[IngredientsScreen] Raw recipeData param:", params.recipeData);
+        const parsedNavData = JSON.parse(params.recipeData) as IngredientsNavParams;
+        // --- Log #1: Check parsed data --- 
+        console.log("[IngredientsScreen] Parsed Nav Data:", JSON.stringify(parsedNavData, null, 2)); 
+        setNavData(parsedNavData);
 
-        // Process the ingredients based on their type
-        if (rawRecipe.ingredients) {
-            if (Array.isArray(rawRecipe.ingredients)) {
-                // Now we know it's an array, check the type of its elements
-                if (rawRecipe.ingredients.length === 0) {
-                    // Handle empty array explicitly
-                    processedIngredients = [];
-                } else if (typeof rawRecipe.ingredients[0] === 'string') {
-                    // TypeScript should now infer rawRecipe.ingredients is string[] here
-                    console.warn("Received ingredient strings instead of objects. Mapping to structured.");
-                    processedIngredients = rawRecipe.ingredients.map(ingredientNameString => ({ // Renamed parameter from str
-                        name: ingredientNameString, // Use renamed parameter
-                        amount: null,
-                        unit: null,
-                        suggested_substitutions: null
-                    }));
-                } else if (rawRecipe.ingredients.every(item => typeof item === 'object' && item !== null && 'name' in item)) {
-                    // Type guard confirms elements are objects with at least a 'name' property
-                    // TypeScript *should* infer rawRecipe.ingredients is StructuredIngredient[] here
-                    processedIngredients = rawRecipe.ingredients; // Removed explicit cast
-                } else {
-                    // Mixed array or other invalid format
-                    console.warn("Received ingredients data is not a valid array of strings or structured objects. Falling back to empty.");
-                    processedIngredients = []; // Fallback to empty array
-                }
-            } else {
-                // It's not an array
-                console.warn("Received ingredients data is not an array, falling back to empty.");
-                processedIngredients = []; // Fallback to empty array
-            }
-        } else {
-             // Ingredients property was null
-             processedIngredients = null;
-        }
-        
-        // Create the final recipe object for state with processed ingredients
-        const finalRecipe: ParsedRecipe = {
-            ...rawRecipe,
-            ingredients: processedIngredients // Assign the correctly typed array/null
-        };
+        // --- Process and set state from navData --- 
+        const ingredientsForDisplay = parsedNavData.scaledIngredients || []; 
+        // --- Log #2: Check data before setting state --- 
+        console.log("[IngredientsScreen] Ingredients for display (before setState):", JSON.stringify(ingredientsForDisplay, null, 2));
+        setDisplayIngredients(ingredientsForDisplay); 
 
-        console.log("Processed recipe object in useEffect:", JSON.stringify(finalRecipe, null, 2));
-        setParsedRecipe(finalRecipe);
-        setAppliedSubstitution(null); // Reset substitutions when recipe data changes
+        // Store original ingredients separately
+        setOriginalIngredientsList(parsedNavData.originalIngredients); 
+
+        // Store servings
+        const originalServingsNum = parseInt(parsedNavData.originalYield || '1', 10);
+        setOriginalServings(!isNaN(originalServingsNum) && originalServingsNum > 0 ? originalServingsNum : 1);
+        setSelectedServings(parsedNavData.selectedServings); 
+
+        // Reset other states
+        setAppliedSubstitution(null); 
+        setCheckedIngredients({}); 
+        setError(null);
       } catch (e) {
         console.error("Failed to parse recipe data:", e);
         setError("Could not load recipe data.");
+        setNavData(null); // Clear data on error
+        setDisplayIngredients(null);
+        setOriginalIngredientsList(null);
       }
     } else {
       setError("Recipe data not provided.");
     }
-    setIsLoading(false);
-    // Reset checked state when data changes
-    setCheckedIngredients({}); 
+    setIsLoading(false); 
   }, [params.recipeData]);
 
-  
   if (isLoading) {
     return (
       <SafeAreaView style={styles.centeredStatusContainer}>
@@ -166,7 +152,7 @@ export default function IngredientsScreen() {
     );
   }
 
-  if (error || !parsedRecipe) {
+  if (error || !navData) {
     return (
       <SafeAreaView style={styles.centeredStatusContainer}>
         <Text style={styles.errorText}>{error || 'Recipe data is unavailable.'}</Text>
@@ -178,68 +164,79 @@ export default function IngredientsScreen() {
   }
   
   const navigateToNextScreen = async () => {
-    if (!parsedRecipe) {
-      console.error("Cannot navigate, parsed recipe data is missing.");
+    if (!navData || !displayIngredients) { // Check navData and displayIngredients
+      console.error("Cannot navigate, essential data is missing.");
       return;
     }
 
-    let finalInstructions = parsedRecipe.instructions || [];
-    let finalSubstitutionsText = parsedRecipe.substitutions_text || '';
+    let finalInstructions = navData.instructions || [];
+    let finalSubstitutionsText = navData.substitutions_text || '';
+    const needsScaling = originalServings !== null && selectedServings !== null && originalServings !== selectedServings;
 
+    // --- 1. Handle Substitution Rewriting (if applicable) --- 
     if (appliedSubstitution) {
-      console.log("Applied substitution detected. Attempting to rewrite instructions...");
+      console.log("Applied substitution detected. Rewriting instructions...");
       setIsRewriting(true);
       try {
-        // Get the backend URL (replace with your actual deployed or local URL)
-        // IMPORTANT: Replace this with your actual Vercel deployment URL or keep localhost for dev
-        const backendUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000'; // Use env var or fallback
-        
+        const backendUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
         const response = await fetch(`${backendUrl}/api/recipes/rewrite-instructions`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            originalInstructions: parsedRecipe.instructions || [],
+            originalInstructions: navData.instructions || [], // Use initial instructions from navData
             originalIngredientName: appliedSubstitution.originalName,
             substitutedIngredientName: appliedSubstitution.substitution.name,
           }),
         });
-
         const result = await response.json();
-
-        if (!response.ok) {
-          throw new Error(result.error || `Failed to rewrite instructions (Status: ${response.status})`);
-        }
-
-        if (result.rewrittenInstructions && Array.isArray(result.rewrittenInstructions)) {
-          console.log("Successfully received rewritten instructions.");
-          finalInstructions = result.rewrittenInstructions;
-          // Optionally update substitutions text if needed, or clear it?
-          // finalSubstitutionsText = "Instructions modified based on substitution."; 
-        } else {
-          throw new Error("Invalid format received for rewritten instructions.");
-        }
-
+        if (!response.ok) throw new Error(result.error || `Rewrite failed (Status: ${response.status})`);
+        if (result.rewrittenInstructions) finalInstructions = result.rewrittenInstructions;
+        else throw new Error("Invalid format for rewritten instructions.");
       } catch (rewriteError) {
         console.error("Error rewriting instructions:", rewriteError);
-        Alert.alert(
-            "Rewrite Failed", 
-            `Could not automatically adjust instructions for the substitution: ${(rewriteError as Error).message}. Proceeding with original instructions.`
-        );
-        // Proceed with original instructions on failure
-        finalInstructions = parsedRecipe.instructions || []; 
+        Alert.alert("Rewrite Failed", `Could not adjust instructions for substitution. Proceeding with previous version.`);
+        // Keep instructions as they were before the failed rewrite attempt
       } finally {
         setIsRewriting(false);
       }
     }
 
-    // Navigate with either original or rewritten instructions
+    // --- 2. Handle Instruction Scaling (if applicable) --- 
+    if (needsScaling && originalIngredientsList) {
+        console.log(`Servings changed (${originalServings} -> ${selectedServings}). Scaling instructions...`);
+        setIsScalingInstructions(true);
+        try {
+            const backendUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+            const response = await fetch(`${backendUrl}/api/recipes/scale-instructions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    instructionsToScale: finalInstructions, // Use potentially rewritten instructions
+                    originalIngredients: originalIngredientsList, // Pass the stored original list
+                    scaledIngredients: displayIngredients, // Pass the current (scaled) list
+                }),
+            });
+            const result = await response.json();
+             if (!response.ok) throw new Error(result.error || `Scaling failed (Status: ${response.status})`);
+             if (result.scaledInstructions) {
+                 finalInstructions = result.scaledInstructions; // Update with scaled instructions
+                 console.log("Successfully scaled instructions.");
+             } else throw new Error("Invalid format for scaled instructions.");
+        } catch (scalingError) {
+            console.error("Error scaling instructions:", scalingError);
+            Alert.alert("Instruction Scaling Failed", `Could not automatically scale instruction quantities. Proceeding with unscaled quantities in text.`);
+             // Proceed with the instructions we have (potentially rewritten but not scaled)
+        } finally {
+            setIsScalingInstructions(false);
+        }
+    }
+
+    // --- 3. Navigate to Steps Screen --- 
     router.push({
       pathname: '/recipe/steps',
       params: { 
-        instructionsData: JSON.stringify(finalInstructions),
-        substitutionsText: finalSubstitutionsText, // Pass original or potentially modified text
+        instructionsData: JSON.stringify(finalInstructions), // Pass final (rewritten and/or scaled) instructions
+        substitutionsText: finalSubstitutionsText, 
       }
     });
   };
@@ -258,58 +255,43 @@ export default function IngredientsScreen() {
   };
 
   const handleApplySubstitution = (substitution: { name: string }) => {
-      if (!selectedIngredient || !parsedRecipe?.ingredients) return;
-
-      // Find the index of the selected ingredient in the current recipe state
-      const index = parsedRecipe.ingredients.findIndex(ing => ing.name === selectedIngredient.name);
-      if (index === -1) {
-          console.error("Could not find selected ingredient index.");
-          setSubstitutionModalVisible(false);
-          setSelectedIngredient(null);
-          return;
-      }
+      // --- Update UI to use displayIngredients state --- 
+      if (!selectedIngredient || !displayIngredients) return;
+      const index = displayIngredients.findIndex(ing => ing.name === selectedIngredient.name);
+      if (index === -1) { /* ... error handling ... */ return; }
       
       console.log(`Applying substitution: ${substitution.name} for ${selectedIngredient.name} at index ${index}`);
       
-      // --- Track the substitution ---
-      // For now, only allow one substitution. Clear previous if applying a new one.
+      // Store original name before modifying display name
+      const originalNameForSub = displayIngredients[index].name.includes('(substituted for') 
+          ? displayIngredients[index].name.substring(displayIngredients[index].name.indexOf('(substituted for') + 17, displayIngredients[index].name.length - 1)
+          : displayIngredients[index].name;
+
       setAppliedSubstitution({ 
           originalIndex: index, 
-          originalName: selectedIngredient.name, // Store original name
+          originalName: originalNameForSub, // Use the actual original name
           substitution: { name: substitution.name }
       });
-      // --- End Track Substitution ---
 
-      // --- Update UI (Optional - modify ingredient name in list) ---
-      // This provides immediate visual feedback
-      setParsedRecipe(prevRecipe => {
-         if (!prevRecipe || !prevRecipe.ingredients) return prevRecipe;
-         const newIngredients = [...prevRecipe.ingredients];
-         // Restore original name if a previous substitution existed for this index
-         // (This part might need refinement if multiple substitutions are allowed later)
-         // For now, let's just update the current one
+      setDisplayIngredients(prevIngredients => {
+         if (!prevIngredients) return prevIngredients;
+         const newIngredients = [...prevIngredients];
          newIngredients[index] = {
              ...newIngredients[index],
-             name: `${substitution.name} (substituted for ${selectedIngredient.name})` // Modify name for display
+             // Make sure name modification references the correct original name
+             name: `${substitution.name} (substituted for ${originalNameForSub})` 
          };
-         return { ...prevRecipe, ingredients: newIngredients };
+         return newIngredients;
       });
-      // --- End Update UI ---
+      // --- End Update UI --- 
 
       setSubstitutionModalVisible(false);
       setSelectedIngredient(null);
   };
 
-  // --- Log before rendering --- 
-  console.log("State before render - isLoading:", isLoading);
-  console.log("State before render - error:", error);
-  console.log("State before render - parsedRecipe ingredients:", JSON.stringify(parsedRecipe?.ingredients, null, 2));
-  // --- End log before rendering ---
-  
-  // --- Log modal state before return ---
-  console.log("Modal state before return - selectedIngredient:", selectedIngredient?.name);
-  console.log("Modal state before return - substitutionModalVisible:", substitutionModalVisible);
-  // --- End log modal state ---
+  // --- RENDER LOGIC --- 
+  // --- Log #3: Check state right before render --- 
+  console.log("[IngredientsScreen] displayIngredients state before render:", JSON.stringify(displayIngredients, null, 2));
 
   return (
     <SafeAreaView style={styles.container}>
@@ -320,49 +302,45 @@ export default function IngredientsScreen() {
         >
           <ArrowLeft size={24} color={COLORS.raisinBlack} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{parsedRecipe.title || 'Ingredients'}</Text>
+        <Text style={styles.headerTitle} numberOfLines={1}>{navData?.title || 'Ingredients'}</Text>
         <View style={styles.placeholder} />
       </Animated.View>
       
       <ScrollView style={styles.ingredientsList} showsVerticalScrollIndicator={false}>
-        {parsedRecipe.ingredients && parsedRecipe.ingredients.length > 0 ? (
-            parsedRecipe.ingredients.map((ingredient, index) => {
-              // --- Add logging inside the map --- 
-              console.log(`Rendering ingredient ${index}:`, JSON.stringify(ingredient));
-              // --- End logging ---
-              
-              const isChecked = !!checkedIngredients[index]; // Get checked status
+        {displayIngredients && displayIngredients.length > 0 ? (
+            displayIngredients.map((ingredient, index) => {
+              // Checkbox logic using checkedIngredients[index]
+              const isChecked = !!checkedIngredients[index];
+              // Substitution styling
               const isSubstituted = appliedSubstitution?.originalIndex === index;
+              // Check if quantity exists
+              const hasQuantity = !!ingredient.amount || !!ingredient.unit;
 
-              // Check if ingredient is an object (structured) or string (fallback)
-              if (typeof ingredient === 'object' && ingredient !== null) {
-                // Check if BOTH amount and unit are effectively missing
-                const hasQuantity = !!ingredient.amount || !!ingredient.unit;
-
-                return (
-                  <TouchableOpacity 
-                    key={`ing-${index}`} 
-                    style={[styles.ingredientItemContainer, isSubstituted && styles.ingredientItemSubstituted]}
-                    onPress={() => toggleCheckIngredient(index)}
-                    activeOpacity={0.7} 
-                  >
-                    {/* Checkbox Visual */}
-                    <View style={[styles.checkboxBase, isChecked && styles.checkboxChecked]}>
-                      {isChecked && <View style={styles.checkboxInnerCheck} />}
-                    </View>
-                    {/* Ingredient Text Container */}
-                    <View style={styles.ingredientTextContainer}>
-                      {hasQuantity ? (
-                        <> 
-                          {/* Display amount and unit ONLY if they exist */} 
-                          <Text style={[styles.ingredientAmountUnit, isChecked && styles.ingredientTextChecked]}>
-                            {String(ingredient.amount ? `${ingredient.amount} ` : '')}
-                            {String(ingredient.unit ? `${abbreviateUnit(ingredient.unit)} ` : '')}
+              return (
+                <TouchableOpacity 
+                  key={`ing-${index}`} 
+                  style={[styles.ingredientItemContainer, isSubstituted && styles.ingredientItemSubstituted]}
+                  onPress={() => toggleCheckIngredient(index)}
+                  activeOpacity={0.7} 
+                >
+                  {/* Checkbox Visual */}
+                  <View style={[styles.checkboxBase, isChecked && styles.checkboxChecked]}>
+                    {isChecked && <View style={styles.checkboxInnerCheck} />}
+                  </View>
+                  {/* Ingredient Text Container */}
+                  <View style={styles.ingredientTextContainer}>
+                    {hasQuantity ? (
+                      <>
+                        <Text style={[styles.ingredientAmountUnit, isChecked && styles.ingredientTextChecked]}>
+                          {String(ingredient.amount ? `${ingredient.amount} ` : '')}
+                          {String(ingredient.unit ? `${abbreviateUnit(ingredient.unit)} ` : '')}
+                        </Text>
+                        <View style={styles.ingredientNameContainer}>
+                          <Text style={[styles.ingredientName, isChecked && styles.ingredientTextChecked, isSubstituted && styles.ingredientNameSubstituted]}>
+                            {String(ingredient.name)}
                           </Text>
-                          <View style={styles.ingredientNameContainer}>
-                            <Text style={[styles.ingredientName, isChecked && styles.ingredientTextChecked, isSubstituted && styles.ingredientNameSubstituted]}>
-                              {String(ingredient.name)}
-                            </Text>
+                          {/* Substitution Button */} 
+                          {ingredient.suggested_substitutions && ingredient.suggested_substitutions.length > 0 && (
                             <TouchableOpacity 
                               style={styles.infoButton}
                               onPress={() => openSubstitutionModal(ingredient)}
@@ -370,14 +348,16 @@ export default function IngredientsScreen() {
                             >
                               <Text style={styles.infoButtonText}>S</Text>
                             </TouchableOpacity>
-                          </View>
-                        </>
-                      ) : (
-                        // Render name taking full width if no quantity
-                        <View style={styles.ingredientNameContainer}>
-                          <Text style={[styles.ingredientNameFullWidth, isChecked && styles.ingredientTextChecked, isSubstituted && styles.ingredientNameSubstituted]}>
-                            {String(ingredient.name)}
-                          </Text>
+                          )}
+                        </View>
+                      </>
+                    ) : (
+                      <View style={styles.ingredientNameContainer}>
+                        <Text style={[styles.ingredientNameFullWidth, isChecked && styles.ingredientTextChecked, isSubstituted && styles.ingredientNameSubstituted]}>
+                          {String(ingredient.name)}
+                        </Text>
+                         {/* Substitution Button */} 
+                         {ingredient.suggested_substitutions && ingredient.suggested_substitutions.length > 0 && (
                           <TouchableOpacity 
                             style={styles.infoButton}
                             onPress={() => openSubstitutionModal(ingredient)}
@@ -385,20 +365,12 @@ export default function IngredientsScreen() {
                           >
                             <Text style={styles.infoButtonText}>S</Text>
                           </TouchableOpacity>
-                        </View>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                );
-              } else if (typeof ingredient === 'string') {
-                 // Fallback display for simple strings (no checkbox for simplicity)
-                 return (
-                    <View key={`ing-${index}`} style={styles.ingredientItemSimple}>
-                        <Text style={styles.ingredientTextSimple}>{`\u2022 ${ingredient}`}</Text>
-                    </View>
-                 );
-              }
-              return null; // Should not happen if validation is good
+                         )}
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
             })
           ) : (
             <Text style={styles.placeholderText}>No ingredients found.</Text>
@@ -407,17 +379,17 @@ export default function IngredientsScreen() {
 
       <View style={styles.footer}>
         <TouchableOpacity 
-          style={[styles.nextButton, isRewriting && styles.nextButtonDisabled]}
+          style={[styles.nextButton, (isRewriting || isScalingInstructions) && styles.nextButtonDisabled]}
           onPress={navigateToNextScreen}
-          disabled={isRewriting}
+          disabled={isRewriting || isScalingInstructions} // Disable if either process is running
         >
-          {isRewriting ? (
+          {(isRewriting || isScalingInstructions) && (
              <ActivityIndicator size="small" color={COLORS.white} style={{ marginRight: 8 }}/>
-          ) : null}
+          )}
           <Text style={styles.nextButtonText}>
-              {isRewriting ? 'Adjusting Steps...' : 'Go to Steps'}
+              {isRewriting ? 'Adjusting Steps...' : isScalingInstructions ? 'Scaling Steps...' : 'Go to Steps'}
           </Text>
-          {!isRewriting && <ChevronRight size={20} color={COLORS.white} />}
+          {!(isRewriting || isScalingInstructions) && <ChevronRight size={20} color={COLORS.white} />}
         </TouchableOpacity>
       </View>
 
@@ -428,7 +400,7 @@ export default function IngredientsScreen() {
             setSubstitutionModalVisible(false);
             setSelectedIngredient(null);
           }}
-          ingredientName={selectedIngredient.name}
+          ingredientName={selectedIngredient.name} // Use name from selectedIngredient state
           substitutions={selectedIngredient.suggested_substitutions || null}
           onApply={handleApplySubstitution}
         />
@@ -494,7 +466,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   nextButtonDisabled: {
-      backgroundColor: COLORS.textGray,
+      backgroundColor: COLORS.darkGray, // Or another disabled color
   },
   nextButtonText: {
     fontFamily: 'Poppins-Medium',

@@ -86,12 +86,10 @@ export default function HomeScreen() {
 
         if (result.recipe) {
           console.log('Recipe data found in response.');
-          console.log("Attempting navigation to /recipe/ingredients..."); 
+          console.log("Attempting navigation to /recipe/summary..."); 
           router.push({
-            pathname: '/recipe/ingredients', 
-            params: { 
-              recipeData: JSON.stringify(result.recipe) 
-            }
+            pathname: '/recipe/summary',
+            params: { recipeData: JSON.stringify(result.recipe) }
           });
           console.log("Navigation call finished."); 
         } else {

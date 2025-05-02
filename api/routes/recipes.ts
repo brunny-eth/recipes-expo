@@ -18,6 +18,12 @@ type InitialParsedRecipe = {
   ingredients: string[] | null; // Expect strings first
   instructions: string[] | null;
   substitutions_text: string | null;
+  // Added optional fields
+  recipeYield?: string | null;
+  prepTime?: string | null;
+  cookTime?: string | null;
+  totalTime?: string | null;
+  nutrition?: { calories?: string | null; protein?: string | null; [key: string]: any } | null; // Simple nutrition object
 };
 // --- ---
 
@@ -27,6 +33,12 @@ type FinalRecipeOutput = {
   ingredients: StructuredIngredient[] | string[] | null; // Can be structured or fallback to strings
   instructions: string[] | null;
   substitutions_text: string | null;
+  // Added optional fields
+  recipeYield?: string | null;
+  prepTime?: string | null;
+  cookTime?: string | null;
+  totalTime?: string | null;
+  nutrition?: { calories?: string | null; protein?: string | null; [key: string]: any } | null;
 };
 // --- ---
 
@@ -286,11 +298,12 @@ router.post('/parse', async (req: Request, res: Response) => {
     const openai = new OpenAI({ apiKey });
 
     // --- New Prompt using extracted text ---
-    const initialPrompt = `You are provided with pre-extracted text sections for a recipe's title, ingredients, and instructions. Format this into the specified JSON structure: { "title": "string | null", "ingredients": "array of strings | null", "instructions": "array of strings, where each string is a single cooking step without any numbering | null", "substitutions_text": "string | null" }.
+    const initialPrompt = `You are provided with pre-extracted text sections for a recipe's title, ingredients, and instructions. Format this into the specified JSON structure: { "title": "string | null", "ingredients": "array of strings | null", "instructions": "array of strings, where each string is a single cooking step without any numbering | null", "substitutions_text": "string | null", "recipeYield": "string | null", "prepTime": "string | null", "cookTime": "string | null", "totalTime": "string | null", "nutrition": { "calories": "string | null", "protein": "string | null" } | null }.
 If a section was not successfully extracted or is empty, use null for its value.
 For the 'instructions' array: ONLY include actionable cooking or preparation steps. Split the provided instructions text into logical step-by-step actions. Critically, EXCLUDE any sentences that are serving suggestions, personal anecdotes, author tips, or anything not part of the core cooking process. Ensure steps do not have numbering.
 For the 'ingredients' array: Split the provided ingredients text into an array of individual ingredient strings.
 Attempt to find any explicit substitution notes mentioned within the INSTRUCTIONS text provided and place them in 'substitutions_text', otherwise use null.
+Extract recipe yield (servings), prep time, cook time, total time, and basic nutrition info (calories, protein) if available in the text, otherwise use null.
 Only use the provided text sections. Ensure the output is strictly valid JSON.
 
 Title:
@@ -377,7 +390,13 @@ ${extractedContent.instructionsText}
       title: initialParsedResult.title,
       ingredients: initialParsedResult.ingredients, // Start with string array or null
       instructions: initialParsedResult.instructions,
-      substitutions_text: initialParsedResult.substitutions_text, // From Pass 1
+      substitutions_text: initialParsedResult.substitutions_text,
+      // Initialize new fields
+      recipeYield: initialParsedResult.recipeYield || null,
+      prepTime: initialParsedResult.prepTime || null,
+      cookTime: initialParsedResult.cookTime || null,
+      totalTime: initialParsedResult.totalTime || null,
+      nutrition: initialParsedResult.nutrition || null,
     };
 
     if (initialParsedResult.ingredients && initialParsedResult.ingredients.length > 0) {
@@ -602,6 +621,120 @@ ${JSON.stringify(originalInstructions)}
     res.status(500).json({ error: message });
   }
 });
-// --- End New Endpoint ---
+
+// --- NEW: POST /api/recipes/scale-instructions --- 
+router.post('/scale-instructions', async (req: Request, res: Response) => {
+  try {
+    const { 
+        instructionsToScale, 
+        originalIngredients, 
+        scaledIngredients    
+    } = req.body;
+
+    // Basic Input Validation
+    if (!Array.isArray(instructionsToScale) || !Array.isArray(originalIngredients) || !Array.isArray(scaledIngredients)) {
+      return res.status(400).json({ error: 'Invalid input: instructions, originalIngredients, and scaledIngredients must be arrays.' });
+    }
+    if (instructionsToScale.length === 0) {
+        console.log("No instructions provided to scale.");
+        return res.json({ scaledInstructions: [] }); // Return empty if no instructions
+    }
+     if (originalIngredients.length !== scaledIngredients.length) {
+        console.warn("Original and scaled ingredient lists have different lengths. Scaling might be inaccurate.");
+        // Proceed, but be aware of potential issues
+     }
+
+    console.log(`Received ${instructionsToScale.length} instructions to potentially scale.`);
+
+    // --- Instantiate OpenAI client here --- 
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      console.error('OPENAI_API_KEY is not set for scale-instructions endpoint.');
+      return res.status(500).json({ error: 'Server configuration error: Missing OpenAI API key.' });
+    }
+    const openai = new OpenAI({ apiKey }); // Instantiate the client
+    // --- End Instantiation --- 
+
+    // --- Prepare Prompt for Scaling --- 
+    // We need to present the ingredients clearly to the AI
+    const originalIngredientsDesc = originalIngredients.map(ing => `${ing.amount || ''} ${ing.unit || ''} ${ing.name}`.trim()).join(', ');
+    const scaledIngredientsDesc = scaledIngredients.map(ing => `${ing.amount || ''} ${ing.unit || ''} ${ing.name}`.trim()).join(', ');
+
+    const scalePrompt = `You are an expert recipe editor. You are given recipe instructions that were originally written for ingredients with these quantities: [${originalIngredientsDesc}].
+
+The ingredients have now been scaled to new quantities: [${scaledIngredientsDesc}].
+
+Your task is to rewrite the provided recipe instructions, carefully adjusting any specific ingredient quantities mentioned in the text to match the *new* scaled quantities. Maintain the original meaning, structure, and step count. Be precise with the numbers.
+
+For example, if an original instruction was "Add 2 cups flour" and the scaled ingredients now list "4 cups flour", the instruction should become "Add 4 cups flour". If an instruction mentions "the onion" and the quantity didn't change or wasn't numeric, leave it as is. Only adjust explicit numeric quantities that correspond to scaled ingredients.
+
+Output ONLY a valid JSON object with a single key "scaledInstructions", where the value is an array of strings, each string being a single rewritten step.
+
+Instructions to Scale (Array):
+${JSON.stringify(instructionsToScale)}
+`;
+    // --- End Scaling Prompt --- 
+
+    console.log('Sending instruction scaling request to OpenAI...');
+    let scaledInstructionsResult: string[] | null = null;
+    let scaleError = null;
+
+    try {
+         if (scalePrompt.length > 150000) { // Safety limit
+             throw new Error(`Instruction scaling prompt too large (${scalePrompt.length} chars).`);
+         }
+
+        const completion = await openai.chat.completions.create({
+          model: "gpt-4-turbo", // Or another capable model
+          messages: [
+            { role: "system", content: "You are an assistant that rewrites recipe instructions to reflect scaled ingredient quantities, outputting a JSON object with a 'scaledInstructions' array." },
+            { role: "user", content: scalePrompt }
+          ],
+          temperature: 0.2, // Lower temperature for less creative changes
+          response_format: { type: "json_object" },
+        });
+
+        const responseContent = completion.choices[0]?.message?.content;
+        console.log('OpenAI scaling raw response content:', responseContent);
+
+        if (responseContent) {
+           try {
+             const parsedResult: any = JSON.parse(responseContent);
+             if (parsedResult && Array.isArray(parsedResult.scaledInstructions)) {
+                scaledInstructionsResult = parsedResult.scaledInstructions.map((item: any) => String(item)); // Ensure strings
+                console.log('Successfully parsed scaled instructions from OpenAI response.');
+             } else {
+                throw new Error("Parsed JSON result did not have the expected 'scaledInstructions' array.");
+             }
+           } catch (parseErr) {
+             console.error('Failed to parse scaled instructions JSON from OpenAI response:', parseErr);
+             console.error('Raw content that failed parsing:', responseContent);
+             scaleError = 'Invalid JSON format received from AI instruction scaler.';
+           }
+        } else {
+          scaleError = 'Empty response received from AI instruction scaler.';
+        }
+
+    } catch (err) {
+      console.error('Error calling OpenAI API for instruction scaling or processing result:', err);
+      scaleError = err instanceof Error ? err.message : 'An unknown error occurred calling OpenAI for instruction scaling';
+      // Handle specific errors like rate limits if needed
+    }
+
+    // Send Response
+    if (scaledInstructionsResult) {
+      res.json({ scaledInstructions: scaledInstructionsResult });
+    } else {
+      // If scaling failed, should we return original instructions or an error?
+      // Returning error seems appropriate as the frontend expects scaled instructions.
+      console.error("Instruction scaling failed:", scaleError);
+      res.status(500).json({ error: scaleError || 'Failed to scale instructions.' });
+    }
+
+  } catch (error) {
+    console.error("Error in /scale-instructions route:", error);
+    res.status(500).json({ error: 'Internal server error processing instruction scaling request.' });
+  }
+});
 
 export const recipeRouter = router
