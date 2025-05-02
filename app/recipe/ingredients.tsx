@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, ChevronRight } from 'lucide-react-native';
+import { ArrowLeft, ChevronRight, Info as InfoIcon } from 'lucide-react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { COLORS } from '@/constants/theme';
-// import IngredientSubstitutionModal from './IngredientSubstitutionModal';
+import IngredientSubstitutionModal from './IngredientSubstitutionModal';
 
 // --- Define Structured Ingredient Type (matching backend output) ---
 type StructuredIngredient = {
@@ -85,13 +85,9 @@ export default function IngredientsScreen() {
   const [parsedRecipe, setParsedRecipe] = useState<ParsedRecipe | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // const [checked, setChecked] = useState<{[key: string]: boolean}>({});
-  // const [substitutionModalVisible, setSubstitutionModalVisible] = useState(false);
-  // const [selectedIngredient, setSelectedIngredient] = useState<Ingredient | null>(null);
-  // const [servings, setServings] = useState(4);
-  // --- Add state for checked ingredients --- 
   const [checkedIngredients, setCheckedIngredients] = useState<{ [key: number]: boolean }>({});
-  // --- End state add ---
+  const [substitutionModalVisible, setSubstitutionModalVisible] = useState(false);
+  const [selectedIngredient, setSelectedIngredient] = useState<StructuredIngredient | null>(null);
 
   useEffect(() => {
     if (params.recipeData) {
@@ -156,14 +152,26 @@ export default function IngredientsScreen() {
     }
   };
   
-  // --- Add function to toggle checked state --- 
   const toggleCheckIngredient = (index: number) => {
     setCheckedIngredients(prev => ({
       ...prev,
       [index]: !prev[index] // Toggle the boolean value for the given index
     }));
   };
-  // --- End toggle function --- 
+
+  const openSubstitutionModal = (ingredient: StructuredIngredient) => {
+      console.log("Opening substitution modal for:", JSON.stringify(ingredient)); // Log 1
+      setSelectedIngredient(ingredient);
+      setSubstitutionModalVisible(true);
+  };
+
+  const handleApplySubstitution = (substitution: any) => {
+      // TODO: Implement logic to actually apply the substitution if needed
+      // For now, just close the modal
+      console.log("Applying substitution:", substitution, "for", selectedIngredient?.name);
+      setSubstitutionModalVisible(false);
+      setSelectedIngredient(null);
+  };
 
   // --- Log before rendering --- 
   console.log("State before render - isLoading:", isLoading);
@@ -171,6 +179,11 @@ export default function IngredientsScreen() {
   console.log("State before render - parsedRecipe ingredients:", JSON.stringify(parsedRecipe?.ingredients, null, 2));
   // --- End log before rendering ---
   
+  // --- Log modal state before return ---
+  console.log("Modal state before return - selectedIngredient:", selectedIngredient?.name);
+  console.log("Modal state before return - substitutionModalVisible:", substitutionModalVisible);
+  // --- End log modal state ---
+
   return (
     <SafeAreaView style={styles.container}>
       <Animated.View entering={FadeIn.duration(300)} style={styles.header}>
@@ -218,15 +231,33 @@ export default function IngredientsScreen() {
                             {String(ingredient.amount ? `${ingredient.amount} ` : '')}
                             {String(ingredient.unit ? `${abbreviateUnit(ingredient.unit)} ` : '')}
                           </Text>
-                          <Text style={[styles.ingredientName, isChecked && styles.ingredientTextChecked]}>
-                            {String(ingredient.name)}
-                          </Text>
+                          <View style={styles.ingredientNameContainer}>
+                            <Text style={[styles.ingredientName, isChecked && styles.ingredientTextChecked]}>
+                              {String(ingredient.name)}
+                            </Text>
+                            <TouchableOpacity 
+                              style={styles.infoButton}
+                              onPress={() => openSubstitutionModal(ingredient)}
+                              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            >
+                              <InfoIcon size={18} color={COLORS.primary} />
+                            </TouchableOpacity>
+                          </View>
                         </>
                       ) : (
                         // Render name taking full width if no quantity
-                        <Text style={[styles.ingredientNameFullWidth, isChecked && styles.ingredientTextChecked]}>
-                          {String(ingredient.name)}
-                        </Text>
+                        <View style={styles.ingredientNameContainer}>
+                          <Text style={[styles.ingredientNameFullWidth, isChecked && styles.ingredientTextChecked]}>
+                            {String(ingredient.name)}
+                          </Text>
+                          <TouchableOpacity 
+                            style={styles.infoButton}
+                            onPress={() => openSubstitutionModal(ingredient)}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                          >
+                            <InfoIcon size={18} color={COLORS.primary} />
+                          </TouchableOpacity>
+                        </View>
                       )}
                     </View>
                   </TouchableOpacity>
@@ -255,6 +286,19 @@ export default function IngredientsScreen() {
           <ChevronRight size={20} color={COLORS.white} />
         </TouchableOpacity>
       </View>
+
+      {selectedIngredient && (
+        <IngredientSubstitutionModal
+          visible={substitutionModalVisible}
+          onClose={() => {
+            setSubstitutionModalVisible(false);
+            setSelectedIngredient(null);
+          }}
+          ingredientName={selectedIngredient.name}
+          onApply={handleApplySubstitution}
+        />
+      )}
+
     </SafeAreaView>
   );
 }
@@ -402,12 +446,19 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginRight: 10,
   },
+  ingredientNameContainer: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+  },
   ingredientName: {
     fontFamily: 'Poppins-SemiBold',
     fontSize: 16,
     color: COLORS.textDark,
     lineHeight: 24,
     flex: 1,
+    marginRight: 8,
   },
   ingredientNameFullWidth: {
     fontFamily: 'Poppins-SemiBold',
@@ -415,5 +466,9 @@ const styles = StyleSheet.create({
     color: COLORS.textDark,
     lineHeight: 24,
     flex: 1,
+    marginRight: 8,
+  },
+  infoButton: {
+    padding: 4,
   },
 });
