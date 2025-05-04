@@ -428,12 +428,10 @@ const styles = StyleSheet.create({
     padding: 8, 
   },
   headerTitle: {
-    flex: 1, 
     textAlign: 'center',
     fontFamily: 'Poppins-SemiBold',
     fontSize: 18,
     color: COLORS.raisinBlack,
-    marginHorizontal: 10,
   },
   placeholder: {
     width: 24 + 16,
@@ -510,8 +508,8 @@ const styles = StyleSheet.create({
   },
   ingredientItemContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 15, 
+    alignItems: 'flex-start',
+    marginBottom: 15,
     paddingVertical: 8,
     paddingHorizontal: 10,
   },
@@ -585,8 +583,8 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   infoButton: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 4,
     backgroundColor: COLORS.lightGray,
     marginLeft: 5,
