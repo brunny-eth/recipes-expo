@@ -123,7 +123,7 @@ export default function HomeScreen() {
           <Text style={styles.loadingText}>Loading....</Text>
           <View style={styles.loadingIndicator} />
           <Text style={styles.loadingHint}>
-            Just a moment while we transform your recipe!
+            just a moment while we transform the recipe into something more useful...
           </Text>
         </Animated.View>
       </SafeAreaView>
