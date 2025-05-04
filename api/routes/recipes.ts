@@ -402,19 +402,41 @@ ${extractedContent.instructionsText}
     if (initialParsedResult.ingredients && initialParsedResult.ingredients.length > 0) {
       console.log(`Found ${initialParsedResult.ingredients.length} ingredient strings to parse further.`);
 
-      // --- Prompt asking for object containing the array (No change needed here) ---
-      const ingredientParsingPrompt = `Parse the following array of ingredient strings into an array of JSON objects. Each object should have keys: "name" (string), "amount" (string or null), "unit" (string or null), and an optional key "suggested_substitutions" (array of objects { name: string, description?: string | null } or null).
-      For each ingredient, try to suggest 1-3 sensible culinary substitutions (e.g., different oil, different vegetable, vegan alternative like tofu for chicken). If no good substitutions come to mind, use null for "suggested_substitutions".
-      Convert all fractional amounts (e.g., "1 1/2", "3/4") to their decimal representation (e.g., "1.5", "0.75").
-      Handle variations like ranges, optional parts. If a part isn't clearly identifiable, use null.
-      If an ingredient clearly lacks a quantity (e.g., toppings like 'fresh cilantro'), set amount to null and unit to "to taste" or "as needed".
+      // --- Prompt asking for object containing the array ---
+      const ingredientParsingPrompt = `Parse the following array of ingredient strings into an array of JSON objects. Each object must have keys: "name" (string), "amount" (string or null), "unit" (string or null), and an optional key "suggested_substitutions" (array of objects or null).
+
+      **Substitution Rules & Examples:**
+      For each ingredient, suggest 1-2 sensible culinary substitutions.
+      For EACH substitution suggestion, the object MUST include:
+        - "name" (string): The name of the substitute.
+        - "amount" (string, number, or null): The suggested *equivalent* amount based on the original quantity. If direct conversion isn't possible or relevant (e.g., spice for spice 1:1 tsp), use null.
+        - "unit" (string or null): The suggested unit for the substitute amount.
+        - "description" (string or null, optional): Brief notes on flavor/texture differences or usage (e.g., "milder flavor", "press firmly").
+
+      **Guiding Principle:** Substitute based on volume or weight where applicable, not necessarily unit count, due to size variance. Adjust for flavor intensity, texture, and cooking method.
+
+      **Good Examples of Substitution Formatting:**
+      - Original: "4 cloves garlic" -> Substitution Suggestion: { "name": "shallot", "amount": "1", "unit": "small", "description": "milder, sweeter flavor" }
+      - Original: "1 small onion" -> Substitution Suggestion: { "name": "shallots", "amount": "2-3", "unit": null, "description": "milder, more complex" }
+      - Original: "1 lb chicken breast" -> Substitution Suggestion: { "name": "tofu", "amount": "14", "unit": "oz", "description": "pressed, extra-firm" }
+      - Original: "1 cup all-purpose flour" -> Substitution Suggestion: { "name": "whole wheat flour", "amount": "0.875", "unit": "cup", "description": "denser texture, may need more liquid" }
+
+      If no good substitutions come to mind, use null for "suggested_substitutions".
+
+      **Other Parsing Rules:**
+      Convert all fractional amounts (e.g., "1 1/2", "3/4") in the *main* ingredient parsing to their decimal representation (e.g., "1.5", "0.75").
+      Handle variations like ranges, optional parts in the main ingredient. If a part isn't clearly identifiable, use null.
+      If an ingredient clearly lacks a quantity (e.g., toppings like 'fresh cilantro'), set main amount to null and main unit to "to taste" or "as needed".
       **IMPORTANT: Do NOT include ingredients that are variations of 'sea salt', 'salt', 'black pepper', or 'pepper' in the final array.**
-      Output ONLY a single valid JSON object with one key "structured_ingredients" whose value is the array of parsed ingredient objects.
-      Example: { "structured_ingredients": [ { "name": "olive oil", "amount": "2", "unit": "tbsp", "suggested_substitutions": [{ "name": "avocado oil" }, { "name": "canola oil" }] }, { "name": "chicken breast", "amount": "1", "unit": "lb", "suggested_substitutions": [{ "name": "tofu", "description": "pressed, extra-firm"}, {"name": "chickpeas"}] }, { "name": "onion", "amount": "1", "unit": null, "suggested_substitutions": null } ] }.
-      Ingredient Strings: ${JSON.stringify(initialParsedResult.ingredients)}`;
+
+      **Output Format:** Output ONLY a single valid JSON object with one key "structured_ingredients" whose value is the array of parsed ingredient objects, adhering strictly to the format described above for ingredients AND their substitutions.
+      Example Output Structure: { "structured_ingredients": [ { "name": "olive oil", "amount": "2", "unit": "tbsp", "suggested_substitutions": [{ "name": "avocado oil", "amount": "2", "unit": "tbsp" }] }, { "name": "chicken breast", "amount": "1", "unit": "lb", "suggested_substitutions": [{ "name": "tofu", "amount": "14", "unit": "oz", "description": "pressed, extra-firm"}] } ] }.
+
+      Ingredient Strings to Parse: ${JSON.stringify(initialParsedResult.ingredients)}
+      `;
       // --- End Prompt ---
 
-      console.log('Sending ingredient parsing request to OpenAI (GPT-4 Turbo with JSON mode)...');
+      console.log('Sending ingredient parsing request to OpenAI (GPT-4 Turbo with JSON mode - enhanced prompt)...');
       let structuredIngredients: StructuredIngredient[] | null = null;
       let ingredientParseError = null;
 

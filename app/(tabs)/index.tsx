@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
 import { useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, Keyboard, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, Keyboard, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Alert } from 'react-native';
 import { useRouter, useNavigation } from 'expo-router';
 import Animated, { FadeIn, FadeInDown, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
 import { COLORS } from '@/constants/theme';
@@ -61,7 +61,20 @@ export default function HomeScreen() {
   }, []);
 
   const handleSubmit = async () => {
-    if (!recipeUrl) return;
+    // --- Basic URL Validation --- 
+    const urlPattern = new RegExp('^(https?:\\/\\/)?'+ // protocol
+    '((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.?)+[a-z]{2,}|((\\d{1,3}\\.){3}\\d{1,3}))'+ // domain name or ip
+    '(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*'+ // port and path
+    '(\\?[;&a-z\\d%_.~+=-]*)?'+ // query string
+    '(\\#[-a-z\\d_]*)?$','i'); // fragment locator
+
+    if (!recipeUrl || !urlPattern.test(recipeUrl)) {
+        Alert.alert("Invalid Input", "Please enter a valid recipe URL starting with http:// or https://");
+        return; // Stop execution if validation fails
+    }
+    // --- End Validation ---
+
+    if (!recipeUrl) return; // This check is somewhat redundant now but safe to keep
     
     Keyboard.dismiss();
     setIsLoading(true);

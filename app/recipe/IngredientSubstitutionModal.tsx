@@ -16,6 +16,7 @@ import Animated, {
   SlideOutDown,
 } from 'react-native-reanimated';
 import { COLORS } from '@/constants/theme';
+import { abbreviateUnit } from './ingredients'; // Import helper if needed
 
 interface SubstitutionOption {
   id: string;
@@ -23,28 +24,30 @@ interface SubstitutionOption {
   description: string;
 }
 
-// Define the type for a single substitution suggestion (matching backend)
+// Define the type for a single substitution suggestion (matching backend and ingredients screen)
 interface SubstitutionSuggestion {
   name: string;
   description?: string | null;
+  amount?: string | number | null; // Added
+  unit?: string | null;       // Added
 }
 
 interface IngredientSubstitutionModalProps {
   visible: boolean;
   onClose: () => void;
   ingredientName: string;
-  substitutions: SubstitutionSuggestion[] | null; // Changed from SAMPLE_SUBSTITUTIONS
-  onApply: (selectedOption: SubstitutionSuggestion) => void; // Changed type
+  substitutions: SubstitutionSuggestion[] | null; // Use updated type
+  onApply: (selectedOption: SubstitutionSuggestion) => void; // Use updated type
 }
 
 export default function IngredientSubstitutionModal({
   visible,
   onClose,
   ingredientName,
-  substitutions, // Use passed-in substitutions
+  substitutions,
   onApply,
 }: IngredientSubstitutionModalProps) {
-  const [selectedOption, setSelectedOption] = useState<SubstitutionSuggestion | null>(null); // Changed type
+  const [selectedOption, setSelectedOption] = useState<SubstitutionSuggestion | null>(null);
 
   const handleApply = () => {
     if (selectedOption) {
@@ -52,6 +55,15 @@ export default function IngredientSubstitutionModal({
       setSelectedOption(null); // Reset after applying
     }
   };
+
+  // Helper to format the quantity display
+  const formatQuantity = (amount: string | number | null | undefined, unit: string | null | undefined): string | null => {
+    if (amount == null && unit == null) return null;
+    const amountStr = amount != null ? String(amount) : '';
+    // Use the same abbreviateUnit function from ingredients.tsx if available, otherwise fallback
+    const unitStr = unit ? (typeof abbreviateUnit === 'function' ? abbreviateUnit(unit) : unit) : '';
+    return `(approx. ${amountStr}${unitStr ? ' ' + unitStr : ''})`.trim();
+  }
 
   return (
     <Modal
@@ -83,28 +95,37 @@ export default function IngredientSubstitutionModal({
 
           <ScrollView style={styles.optionsList}>
             {substitutions && substitutions.length > 0 ? (
-              substitutions.map((option, index) => (
-                <TouchableOpacity
-                  key={`${option.name}-${index}`} // Use name + index for key
-                  style={[
-                    styles.optionItem,
-                    selectedOption?.name === option.name && styles.optionItemSelected, // Compare by name
-                  ]}
-                  onPress={() => setSelectedOption(option)}
-                >
-                  <View style={styles.radioButton}>
-                    {selectedOption?.name === option.name && (
-                      <View style={styles.radioButtonInner} />
-                    )}
-                  </View>
-                  <View style={styles.optionContent}>
-                    <Text style={styles.optionName}>{option.name}</Text>
-                    {option.description && (
-                       <Text style={styles.optionDescription}>{option.description}</Text>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              ))
+              substitutions.map((option, index) => {
+                const quantityText = formatQuantity(option.amount, option.unit); // Format quantity
+                return (
+                  <TouchableOpacity
+                    key={`${option.name}-${index}`}
+                    style={[
+                      styles.optionItem,
+                      selectedOption?.name === option.name && styles.optionItemSelected,
+                    ]}
+                    onPress={() => setSelectedOption(option)}
+                  >
+                    <View style={styles.radioButton}>
+                      {selectedOption?.name === option.name && (
+                        <View style={styles.radioButtonInner} />
+                      )}
+                    </View>
+                    <View style={styles.optionContent}>
+                      <View style={styles.optionNameContainer}>
+                        <Text style={styles.optionName}>{option.name}</Text>
+                        {/* Display Formatted Quantity */}
+                        {quantityText && (
+                           <Text style={styles.optionQuantity}>{quantityText}</Text>
+                        )}
+                      </View>
+                      {option.description && (
+                         <Text style={styles.optionDescription}>{option.description}</Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
             ) : (
                 <Text style={styles.noSuggestionsText}>No automatic substitutions found for this ingredient.</Text>
             )}
@@ -192,11 +213,24 @@ const styles = StyleSheet.create({
   optionContent: {
     flex: 1,
   },
+  optionNameContainer: { // New container for name + quantity
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start', // Align text top
+    marginBottom: 4,
+  },
   optionName: {
     fontFamily: 'Poppins-SemiBold',
     fontSize: 16,
     color: COLORS.textDark,
-    marginBottom: 4,
+    flexShrink: 1, // Allow name to wrap
+    marginRight: 8, // Space between name and quantity
+  },
+  optionQuantity: { // Style for the quantity text
+    fontFamily: 'Poppins-Regular',
+    fontSize: 14,
+    color: COLORS.darkGray,
+    textAlign: 'right',
   },
   optionDescription: {
     fontFamily: 'Poppins-Regular',
