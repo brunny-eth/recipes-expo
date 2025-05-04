@@ -423,7 +423,10 @@ export default function IngredientsScreen() {
                   activeOpacity={0.7} 
                 >
                   {/* Checkbox Visual */}
-                  <View style={[styles.checkboxBase, isChecked && styles.checkboxChecked]}>
+                  <View 
+                    style={[styles.checkboxBase, isChecked && styles.checkboxChecked]}
+                    testID={`checkbox-${ingredient.name}`}
+                  >
                     {isChecked && <View style={styles.checkboxInnerCheck} />}
                   </View>
                   
@@ -448,6 +451,7 @@ export default function IngredientsScreen() {
                         style={styles.infoButton}
                         onPress={() => openSubstitutionModal(ingredient)}
                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        testID={`substitution-button-${ingredient.name}`}
                       >
                         <Text style={styles.infoButtonText}>S</Text>
                       </TouchableOpacity>

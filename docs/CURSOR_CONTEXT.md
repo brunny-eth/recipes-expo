@@ -6,6 +6,7 @@ This file provides guidance to Cursor about the codebase structure, patterns to 
 - **Stateless**: All Express routes are serverless; no in-memory persistence across requests.
 - **Modularity**: Use `/api/routes/<feature>.ts` for related endpoints.
 - **Error Handling**: Return meaningful JSON errors and HTTP status codes.
+- **Write Tests as New Code is Implemented, when needed**: Don't delete tests because they fail; problem-solve the test or the function
 
 ## File Structure
 ```
