@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator, Platform, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator, Platform, Alert, Modal, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, ChevronRight } from 'lucide-react-native';
+import { ArrowLeft, ChevronRight, X } from 'lucide-react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { COLORS } from '@/constants/theme';
 import IngredientSubstitutionModal from './IngredientSubstitutionModal';
@@ -102,6 +102,18 @@ export default function IngredientsScreen() {
   const [appliedSubstitution, setAppliedSubstitution] = useState<{ originalIndex: number; originalName: string; substitution: { name: string } } | null>(null);
   const [isRewriting, setIsRewriting] = useState(false); // For substitution rewrite
   const [isScalingInstructions, setIsScalingInstructions] = useState(false); // For scaling instructions
+  const [isHelpModalVisible, setIsHelpModalVisible] = useState(false); // <-- New state for help modal
+
+  useEffect(() => {
+    // TODO: Add logic here later to check if this is the first time 
+    // using AsyncStorage or user auth state.
+    // For now, show it every time.
+    const timer = setTimeout(() => {
+      setIsHelpModalVisible(true);
+    }, 500); // Show after a short delay
+
+    return () => clearTimeout(timer); // Cleanup timer on unmount
+  }, []);
 
   useEffect(() => {
     setIsLoading(true); 
@@ -406,6 +418,32 @@ export default function IngredientsScreen() {
         />
       )}
 
+      {/* Help Modal */}
+      <Modal
+        visible={isHelpModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsHelpModalVisible(false)} // For Android back button
+      >
+        <Pressable 
+          style={styles.helpModalBackdrop} 
+          onPress={() => setIsHelpModalVisible(false)} // Dismiss on backdrop press
+        >
+          <Pressable style={styles.helpModalContent} onPress={() => {}}> 
+            {/* Prevent backdrop press from triggering through content */}
+            <Text style={styles.helpModalText}>
+              Tip: substitute out an ingredient in the recipe by clicking the S next to the ingredient name. The recipe will adjust accordingly!
+            </Text>
+            <TouchableOpacity 
+              style={styles.helpModalCloseButton} 
+              onPress={() => setIsHelpModalVisible(false)}
+            >
+              <X size={20} color={COLORS.textDark} />
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -593,5 +631,45 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-Bold',
     fontSize: 12,
     color: COLORS.primary, 
-  }
+  },
+  // --- Help Modal Styles ---
+  helpModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 30,
+  },
+  helpModalContent: {
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    padding: 25,
+    paddingTop: 35, // Extra padding top for close button
+    alignItems: 'center',
+    position: 'relative',
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    width: '100%',
+    maxWidth: 400,
+  },
+  helpModalText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 16,
+    color: COLORS.textDark,
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  helpModalCloseButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    padding: 5,
+  },
+  // --- End Help Modal Styles ---
 });
