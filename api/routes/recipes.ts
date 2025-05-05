@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express'
 import { supabase } from '../lib/supabase'
 import OpenAI from 'openai'
 import * as cheerio from 'cheerio'; // Import cheerio
+import scraperapiClient from 'scraperapi-sdk'; // Import the SDK
 
 // --- Define the expected structured ingredient type ---
 type StructuredIngredient = {
@@ -161,6 +162,15 @@ function extractRecipeContent(html: string): { title: string | null, ingredients
 
 const router = Router()
 
+// --- Initialize ScraperAPI Client ---
+const scraperApiKey = process.env.SCRAPERAPI_KEY;
+if (!scraperApiKey) {
+  console.error('SCRAPERAPI_KEY environment variable is not set!');
+  // Optionally throw an error or exit if the key is critical for operation
+  // throw new Error('Server configuration error: Missing ScraperAPI key.');
+}
+const scraperClient = scraperapiClient(scraperApiKey || ''); // Initialize client - provide empty string if null
+
 // Get all recipes
 router.get('/', async (req: Request, res: Response) => {
   try {
@@ -243,6 +253,15 @@ router.post('/', async (req: Request, res: Response) => {
 
 // --- Main Parsing Route ---
 router.post('/parse', async (req: Request, res: Response) => {
+  const requestStartTime = Date.now(); // Start timing the whole request
+  let timings = {
+      fetchHtml: -1,
+      extractContent: -1,
+      openaiPass1: -1,
+      openaiPass2: -1, // Initialize as -1
+      total: -1
+  };
+
   // Overall try-catch for request processing errors
   try {
     const { url } = req.body;
@@ -250,36 +269,63 @@ router.post('/parse', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Missing URL in request body' });
     }
 
-    // --- Step 1: Fetch HTML ---
-    console.log(`Attempting to fetch HTML from: ${url}`);
-    const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36';
+    // Check if ScraperAPI client is configured before proceeding
+    if (!scraperApiKey) {
+         return res.status(500).json({ error: 'Server configuration error: Missing ScraperAPI key.' });
+    }
+
+    // --- Step 1: Fetch HTML using ScraperAPI SDK ---
+    console.log(`Attempting to fetch HTML via ScraperAPI from: ${url}`);
+    const fetchStartTime = Date.now();
     let htmlContent = '';
     let fetchError = null;
+
     try {
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': userAgent,
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.5',
-          'Referer': 'https://www.google.com/'
+        // Use the ScraperAPI client
+        console.log('Calling scraperClient.get...'); // Added log
+        // Consider adding options like { render: true } if needed for dynamic sites
+        const scraperResponse = await scraperClient.get(url);
+        console.log('scraperClient.get returned.'); // Added log
+        console.log('Type of scraperResponse:', typeof scraperResponse); // Added log
+        // Try JSON.stringify for better object inspection
+        let responseString = '';
+        try {
+            responseString = JSON.stringify(scraperResponse);
+        } catch (e) {
+            responseString = String(scraperResponse);
         }
-      });
-      if (!response.ok) throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
-      htmlContent = await response.text();
-      console.log(`Successfully fetched HTML. Length: ${htmlContent.length}`);
+        console.log('Raw scraperResponse content:', responseString);
+
+        // Check if the response is an object with a non-empty string 'body' property
+        if (typeof scraperResponse === 'object' && scraperResponse !== null && typeof scraperResponse.body === 'string' && scraperResponse.body.length > 0) {
+            htmlContent = scraperResponse.body; // Extract the HTML from the body property
+            console.log(`Successfully fetched HTML via ScraperAPI. Length: ${htmlContent.length}`);
+        } else if (typeof scraperResponse === 'string' && scraperResponse.length > 0) {
+             // Fallback: Maybe sometimes it DOES return a string directly?
+             htmlContent = scraperResponse;
+             console.log(`Successfully fetched HTML directly as string via ScraperAPI. Length: ${htmlContent.length}`);
+        } else {
+            // Throw an error if the response is not the expected object or string
+            throw new Error(`ScraperAPI returned unexpected response: ${responseString}`);
+        }
     } catch (err) {
-      console.error(`Error fetching URL ${url}:`, err);
-      fetchError = err instanceof Error ? err.message : 'An unknown error occurred during fetch';
+        console.error(`Error fetching URL ${url} via ScraperAPI:`, err);
+        fetchError = err instanceof Error ? err.message : 'An unknown error occurred during ScraperAPI fetch';
+        // ScraperAPI errors might have specific structures, you could log `err` for more details
     }
+    timings.fetchHtml = Date.now() - fetchStartTime;
     if (fetchError) {
-      return res.status(500).json({ error: `Failed to retrieve recipe content: ${fetchError}` });
+        // Updated error message prefix
+        return res.status(500).json({ error: `Failed to retrieve recipe content via ScraperAPI: ${fetchError}` });
     }
     // --- End Fetch HTML ---
 
 
     // --- Step 1.5: Pre-process HTML to Extract Content ---
     console.log("Pre-processing HTML with cheerio...");
+    const extractStartTime = Date.now(); // Start timing extraction
     const extractedContent = extractRecipeContent(htmlContent);
+    timings.extractContent = Date.now() - extractStartTime; // End timing extraction
 
     if (!extractedContent.ingredientsText || !extractedContent.instructionsText) {
         console.error("Failed to extract ingredients or instructions using cheerio.");
@@ -320,6 +366,7 @@ ${extractedContent.instructionsText}
     console.log('Sending initial request to OpenAI (GPT-4 Turbo with JSON mode using extracted content)...');
     let initialParsedResult: InitialParsedRecipe | null = null;
     let initialOpenAIError = null;
+    const openai1StartTime = Date.now(); // Start timing OpenAI Pass 1
 
     try {
       // Ensure prompt isn't excessively large (though much less likely now)
@@ -373,6 +420,8 @@ ${extractedContent.instructionsText}
        if ((err as any)?.code === 'rate_limit_exceeded') {
            initialOpenAIError = `OpenAI rate limit exceeded. Please try again later. Details: ${initialOpenAIError}`;
        }
+    } finally {
+        timings.openaiPass1 = Date.now() - openai1StartTime; // End timing OpenAI Pass 1
     }
      if (initialOpenAIError) {
       // If the first pass fails critically, return error
@@ -439,6 +488,7 @@ ${extractedContent.instructionsText}
       console.log('Sending ingredient parsing request to OpenAI (GPT-4 Turbo with JSON mode - enhanced prompt)...');
       let structuredIngredients: StructuredIngredient[] | null = null;
       let ingredientParseError = null;
+      const openai2StartTime = Date.now(); // Start timing OpenAI Pass 2
 
       try {
         // --- Add safety check for prompt length ---
@@ -500,6 +550,8 @@ ${extractedContent.instructionsText}
         if ((err as any)?.code === 'rate_limit_exceeded') {
              ingredientParseError = `OpenAI rate limit exceeded. Please try again later. Details: ${ingredientParseError}`;
         }
+      } finally {
+          timings.openaiPass2 = Date.now() - openai2StartTime; // End timing OpenAI Pass 2
       }
 
       if (structuredIngredients) {
@@ -529,6 +581,8 @@ ${extractedContent.instructionsText}
 
 
     // --- Step 4: Send Final Response ---
+    timings.total = Date.now() - requestStartTime; // Calculate total time
+    console.log(`Request Timings (ms): ScraperAPI Fetch=${timings.fetchHtml}, Extract=${timings.extractContent}, OpenAI1=${timings.openaiPass1}, OpenAI2=${timings.openaiPass2 > 0 ? timings.openaiPass2 : 'N/A'}, Total=${timings.total}`);
     console.log("Sending final parsed recipe data to client.");
     res.json({
       message: 'Recipe processing complete.',
@@ -541,6 +595,9 @@ ${extractedContent.instructionsText}
     // Catch errors related to request processing (e.g., reading req.body)
     console.error('Error in /parse route processing:', error);
     const message = error instanceof Error ? error.message : 'An unknown server error occurred';
+    // Log timing even if there's an error before sending response
+    timings.total = Date.now() - requestStartTime;
+    console.log(`Request Timings on Error (ms): ScraperAPI Fetch=${timings.fetchHtml > 0 ? timings.fetchHtml : 'N/A'}, Extract=${timings.extractContent > 0 ? timings.extractContent : 'N/A'}, OpenAI1=${timings.openaiPass1 > 0 ? timings.openaiPass1 : 'N/A'}, OpenAI2=${timings.openaiPass2 > 0 ? timings.openaiPass2 : 'N/A'}, Total=${timings.total}`);
     res.status(500).json({ error: message });
   }
 });
