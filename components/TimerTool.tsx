@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Play, Pause, RotateCcw } from 'lucide-react-native';
 import { COLORS } from '@/constants/theme';
 
@@ -7,45 +7,62 @@ import { COLORS } from '@/constants/theme';
 interface TimerToolProps {
   timeRemaining: number;
   isActive: boolean;
-  formatTime: (seconds: number) => string;
-  addTime: (secondsToAdd: number) => void;
+  addSeconds: (seconds: number) => void;
   handleStartPause: () => void;
   handleReset: () => void;
+  formatTime: (timeInSeconds: number) => string;
 }
 
 export default function TimerTool({
-    timeRemaining,
-    isActive,
-    formatTime,
-    addTime,
-    handleStartPause,
-    handleReset
+  timeRemaining,
+  isActive,
+  addSeconds,
+  handleStartPause,
+  handleReset,
+  formatTime,
 }: TimerToolProps) {
   return (
     <View style={styles.container}>
       <Text style={styles.timerDisplay}>{formatTime(timeRemaining)}</Text>
       
-      <View style={styles.presetButtons}>
-        <TouchableOpacity style={styles.presetButton} onPress={() => addTime(60)} disabled={isActive}> 
-            <Text style={styles.presetButtonText}>+1m</Text>
+      <View style={styles.quickAddContainer}>
+        <TouchableOpacity
+          style={styles.quickAddButton}
+          onPress={() => addSeconds(30)}
+          disabled={isActive}
+        >
+          <Text style={styles.quickAddButtonText}>+30s</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.presetButton} onPress={() => addTime(300)} disabled={isActive}>
-            <Text style={styles.presetButtonText}>+5m</Text>
+        <TouchableOpacity
+          style={styles.quickAddButton}
+          onPress={() => addSeconds(60)}
+          disabled={isActive}
+        >
+          <Text style={styles.quickAddButtonText}>+1m</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.presetButton} onPress={() => addTime(600)} disabled={isActive}>
-            <Text style={styles.presetButtonText}>+10m</Text>
+        <TouchableOpacity
+          style={styles.quickAddButton}
+          onPress={() => addSeconds(300)}
+          disabled={isActive}
+        >
+          <Text style={styles.quickAddButtonText}>+5m</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Optional: Custom input - could be added later */}
-      {/* <TextInput placeholder="Set custom time (seconds)" keyboardType="numeric" /> */}
-
-      <View style={styles.controlButtons}>
-        <TouchableOpacity style={styles.controlButton} onPress={handleStartPause} disabled={timeRemaining === 0}>
-          {isActive ? <Pause size={24} color={timeRemaining === 0 ? COLORS.darkGray : COLORS.white} /> : <Play size={24} color={timeRemaining === 0 ? COLORS.darkGray : COLORS.white} />}
+      <View style={styles.controlsContainer}>
+        <TouchableOpacity
+          style={styles.controlButton}
+          onPress={handleStartPause}
+          disabled={timeRemaining === 0 && !isActive}
+        >
+          {isActive ? (
+            <Pause size={32} color={COLORS.textDark} />
+          ) : (
+            <Play size={32} color={timeRemaining === 0 ? COLORS.darkGray : COLORS.textDark} />
+          )}
         </TouchableOpacity>
         <TouchableOpacity style={styles.controlButton} onPress={handleReset}>
-          <RotateCcw size={24} color={COLORS.white} />
+          <RotateCcw size={32} color={COLORS.textDark} />
         </TouchableOpacity>
       </View>
     </View>
@@ -55,42 +72,52 @@ export default function TimerTool({
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 20,
+    width: '100%',
   },
   timerDisplay: {
-    fontFamily: 'Poppins-Bold',
-    fontSize: 48,
+    fontSize: 56,
+    fontWeight: 'bold',
     color: COLORS.textDark,
-    marginBottom: 20,
-    minWidth: 150, // Ensure space for MM:SS
-    textAlign: 'center',
+    marginBottom: 25,
+    fontVariant: ['tabular-nums'],
   },
-  presetButtons: {
+  quickAddContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    width: '80%',
-    marginBottom: 20,
+    width: '90%',
+    marginBottom: 30,
   },
-  presetButton: {
+  quickAddButton: {
     backgroundColor: COLORS.lightGray,
-    paddingVertical: 8,
+    paddingVertical: 10,
     paddingHorizontal: 15,
-    borderRadius: 20,
+    borderRadius: 25,
+    minWidth: 60,
+    alignItems: 'center',
   },
-  presetButtonText: {
-      fontFamily: 'Poppins-Medium',
-      fontSize: 14,
-      color: COLORS.primary,
+  quickAddButtonText: {
+    fontSize: 14,
+    color: COLORS.textDark,
+    fontWeight: '500',
   },
-  controlButtons: {
+  controlsContainer: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    width: '60%',
+    justifyContent: 'space-evenly',
+    width: '70%',
   },
   controlButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#fbeded',
     padding: 15,
-    borderRadius: 30, // Make circular
-    marginHorizontal: 15,
+    borderRadius: 50,
+    marginHorizontal: 10,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
   },
 }); 

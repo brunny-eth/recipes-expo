@@ -4,8 +4,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, CircleCheck as CheckCircle2, Hammer as ToolsIcon } from 'lucide-react-native';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 import { COLORS } from '@/constants/theme';
-import ToolsSidePanel from '@/components/ToolsSidePanel';
+import ToolsModal from '@/components/ToolsModal';
 import MiniTimerDisplay from '@/components/MiniTimerDisplay';
+import { ActiveTool } from '@/components/ToolsModal';
 
 export default function StepsScreen() {
   const params = useLocalSearchParams<{ instructionsData?: string, substitutionsText?: string }>();
@@ -17,6 +18,7 @@ export default function StepsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [completedSteps, setCompletedSteps] = useState<{[key: number]: boolean}>({});
   const [isToolsPanelVisible, setIsToolsPanelVisible] = useState(false);
+  const [initialToolToShow, setInitialToolToShow] = useState<ActiveTool>(null);
   
   // --- Lifted Timer State --- 
   const [timerTimeRemaining, setTimerTimeRemaining] = useState(0); // Time in seconds
@@ -55,7 +57,7 @@ export default function StepsScreen() {
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   };
 
-  const addTime = (secondsToAdd: number) => {
+  const handleTimerAddSeconds = (secondsToAdd: number) => {
     if (!isTimerActive) {
         setTimerTimeRemaining(prev => Math.max(0, prev + secondsToAdd));
     }
@@ -126,14 +128,19 @@ export default function StepsScreen() {
     }));
   };
 
-  const openToolsPanel = () => {
-      console.log("Opening tools panel");
+  const openToolsModal = (initialTool: ActiveTool = null) => {
+      console.log(`Opening tools modal${initialTool ? ` to ${initialTool}` : ''}`);
+      setInitialToolToShow(initialTool);
       setIsToolsPanelVisible(true);
   };
 
-  // Function to close panel (passed down)
-  const closeToolsPanel = () => {
+  const closeToolsModal = () => {
       setIsToolsPanelVisible(false);
+      setInitialToolToShow(null);
+  };
+
+  const handleMiniTimerPress = () => {
+    openToolsModal('timer');
   };
 
   return (
@@ -146,7 +153,7 @@ export default function StepsScreen() {
           <ArrowLeft size={24} color={COLORS.raisinBlack} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Instructions</Text>
-        <TouchableOpacity style={styles.toolsButton} onPress={openToolsPanel}>
+        <TouchableOpacity style={styles.toolsButton} onPress={() => openToolsModal()}>
             <ToolsIcon size={24} color={COLORS.raisinBlack} />
         </TouchableOpacity>
       </Animated.View>
@@ -236,21 +243,23 @@ export default function StepsScreen() {
         </Animated.View>
       )}
       
-      <ToolsSidePanel 
-          isVisible={isToolsPanelVisible} 
-          onClose={closeToolsPanel} 
-          timeRemaining={timerTimeRemaining}
-          isActive={isTimerActive}
+      <ToolsModal 
+          isVisible={isToolsPanelVisible}
+          onClose={closeToolsModal}
+          initialTool={initialToolToShow}
+          timerTimeRemaining={timerTimeRemaining}
+          isTimerActive={isTimerActive}
           formatTime={formatTime}
-          addTime={addTime}
-          handleStartPause={handleTimerStartPause}
-          handleReset={handleTimerReset}
+          handleTimerAddSeconds={handleTimerAddSeconds}
+          handleTimerStartPause={handleTimerStartPause}
+          handleTimerReset={handleTimerReset}
       />
 
       {!isToolsPanelVisible && isTimerActive && timerTimeRemaining > 0 && (
           <MiniTimerDisplay 
               timeRemaining={timerTimeRemaining} 
               formatTime={formatTime} 
+              onPress={handleMiniTimerPress}
           />
       )}
     </SafeAreaView>
