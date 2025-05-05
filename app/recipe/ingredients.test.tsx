@@ -3,6 +3,8 @@ import { render, screen, fireEvent, act } from '@testing-library/react-native';
 import IngredientsScreen from './ingredients'; // Adjust path if needed
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet } from 'react-native'; // Import StyleSheet for style checks
+// Explicitly import matcher type to help TypeScript
+import type {} from '@testing-library/jest-native/extend-expect';
 
 // --- Types (Mirror from component) ---
 // It's good practice to keep types consistent or import them if possible
@@ -62,8 +64,53 @@ const mockRecipeData: IngredientsNavParams = {
   selectedServings: 4, // Keep scale factor 1 for simplicity initially
 };
 
-// Mock IngredientSubstitutionModal to prevent rendering its complexity
-jest.mock('./IngredientSubstitutionModal', () => 'IngredientSubstitutionModal');
+// --- Mock IngredientSubstitutionModal --- 
+jest.mock('./IngredientSubstitutionModal', () => {
+  // Move imports INSIDE the factory function
+  const React = require('react');
+  const { View, TouchableOpacity, Text: RNText } = require('react-native');
+
+  // Define props type for the mock modal (can stay outside if preferred, or move in)
+  interface MockModalProps {
+    visible: boolean;
+    onClose: () => void;
+    ingredientName: string;
+    substitutions: any[] | null; // Using any[] for simplicity in mock
+    onApply: (selectedOption: any) => void; // Using any for simplicity in mock
+  }
+
+  // Mock component that renders props and allows interaction
+  const MockModal: React.FC<MockModalProps> = ({ 
+      visible, 
+      onClose, 
+      ingredientName, 
+      substitutions, 
+      onApply 
+  }) => {
+    if (!visible) {
+      return null;
+    }
+    const firstSub = substitutions && substitutions[0];
+    return (
+      <View testID="mock-substitution-modal">
+        <RNText>Substitute {ingredientName}</RNText>
+        {firstSub && (
+          <TouchableOpacity
+            testID={`substitution-option-${firstSub.name}`}
+            onPress={() => onApply(firstSub)}
+          >
+            <RNText>{`${firstSub.name} (Amount: ${firstSub.amount}, Unit: ${firstSub.unit})`}</RNText>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity testID="modal-close-button" onPress={onClose}>
+          <RNText>Close</RNText>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+  return MockModal;
+});
+// --- End Mock --- 
 
 // Add checked style for comparison
 const checkedStyle = StyleSheet.create({
@@ -140,7 +187,45 @@ describe('<IngredientsScreen />', () => {
     expect(await screen.findByText(/Flour.*\(2 cup\)/)).not.toHaveStyle(checkedStyle);
   });
 
-  // Add more tests here for interactions (checking items, substitutions, navigation)
+  it('applies substitution correctly', async () => {
+    render(<IngredientsScreen />);
+
+    // Find the 'S' button for Flour
+    const flourSubstituteButton = await screen.findByTestId('substitution-button-Flour');
+
+    // --- Open the modal ---
+    fireEvent.press(flourSubstituteButton);
+
+    // Verify modal is visible (using its testID)
+    const modal = await screen.findByTestId('mock-substitution-modal');
+    expect(modal).toBeTruthy();
+
+    // Verify the correct ingredient name is shown in the modal title
+    expect(screen.getByText('Substitute Flour')).toBeTruthy();
+
+    // Find the first substitution option (Almond Flour in mock data)
+    const almondFlourOption = await screen.findByTestId('substitution-option-Almond Flour');
+    expect(almondFlourOption).toBeTruthy();
+    // Optional: Check if scaled amount is displayed (scale factor is 1 here)
+    expect(screen.getByText(/Almond Flour.*Amount: 2, Unit: cup/)).toBeTruthy();
+
+    // --- Apply the substitution (mock triggers onApply on press) ---
+    fireEvent.press(almondFlourOption);
+
+    // --- Verify changes --- 
+    // Modal should close
+    expect(screen.queryByTestId('mock-substitution-modal')).toBeNull();
+
+    // New substituted text should appear
+    // Regex checks for "Almond Flour (substituted for Flour) (2 cup)"
+    expect(await screen.findByText(/Almond Flour \(substituted for Flour\).*\(\s*2\s*cup\s*\)/)).toBeTruthy();
+
+    // 'S' button for the original item (Flour) should now be gone
+    expect(screen.queryByTestId('substitution-button-Flour')).toBeNull();
+
+  });
+
+  // Add more tests here for navigation etc.
 
 });
 

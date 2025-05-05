@@ -8,10 +8,13 @@ config.resolver.assetExts = config.resolver.assetExts.filter(ext => ext !== 'svg
 config.resolver.sourceExts.push('svg');
 
 // Explicitly block test files to be sure
-// Default Expo config should do this, but let's be explicit
-const defaultBlockList = config.resolver.blockList || [];
+// Ensure we have an array before spreading
+const existingBlockList = Array.isArray(config.resolver.blockList) 
+                          ? config.resolver.blockList 
+                          : [];
+
 config.resolver.blockList = [
-  ...defaultBlockList,
+  ...existingBlockList, 
   /.*\.test\.tsx?$/,
 ];
 

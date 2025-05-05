@@ -88,3 +88,6 @@ web-build/
 .vscode/
 .idea/
 .vercel
+
+# Future tasks doc
+docs/things_to_do_in_the_future.md
