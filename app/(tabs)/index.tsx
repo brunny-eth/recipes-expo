@@ -164,11 +164,11 @@ export default function HomeScreen() {
             style={styles.contentContainer}
           >
             <View style={{ height: 16 }} />
-            <Text style={styles.title}>Transform recipes</Text>
+            <Text style={styles.title}>Sift and Serve</Text>
             <View style={styles.featuresContainer}>
-              <Text style={styles.featureText}>No ads</Text>
-              <Text style={styles.featureText}>No fluff</Text>
-              <Text style={styles.featureText}>Just recipes</Text>
+              <Text style={styles.featureText}>No essays.</Text>
+              <Text style={styles.featureText}>No ads.</Text>
+              <Text style={styles.featureText}>Just the recipe you came for.</Text>
             </View>
             <View style={{ height: 24 }} />
             <View style={styles.inputContainer}>

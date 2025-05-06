@@ -446,7 +446,10 @@ export default function IngredientsScreen() {
                     </Text>
 
                     {/* Substitution Button - Show only if NOT already substituted */}
-                    {!isSubstituted && ingredient.suggested_substitutions && ingredient.suggested_substitutions.length > 0 && (
+                    {!isSubstituted && 
+                     ingredient.suggested_substitutions && 
+                     ingredient.suggested_substitutions.length > 0 && 
+                     ingredient.suggested_substitutions.some(sub => sub && sub.name != null) && (
                       <TouchableOpacity 
                         style={styles.infoButton}
                         onPress={() => openSubstitutionModal(ingredient)}
