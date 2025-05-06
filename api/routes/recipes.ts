@@ -431,7 +431,9 @@ router.post('/parse', async (req: Request, res: Response) => {
 
 **Parsing Rules:**
 1.  **Sections:** If a section (title, ingredients, instructions) was not successfully extracted or is empty, use null for its value in the JSON.
-2.  **Instructions Array:** ONLY include actionable cooking/preparation steps. Split the provided instructions text into logical step-by-step actions. EXCLUDE serving suggestions, anecdotes, tips, etc. Ensure steps do not have numbering.
+2.  **Instructions Array:** 
+    - ONLY include actionable cooking/preparation steps. Split the provided instructions text into logical step-by-step actions. EXCLUDE serving suggestions, anecdotes, tips, etc. Ensure steps do not have numbering.
+    - **Clarity for Sub-groups:** If an instruction refers to combining a sub-group of ingredients (e.g., 'dressing ingredients', 'tahini ranch ingredients'), and those ingredients are part of the main ingredient list you parsed, rephrase the instruction to explicitly list those specific ingredients. For example, instead of 'combine tahini ranch ingredients', if tahini, chives, and parsley are the ranch ingredients, the instruction should be 'combine tahini, dried chives, and dried parsley, whisking in water to thin...'.
 3.  **Ingredients Array:** 
     - Parse the provided ingredients text into the structured array shown above.
     - **Convert Fractions:** Convert all fractional amounts (e.g., "1 1/2", "3/4") to their decimal representation (e.g., "1.5", "0.75") for the main ingredient's "amount".
@@ -444,7 +446,9 @@ router.post('/parse', async (req: Request, res: Response) => {
     - Base substitution amount/unit on volume/weight where possible, adjust for flavor/texture.
     - If no good substitutions come to mind, use null for "suggested_substitutions".
 5.  **Substitutions Text:** Attempt to find any *explicit substitution notes* mentioned within the original INSTRUCTIONS text and place them in the top-level "substitutions_text" field, otherwise use null.
-6.  **Metadata:** Extract recipe yield (servings), prep time, cook time, total time, and basic nutrition info (calories, protein) if available in the *original* text, otherwise use null.
+6.  **Metadata:** 
+    - **recipeYield:** Diligently extract the recipe yield (servings). Look for terms like "serves", "makes", "yields", "servings", etc., and the associated number (e.g., "serves 4-6", "makes 2 dozen"). If a range is given, use the lower end or the most reasonable single number (e.g., "4-6" becomes "4"). If no explicit yield is found after careful searching of the entire provided text, use null.
+    - Extract prep time, cook time, total time, and basic nutrition info (calories, protein) if available in the *original* text, otherwise use null.
 7.  **Output:** Ensure the output is ONLY the single, strictly valid JSON object described.
 
 **Provided Text Sections:**
