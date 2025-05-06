@@ -222,6 +222,20 @@ async function fetchHtmlWithFallback(
 }
 // --- End Helper Function: Fetch HTML with Fallback ---
 
+// --- Helper Function: Truncate Text by Lines ---
+function truncateTextByLines(text: string | null | undefined, maxLines: number, marker: string = "\n\n[CONTENT TRUNCATED]"): string {
+  if (!text) {
+    return '';
+  }
+  const lines = text.split('\n');
+  if (lines.length > maxLines) {
+    console.log(`Truncating text from ${lines.length} lines to ${maxLines} lines.`);
+    return lines.slice(0, maxLines).join('\n') + marker;
+  }
+  return text;
+}
+// --- End Helper Function: Truncate Text by Lines ---
+
 const router = Router()
 
 // --- Initialize ScraperAPI Client ---
@@ -448,6 +462,19 @@ router.post('/parse', async (req: Request, res: Response) => {
     console.log("Successfully extracted content sections.");
     // --- End Pre-processing ---
 
+    // --- Apply Element-Level Truncation ---
+    const maxIngredientLines = 40; // Max number of ingredient lines
+    const maxInstructionLines = 40; // Max number of instruction lines
+
+    console.log("Original ingredientsText length:", extractedContent.ingredientsText?.split('\n').length);
+    const safeIngredientsText = truncateTextByLines(extractedContent.ingredientsText, maxIngredientLines, "\n\n[INGREDIENTS TRUNCATED]");
+    console.log("safeIngredientsText length after truncation (if any):", safeIngredientsText.split('\n').length);
+
+    console.log("Original instructionsText length:", extractedContent.instructionsText?.split('\n').length);
+    const safeInstructionsText = truncateTextByLines(extractedContent.instructionsText, maxInstructionLines, "\n\n[INSTRUCTIONS TRUNCATED]");
+    console.log("safeInstructionsText length after truncation (if any):", safeInstructionsText.split('\n').length);
+    // --- End Element-Level Truncation ---
+
 
     // --- Step 2: Combined Gemini Parsing (Using Extracted Content) ---
 
@@ -509,10 +536,10 @@ Title:
 ${extractedContent.title || 'N/A'}
 
 Ingredients Text:
-${extractedContent.ingredientsText}
+${safeIngredientsText}
 
 Instructions Text:
-${extractedContent.instructionsText}
+${safeInstructionsText}
 `;
     // --- End UPDATED Prompt --- 
 
@@ -783,6 +810,10 @@ router.post('/scale-instructions', async (req: Request, res: Response) => {
 The ingredients have now been scaled to new quantities: [${scaledIngredientsDesc}].
 
 Your task is to rewrite the provided recipe instructions, carefully adjusting any specific ingredient quantities mentioned in the text to match the *new* scaled quantities. Maintain the original meaning, structure, and step count. Be precise with the numbers.
+
+**Important Scaling Rules for Quantities:**
+- For most ingredients, use the precise scaled quantity.
+- However, for ingredients that are typically used whole and are not easily divisible (e.g., star anise, whole cloves, cinnamon sticks, bay leaves, an egg), if the scaled quantity results in a fraction, round it to the nearest sensible whole number. For example, if scaling results in "1 1/2 star anise", use "2 star anise" or "1 star anise" based on which is closer or makes more culinary sense. If it's "0.25 of an egg", consider if it should be omitted or rounded to 1 if critical, or if the instruction should note to use "a small amount of beaten egg". Use your culinary judgment for sensible rounding of such items.
 
 For example, if an original instruction was "Add 2 cups flour" and the scaled ingredients now list "4 cups flour", the instruction should become "Add 4 cups flour". If an instruction mentions "the onion" and the quantity didn't change or wasn't numeric, leave it as is. Only adjust explicit numeric quantities that correspond to scaled ingredients.
 
