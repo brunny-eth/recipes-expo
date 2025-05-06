@@ -144,6 +144,84 @@ function extractRecipeContent(html: string): { title: string | null, ingredients
 }
 // --- End Helper Function ---
 
+// --- Helper Function: Fetch HTML with Fallback ---
+async function fetchHtmlWithFallback(
+  url: string, 
+  apiKey: string | undefined, // scraperApiKey
+  client: any // scraperClient instance
+): Promise<{ htmlContent: string; fetchMethodUsed: string; error: Error | null }> {
+  let htmlContent = '';
+  let fetchMethodUsed = 'Direct Fetch';
+  let error: Error | null = null;
+  const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36';
+
+  // Attempt 1: Direct Fetch
+  console.log(`Attempting direct fetch from: ${url}`);
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': userAgent,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Referer': 'https://www.google.com/',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'cross-site',
+        'Sec-Fetch-User': '?1',
+        'DNT': '1'
+      }
+    });
+    if (!response.ok) {
+      throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
+    }
+    htmlContent = await response.text();
+    console.log(`Successfully fetched HTML via Direct Fetch. Length: ${htmlContent.length}`);
+  } catch (directErr) {
+    const directFetchError = directErr instanceof Error ? directErr : new Error(String(directErr));
+    console.warn(`Direct fetch failed: ${directFetchError.message}`);
+    error = directFetchError; // Assume error initially
+
+    // Attempt 2: ScraperAPI Fallback (only on 403 or if direct fetch failed for other reasons and key is present)
+    // We'll attempt fallback if directFetchError message contains '403' OR if any direct fetch error occurred and scraperApiKey is present.
+    if (apiKey && (directFetchError.message.includes('Fetch failed: 403') || directFetchError)) {
+      console.log(`Direct fetch failed. Falling back to ScraperAPI... Cause: ${directFetchError.message}`);
+      fetchMethodUsed = 'ScraperAPI Fallback';
+      try {
+        const scraperResponse: any = await client.get(url);
+        if (typeof scraperResponse === 'object' && scraperResponse !== null && typeof scraperResponse.body === 'string' && scraperResponse.body.length > 0) {
+          htmlContent = scraperResponse.body;
+          console.log(`Successfully fetched HTML via ScraperAPI Fallback. Length: ${htmlContent.length}`);
+          error = null; // Clear error as fallback succeeded
+        } else if (typeof scraperResponse === 'string' && scraperResponse.length > 0) {
+          htmlContent = scraperResponse;
+          console.log(`Successfully fetched HTML directly as string via ScraperAPI Fallback. Length: ${htmlContent.length}`);
+          error = null; // Clear error as fallback succeeded
+        } else {
+          let responseString = '';
+          try {
+            responseString = JSON.stringify(scraperResponse);
+          } catch (e) {
+            responseString = String(scraperResponse);
+          }
+          throw new Error(`ScraperAPI fallback returned unexpected response: ${responseString}`);
+        }
+      } catch (scraperErr) {
+        const scraperErrorMessage = scraperErr instanceof Error ? scraperErr.message : String(scraperErr);
+        console.error(`ScraperAPI fallback also failed:`, scraperErr);
+        // Combine error messages
+        error = new Error(`Direct fetch failed (${directFetchError.message}) and ScraperAPI fallback failed (${scraperErrorMessage})`);
+      }
+    } else if (!apiKey && directFetchError) {
+         console.warn('Direct fetch failed and ScraperAPI key is missing. Cannot fallback.');
+         // error is already set to directFetchError
+    }
+  }
+  return { htmlContent, fetchMethodUsed, error };
+}
+// --- End Helper Function: Fetch HTML with Fallback ---
+
 const router = Router()
 
 // --- Initialize ScraperAPI Client ---
@@ -263,9 +341,11 @@ router.post('/', async (req: Request, res: Response) => {
 router.post('/parse', async (req: Request, res: Response) => {
   const requestStartTime = Date.now();
   let timings = {
+    dbCheck: -1, // Added for timing database check
     fetchHtml: -1,
     extractContent: -1,
     geminiCombinedParse: -1,
+    dbInsert: -1, // Added for timing database insert
     total: -1
   };
   let usage = {
@@ -280,10 +360,46 @@ router.post('/parse', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Missing URL in request body' });
     }
 
-    // Check ScraperAPI key
-    if (!scraperApiKey) {
-      return res.status(500).json({ error: 'Server configuration error: Missing ScraperAPI key.' });
+    // --- Check Supabase for Cached Recipe ---
+    const dbCheckStartTime = Date.now();
+    try {
+      const { data: cachedRecipe, error: dbError } = await supabase
+        .from('processed_recipes_cache') // IMPORTANT: Use your actual table name
+        .select('recipe_data') // IMPORTANT: Use your actual column name for the JSON data
+        .eq('url', url)
+        .maybeSingle(); // Use maybeSingle() if a URL might not exist
+
+      timings.dbCheck = Date.now() - dbCheckStartTime;
+
+      if (dbError) {
+        console.error('Error checking cache in Supabase:', dbError);
+        // Decide if you want to fail or proceed if cache check fails
+        // For now, we'll log and proceed
+      }
+
+      if (cachedRecipe && cachedRecipe.recipe_data) {
+        console.log(`Cache hit for URL: ${url}. Returning cached data.`);
+        timings.total = Date.now() - requestStartTime;
+        console.log(`Request Timings (ms): DB Check=${timings.dbCheck}, Total=${timings.total}`);
+        return res.json({
+          message: 'Recipe retrieved from cache.',
+          receivedUrl: url,
+          recipe: cachedRecipe.recipe_data // IMPORTANT: Ensure this matches your column name
+        });
+      }
+      console.log(`Cache miss for URL: ${url}. Proceeding with parsing.`);
+    } catch (cacheError) {
+      timings.dbCheck = Date.now() - dbCheckStartTime;
+      console.error('Exception during cache check:', cacheError);
+      // Proceed with parsing if cache check throws an error
     }
+    // --- End Cache Check ---
+
+    // Check ScraperAPI key
+    // No longer need to check scraperApiKey here as fetchHtmlWithFallback handles it
+    // if (!scraperApiKey) {
+    //   return res.status(500).json({ error: 'Server configuration error: Missing ScraperAPI key.' });
+    // }
     // Check Google AI key
     if (!googleApiKey) {
       return res.status(500).json({ error: 'Server configuration error: Missing Google API key.' });
@@ -292,78 +408,14 @@ router.post('/parse', async (req: Request, res: Response) => {
     // --- Step 1: Fetch HTML (with ScraperAPI fallback on 403) ---
     console.log(`Attempting direct fetch from: ${url}`);
     const fetchStartTime = Date.now();
-    let htmlContent = '';
-    let fetchError: Error | null = null;
-    const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'; // Keep user agent
+    // let htmlContent = ''; // Now handled by helper
+    // let fetchError: Error | null = null; // Now handled by helper
+    // const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'; // Keep user agent
 
-    // --- Attempt 1: Direct Fetch ---
-    try {
-      const response = await fetch(url, {
-        headers: {
-          // Use the comprehensive headers from before
-          'User-Agent': userAgent,
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Accept-Encoding': 'gzip, deflate, br',
-          'Referer': 'https://www.google.com/',
-          'Upgrade-Insecure-Requests': '1',
-          'Sec-Fetch-Dest': 'document',
-          'Sec-Fetch-Mode': 'navigate',
-          'Sec-Fetch-Site': 'cross-site',
-          'Sec-Fetch-User': '?1',
-          'DNT': '1' 
-        }
-      });
-      if (!response.ok) {
-          // Throw an error to trigger the catch block, including status code
-          throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
-      }
-      htmlContent = await response.text();
-      console.log(`Successfully fetched HTML via Direct Fetch. Length: ${htmlContent.length}`);
-
-    } catch (err) {
-      console.warn(`Direct fetch failed: ${err instanceof Error ? err.message : String(err)}`);
-      const directFetchError = err instanceof Error ? err : new Error(String(err)); // Assign to a new const
-      fetchError = directFetchError; // Assign to the broader scoped variable
-
-      // --- Attempt 2: ScraperAPI Fallback (only on 403) ---
-      if (directFetchError.message.includes('Fetch failed: 403')) {
-          console.log(`Direct fetch forbidden (403). Falling back to ScraperAPI...`);
-          fetchMethodUsed = 'ScraperAPI Fallback';
-          try {
-              if (!scraperApiKey) {
-                  throw new Error('ScraperAPI key is missing, cannot fallback.');
-              }
-              const scraperResponse: any = await scraperClient.get(url);
-
-              if (typeof scraperResponse === 'object' && scraperResponse !== null && typeof scraperResponse.body === 'string' && scraperResponse.body.length > 0) {
-                  htmlContent = scraperResponse.body;
-                  console.log(`Successfully fetched HTML via ScraperAPI Fallback. Length: ${htmlContent.length}`);
-                  fetchError = null; // Clear the error as fallback succeeded
-              } else if (typeof scraperResponse === 'string' && scraperResponse.length > 0) {
-                  htmlContent = scraperResponse;
-                  console.log(`Successfully fetched HTML directly as string via ScraperAPI Fallback. Length: ${htmlContent.length}`);
-                  fetchError = null; // Clear the error as fallback succeeded
-              } else {
-                   let responseString = '';
-                    try {
-                        responseString = JSON.stringify(scraperResponse);
-                    } catch (e) {
-                        responseString = String(scraperResponse);
-                    }
-                  throw new Error(`ScraperAPI fallback returned unexpected response: ${responseString}`);
-              }
-          } catch (scraperErr) {
-              console.error(`ScraperAPI fallback also failed:`, scraperErr);
-              const scraperErrorMessage = scraperErr instanceof Error ? scraperErr.message : String(scraperErr);
-              // Now, when creating the new error, directFetchError.message is definitely available.
-              fetchError = new Error(`Direct fetch failed (${directFetchError.message}) and ScraperAPI fallback failed (${scraperErrorMessage})`);
-          }
-      } else {
-          // If the direct fetch error was not a 403, don't fallback.
-          console.log('Direct fetch failed with non-403 error, not falling back to ScraperAPI.');
-      }
-    }
+    const fetchResult = await fetchHtmlWithFallback(url, scraperApiKey, scraperClient);
+    let htmlContent = fetchResult.htmlContent;
+    let fetchError = fetchResult.error;
+    fetchMethodUsed = fetchResult.fetchMethodUsed; // Update fetchMethodUsed from helper
 
     // --- Check Fetch Result --- 
     timings.fetchHtml = Date.now() - fetchStartTime;
@@ -546,6 +598,34 @@ ${extractedContent.instructionsText}
     console.log(`Request Timings (ms): Fetch (${fetchMethodUsed})=${timings.fetchHtml}, Extract=${timings.extractContent}, Gemini Combined Parse=${timings.geminiCombinedParse}, Total=${timings.total}`);
     console.log(`Token Usage: Combined Parse=${usage.combinedParseInputTokens}/${usage.combinedParseOutputTokens} (Input/Output)`);
     console.log("Sending final parsed recipe data to client.");
+
+    // --- Cache the new result before sending response ---
+    if (combinedParsedResult) {
+      const dbInsertStartTime = Date.now();
+      try {
+        const { error: insertError } = await supabase
+          .from('processed_recipes_cache') // IMPORTANT: Use your actual table name
+          .insert({
+            url: url,
+            recipe_data: combinedParsedResult, // IMPORTANT: Use your actual column name
+            // last_processed_at: new Date().toISOString() // Optional: add a timestamp
+          });
+
+        timings.dbInsert = Date.now() - dbInsertStartTime;
+
+        if (insertError) {
+          console.error('Error saving recipe to cache:', insertError);
+          // Don't fail the request if caching fails, just log it.
+        } else {
+          console.log(`Successfully cached new recipe for URL: ${url}`);
+        }
+      } catch (cacheInsertError) {
+        timings.dbInsert = Date.now() - dbInsertStartTime;
+        console.error('Exception during cache insertion:', cacheInsertError);
+      }
+    }
+    // --- End Caching New Result ---
+
     res.json({
       message: 'Recipe processing complete (Combined Parse).',
       receivedUrl: url,
@@ -557,7 +637,7 @@ ${extractedContent.instructionsText}
     console.error('Error in /parse route processing:', error);
     const message = error instanceof Error ? error.message : 'An unknown server error occurred';
     timings.total = Date.now() - requestStartTime;
-    console.log(`Request Timings on Error (ms): Fetch (${fetchMethodUsed})=${timings.fetchHtml > 0 ? timings.fetchHtml : 'N/A'}, Extract=${timings.extractContent > 0 ? timings.extractContent : 'N/A'}, Gemini Combined Parse=${timings.geminiCombinedParse > 0 ? timings.geminiCombinedParse : 'N/A'}, Total=${timings.total}`);
+    console.log(`Request Timings on Error (ms): DB Check=${timings.dbCheck > 0 ? timings.dbCheck : 'N/A'}, Fetch (${fetchMethodUsed})=${timings.fetchHtml > 0 ? timings.fetchHtml : 'N/A'}, Extract=${timings.extractContent > 0 ? timings.extractContent : 'N/A'}, Gemini Combined Parse=${timings.geminiCombinedParse > 0 ? timings.geminiCombinedParse : 'N/A'}, DB Insert=${timings.dbInsert > 0 ? timings.dbInsert : 'N/A'}, Total=${timings.total}`);
     console.log(`Token Usage on Error: Combined Parse=${usage.combinedParseInputTokens > 0 ? usage.combinedParseInputTokens : 'N/A'}/${usage.combinedParseOutputTokens > 0 ? usage.combinedParseOutputTokens : 'N/A'} (Input/Output)`);
     res.status(500).json({ error: message });
   }
