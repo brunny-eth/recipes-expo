@@ -159,7 +159,10 @@ export default function RecipeSummaryScreen() {
         {/* Nutrition Info Section Removed */}
 
         {/* Servings Selector */} 
-        <Text style={styles.sectionTitle}>How many servings?</Text>
+        <Text style={styles.sectionTitle}>Adjust Recipe Size</Text>
+        <Text style={styles.servingQuestionPrompt}>
+          {`This recipe is currently set for ${recipe.recipeYield ? `${recipe.recipeYield} servings` : 'its original servings'}. How many servings would you like to prepare?`}
+        </Text>
         <View style={styles.servingsContainer}>
           {servingOptions.map(num => (
             <TouchableOpacity 
@@ -360,6 +363,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-Medium',
     fontSize: 16,
     color: COLORS.textDark,
+  },
+  servingQuestionPrompt: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 16,
+    color: COLORS.textDark,
+    marginBottom: 10,
   },
   // Add styles for loading/error states if needed
 }); 

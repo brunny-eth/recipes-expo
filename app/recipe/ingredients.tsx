@@ -36,7 +36,7 @@ type IngredientsNavParams = {
 // --- End Types ---
 
 // --- Helper function for unit abbreviation (kept for display) ---
-const abbreviateUnit = (unit: string | null): string | null => {
+export const abbreviateUnit = (unit: string | null): string | null => {
   if (!unit) return null;
   const lowerUnit = unit.toLowerCase();
   switch (lowerUnit) {
@@ -544,10 +544,12 @@ const styles = StyleSheet.create({
     padding: 8, 
   },
   headerTitle: {
+    flex: 1,
     textAlign: 'center',
     fontFamily: 'Poppins-SemiBold',
     fontSize: 18,
     color: COLORS.raisinBlack,
+    marginHorizontal: 8,
   },
   placeholder: {
     width: 24 + 16,
