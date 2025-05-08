@@ -4,10 +4,24 @@
     "lib": ["es2020"],
     "module": "commonjs",
     "moduleResolution": "node",
-    "rootDir": ".",
     "esModuleInterop": true,
     "strict": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "baseUrl": ".",
+    "typeRoots": [
+      "./types"
+    ]
   },
-  "include": ["**/*.ts"]
+  "include": [
+    "routes/**/*.ts"
+  ],
+  "files": [
+    "types/scraperapi-sdk.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "../node_modules"
+  ]
 } 
