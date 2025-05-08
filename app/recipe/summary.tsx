@@ -39,6 +39,27 @@ type IngredientsNavParams = {
 };
 // --- End Types ---
 
+// --- NEW Helper Function to parse yield string ---
+function parseYieldString(yieldStr: string | null | undefined): number | null {
+  if (!yieldStr) return null;
+  // Try to get the first number in the string
+  // This regex handles integers, and potentially the first number in a range like "4-6"
+  const match = yieldStr.match(/\d+/);
+  if (match && match[0]) {
+    const num = parseInt(match[0], 10);
+    return !isNaN(num) && num > 0 ? num : null;
+  }
+  // Fallback for simple worded numbers (optional, can be expanded)
+  // This is a very basic example, a more robust library might be needed for complex cases
+  const lowerYieldStr = yieldStr.toLowerCase();
+  if (lowerYieldStr.includes("one")) return 1;
+  if (lowerYieldStr.includes("two")) return 2;
+  // Add more common words if necessary
+
+  return null;
+}
+// --- End NEW Helper Function ---
+
 export default function RecipeSummaryScreen() {
   const params = useLocalSearchParams<{ recipeData?: string }>();
   const router = useRouter();
@@ -53,10 +74,14 @@ export default function RecipeSummaryScreen() {
       try {
         const parsed = JSON.parse(params.recipeData) as ParsedRecipe;
         setRecipe(parsed);
-        // Optionally set initial servings based on recipeYield if parseable
-        const yieldNum = parseInt(parsed.recipeYield || '4', 10);
-        if (!isNaN(yieldNum) && yieldNum > 0) {
+        
+        // Use the new parseYieldString helper, with a default of 4 if null or invalid
+        const yieldNum = parseYieldString(parsed.recipeYield) ?? 4; 
+
+        if (yieldNum > 0) { // isNaN check is covered by parseYieldString returning null
           setSelectedServings(yieldNum);
+        } else {
+          setSelectedServings(4); // Explicitly default to 4 if yieldNum ended up not positive
         }
       } catch (e) {
         console.error("Failed to parse recipe data on summary screen:", e);

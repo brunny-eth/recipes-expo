@@ -61,20 +61,27 @@ export default function HomeScreen() {
   }, []);
 
   const handleSubmit = async () => {
-    // --- Basic URL Validation --- 
-    const urlPattern = new RegExp('^(https?:\\/\\/)?'+ // protocol
-    '((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.?)+[a-z]{2,}|((\\d{1,3}\\.){3}\\d{1,3}))'+ // domain name or ip
-    '(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*'+ // port and path
-    '(\\?[;&a-z\\d%_.~+=-]*)?'+ // query string
-    '(\\#[-a-z\\d_]*)?$','i'); // fragment locator
+    // --- REMOVE Strict URL Validation, keep only a basic check for non-empty input ---
+    // const urlPattern = new RegExp('^(https?:\\/\\/)?'+
+    // '((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.?)+[a-z]{2,}|((\\d{1,3}\\.){3}\\d{1,3}))'+
+    // '(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*'+
+    // '(\\?[;&a-z\\d%_.~+=-]*)?'+
+    // '(\\#[-a-z\\d_]*)?$','i');
 
-    if (!recipeUrl || !urlPattern.test(recipeUrl)) {
-        Alert.alert("Invalid Input", "Please enter a valid recipe URL starting with http:// or https://");
-        return; // Stop execution if validation fails
+    // if (!recipeUrl || !urlPattern.test(recipeUrl)) {
+    //     Alert.alert("Invalid Input", "Please enter a valid recipe URL starting with http:// or https://");
+    //     return; // Stop execution if validation fails
+    // }
+
+    if (!recipeUrl || recipeUrl.trim() === '') {
+        Alert.alert("Input Required", "Please paste a recipe URL or recipe text.");
+        return; // Stop execution if input is empty
     }
-    // --- End Validation ---
+    // --- End Validation Update ---
 
-    if (!recipeUrl) return; // This check is somewhat redundant now but safe to keep
+    // if (!recipeUrl) return; // This check is somewhat redundant now but safe to keep
+    // Renaming recipeUrl to recipeInput for clarity, though the state variable name remains recipeUrl
+    const recipeInput = recipeUrl.trim();
     
     Keyboard.dismiss();
     setIsLoading(true);
@@ -83,13 +90,13 @@ export default function HomeScreen() {
     const backendUrl = 'http://192.168.1.99:3000/api/recipes/parse'; 
 
     try {
-      console.log(`Sending request to: ${backendUrl} with URL: ${recipeUrl}`);
+      console.log(`Sending request to: ${backendUrl} with URL: ${recipeInput}`);
       const response = await fetch(backendUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ url: recipeUrl }),
+        body: JSON.stringify({ input: recipeInput }), // Changed from url: recipeUrl to input: recipeInput
       });
 
       const result = await response.json();
