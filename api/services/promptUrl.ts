@@ -87,9 +87,10 @@ export async function handleRecipeUrl(
   const maxInstructionLines = 40; 
   const safeIngredientsText = truncateTextByLines(extractedContent.ingredientsText, maxIngredientLines, "\n\n[INGREDIENTS TRUNCATED BY SYSTEM]");
   const safeInstructionsText = truncateTextByLines(extractedContent.instructionsText, maxInstructionLines, "\n\n[INSTRUCTIONS TRUNCATED BY SYSTEM]");
+  // const safeRecipeYieldText = truncateTextByLines(extractedContent.recipeYieldText, 5, "\n\n[YIELD TRUNCATED]"); // Optional: truncate if it can be very long
 
   // Step 2: Gemini Parsing
-  const combinedPromptForUrl = `You are provided with pre-extracted text sections for a recipe's title, ingredients, and instructions. Your goal is to parse ALL information into a single, specific JSON object.
+  const combinedPromptForUrl = `You are provided with pre-extracted text sections for a recipe. Your goal is to parse ALL information into a single, specific JSON object.
 
 **Desired JSON Structure:**
 { 
@@ -136,14 +137,17 @@ export async function handleRecipeUrl(
     - If no good substitutions come to mind, use null for "suggested_substitutions".
 5.  **Substitutions Text:** Attempt to find any *explicit substitution notes* mentioned within the original INSTRUCTIONS text and place them in the top-level "substitutions_text" field, otherwise use null.
 6.  **Metadata:** 
-    - **recipeYield:** Diligently extract the recipe yield (servings). Look for terms like "serves", "makes", "yields", "servings", etc., from the *original text sections provided*, and the associated number (e.g., "serves 4-6", "makes 2 dozen"). If a range is given, use the lower end or the most reasonable single number (e.g., "4-6" becomes "4"). If no explicit yield is found after careful searching of the entire provided text, use null.
-    - Extract prepTime, cookTime, total time, and basic nutrition info (calories, protein) if available in the *original text sections provided*, otherwise use null.
+    - **recipeYield:** Your primary source for recipe yield (servings) should be the "Explicit Recipe Yield Text" provided below. This text is specifically extracted from fields likely to contain only the yield. Parse the number from this text (e.g., "Servings: 6" becomes "6"; "Makes 2 dozen" becomes "24" or "2 dozen" based on your judgment of what is more useful as a string). If this explicit text is missing, empty, or clearly not a yield, then secondarily look for terms like "serves", "makes", "yields", "servings" in the main "Instructions Text" or "Ingredients Text", and the associated number. If a range is given (e.g., "4-6") in these secondary texts, use the higher end of the range (e.g., "4-6" becomes "6"). If only a single number is provided, use that number. If no yield is found, use null.
+    - Extract prepTime, cookTime, total time, and basic nutrition info (calories, protein) if available in the *original text sections provided* (prioritizing any explicit metadata text if we add it later), otherwise use null.
 7.  **Output:** Ensure the output is ONLY the single, strictly valid JSON object described.
 
 **Provided Text Sections:**
 
 Title:
 ${extractedContent.title || 'N/A'}
+
+Explicit Recipe Yield Text:
+${extractedContent.recipeYieldText || 'N/A'}
 
 Ingredients Text:
 ${safeIngredientsText || 'N/A'}

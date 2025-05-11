@@ -253,6 +253,8 @@ export default function StepsScreen() {
           handleTimerAddSeconds={handleTimerAddSeconds}
           handleTimerStartPause={handleTimerStartPause}
           handleTimerReset={handleTimerReset}
+          recipeInstructions={instructions}
+          recipeSubstitutions={substitutions}
       />
 
       {!isToolsPanelVisible && isTimerActive && timerTimeRemaining > 0 && (

@@ -76,28 +76,6 @@ const geminiModel = genAI.getGenerativeModel({
     safetySettings: safetySettings,
 });
 
-// --- NEW Handler Function: Process Raw Recipe Text --- DELETED
-// async function handleRawTextRecipe(
-//   rawText: string,
-//   requestId: string,
-//   geminiModel: GeminiModel // Passed the initialized model
-// ): Promise<{ 
-//   recipe: CombinedParsedRecipe | null; 
-// ... function body deleted ...
-// })
-
-// --- REFACTORED Handler Function: Process Recipe URL --- DELETED
-// async function handleRecipeUrl(
-//   url: string,
-//   requestId: string,
-//   geminiModel: GeminiModel, // Passed the initialized model
-//   scraperApiKey: string | undefined, // Passed API key
-//   scraperClient: any // Passed client instance
-// ): Promise<{
-//   recipe: CombinedParsedRecipe | null;
-// ... function body deleted ...
-// }
-
 // Get all recipes
 router.get('/', async (req: Request, res: Response) => {
   try {

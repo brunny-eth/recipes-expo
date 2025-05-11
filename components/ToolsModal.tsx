@@ -20,6 +20,7 @@ import { COLORS } from '@/constants/theme';
 import ChefHat from '@/assets/images/Chef.svg';
 import TimerTool from './TimerTool';
 import UnitsTool from './UnitsTool';
+import HelpTool from './HelpTool';
 
 export type ActiveTool = 'timer' | 'units' | 'help' | null;
 
@@ -33,6 +34,8 @@ interface ToolsModalProps {
   handleTimerStartPause: () => void;
   handleTimerReset: () => void;
   formatTime: (timeInSeconds: number) => string;
+  recipeInstructions?: string[];
+  recipeSubstitutions?: string | null;
 }
 
 export default function ToolsModal({
@@ -45,6 +48,8 @@ export default function ToolsModal({
   handleTimerStartPause,
   handleTimerReset,
   formatTime,
+  recipeInstructions,
+  recipeSubstitutions,
 }: ToolsModalProps) {
   const [activeTool, setActiveTool] = useState<ActiveTool>(null);
 
@@ -72,7 +77,7 @@ export default function ToolsModal({
       case 'units':
         return <UnitsTool />;
       case 'help':
-        return <Text style={styles.toolPlaceholderText}>Help Feature Coming Soon!</Text>;
+        return <HelpTool recipeInstructions={recipeInstructions} recipeSubstitutions={recipeSubstitutions} />;
       default:
         return (
           <View style={styles.placeholderContainer}>
@@ -126,7 +131,10 @@ export default function ToolsModal({
               </TouchableOpacity>
             </View>
 
-            <View style={styles.toolContentContainer}>
+            <View style={[
+              styles.toolContentContainer,
+              activeTool === 'help' && styles.toolContentContainerHelpActive
+            ]}>
               {renderToolContent()}
             </View>
           </Pressable>
@@ -211,6 +219,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     minHeight: 150,
     justifyContent: 'center',
+  },
+  toolContentContainerHelpActive: {
+    minHeight: 450,
+    width: '100%',
+    justifyContent: 'flex-start',
+    alignItems: 'stretch',
   },
   placeholderContainer: {
     alignItems: 'center',

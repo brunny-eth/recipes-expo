@@ -5,6 +5,7 @@ type ExtractedContent = {
   title: string | null;
   ingredientsText: string | null;
   instructionsText: string | null;
+  recipeYieldText?: string | null;
 };
 
 /**
@@ -18,6 +19,7 @@ export function extractRecipeContent(html: string): ExtractedContent {
   let title: string | null = null;
   let ingredientsText: string | null = null;
   let instructionsText: string | null = null;
+  let recipeYieldText: string | null = null;
 
   // Tier 1: Try JSON-LD
   let recipeJson: any = null;
@@ -66,19 +68,30 @@ export function extractRecipeContent(html: string): ExtractedContent {
                 .join('\n');
         }
     }
+    // Extract recipeYield from JSON-LD if available
+    if (recipeJson.recipeYield) {
+      if (Array.isArray(recipeJson.recipeYield)) {
+        // Handle cases where yield might be an array (e.g., "6 servings", "makes 12 cookies")
+        // We'll take the first one or try to make sense of it.
+        // For simplicity, join if it's an array of strings, or take first if complex.
+        recipeYieldText = recipeJson.recipeYield.join(', '); // Or more sophisticated joining
+      } else {
+        recipeYieldText = String(recipeJson.recipeYield);
+      }
+    }
     // Fallback title extraction if needed, only if JSON-LD didn't yield one
     if (!title) title = $('title').first().text() || $('h1').first().text() || null;
 
-    console.log(`Extracted from JSON-LD - Title: ${!!title}, Ingredients: ${!!ingredientsText}, Instructions: ${!!instructionsText}`);
+    console.log(`Extracted from JSON-LD - Title: ${!!title}, Ingredients: ${!!ingredientsText}, Instructions: ${!!instructionsText}, Yield: ${!!recipeYieldText}`);
     // If JSON-LD provides all key parts, prefer it and return early
-    if (title && ingredientsText && instructionsText) {
-        return { title, ingredientsText, instructionsText };
+    if (title && ingredientsText && instructionsText && recipeYieldText) {
+        return { title, ingredientsText, instructionsText, recipeYieldText };
     }
     // Continue to selector fallback if JSON-LD was incomplete
   }
 
   // Tier 2: Fallback to Selectors (or run if JSON-LD was incomplete)
-  console.log("JSON-LD not found or incomplete. Trying selectors.");
+  console.log("JSON-LD not found or incomplete for all fields. Trying selectors.");
   if (!title) { // Only grab title from selectors if JSON-LD (or its internal fallback) didn't provide it
     title = $('title').first().text() || $('h1').first().text() || null;
   }
@@ -161,6 +174,55 @@ export function extractRecipeContent(html: string): ExtractedContent {
       }
   }
 
-  console.log(`Final Extracted Content - Title: ${!!title}, Ingredients: ${!!ingredientsText}, Instructions: ${!!instructionsText}`);
-  return { title, ingredientsText, instructionsText };
+  // Yield Selectors (new section)
+  if (!recipeYieldText) { // Only run if JSON-LD didn't provide it
+    const yieldSelectors = [
+      '.wprm-recipe-servings', '.wprm-recipe-yield',
+      '.tasty-recipes-yield', '.tasty-recipes-details .recipe-yield',
+      '.easyrecipe-servings', '.mf-recipe-servings',
+      '[itemprop="recipeYield"]', '[data-mv-recipe-meta="servings"] .mv-value',
+      // Generic selectors looking for keywords if specific classes fail
+      'div:contains("Servings:")', 'span:contains("Servings:")', 'p:contains("Servings:")',
+      'div:contains("Yield:")', 'span:contains("Yield:")', 'p:contains("Yield:")',
+      'div:contains("Makes:")', 'span:contains("Makes:")', 'p:contains("Makes:")'
+    ];
+    let foundYield = false;
+    for (const selector of yieldSelectors) {
+      if (foundYield) break;
+      // For keyword selectors, we need more careful extraction
+      if (selector.includes(':contains')) {
+        const keyword = selector.substring(selector.indexOf('"') + 1, selector.lastIndexOf('"'));
+        const tagName = selector.substring(0, selector.indexOf(':'));
+        $(tagName).each((_, el) => {
+          const elementText = $(el).text();
+          if (elementText.toLowerCase().includes(keyword.toLowerCase())) {
+            // Try to get the most specific text containing the keyword and its value
+            // This is a simple approach; might need refinement
+            const lines = elementText.split('\n').map(line => line.trim()).filter(line => line.toLowerCase().includes(keyword.toLowerCase()));
+            if (lines.length > 0) {
+              recipeYieldText = lines[0]; // Take the first line that contains the keyword
+              foundYield = true;
+              return false; // Break from .each()
+            }
+          }
+        });
+      } else {
+        // For class/attribute selectors
+        $(selector).each((_, el) => {
+          const text = $(el).text().trim();
+          if (text) {
+            recipeYieldText = text;
+            foundYield = true;
+            return false; // Break from .each()
+          }
+        });
+      }
+    }
+    if (recipeYieldText) {
+      console.log(`Extracted recipeYieldText using selectors: ${recipeYieldText}`);
+    }
+  }
+
+  console.log(`Final Extracted Content - Title: ${!!title}, Ingredients: ${!!ingredientsText}, Instructions: ${!!instructionsText}, Yield: ${!!recipeYieldText}`);
+  return { title, ingredientsText, instructionsText, recipeYieldText };
 }
