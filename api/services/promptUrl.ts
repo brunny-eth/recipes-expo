@@ -1,75 +1,32 @@
-import { GoogleGenerativeAI, GenerationConfig } from "@google/generative-ai";
-import { fetchHtmlWithFallback } from './htmlFetch';
-import { extractRecipeContent } from './extractContent';
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { truncateTextByLines } from '../utils/truncate';
-import { CombinedParsedRecipe, GeminiModel } from '../types';
+import { CombinedParsedRecipe, GeminiModel, GeminiHandlerResponse } from '../types';
+import { ExtractedContent } from './extractContent'; // Need this type
+import { normalizeUsageMetadata, StandardizedUsage } from '../utils/usageUtils'; // Import the new utility
 
-export async function handleRecipeUrl(
-  url: string,
-  requestId: string,
-  geminiModel: GeminiModel, // Pass the initialized model
-  scraperApiKey: string | undefined, // Pass API key
-  scraperClient: any // Pass client instance
-): Promise<{
-  recipe: CombinedParsedRecipe | null;
-  error: string | null;
-  fetchMethodUsed: string;
-  timings: { fetchHtml: number; extractContent: number; geminiCombinedParse: number; totalProcessingNoCache: number };
-  usage: { combinedParseInputTokens: number; combinedParseOutputTokens: number; };
-}> {
-  const handlerStartTime = Date.now();
-  console.log(`[${requestId}] Starting URL recipe processing for: ${url}`);
-  let timings = { fetchHtml: -1, extractContent: -1, geminiCombinedParse: -1, totalProcessingNoCache: -1 };
-  let usage = { combinedParseInputTokens: 0, combinedParseOutputTokens: 0 };
-  let combinedParsedResult: CombinedParsedRecipe | null = null;
-  let processingError: string | null = null;
-  let fetchMethodUsed = 'Direct Fetch';
+// --- New function for Gemini Parsing of URL content ---
+export async function parseUrlContentWithGemini(
+    extractedContent: ExtractedContent,
+    requestId: string,
+    geminiModel: GeminiModel
+): Promise<GeminiHandlerResponse> {
+    const handlerStartTime = Date.now(); // For timing this specific step
+    console.log(`[${requestId}] Starting Gemini parsing for extracted URL content.`);
+    let usage: StandardizedUsage = { inputTokens: 0, outputTokens: 0 };
+    let combinedParsedResult: CombinedParsedRecipe | null = null;
+    let processingError: string | null = null;
 
-  // Step 1: Fetch HTML
-  const fetchStartTime = Date.now();
-  // Use the passed-in key and client
-  const fetchResult = await fetchHtmlWithFallback(url, scraperApiKey, scraperClient); 
-  let htmlContent = fetchResult.htmlContent;
-  let fetchError = fetchResult.error;
-  fetchMethodUsed = fetchResult.fetchMethodUsed;
-  timings.fetchHtml = Date.now() - fetchStartTime;
 
-  if (fetchError) {
-      console.error(`[${requestId}] Fetch process failed for URL ${url}: ${fetchError.message}`);
-      processingError = `Failed to retrieve recipe content from ${url}: ${fetchError.message}`;
-  } else if (htmlContent.length === 0) {
-      const finalErrorMessage = 'HTML content was empty after fetch attempts';
-      console.error(`[${requestId}] Fetch process failed for URL ${url}: ${finalErrorMessage}`);
-      processingError = `Failed to retrieve recipe content from ${url}: ${finalErrorMessage}`;
-  }
+    // Truncate Extracted Content (moved from old handleRecipeUrl)
+    const maxIngredientLines = 40;
+    const maxInstructionLines = 40;
+    const safeIngredientsText = truncateTextByLines(extractedContent.ingredientsText, maxIngredientLines, "\n\n[INGREDIENTS TRUNCATED BY SYSTEM]");
+    const safeInstructionsText = truncateTextByLines(extractedContent.instructionsText, maxInstructionLines, "\n\n[INSTRUCTIONS TRUNCATED BY SYSTEM]");
+    // const safeRecipeYieldText = truncateTextByLines(extractedContent.recipeYieldText, 5, "\n\n[YIELD TRUNCATED]");
 
-  if (processingError) {
-    timings.totalProcessingNoCache = Date.now() - handlerStartTime;
-    return { recipe: null, error: processingError, fetchMethodUsed, timings, usage };
-  }
-  console.log(`[${requestId}] Using HTML content obtained via: ${fetchMethodUsed} (URL: ${url}, Length: ${htmlContent.length})`);
 
-  // Step 1.5: Extract Content
-  console.log(`[${requestId}] Pre-processing HTML with cheerio for URL: ${url}...`);
-  const extractStartTime = Date.now();
-  const extractedContent = extractRecipeContent(htmlContent);
-  timings.extractContent = Date.now() - extractStartTime;
-
-  if (!extractedContent.ingredientsText || !extractedContent.instructionsText) {
-      console.warn(`[${requestId}] Failed to extract clear ingredients or instructions using cheerio for URL: ${url}. Will proceed with what was found (or nulls).`);
-  } else {
-      console.log(`[${requestId}] Successfully extracted content sections for URL: ${url}.`);
-  }
-  
-  // Step 1.6: Truncate Extracted Content
-  const maxIngredientLines = 40; 
-  const maxInstructionLines = 40; 
-  const safeIngredientsText = truncateTextByLines(extractedContent.ingredientsText, maxIngredientLines, "\n\n[INGREDIENTS TRUNCATED BY SYSTEM]");
-  const safeInstructionsText = truncateTextByLines(extractedContent.instructionsText, maxInstructionLines, "\n\n[INSTRUCTIONS TRUNCATED BY SYSTEM]");
-  // const safeRecipeYieldText = truncateTextByLines(extractedContent.recipeYieldText, 5, "\n\n[YIELD TRUNCATED]"); // Optional: truncate if it can be very long
-
-  // Step 2: Gemini Parsing
-  const combinedPromptForUrl = `You are provided with pre-extracted text sections for a recipe. Your goal is to parse ALL information into a single, specific JSON object.
+    // Gemini Prompt (copied from old handleRecipeUrl, using extractedContent)
+    const combinedPromptForUrl = `You are provided with pre-extracted text sections for a recipe. Your goal is to parse ALL information into a single, specific JSON object.
 
 **Desired JSON Structure:**
 { 
@@ -91,11 +48,14 @@ export async function handleRecipeUrl(
   ] | null, 
   "instructions": "array of strings, each a single step without numbering | null", 
   "substitutions_text": "string | null", 
-  "recipeYield": "string | null", 
-  "prepTime": "string | null", 
-  "cookTime": "string | null", 
-  "totalTime": "string | null", 
-  "nutrition": { "calories": "string | null", "protein": "string | null" } | null 
+  "recipeYield": "string | null", // Examples: "6 servings", "12 cookies", "Makes one 9-inch pie"
+  "prepTime": "string | null",     // Examples: "15 minutes", "20 min", "Approx. 10 mins"
+  "cookTime": "string | null",     // Examples: "1 hour", "45 min", "90 minutes"
+  "totalTime": "string | null",    // Examples: "1 hr 15 min", "About 1 hour"
+  "nutrition": { 
+    "calories": "string | null", // Example: "350 kcal", "400 calories per serving"
+    "protein": "string | null"  // Example: "15g protein", "20 grams protein"
+  } | null 
 }
 
 **Parsing Rules:**
@@ -116,9 +76,11 @@ export async function handleRecipeUrl(
     - If no good substitutions come to mind, use null for "suggested_substitutions".
 5.  **Substitutions Text:** Attempt to find any *explicit substitution notes* mentioned within the original INSTRUCTIONS text and place them in the top-level "substitutions_text" field, otherwise use null.
 6.  **Metadata:** 
-    - **recipeYield:** Your primary source for recipe yield (servings) should be the "Explicit Recipe Yield Text" provided below. This text is specifically extracted from fields likely to contain only the yield. Parse the number from this text (e.g., "Servings: 6" becomes "6"; "Makes 2 dozen" becomes "24" or "2 dozen" based on your judgment of what is more useful as a string). If this explicit text is missing, empty, or clearly not a yield, then secondarily look for terms like "serves", "makes", "yields", "servings" in the main "Instructions Text" or "Ingredients Text", and the associated number. If a range is given (e.g., "4-6") in these secondary texts, use the higher end of the range (e.g., "4-6" becomes "6"). If only a single number is provided, use that number. If no yield is found, use null.
-    - Extract prepTime, cookTime, total time, and basic nutrition info (calories, protein) if available in the *original text sections provided* (prioritizing any explicit metadata text if we add it later), otherwise use null.
-7.  **Output:** Ensure the output is ONLY the single, strictly valid JSON object described.
+    - **VERY IMPORTANT:** If a value for a field (like prepTime, cookTime, totalTime, recipeYield, nutrition) is not explicitly found in the provided text, you MUST return \`null\` for that field in the JSON. DO NOT use "N/A", "0", or make up values. Be precise.
+    - **recipeYield:** Your primary source for recipe yield (servings) should be the "Explicit Recipe Yield Text" provided below. This text is specifically extracted from fields likely to contain only the yield. Parse the yield description from this text (e.g., "Servings: 6" becomes "6 servings"; "Makes 2 dozen cookies" becomes "2 dozen cookies"; "Yield: 1 loaf" becomes "1 loaf"). If this explicit text is missing, empty, or clearly not a yield, then secondarily look for terms like "serves", "makes", "yields", "servings" in the main "Instructions Text" or "Ingredients Text", and extract the description. If no yield is found, use null.
+    - **Time Fields (prepTime, cookTime, totalTime):** Look for explicit mentions like "Prep Time: 15 min", "Cook: 45 minutes", "Total Time: 1 hr". Extract the value exactly as stated (e.g., "15 min", "45 minutes", "1 hr"). Return null if not found.
+    - **Nutrition:** Look for nutrition information, specifically "calories" and "protein". Extract the values if present (e.g., "350 kcal", "15g protein"). The entire "nutrition" object should be null if neither calories nor protein is found. If one is found but not the other, return the found value and null for the missing one within the nutrition object.
+7.  **Output:** Ensure the output is ONLY the single, strictly valid JSON object described. Do not include explanations, markdown formatting, or any text outside the JSON structure.
 
 **Provided Text Sections:**
 
@@ -134,79 +96,110 @@ ${safeIngredientsText || 'N/A'}
 Instructions Text:
 ${safeInstructionsText || 'N/A'}
 `;
-  
-  console.log(`[${requestId}] Sending combined parsing request to Gemini for URL ${url} (prompt length: ${combinedPromptForUrl.length})`);
-  let combinedGeminiError = null;
-  const geminiCombinedStartTime = Date.now();
 
-  try {
-    if (combinedPromptForUrl.length > 150000) { 
-        throw new Error(`URL Combined prompt is too large (${combinedPromptForUrl.length} chars).`);
-    }
-    // Use the passed-in model
-    const result = await geminiModel.generateContent(combinedPromptForUrl);
-    const response = result.response;
-    const responseText = response.text();
 
-    usage.combinedParseInputTokens = response.usageMetadata?.promptTokenCount || 0;
-    usage.combinedParseOutputTokens = response.usageMetadata?.candidatesTokenCount || 0;
-    
-    const previewText = responseText ? (responseText.length > 300 ? responseText.substring(0, 300) + "..." : responseText) : "EMPTY";
-    console.log(`[${requestId}] Gemini (URL Parse) raw JSON response: ${previewText}`);
+    console.log(`[${requestId}] Sending combined parsing request to Gemini for extracted URL content (prompt length: ${combinedPromptForUrl.length})`);
+    const geminiCombinedStartTime = Date.now();
 
-    if (responseText) {
-        try {
-            combinedParsedResult = JSON.parse(responseText) as CombinedParsedRecipe;
-            if (typeof combinedParsedResult !== 'object' || combinedParsedResult === null) {
-                 throw new Error("Parsed JSON is not an object.");
-            }
-             if (combinedParsedResult.ingredients && !Array.isArray(combinedParsedResult.ingredients)) {
-                 console.warn(`[${requestId}] Gemini returned non-array for ingredients (URL), setting to null.`);
-                 combinedParsedResult.ingredients = null;
-             } else if (Array.isArray(combinedParsedResult.ingredients)) {
-                 const isValidStructure = combinedParsedResult.ingredients.every(ing => 
-                     typeof ing === 'object' && ing !== null && 'name' in ing && 'amount' in ing && 'unit' in ing
-                 );
-                 if (!isValidStructure) {
-                     console.warn(`[${requestId}] Some ingredients (URL) in the array might not have the expected structure.`);
-                 }
-             }
-             if (combinedParsedResult.instructions && !Array.isArray(combinedParsedResult.instructions)) {
-                 console.warn(`[${requestId}] Gemini returned non-array for instructions (URL), setting to null.`);
-                 combinedParsedResult.instructions = null;
-             }
-             console.log(`[${requestId}] Successfully parsed combined JSON from Gemini (URL) response.`);
-        } catch(parseError) {
-            console.error(`[${requestId}] Failed to parse JSON response from Gemini (URL Parse) for ${url}:`, parseError);
-            console.error(`[${requestId}] Raw Response that failed parsing (URL):`, responseText); 
-            combinedGeminiError = "Invalid JSON received from AI parser for URL.";
+
+    try {
+        if (combinedPromptForUrl.length > 150000) { // Keep safety check
+            throw new Error(`URL Combined prompt is too large (${combinedPromptForUrl.length} chars).`);
         }
-    } else {
-        combinedGeminiError = 'Empty response received from AI parser for URL.';
-    }
-  } catch (err) {
-    console.error(`[${requestId}] Error calling Gemini API (URL Parse) for ${url} or processing result:`, err);
-    combinedGeminiError = err instanceof Error ? err.message : 'An unknown error occurred calling Gemini for URL';
-    if ((err as any)?.response?.promptFeedback?.blockReason) {
-         combinedGeminiError = `Gemini blocked the prompt/response for URL ${url}: ${ (err as any).response.promptFeedback.blockReason }`;
-         console.error(`[${requestId}] Gemini prompt/response blocked for URL. Reason: ${(err as any).response.promptFeedback.blockReason}`);
-         if ((err as any).response.promptFeedback.safetyRatings) {
-            console.error(`[${requestId}] Safety Ratings:`, JSON.stringify((err as any).response.promptFeedback.safetyRatings, null, 2));
-         }
-    }
-  } finally {
-    timings.geminiCombinedParse = Date.now() - geminiCombinedStartTime;
-  }
+        const result = await geminiModel.generateContent(combinedPromptForUrl);
+        const response = result.response;
+        const responseText = response.text();
 
-  if (combinedGeminiError) {
-    processingError = `Failed combined recipe parse from URL ${url}: ${combinedGeminiError}`;
-  } else if (!combinedParsedResult) {
-    processingError = `Failed to get parsed data from AI for URL ${url}.`;
-  }
-  
-  timings.totalProcessingNoCache = Date.now() - handlerStartTime;
-  console.log(`[${requestId}] URL processing finished (before cache insert) for ${url}. Fetch=${timings.fetchHtml}ms, Extract=${timings.extractContent}ms, Gemini=${timings.geminiCombinedParse}ms, HandlerTotal=${timings.totalProcessingNoCache}ms`);
-  console.log(`[${requestId}] Token Usage (URL for ${url}): Input=${usage.combinedParseInputTokens}, Output=${usage.combinedParseOutputTokens}`);
-  
-  return { recipe: combinedParsedResult, error: processingError, fetchMethodUsed, timings, usage };
-} 
+
+        usage = normalizeUsageMetadata(response.usageMetadata, 'gemini');
+
+
+        const previewText = responseText ? (responseText.length > 300 ? responseText.substring(0, 300) + "..." : responseText) : "EMPTY";
+        console.log(`[${requestId}] Gemini (URL Parse) raw JSON response preview: ${previewText}`);
+
+
+        if (responseText) {
+            try {
+                combinedParsedResult = JSON.parse(responseText) as CombinedParsedRecipe;
+                // Basic validation (copied from old handler)
+                if (typeof combinedParsedResult !== 'object' || combinedParsedResult === null) {
+                    throw new Error("Parsed JSON is not an object.");
+                }
+                if (combinedParsedResult.ingredients && !Array.isArray(combinedParsedResult.ingredients)) {
+                    console.warn(`[${requestId}] Gemini returned non-array for ingredients (URL), setting to null.`);
+                    combinedParsedResult.ingredients = null;
+                }
+                if (combinedParsedResult.instructions && !Array.isArray(combinedParsedResult.instructions)) {
+                    console.warn(`[${requestId}] Gemini returned non-array for instructions (URL), setting to null.`);
+                    combinedParsedResult.instructions = null;
+                }
+                console.log(`[${requestId}] Successfully parsed combined JSON from Gemini (URL) response.`);
+            } catch (parseError: any) {
+                console.error(`[${requestId}] Failed to parse JSON response from Gemini (URL Parse):`, parseError);
+                console.error(`[${requestId}] Raw Response that failed parsing (URL):`, responseText); 
+                processingError = `Invalid JSON received from AI parser for URL: ${parseError.message}`;
+            }
+        } else {
+            processingError = 'Empty response received from AI parser for URL.';
+            console.warn(`[${requestId}] Empty response text from Gemini (URL Parse).`);
+        }
+    } catch (err: any) {
+        console.error(`[${requestId}] Error calling Gemini API (URL Parse) or processing result:`, err);
+        processingError = err instanceof Error ? err.message : 'An unknown error occurred calling Gemini for URL';
+        // Handle blocked content specifically
+        if (err?.response?.promptFeedback?.blockReason) {
+            processingError = `Gemini blocked the prompt/response for URL: ${err.response.promptFeedback.blockReason}`;
+            console.error(`[${requestId}] Gemini prompt/response blocked for URL. Reason: ${err.response.promptFeedback.blockReason}`);
+            if (err.response.promptFeedback.safetyRatings) {
+                console.error(`[${requestId}] Safety Ratings:`, JSON.stringify(err.response.promptFeedback.safetyRatings, null, 2));
+            }
+        }
+        // Ensure usage is default if error occurs before assignment
+        if (usage.inputTokens === 0 && usage.outputTokens === 0) {
+            usage = normalizeUsageMetadata(null, 'gemini');
+        }
+    }
+
+
+    const geminiCombinedParseTime = Date.now() - geminiCombinedStartTime;
+    const totalTime = Date.now() - handlerStartTime;
+
+
+    if (!processingError && !combinedParsedResult) {
+         // This state shouldn't really happen if responseText was non-empty and JSON parsing succeeded but resulted in null/undefined? Add warning.
+        console.warn(`[${requestId}] Gemini parsing for URL completed without error, but result is null.`);
+        processingError = 'AI parsing completed without error but yielded no result.'; // Assign an error if no recipe found
+    }
+
+
+    console.log(`[${requestId}] Gemini URL content parsing finished. Time=${geminiCombinedParseTime}ms (Total Step Time=${totalTime}ms)`);
+    console.log(`[${requestId}] Token Usage (URL Gemini Step): Input=${usage.inputTokens}, Output=${usage.outputTokens}`);
+
+
+    return {
+        recipe: combinedParsedResult,
+        error: processingError,
+        usage,
+        timings: { geminiCombinedParse: geminiCombinedParseTime }
+    };
+}
+
+
+// Remove the old handleRecipeUrl function entirely
+/*
+export async function handleRecipeUrl(
+  url: string,
+  requestId: string,
+  geminiModel: GeminiModel, // Pass the initialized model
+  scraperApiKey: string | undefined, // Pass API key
+  scraperClient: any // Pass client instance
+): Promise<{
+  recipe: CombinedParsedRecipe | null;
+  error: string | null;
+  fetchMethodUsed: string;
+  timings: { fetchHtml: number; extractContent: number; geminiCombinedParse: number; totalProcessingNoCache: number };
+  usage: { combinedParseInputTokens: number; combinedParseOutputTokens: number; };
+}> {
+    // ... [Previous implementation removed] ...
+}
+*/ 

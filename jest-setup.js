@@ -8,6 +8,9 @@
 // Ensure this line is active:
 import '@testing-library/jest-native/extend-expect';
 
+import 'react-native-gesture-handler/jestSetup';
+import { jest } from '@jest/globals'; // Use this for importing jest types/functions
+
 // --- Global Mocks --- 
 
 // Mock react-native-reanimated
@@ -44,6 +47,31 @@ jest.mock('react-native-safe-area-context', () => {
     useSafeAreaFrame: jest.fn().mockImplementation(() => ({ x: 0, y: 0, width: 390, height: 844 })),
   }
 })
+
+// Mock @react-native-async-storage/async-storage
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock')
+);
+
+// The react-native-reanimated mock above should handle animation concerns.
+// Removed the problematic NativeAnimatedHelper mock.
+
+// Mock NetInfo
+jest.mock('@react-native-community/netinfo', () => ({
+  useNetInfo: jest.fn(() => ({
+    type: 'wifi',
+    isConnected: true,
+    isInternetReachable: true,
+    details: {},
+  })),
+  // Add other functions/properties from NetInfo that you might use
+  fetch: jest.fn(() => Promise.resolve({
+      type: 'wifi',
+      isConnected: true,
+      isInternetReachable: true,
+      details: {},
+  })),
+}));
 
 // You might need to add mocks for other libraries here, e.g.:
 // jest.mock('@/constants/theme'); // If theme causes issues 
