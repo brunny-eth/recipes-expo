@@ -1,23 +1,11 @@
 import { Router, Request, Response } from 'express'
 import { supabase } from '../lib/supabase'
-// import OpenAI from 'openai'
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold, GenerationConfig, Content } from "@google/generative-ai"; // Import Google AI SDK
-import scraperapiClient from 'scraperapi-sdk'; // Import the SDK
-import { createHash } from 'crypto'; // <-- RE-ADD IMPORT for requestId
-import { isProbablyUrl } from '../utils/detectUrl'; // <-- IMPORT ADDED
-import { preprocessRawRecipeText } from '../utils/preprocessText'; // <-- IMPORT ADDED
-import { truncateTextByLines } from '../utils/truncate'; // <-- IMPORT ADDED
-import { generateCacheKeyHash } from '../utils/hash'; // <-- IMPORT ADDED
-import { extractRecipeContent } from '../services/extractContent'; // <-- IMPORT ADDED
-import { fetchHtmlWithFallback } from '../services/htmlFetch'; // <-- IMPORT ADDED
-import { handleRawTextRecipe } from '../services/promptText'; // <-- IMPORT ADDED
-import { handleRecipeUrl } from '../services/promptUrl'; // <-- IMPORT ADDED
-import { CombinedParsedRecipe, GeminiModel } from '../types'; // <-- IMPORT ADDED
+import scraperapiClient from 'scraperapi-sdk';
 import { parseAndCacheRecipe } from '../services/parseRecipe';
+import { createRecipeWithIngredients } from '../services/recipeService';
+import { rewriteForSubstitution } from '../services/instructionService';
 
-// --- Removed local type definitions ---
-
-// --- API Key Setup ---
 const router = Router()
 
 // --- Initialize ScraperAPI Client ---
@@ -93,36 +81,16 @@ router.get('/:id', async (req: Request, res: Response) => {
 
 // Create new recipe
 router.post('/', async (req: Request, res: Response) => {
-  try {
-    const { title, servings, ingredients } = req.body
-    
-    const { data: recipe, error: recipeError } = await supabase
-      .from('recipes')
-      .insert({ title, servings })
-      .select()
-      .single()
-    
-    if (recipeError) throw recipeError
-    
-    if (ingredients && ingredients.length > 0) {
-      const ingredientsWithRecipeId = ingredients.map((ing: any) => ({
-        ...ing,
-        recipe_id: recipe.id
-      }))
-      
-      const { error: ingredientsError } = await supabase
-        .from('ingredients')
-        .insert(ingredientsWithRecipeId)
-      
-      if (ingredientsError) throw ingredientsError
-    }
-    
-    res.json(recipe)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'An unknown error occurred';
-    res.status(500).json({ error: message });
+  const { title, servings, ingredients } = req.body;
+
+  const { result, error } = await createRecipeWithIngredients({ title, servings, ingredients });
+
+  if (error) {
+    return res.status(500).json({ error });
   }
-})
+
+  res.json(result);
+});
 
 // --- Main Parsing Route --- 
 router.post('/parse', async (req: Request, res: Response) => {
@@ -155,10 +123,8 @@ router.post('/parse', async (req: Request, res: Response) => {
 
 // --- Rewrite Instructions Endpoint ---
 router.post('/rewrite-instructions', async (req: Request, res: Response) => {
-  // TODO: Adapt this endpoint to use Gemini
-  // Similar steps: Check key, create prompt, call geminiModel.generateContent, parse JSON response
   try {
-    const { originalInstructions, originalIngredientName, substitutedIngredientName } = req.body; // Keep validation
+    const { originalInstructions, originalIngredientName, substitutedIngredientName } = req.body;
     if (!originalInstructions || !Array.isArray(originalInstructions) || originalInstructions.length === 0) {
       return res.status(400).json({ error: 'Missing or invalid original instructions' });
     }
@@ -166,92 +132,22 @@ router.post('/rewrite-instructions', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Missing original or substituted ingredient name' });
     }
 
-    // Check Google AI key
     if (!googleApiKey) {
       return res.status(500).json({ error: 'Server configuration error: Missing Google API key.' });
     }
 
-    // --- Construct the prompt for Gemini --- (Using the same logic as the previous OpenAI prompt)
-    const rewritePrompt = `You are an expert cooking assistant. You are given recipe instructions and a specific ingredient substitution.
-Original Ingredient: ${originalIngredientName}
-Substituted Ingredient: ${substitutedIngredientName}
+    const { rewrittenInstructions, error, usage, timeMs } = await rewriteForSubstitution(
+      originalInstructions,
+      originalIngredientName,
+      substitutedIngredientName,
+      geminiModel
+    );
 
-Your task is to rewrite the original instructions to accommodate the substituted ingredient. Consider:
-- **Preparation differences:** Does the substitute need different prep (e.g., pressing tofu, soaking beans)? Add or modify steps accordingly.
-- **Cooking time/temperature:** Adjust cooking times and temperatures if the substitute cooks differently.
-- **Liquid adjustments:** Might the substitute absorb more or less liquid?
-- **Flavor profile:** Keep the core recipe goal, but account for flavor changes if necessary (though focus primarily on process).
-- **Safety:** Ensure the rewritten steps are safe and make culinary sense.
-
-Rewrite the steps clearly. Output ONLY a valid JSON object with a single key "rewrittenInstructions", where the value is an array of strings, each string being a single step without numbering.
-
-Original Instructions (Array):
-${JSON.stringify(originalInstructions)}
-`;
-
-    console.log(`Sending rewrite request to Gemini for ${originalIngredientName} -> ${substitutedIngredientName}`);
-
-    let rewrittenInstructions: string[] | null = null;
-    let rewriteError: string | null = null;
-    let rewriteInputTokens = 0;
-    let rewriteOutputTokens = 0;
-    let rewriteTime = -1; // Added for timing
-
-    // --- Make the Gemini call --- 
-    const rewriteStartTime = Date.now(); // Start timing
-    try {
-        if (rewritePrompt.length > 100000) { // Basic prompt length check
-           throw new Error(`Rewrite prompt too large (${rewritePrompt.length} chars).`);
-        }
-
-        const result = await geminiModel.generateContent(rewritePrompt);
-        const response = result.response;
-        const responseText = response.text();
-
-        // Log token usage
-        rewriteInputTokens = response.usageMetadata?.promptTokenCount || 0;
-        rewriteOutputTokens = response.usageMetadata?.candidatesTokenCount || 0;
-        console.log(`Gemini Rewrite Token Usage: ${rewriteInputTokens}/${rewriteOutputTokens} (Input/Output)`);
-
-        console.log('Gemini (Rewrite) raw JSON response content:', responseText);
-
-        if (responseText) {
-            try {
-                const parsedResult: any = JSON.parse(responseText);
-                if (typeof parsedResult === 'object' && parsedResult !== null && Array.isArray(parsedResult.rewrittenInstructions)) {
-                    rewrittenInstructions = parsedResult.rewrittenInstructions.filter((step: any) => typeof step === 'string'); // Ensure all elements are strings
-                    console.log('Successfully parsed rewritten instructions from Gemini response.');
-                } else {
-                    console.error("Parsed JSON response did not contain expected 'rewrittenInstructions' array:", parsedResult);
-                    throw new Error("Parsed JSON result did not have the expected structure.");
-                }
-            } catch (parseErr) {
-                console.error('Failed to parse rewritten instructions JSON from Gemini response:', parseErr);
-                console.error('Raw content that failed parsing:', responseText);
-                rewriteError = 'Invalid JSON format received from AI instruction rewriter.';
-            }
-        } else {
-            rewriteError = 'Empty response received from AI instruction rewriter.';
-        }
-
-    } catch (err) {
-       rewriteError = err instanceof Error ? err.message : 'Unknown Gemini rewrite error';
-       console.error('Gemini rewrite API call error:', err);
-       // Handle safety blocks
-       if ((err as any)?.response?.promptFeedback?.blockReason) {
-           rewriteError = `Gemini blocked the prompt/response due to safety settings: ${ (err as any).response.promptFeedback.blockReason }`;
-       }
-    } finally {
-        rewriteTime = Date.now() - rewriteStartTime; // End timing
-        console.log(`Gemini Rewrite Time: ${rewriteTime}ms`); // Log time
-    }
-
-    // --- Send response or error ---
-    if (rewriteError || !rewrittenInstructions) {
-      console.error(`Failed to rewrite instructions with Gemini: ${rewriteError || 'Result was null'}`);
-      return res.status(500).json({ error: `Failed to rewrite instructions: ${rewriteError || 'Unknown error'}` });
+    if (error || !rewrittenInstructions) {
+      console.error(`Failed to rewrite instructions with Gemini: ${error || 'Result was null'}`);
+      return res.status(500).json({ error: `Failed to rewrite instructions: ${error || 'Unknown error'}` });
     } else {
-        res.json({ rewrittenInstructions });
+      res.json({ rewrittenInstructions, usage, timeMs });
     }
 
   } catch (error) {
