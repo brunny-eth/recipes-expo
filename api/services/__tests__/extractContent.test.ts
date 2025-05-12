@@ -44,7 +44,8 @@ describe('extractRecipeContent', () => {
     const expected = {
       title: 'JSON-LD Recipe Title',
       ingredientsText: '1 cup Flour\n2 Eggs',
-      instructionsText: 'Mix ingredients.\nBake the cake.'
+      instructionsText: 'Mix ingredients.\nBake the cake.',
+      recipeYieldText: null
     };
     expect(extractRecipeContent(htmlWithJsonLd)).toEqual(expected);
   });
@@ -78,7 +79,8 @@ describe('extractRecipeContent', () => {
     const expected = {
       title: 'Graph Recipe Title',
       ingredientsText: 'Ingredient A\nIngredient B',
-      instructionsText: 'Single instruction step.'
+      instructionsText: 'Single instruction step.',
+      recipeYieldText: null
     };
     expect(extractRecipeContent(htmlWithGraphJsonLd)).toEqual(expected);
   });
@@ -141,7 +143,8 @@ describe('extractRecipeContent', () => {
     const expected = {
       title: 'Incomplete JSON Recipe', // From JSON-LD
       ingredientsText: 'JSON Ingredient 1', // From JSON-LD
-      instructionsText: 'Selector Instruction 1\nSelector Instruction 2' // From CSS selector
+      instructionsText: 'Selector Instruction 1\nSelector Instruction 2', // From CSS selector
+      recipeYieldText: null
     };
     expect(extractRecipeContent(htmlIncompleteJsonLd)).toEqual(expected);
   });
@@ -159,7 +162,8 @@ describe('extractRecipeContent', () => {
     const expected = {
       title: 'Just a Page', // Title can usually be found
       ingredientsText: null,
-      instructionsText: null
+      instructionsText: null,
+      recipeYieldText: null
     };
     expect(extractRecipeContent(htmlNoRecipe)).toEqual(expected);
   });
@@ -182,7 +186,8 @@ describe('extractRecipeContent', () => {
     const expected = {
       title: 'Alt Selector Recipe',
       ingredientsText: 'Tasty Ingredient A',
-      instructionsText: 'Easy Instruction 1'
+      instructionsText: 'Easy Instruction 1',
+      recipeYieldText: null
     };
     expect(extractRecipeContent(htmlAlternativeSelectors)).toEqual(expected);
   });
@@ -226,7 +231,8 @@ describe('extractRecipeContent', () => {
       const expected = {
           title: 'HowToSection Recipe Title',
           ingredientsText: 'Ingredient X\nIngredient Y',
-          instructionsText: 'Combine flour and water.\nKnead the dough.\nPlace in oven.\nBake for 30 minutes.'
+          instructionsText: 'Combine flour and water.\nKnead the dough.\nPlace in oven.\nBake for 30 minutes.',
+          recipeYieldText: null
       };
       expect(extractRecipeContent(htmlWithHowToSection)).toEqual(expected);
   });
@@ -265,7 +271,8 @@ describe('extractRecipeContent', () => {
     const expected = {
       title: 'Selector Title After Malformed JSON', // Should fallback to h1 or title tag
       ingredientsText: 'Selector Ingredient A\nSelector Ingredient B',
-      instructionsText: 'Selector Instruction 1\nSelector Instruction 2'
+      instructionsText: 'Selector Instruction 1\nSelector Instruction 2',
+      recipeYieldText: null
     };
 
     const result = extractRecipeContent(htmlWithMalformedJsonLd);
