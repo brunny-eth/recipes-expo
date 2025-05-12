@@ -6,6 +6,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { COLORS } from '@/constants/theme';
 import IngredientSubstitutionModal from './IngredientSubstitutionModal';
 import { StructuredIngredient, SubstitutionSuggestion } from '@/api/types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // --- Types ---
 // Added SubstitutionSuggestion type matching backend/modal
@@ -109,14 +110,17 @@ export default function IngredientsScreen() {
   const [processedSubstitutionsForModal, setProcessedSubstitutionsForModal] = useState<SubstitutionSuggestion[] | null>(null);
 
   useEffect(() => {
-    // TODO: Add logic here later to check if this is the first time 
-    // using AsyncStorage or user auth state.
-    // For now, show it every time.
-    const timer = setTimeout(() => {
-      setIsHelpModalVisible(true);
-    }, 500); // Show after a short delay
-
-    return () => clearTimeout(timer); // Cleanup timer on unmount
+    const showTip = async () => {
+      const hasSeenTip = await AsyncStorage.getItem('hasSeenTip');
+      if (!hasSeenTip) {
+        const timer = setTimeout(() => {
+          setIsHelpModalVisible(true);
+          AsyncStorage.setItem('hasSeenTip', 'true');
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    };
+    showTip();
   }, []);
 
   useEffect(() => {
