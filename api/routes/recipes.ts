@@ -4,7 +4,7 @@ import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold, GenerationConfig,
 import scraperapiClient from 'scraperapi-sdk';
 import { parseAndCacheRecipe } from '../services/parseRecipe';
 import { createRecipeWithIngredients } from '../services/recipeService';
-import { rewriteForSubstitution } from '../services/instructionService';
+import { rewriteForSubstitution, scaleInstructions } from '../services/instructionService';
 
 const router = Router()
 
@@ -159,120 +159,40 @@ router.post('/rewrite-instructions', async (req: Request, res: Response) => {
 
 // --- Scale Instructions Endpoint ---
 router.post('/scale-instructions', async (req: Request, res: Response) => {
-  // TODO: Adapt this endpoint to use Gemini
-   // Similar steps: Check key, create prompt, call geminiModel.generateContent, parse JSON response
-   try {
-     const { instructionsToScale, originalIngredients, scaledIngredients } = req.body; // Keep validation
-     if (!Array.isArray(instructionsToScale) || !Array.isArray(originalIngredients) || !Array.isArray(scaledIngredients)) {
+  try {
+    const { instructionsToScale, originalIngredients, scaledIngredients } = req.body;
+    if (!Array.isArray(instructionsToScale) || !Array.isArray(originalIngredients) || !Array.isArray(scaledIngredients)) {
       return res.status(400).json({ error: 'Invalid input: instructions, originalIngredients, and scaledIngredients must be arrays.' });
-     }
-     // Add other input checks as before...
-     if (instructionsToScale.length === 0) {
-        console.log("No instructions provided to scale.");
-        return res.json({ scaledInstructions: [] }); // Return empty if no instructions
-     }
-     if (originalIngredients.length !== scaledIngredients.length) {
-        console.warn("Original and scaled ingredient lists have different lengths. Scaling might be inaccurate.");
-     }
+    }
+    if (instructionsToScale.length === 0) {
+      console.log("No instructions provided to scale.");
+      return res.json({ scaledInstructions: [] });
+    }
+    if (originalIngredients.length !== scaledIngredients.length) {
+      console.warn("Original and scaled ingredient lists have different lengths. Scaling might be inaccurate.");
+    }
 
-     // Check Google AI key
     if (!googleApiKey) {
       return res.status(500).json({ error: 'Server configuration error: Missing Google API key.' });
     }
 
-    // --- Construct the prompt for Gemini --- (Using the same logic as before)
-    const originalIngredientsDesc = originalIngredients.map((ing: any) => `${ing.amount || ''} ${ing.unit || ''} ${ing.name}`.trim()).join(', ');
-    const scaledIngredientsDesc = scaledIngredients.map((ing: any) => `${ing.amount || ''} ${ing.unit || ''} ${ing.name}`.trim()).join(', ');
+    const { scaledInstructions, error, usage, timeMs } = await scaleInstructions(
+      instructionsToScale,
+      originalIngredients,
+      scaledIngredients,
+      geminiModel
+    );
 
-    const scalePrompt = `You are an expert recipe editor. You are given recipe instructions that were originally written for ingredients with these quantities: [${originalIngredientsDesc}].
-
-The ingredients have now been scaled to new quantities: [${scaledIngredientsDesc}].
-
-Your task is to rewrite the provided recipe instructions, carefully adjusting any specific ingredient quantities mentioned in the text to match the *new* scaled quantities. Maintain the original meaning, structure, and step count. Be precise with the numbers.
-
-**Important Scaling Rules for Quantities:**
-- For most ingredients, use the precise scaled quantity.
-- However, for ingredients that are typically used whole and are not easily divisible (e.g., star anise, whole cloves, cinnamon sticks, bay leaves, an egg), if the scaled quantity results in a fraction, round it to the nearest sensible whole number. For example, if scaling results in "1 1/2 star anise", use "2 star anise" or "1 star anise" based on which is closer or makes more culinary sense. If it's "0.25 of an egg", consider if it should be omitted or rounded to 1 if critical, or if the instruction should note to use "a small amount of beaten egg". Use your culinary judgment for sensible rounding of such items.
-
-For example, if an original instruction was "Add 2 cups flour" and the scaled ingredients now list "4 cups flour", the instruction should become "Add 4 cups flour". If an instruction mentions "the onion" and the quantity didn't change or wasn't numeric, leave it as is. Only adjust explicit numeric quantities that correspond to scaled ingredients.
-
-Output ONLY a valid JSON object with a single key "scaledInstructions", where the value is an array of strings, each string being a single rewritten step.
-
-Instructions to Scale (Array):
-${JSON.stringify(instructionsToScale)}
-`;
-
-    console.log('Sending instruction scaling request to Gemini...');
-
-    let scaledInstructionsResult: string[] | null = null;
-    let scaleError: string | null = null;
-    let scaleInputTokens = 0;
-    let scaleOutputTokens = 0;
-    let scaleTime = -1; // Added for timing
-
-    // --- Make the Gemini call --- 
-    const scaleStartTime = Date.now(); // Start timing
-    try {
-        if (scalePrompt.length > 100000) { // Basic prompt length check
-           throw new Error(`Scale prompt too large (${scalePrompt.length} chars).`);
-        }
-
-       const result = await geminiModel.generateContent(scalePrompt);
-       const response = result.response;
-       const responseText = response.text();
-
-       // Log token usage
-       scaleInputTokens = response.usageMetadata?.promptTokenCount || 0;
-       scaleOutputTokens = response.usageMetadata?.candidatesTokenCount || 0;
-       console.log(`Gemini Scale Token Usage: ${scaleInputTokens}/${scaleOutputTokens} (Input/Output)`);
-
-       console.log('Gemini (Scale) raw JSON response content:', responseText);
-
-       if (responseText) {
-           try {
-             const parsedResult: any = JSON.parse(responseText);
-             if (parsedResult && Array.isArray(parsedResult.scaledInstructions)) {
-                scaledInstructionsResult = parsedResult.scaledInstructions.map((item: any) => String(item)); // Ensure strings
-                console.log('Successfully parsed scaled instructions from Gemini response.');
-             } else {
-                throw new Error("Parsed JSON result did not have the expected 'scaledInstructions' array.");
-             }
-           } catch (parseErr) {
-             console.error('Failed to parse scaled instructions JSON from Gemini response:', parseErr);
-             console.error('Raw content that failed parsing:', responseText);
-             scaleError = 'Invalid JSON format received from AI instruction scaler.';
-           }
-        } else {
-          scaleError = 'Empty response received from AI instruction scaler.';
-        }
-
-    } catch (err) {
-        scaleError = err instanceof Error ? err.message : 'Unknown Gemini scale error';
-        console.error('Gemini scale API call error:', err);
-        // Handle safety blocks
-        if ((err as any)?.response?.promptFeedback?.blockReason) {
-            scaleError = `Gemini blocked the prompt/response due to safety settings: ${ (err as any).response.promptFeedback.blockReason }`;
-        }
-    } finally {
-        scaleTime = Date.now() - scaleStartTime; // End timing
-        console.log(`Gemini Scale Time: ${scaleTime}ms`); // Log time
-    }
-
-    // --- Send response or error ---
-    if (scaleError || !scaledInstructionsResult) {
-      console.error(`Failed to scale instructions with Gemini: ${scaleError || 'Result was null'}`);
-      // Returning original instructions on failure to avoid breaking the flow entirely
-      console.warn("Returning original instructions due to scaling failure.");
-      res.json({ scaledInstructions: instructionsToScale }); 
-      // Alternatively, return a 500 error:
-      // return res.status(500).json({ error: `Failed to scale instructions: ${scaleError || 'Unknown error'}` });
+    if (error || !scaledInstructions) {
+      console.error(`Failed to scale instructions with Gemini: ${error || 'Result was null'}`);
+      return res.status(500).json({ error: `Failed to scale instructions: ${error || 'Unknown error'}` });
     } else {
-        res.json({ scaledInstructions: scaledInstructionsResult });
+      res.json({ scaledInstructions, usage, timeMs });
     }
 
-   } catch (error) {
-      console.error("Error in /scale-instructions route:", error);
-      res.status(500).json({ error: 'Internal server error processing instruction scaling request.' });
+  } catch (error) {
+    console.error("Error in /scale-instructions route:", error);
+    res.status(500).json({ error: 'Internal server error processing instruction scaling request.' });
   }
 });
 
