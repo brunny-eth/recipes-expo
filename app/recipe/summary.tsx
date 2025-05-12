@@ -5,16 +5,10 @@ import { ArrowLeft, ChevronRight, Clock } from 'lucide-react-native'; // Removed
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { COLORS } from '@/constants/theme';
 import { scaleIngredient } from '@/utils/recipeUtils'; // Correct import path assuming utils is under root/src or similar alias
+import { StructuredIngredient } from '@/api/types';
 
 // --- Define Types (Matching Backend Output) ---
 // Re-define types here or import from a shared types file
-type StructuredIngredient = {
-  name: string;
-  amount: string | null;
-  unit: string | null;
-  suggested_substitutions?: Array<{ name: string; description?: string | null }> | null;
-};
-
 type ParsedRecipe = {
   title: string | null;
   ingredients: StructuredIngredient[] | string[] | null; // This holds the ORIGINAL ingredients initially

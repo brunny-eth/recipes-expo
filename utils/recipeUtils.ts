@@ -1,10 +1,5 @@
-// Define type locally if not available globally
-type StructuredIngredient = {
-  name: string;
-  amount: string | null;
-  unit: string | null;
-  suggested_substitutions?: Array<{ name: string; description?: string | null }> | null;
-};
+// Import the StructuredIngredient type from the shared types file
+import { StructuredIngredient } from '@/api/types';
 
 // --- Fraction Handling ---
 // Helper to convert fraction string ("1/2", "3/4") to number

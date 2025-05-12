@@ -1,28 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { preprocessRawRecipeText } from '../utils/preprocessText';
 import { truncateTextByLines } from '../utils/truncate';
-
-// Type definitions matching those in recipes.ts - consider moving to a shared types file
-type StructuredIngredient = {
-  name: string;
-  amount: string | null;
-  unit: string | null;
-  suggested_substitutions?: Array<{ name: string; description?: string | null, amount?: string | number | null, unit?: string | null }> | null;
-};
-
-type CombinedParsedRecipe = {
-  title: string | null;
-  ingredients: StructuredIngredient[] | null;
-  instructions: string[] | null;
-  substitutions_text: string | null;
-  recipeYield?: string | null;
-  prepTime?: string | null;
-  cookTime?: string | null;
-  totalTime?: string | null;
-  nutrition?: { calories?: string | null; protein?: string | null; [key: string]: any } | null;
-};
-
-type GeminiModel = ReturnType<InstanceType<typeof GoogleGenerativeAI>['getGenerativeModel']>; // Infer type
+import { CombinedParsedRecipe, GeminiModel } from '../types';
 
 export async function handleRawTextRecipe(
   rawText: string,
@@ -35,7 +14,7 @@ export async function handleRawTextRecipe(
   timings: { geminiCombinedParse: number; total: number; } 
 }> {
   const handlerStartTime = Date.now();
-  console.log(`[${requestId}] Starting raw text recipe processing.`);
+  console.log(`[${requestId}] Starting raw text recipe processing (post-plausibility check).`);
   let timings = { geminiCombinedParse: -1, total: -1 };
   let usage = { combinedParseInputTokens: 0, combinedParseOutputTokens: 0 };
   let combinedParsedResult: CombinedParsedRecipe | null = null;
@@ -45,7 +24,9 @@ export async function handleRawTextRecipe(
   const MAX_RAW_TEXT_LINES = 200; 
   const safeRawText = truncateTextByLines(processedText, MAX_RAW_TEXT_LINES, "\n\n[RAW TEXT TRUNCATED BY SYSTEM DUE TO LENGTH]");
 
-  const rawTextPrompt = `You are an expert recipe parsing AI. You are provided with a block of raw text that is believed to be a complete recipe. Your goal is to parse ALL information from this text into a single, specific JSON object.
+  // Simplified prompt: Assumes input has already been validated as likely recipe text.
+  const rawTextPrompt = `You are an expert recipe parsing AI. 
+Your goal is to parse ALL information from the provided raw recipe text into a single, specific JSON object.
 
 **Desired JSON Structure:**
 { 
@@ -76,14 +57,14 @@ export async function handleRawTextRecipe(
 
 **Parsing Rules & Guidelines:**
 1.  **Overall Goal:** Extract as much structured information as possible from the provided text. If a field is not present or cannot be determined, use null.
-2.  **Title:** Identify the recipe's title. This is often at the beginning or prominently displayed. If no clear title is found, try to infer a sensible one from the ingredients or instructions, or use "Untitled Recipe" as a last resort if truly unidentifiable.
+2.  **Title:** Identify the recipe's title. If no clear title is found, try to infer one, or use "Untitled Recipe" as a last resort.
 3.  **Ingredients Array ("ingredients"):**
     - Locate the ingredients list. Parse each ingredient line into "name", "amount", and "unit".
     - "name": The name of the ingredient (e.g., "all-purpose flour", "large eggs").
     - "amount": The quantity (e.g., "1", "1.5", "2-3"). Convert fractions (e.g., "1 1/2", "3/4") to decimal strings (e.g., "1.5", "0.75"). If an amount is a range (e.g., "2-3"), represent it as a string "2-3". If no quantity is specified (e.g., "salt to taste"), "amount" should be null.
     - "unit": The unit of measurement (e.g., "cup", "tbsp", "oz", "cloves"). If no unit is specified (e.g., "2 carrots"), "unit" should be null. For items like "salt to taste", "unit" could be "to taste".
     - **Exclusions:** Do NOT include ingredients that are variations of 'sea salt', 'salt', 'black pepper', or 'pepper' in the final "ingredients" array.
-    - **Ingredient Substitutions ("suggested_substitutions"):** For each parsed ingredient (excluding salt/pepper), if you can think of 1-2 sensible culinary substitutions, provide them. Each substitution MUST be an object with "name" (string), "amount" (string/number/null - the *equivalent* amount for the substitution), "unit" (string/null), and an optional "description" (string/null, e.g., "for a richer flavor"). If no good substitutions come to mind, "suggested_substitutions" should be null for that ingredient.
+    - **Ingredient Substitutions ("suggested_substitutions"):** For each parsed ingredient (excluding salt/pepper), if you can think of 1-2 sensible culinary substitutions, provide them. Each substitution MUST be an object with "name" (string), "amount": "string/number/null" (the *equivalent* amount for the substitution), "unit" (string/null), and an optional "description" (string/null, e.g., "for a richer flavor"). If no good substitutions come to mind, "suggested_substitutions" should be null for that ingredient.
 4.  **Instructions Array ("instructions"):**
     - Find the preparation or cooking steps.
     - Split the instructions into an array of strings, where each string is a single, distinct step.
@@ -123,8 +104,11 @@ ${safeRawText}
         try {
             combinedParsedResult = JSON.parse(responseText) as CombinedParsedRecipe;
             if (typeof combinedParsedResult !== 'object' || combinedParsedResult === null) {
-                 throw new Error("Parsed JSON is not an object.");
+                console.error(`[${requestId}] Parsed JSON from Gemini (Raw Text) is not a recipe object.`);
+                // This error should be caught by the main try...catch of this function if it propagates
+                throw new Error("Parsed JSON is not a recognized recipe object."); 
             }
+            // Existing validation for combinedParsedResult properties
             if (combinedParsedResult.ingredients && !Array.isArray(combinedParsedResult.ingredients)) {
                  console.warn(`[${requestId}] Gemini returned non-array for ingredients (Raw Text), setting to null.`);
                  combinedParsedResult.ingredients = null;
@@ -140,7 +124,7 @@ ${safeRawText}
                  console.warn(`[${requestId}] Gemini returned non-array for instructions (Raw Text), setting to null.`);
                  combinedParsedResult.instructions = null;
             }
-            console.log(`[${requestId}] Successfully parsed JSON from Gemini (Raw Text) response.`);
+            console.log(`[${requestId}] Successfully parsed JSON from Gemini (Raw Text) response as recipe.`);
         } catch(parseError) {
             console.error(`[${requestId}] Failed to parse JSON response from Gemini (Raw Text Parse):`, parseError);
             console.error(`[${requestId}] Raw Response that failed parsing (Raw Text):`, responseText); 
@@ -164,8 +148,8 @@ ${safeRawText}
   }
 
   timings.total = Date.now() - handlerStartTime;
-  console.log(`[${requestId}] Raw text processing finished. Gemini Parse Time=${timings.geminiCombinedParse}ms, Handler Total Time=${timings.total}ms`);
-  console.log(`[${requestId}] Token Usage (Raw Text): Input=${usage.combinedParseInputTokens}, Output=${usage.combinedParseOutputTokens}`);
+  console.log(`[${requestId}] Raw text processing finished (post-plausibility). Gemini Parse Time=${timings.geminiCombinedParse}ms, Handler Total Time=${timings.total}ms`);
+  console.log(`[${requestId}] Token Usage (Raw Text Post-Plausibility): Input=${usage.combinedParseInputTokens}, Output=${usage.combinedParseOutputTokens}`);
 
   return { recipe: combinedParsedResult, error: combinedGeminiError, usage, timings };
-} 
+}

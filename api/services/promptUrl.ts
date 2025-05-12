@@ -1,29 +1,8 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, GenerationConfig } from "@google/generative-ai";
 import { fetchHtmlWithFallback } from './htmlFetch';
 import { extractRecipeContent } from './extractContent';
 import { truncateTextByLines } from '../utils/truncate';
-
-// Type definitions matching those in recipes.ts - consider moving to a shared types file
-type StructuredIngredient = {
-  name: string;
-  amount: string | null;
-  unit: string | null;
-  suggested_substitutions?: Array<{ name: string; description?: string | null, amount?: string | number | null, unit?: string | null }> | null;
-};
-
-type CombinedParsedRecipe = {
-  title: string | null;
-  ingredients: StructuredIngredient[] | null;
-  instructions: string[] | null;
-  substitutions_text: string | null;
-  recipeYield?: string | null;
-  prepTime?: string | null;
-  cookTime?: string | null;
-  totalTime?: string | null;
-  nutrition?: { calories?: string | null; protein?: string | null; [key: string]: any } | null;
-};
-
-type GeminiModel = ReturnType<InstanceType<typeof GoogleGenerativeAI>['getGenerativeModel']>; // Infer type
+import { CombinedParsedRecipe, GeminiModel } from '../types';
 
 export async function handleRecipeUrl(
   url: string,

@@ -5,23 +5,10 @@ import { ArrowLeft, ChevronRight, X } from 'lucide-react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { COLORS } from '@/constants/theme';
 import IngredientSubstitutionModal from './IngredientSubstitutionModal';
+import { StructuredIngredient, SubstitutionSuggestion } from '@/api/types';
 
 // --- Types ---
 // Added SubstitutionSuggestion type matching backend/modal
-type SubstitutionSuggestion = {
-  name: string;
-  description?: string | null;
-  amount?: string | number | null;
-  unit?: string | null;
-};
-
-type StructuredIngredient = {
-  name: string;
-  amount: string | null;
-  unit: string | null;
-  // Update the type here:
-  suggested_substitutions?: SubstitutionSuggestion[] | null;
-};
 
 // Type for data received via navigation params
 type IngredientsNavParams = {

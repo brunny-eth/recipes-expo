@@ -12,39 +12,11 @@ import { extractRecipeContent } from '../services/extractContent'; // <-- IMPORT
 import { fetchHtmlWithFallback } from '../services/htmlFetch'; // <-- IMPORT ADDED
 import { handleRawTextRecipe } from '../services/promptText'; // <-- IMPORT ADDED
 import { handleRecipeUrl } from '../services/promptUrl'; // <-- IMPORT ADDED
+import { CombinedParsedRecipe, GeminiModel } from '../types'; // <-- IMPORT ADDED
 
-// --- Define the expected *single pass* structured ingredient type --- 
-type StructuredIngredient = {
-  name: string;
-  amount: string | null;
-  unit: string | null;
-  suggested_substitutions?: Array<{ name: string; description?: string | null, amount?: string | number | null, unit?: string | null }> | null; // Added amount/unit to substitution suggestions
-};
+// --- Removed local type definitions ---
 
-// --- Define the type for the combined parsing pass --- 
-// (This now expects structured ingredients directly)
-type CombinedParsedRecipe = {
-  title: string | null;
-  ingredients: StructuredIngredient[] | null; // Expect structured ingredients directly
-  instructions: string[] | null;
-  substitutions_text: string | null;
-  recipeYield?: string | null;
-  prepTime?: string | null;
-  cookTime?: string | null;
-  totalTime?: string | null;
-  nutrition?: { calories?: string | null; protein?: string | null; [key: string]: any } | null;
-};
-
-// --- Helper Function: Fetch HTML with Fallback --- DELETED
-// async function fetchHtmlWithFallback(
-//   url: string, 
-//   apiKey: string | undefined, 
-//   client: any 
-// ): Promise<{ htmlContent: string; fetchMethodUsed: string; error: Error | null }> {
-// ... function body deleted ...
-// }
-// --- End Helper Function: Fetch HTML with Fallback ---
-
+// --- API Key Setup ---
 const router = Router()
 
 // --- Initialize ScraperAPI Client ---
@@ -151,7 +123,7 @@ router.post('/', async (req: Request, res: Response) => {
   }
 })
 
-// --- MODIFIED Main Parsing Route --- 
+// --- Main Parsing Route --- 
 router.post('/parse', async (req: Request, res: Response) => {
   const requestId = createHash('sha256').update(Date.now().toString() + Math.random().toString()).digest('hex').substring(0, 12);
   const requestStartTime = Date.now();
