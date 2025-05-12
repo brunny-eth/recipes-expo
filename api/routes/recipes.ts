@@ -13,6 +13,7 @@ import { fetchHtmlWithFallback } from '../services/htmlFetch'; // <-- IMPORT ADD
 import { handleRawTextRecipe } from '../services/promptText'; // <-- IMPORT ADDED
 import { handleRecipeUrl } from '../services/promptUrl'; // <-- IMPORT ADDED
 import { CombinedParsedRecipe, GeminiModel } from '../types'; // <-- IMPORT ADDED
+import { parseAndCacheRecipe } from '../services/parseRecipe';
 
 // --- Removed local type definitions ---
 
@@ -125,135 +126,31 @@ router.post('/', async (req: Request, res: Response) => {
 
 // --- Main Parsing Route --- 
 router.post('/parse', async (req: Request, res: Response) => {
-  const requestId = createHash('sha256').update(Date.now().toString() + Math.random().toString()).digest('hex').substring(0, 12);
-  const requestStartTime = Date.now();
-  let overallTimings = {
-    dbCheck: -1,
-    processing: -1, 
-    dbInsert: -1,
-    total: -1
-  };
-  let handlerUsage = { combinedParseInputTokens: 0, combinedParseOutputTokens: 0 }; 
-
-  const { input } = req.body; 
+  const { input } = req.body;
   if (!input || typeof input !== 'string' || input.trim() === '') {
-    console.warn(`[${requestId}] Invalid request: Missing or empty "input" in request body.`);
     return res.status(400).json({ error: 'Missing or empty "input" in request body' });
   }
 
-  const trimmedInput = input.trim();
-  const isUrl = isProbablyUrl(trimmedInput);
-  const cacheKey = isUrl ? trimmedInput : generateCacheKeyHash(trimmedInput);
-
-  console.log(`[${requestId}] Received parse request. Input type: ${isUrl ? 'URL' : 'Raw Text'}. Input length: ${trimmedInput.length}. Cache key: ${cacheKey}`);
-
-  const dbCheckStartTime = Date.now();
-  try {
-    const { data: cachedRecipe, error: dbError } = await supabase
-      .from('processed_recipes_cache') 
-      .select('recipe_data') 
-      .eq('url', cacheKey) 
-      .maybeSingle(); 
-
-    overallTimings.dbCheck = Date.now() - dbCheckStartTime;
-
-    if (dbError) {
-      console.error(`[${requestId}] Error checking cache in Supabase for key ${cacheKey}:`, dbError);
-    }
-
-    if (cachedRecipe && cachedRecipe.recipe_data) {
-      console.log(`[${requestId}] Cache hit for key: ${cacheKey}. Returning cached data. DB Check time: ${overallTimings.dbCheck}ms.`);
-      overallTimings.total = Date.now() - requestStartTime;
-      return res.json({
-        message: 'Recipe retrieved from cache.',
-        inputType: isUrl ? 'URL' : 'Raw Text',
-        receivedInput: trimmedInput, 
-        cacheKey: cacheKey,
-        recipe: cachedRecipe.recipe_data 
-      });
-    }
-    console.log(`[${requestId}] Cache miss for key: ${cacheKey}. DB Check time: ${overallTimings.dbCheck}ms. Proceeding with parsing.`);
-  } catch (cacheError) {
-    overallTimings.dbCheck = Date.now() - dbCheckStartTime;
-    console.error(`[${requestId}] Exception during cache check for key ${cacheKey}:`, cacheError);
+  if (!scraperApiKey) {
+    return res.status(500).json({ error: 'Server configuration error: Missing ScraperAPI key.' });
   }
 
-  if (!googleApiKey) { 
-    console.error(`[${requestId}] Server configuration error: Missing Google API key.`);
-    return res.status(500).json({ error: 'Server configuration error: Missing Google API key.' });
-  }
+  const { recipe, error, fromCache, inputType, cacheKey, timings, usage, fetchMethodUsed } = await parseAndCacheRecipe(input, geminiModel, scraperApiKey, scraperClient);
 
-  let handlerResponse;
-  if (isUrl) {
-    // Call the imported function, passing the required instances/keys
-    handlerResponse = await handleRecipeUrl(trimmedInput, requestId, geminiModel, scraperApiKey, scraperClient);
-  } else {
-    handlerResponse = await handleRawTextRecipe(trimmedInput, requestId, geminiModel);
-  }
-
-  // Correctly access timings based on the handler type
-  if (isUrl) {
-    overallTimings.processing = (handlerResponse.timings as { fetchHtml: number; extractContent: number; geminiCombinedParse: number; totalProcessingNoCache: number }).totalProcessingNoCache;
-  } else {
-    overallTimings.processing = (handlerResponse.timings as { geminiCombinedParse: number; total: number }).total;
-  }
-  
-  if (handlerResponse.usage) { // Check if usage exists before assigning
-      handlerUsage = handlerResponse.usage;
-  }
-
-  if (handlerResponse.error || !handlerResponse.recipe) {
-    overallTimings.total = Date.now() - requestStartTime;
-    console.error(`[${requestId}] Processing failed for input. Error: ${handlerResponse.error}. Input Type: ${isUrl ? 'URL' : 'Raw Text'}. Overall timings: DB Check=${overallTimings.dbCheck}ms, Processing=${overallTimings.processing}ms, Total=${overallTimings.total}ms`);
-    return res.status(500).json({
-      error: handlerResponse.error || 'Failed to process recipe input.',
-      inputType: isUrl ? 'URL' : 'Raw Text',
-      fetchMethodUsed: (handlerResponse as any).fetchMethodUsed, 
-      receivedInput: trimmedInput,
-      cacheKey: cacheKey,
-    });
-  }
-
-  const finalRecipeData = handlerResponse.recipe;
-
-  if (finalRecipeData) {
-    const dbInsertStartTime = Date.now();
-    try {
-      const { error: insertError } = await supabase
-        .from('processed_recipes_cache') 
-        .insert({
-          url: cacheKey, 
-          recipe_data: finalRecipeData, 
-        });
-
-      overallTimings.dbInsert = Date.now() - dbInsertStartTime;
-
-      if (insertError) {
-        console.error(`[${requestId}] Error saving recipe to cache (key: ${cacheKey}):`, insertError);
-      } else {
-        console.log(`[${requestId}] Successfully cached new recipe (key: ${cacheKey}). DB Insert time: ${overallTimings.dbInsert}ms`);
-      }
-    } catch (cacheInsertError) {
-      overallTimings.dbInsert = Date.now() - dbInsertStartTime; 
-      console.error(`[${requestId}] Exception during cache insertion (key: ${cacheKey}):`, cacheInsertError);
-    }
-  }
-  
-  overallTimings.total = Date.now() - requestStartTime;
-  console.log(`[${requestId}] Request complete for input. Input Type: ${isUrl ? 'URL' : 'Raw Text'}. Overall Timings (ms): DB Check=${overallTimings.dbCheck}, Processing=${overallTimings.processing}, DB Insert=${overallTimings.dbInsert}, Total=${overallTimings.total}`);
-  if (handlerUsage) {
-    console.log(`[${requestId}] Token Usage: Input=${handlerUsage.combinedParseInputTokens}, Output=${handlerUsage.combinedParseOutputTokens}. Fetch Method (if URL): ${(handlerResponse as any).fetchMethodUsed || 'N/A'}`);
+  if (error) {
+    return res.status(500).json({ error });
   }
 
   res.json({
-    message: `Recipe processing complete (${isUrl ? 'URL' : 'Raw Text'}).`,
-    inputType: isUrl ? 'URL' : 'Raw Text',
-    fetchMethodUsed: (handlerResponse as any).fetchMethodUsed,
-    receivedInput: trimmedInput,
-    cacheKey: cacheKey,
-    recipe: finalRecipeData
+    message: `Recipe processing complete (${inputType}).`,
+    inputType,
+    fromCache,
+    cacheKey,
+    timings,
+    usage,
+    fetchMethodUsed,
+    recipe
   });
-
 });
 
 // --- Rewrite Instructions Endpoint ---
