@@ -3,6 +3,7 @@ import { truncateTextByLines } from '../utils/truncate';
 import { CombinedParsedRecipe, GeminiModel, GeminiHandlerResponse } from '../types';
 import { ExtractedContent } from './extractContent'; // Need this type
 import { normalizeUsageMetadata, StandardizedUsage } from '../utils/usageUtils'; // Import the new utility
+import { parseISODuration } from '../utils/timeUtils'; // Import the utility
 
 // --- New function for Gemini Parsing of URL content ---
 export async function parseUrlContentWithGemini(
@@ -16,17 +17,72 @@ export async function parseUrlContentWithGemini(
     let combinedParsedResult: CombinedParsedRecipe | null = null;
     let processingError: string | null = null;
 
+    // Define truncation limits
+    const fallbackMaxChars = 100000; // Max CHARACTERS if using raw body fallback
+    const defaultMaxIngredientLines = 40;
+    const defaultMaxInstructionLines = 40;
 
-    // Truncate Extracted Content (moved from old handleRecipeUrl)
-    const maxIngredientLines = 40;
-    const maxInstructionLines = 40;
-    const safeIngredientsText = truncateTextByLines(extractedContent.ingredientsText, maxIngredientLines, "\n\n[INGREDIENTS TRUNCATED BY SYSTEM]");
-    const safeInstructionsText = truncateTextByLines(extractedContent.instructionsText, maxInstructionLines, "\n\n[INSTRUCTIONS TRUNCATED BY SYSTEM]");
-    // const safeRecipeYieldText = truncateTextByLines(extractedContent.recipeYieldText, 5, "\n\n[YIELD TRUNCATED]");
+    let textToParse = ``;
+    let promptPrefix = ``;
 
+    if (extractedContent.isFallback) {
+        console.log(`[${requestId}] Fallback extraction detected. Preparing raw body text for prompt (max ${fallbackMaxChars} chars).`);
+        // Use the simpler prompt prefix for direct raw text
+        promptPrefix = `This is raw page text from a cooking website. Please extract structured data:
+- Title
+- Ingredients (as list)
+- Instructions (as clear steps)
+`;
+        
+        const cleanedRawBody = extractedContent.ingredientsText 
+            ? extractedContent.ingredientsText.split('\n').map(line => line.trim()).filter(line => line).join('\n') 
+            : '';
+        
+        // --- Log sample of cleanedRawBody --- 
+        if (cleanedRawBody) {
+            console.log(`[${requestId}] Sample of cleaned raw body text (first 50 lines):
+${cleanedRawBody.split('\n').slice(0, 50).join('\n')}`);
+        }
+        // --- End Log --- 
 
-    // Gemini Prompt (copied from old handleRecipeUrl, using extractedContent)
-    const combinedPromptForUrl = `You are provided with pre-extracted text sections for a recipe. Your goal is to parse ALL information into a single, specific JSON object.
+        let safeRawBodyText = cleanedRawBody;
+        if (safeRawBodyText.length > fallbackMaxChars) {
+            console.warn(`[${requestId}] Fallback raw body text exceeds ${fallbackMaxChars} chars (${safeRawBodyText.length}). Truncating by characters.`);
+            safeRawBodyText = safeRawBodyText.substring(0, fallbackMaxChars) + "\n\n[RAW BODY TEXT TRUNCATED BY SYSTEM (CHAR LIMIT)]";
+        } else {
+            console.log(`[${requestId}] Fallback raw body text within char limit (${safeRawBodyText.length} chars).`);
+        }
+
+        // --- Skip Heuristic Filtering (Temporary) --- 
+        console.log(`[${requestId}] Skipping heuristic filtering. Using character-truncated raw body text directly.`);
+        const formattedRawText = `
+------------------------
+${safeRawBodyText}
+------------------------`;
+        // --- End Skip --- 
+        
+        textToParse = `**Provided Text Sections:**\n\nTitle:\n${extractedContent.title || 'N/A'}\n\nExplicit Recipe Yield Text:\n${extractedContent.recipeYieldText || 'N/A'}\n\nRaw Page Content:\n${formattedRawText || 'N/A'}`; // Use the formatted *unfiltered* raw text
+
+    } else {
+        console.log(`[${requestId}] Standard extraction detected. Using default truncation limits (Ingredients: ${defaultMaxIngredientLines}, Instructions: ${defaultMaxInstructionLines}).`);
+        promptPrefix = `This is structured text from a recipe site with extracted ingredients and instructions.`;
+
+        const cleanedIngredients = extractedContent.ingredientsText
+            ? extractedContent.ingredientsText.split('\n').map(line => line.trim()).filter(line => line).join('\n')
+            : null;
+        const safeIngredientsText = truncateTextByLines(cleanedIngredients, defaultMaxIngredientLines, "\n\n[INGREDIENTS TRUNCATED BY SYSTEM]");
+        
+        const safeInstructionsText = truncateTextByLines(extractedContent.instructionsText, defaultMaxInstructionLines, "\n\n[INSTRUCTIONS TRUNCATED BY SYSTEM]");
+        
+        textToParse = `**Provided Text Sections:**\n\nTitle:\n${extractedContent.title || 'N/A'}\n\nExplicit Recipe Yield Text:\n${extractedContent.recipeYieldText || 'N/A'}\n\nIngredients Text:\n${safeIngredientsText || 'N/A'}\n\nInstructions Text:\n${safeInstructionsText || 'N/A'}`;
+    }
+
+    // Gemini Prompt - Combined with updated prefix logic
+    const combinedPromptForUrl = `${promptPrefix}
+
+Your goal is to parse ALL information from the provided text sections into a single, specific JSON object.
+
+**Important Note:** If processing 'Raw Page Content' (due to fallback), use the provided raw text. If processing separate 'Ingredients Text' and 'Instructions Text', use those specific sections.
 
 **Desired JSON Structure:**
 { 
@@ -59,7 +115,10 @@ export async function parseUrlContentWithGemini(
 }
 
 **Parsing Rules:**
-1.  **Sections:** If a section (title, ingredients, instructions) was not successfully extracted or is empty (appears as 'N/A' or is blank in the provided text), use null for its value in the JSON. If ingredients or instructions text is present but seems nonsensical or too short to be a real recipe, also consider using null for those arrays.
+1.  **Sections:** Parse the data from the 'Provided Text Sections' below. 
+    - If 'Raw Page Content' is provided, attempt to find title, ingredients, instructions, etc., within it.
+    - If separate 'Ingredients Text' and 'Instructions Text' are provided, use them primarily.
+    - If a section (title, ingredients, instructions) cannot be found or is empty (appears as 'N/A' or is blank), use null for its value in the JSON. If text is present but seems nonsensical, too short, or clearly not a recipe, also consider using null for those arrays.
 2.  **Instructions Array:** 
     - ONLY include actionable cooking/preparation steps. Split the provided instructions text into logical step-by-step actions. EXCLUDE serving suggestions, anecdotes, tips, etc. Ensure steps do not have numbering.
     - **Clarity for Sub-groups:** If an instruction refers to combining a sub-group of ingredients (e.g., 'dressing ingredients', 'tahini ranch ingredients'), and those ingredients are part of the main ingredient list you parsed, rephrase the instruction to explicitly list those specific ingredients. For example, instead of 'combine tahini ranch ingredients', if tahini, chives, and parsley are the ranch ingredients, the instruction should be 'combine tahini, dried chives, and dried parsley, whisking in water to thin...'.
@@ -82,21 +141,15 @@ export async function parseUrlContentWithGemini(
     - **Nutrition:** Look for nutrition information, specifically "calories" and "protein". Extract the values if present (e.g., "350 kcal", "15g protein"). The entire "nutrition" object should be null if neither calories nor protein is found. If one is found but not the other, return the found value and null for the missing one within the nutrition object.
 7.  **Output:** Ensure the output is ONLY the single, strictly valid JSON object described. Do not include explanations, markdown formatting, or any text outside the JSON structure.
 
-**Provided Text Sections:**
-
-Title:
-${extractedContent.title || 'N/A'}
-
-Explicit Recipe Yield Text:
-${extractedContent.recipeYieldText || 'N/A'}
-
-Ingredients Text:
-${safeIngredientsText || 'N/A'}
-
-Instructions Text:
-${safeInstructionsText || 'N/A'}
+${textToParse}
 `;
 
+    // --- ADDED DEBUG LOG ---
+    console.log(`[DEBUG promptUrl] Gemini Prompt for ${requestId} (first 1000 chars):
+${combinedPromptForUrl.substring(0, 1000)}`);
+    // For full prompt, uncomment and be careful with large outputs:
+    // console.log(`[DEBUG promptUrl] Full Gemini Prompt for ${requestId}:\n${combinedPromptForUrl}`); 
+    // --- END DEBUG LOG ---
 
     console.log(`[${requestId}] Sending combined parsing request to Gemini for extracted URL content (prompt length: ${combinedPromptForUrl.length})`);
     const geminiCombinedStartTime = Date.now();
@@ -184,22 +237,3 @@ ${safeInstructionsText || 'N/A'}
     };
 }
 
-
-// Remove the old handleRecipeUrl function entirely
-/*
-export async function handleRecipeUrl(
-  url: string,
-  requestId: string,
-  geminiModel: GeminiModel, // Pass the initialized model
-  scraperApiKey: string | undefined, // Pass API key
-  scraperClient: any // Pass client instance
-): Promise<{
-  recipe: CombinedParsedRecipe | null;
-  error: string | null;
-  fetchMethodUsed: string;
-  timings: { fetchHtml: number; extractContent: number; geminiCombinedParse: number; totalProcessingNoCache: number };
-  usage: { combinedParseInputTokens: number; combinedParseOutputTokens: number; };
-}> {
-    // ... [Previous implementation removed] ...
-}
-*/ 

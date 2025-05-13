@@ -45,7 +45,7 @@ The core recipe processing logic resides in the `POST /api/recipes/parse` endpoi
     -   Accepts a single `input` field in the JSON request body.
     -   This `input` can be either a recipe URL or free-form recipe text (e.g., copied from a social media post or a notes app).
 -   **Input Type Detection**:
-    -   A heuristic function (`isProbablyUrl` in `api/routes/recipes.ts`) is used to determine if the input is likely a URL. This check primarily looks for the presence of a period (`.`) and the absence of whitespace characters in the trimmed input string.
+    -   A heuristic function (`detectInputType` in `api/routes/recipes.ts`) is used to determine if the input is likely a URL. This check primarily looks for the presence of a period (`.`) and the absence of whitespace characters in the trimmed input string.
 -   **URL Processing Path**:
     -   If the input is classified as a URL:
         -   **Caching (Read)**: The system first queries a Supabase table (`processed_recipes_cache`) to check if the URL has been processed and cached previously. If a valid cache entry exists, the cached recipe data is returned immediately.
@@ -66,3 +66,6 @@ The core recipe processing logic resides in the `POST /api/recipes/parse` endpoi
   - Tables: `recipes`, `ingredients`, `substitutions`, `processed_recipes_cache` (for caching parsed URL data)
   - Relationships via foreign keys
 - **Deployment**: Vercel serverless functions (auto-scaling, zero maintenance) 
+```
+
+</rewritten_file>

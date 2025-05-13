@@ -1,4 +1,5 @@
 import { performance } from 'perf_hooks';
+import { formatMeasurement } from '../../utils/format';
 
 type LLMResponse<T> = {
   [K in keyof T]: T[K];
@@ -9,21 +10,29 @@ type LLMResponse<T> = {
 };
 
 export async function rewriteForSubstitution(originalInstructions: string[], originalIngredientName: string, substitutedIngredientName: string, geminiModel: any): Promise<LLMResponse<{ rewrittenInstructions: string[] | null }>> {
-    const rewritePrompt = `You are an expert cooking assistant. You are given recipe instructions and a specific ingredient substitution.
-Original Ingredient: ${originalIngredientName}
-Substituted Ingredient: ${substitutedIngredientName}
+    const cleanedSubstitutedIngredientName = formatMeasurement(Number(substitutedIngredientName));
 
-Your task is to rewrite the original instructions to accommodate the substituted ingredient. Consider:
-- **Preparation differences:** Does the substitute need different prep (e.g., pressing tofu, soaking beans)? Add or modify steps accordingly.
-- **Cooking time/temperature:** Adjust cooking times and temperatures if the substitute cooks differently.
-- **Liquid adjustments:** Might the substitute absorb more or less liquid?
-- **Flavor profile:** Keep the core recipe goal, but account for flavor changes if necessary (though focus primarily on process).
-- **Safety:** Ensure the rewritten steps are safe and make culinary sense.
-
-Rewrite the steps clearly. Output ONLY a valid JSON object with a single key "rewrittenInstructions", where the value is an array of strings, each string being a single step without numbering.
-
-Original Instructions (Array):
-${JSON.stringify(originalInstructions)}
+    const rewritePrompt = `
+    You are an expert cooking assistant. You will rewrite cooking instructions to reflect a single ingredient substitution.
+    
+    Original Ingredient: "${originalIngredientName}"
+    Substituted Ingredient: "${substitutedIngredientName}"
+    
+    Consider:
+    - Preparation differences (e.g. tofu may need pressing, beans may need soaking)
+    - Cooking time or method changes
+    - Flavor or texture impacts
+    - Any changes in food safety or allergen concerns
+    
+    If no meaningful change is required, return the original steps unchanged.
+    
+    Respond with ONLY a valid JSON object:
+    {
+      "rewrittenInstructions": [ ... ] // each step as a plain string, without numbering
+    }
+    
+    Original Instructions:
+    ${originalInstructions.map(s => `- ${s}`).join('\n')}
 `;
 
     const startTime = performance.now();
@@ -79,22 +88,26 @@ export async function scaleInstructions(
   const originalIngredientsDesc = originalIngredients.map((ing: any) => `${ing.amount || ''} ${ing.unit || ''} ${ing.name}`.trim()).join(', ');
   const scaledIngredientsDesc = scaledIngredients.map((ing: any) => `${ing.amount || ''} ${ing.unit || ''} ${ing.name}`.trim()).join(', ');
 
-  const scalePrompt = `You are an expert recipe editor. You are given recipe instructions that were originally written for ingredients with these quantities: [${originalIngredientsDesc}].
+  const scalePrompt = `
+You are an expert recipe editor. Your task is to rewrite recipe instructions to reflect updated ingredient quantities.
 
-The ingredients have now been scaled to new quantities: [${scaledIngredientsDesc}].
+Original ingredients: [${originalIngredientsDesc}]
+Scaled ingredients: [${scaledIngredientsDesc}]
 
-Your task is to rewrite the provided recipe instructions, carefully adjusting any specific ingredient quantities mentioned in the text to match the *new* scaled quantities. Maintain the original meaning, structure, and step count. Be precise with the numbers.
+Update **only** ingredient quantities that are explicitly stated (e.g., "2 cups flour"). Do not modify vague references like "the onion" or "some salt".
 
-**Important Scaling Rules for Quantities:**
-- For most ingredients, use the precise scaled quantity.
-- However, for ingredients that are typically used whole and are not easily divisible (e.g., star anise, whole cloves, cinnamon sticks, bay leaves, an egg), if the scaled quantity results in a fraction, round it to the nearest sensible whole number. For example, if scaling results in "1 1/2 star anise", use "2 star anise" or "1 star anise" based on which is closer or makes more culinary sense. If it's "0.25 of an egg", consider if it should be omitted or rounded to 1 if critical, or if the instruction should note to use "a small amount of beaten egg". Use your culinary judgment for sensible rounding of such items.
+**Rules**:
+- Use the exact scaled quantity if numeric.
+- For whole or indivisible ingredients (e.g. eggs, bay leaves, cinnamon sticks), round sensibly.
+- Be precise. If the original says "Add 2 tbsp olive oil" and the scaled amount is "1 tbsp", rewrite as "Add 1 tbsp olive oil".
 
-For example, if an original instruction was "Add 2 cups flour" and the scaled ingredients now list "4 cups flour", the instruction should become "Add 4 cups flour". If an instruction mentions "the onion" and the quantity didn't change or wasn't numeric, leave it as is. Only adjust explicit numeric quantities that correspond to scaled ingredients.
+Respond with ONLY a valid JSON object:
+{
+  "scaledInstructions": [ ... ] // same number of steps, rewritten for new quantities
+}
 
-Output ONLY a valid JSON object with a single key "scaledInstructions", where the value is an array of strings, each string being a single rewritten step.
-
-Instructions to Scale (Array):
-${JSON.stringify(instructionsToScale)}
+Original Instructions:
+${instructionsToScale.map(s => `- ${s}`).join('\n')}
 `;
 
   const startTime = performance.now();

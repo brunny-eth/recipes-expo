@@ -56,6 +56,26 @@ export async function parseAndCacheRecipe(
 
     const trimmedInput = input.trim();
     const inputType = detectInputType(input);
+
+    // --- BEGIN EARLY INPUT TYPE VALIDATION ---
+    const SUPPORTED_INPUT_TYPES: ReadonlyArray<InputType> = ['url', 'raw_text'];
+    if (!SUPPORTED_INPUT_TYPES.includes(inputType)) {
+        const errorMsg = `Unsupported input type detected: ${inputType}`;
+        console.error(`[${requestId}] ${errorMsg}`);
+        overallTimings.total = Date.now() - requestStartTime; // Capture total time before early exit
+        return {
+            recipe: null,
+            error: errorMsg,
+            fromCache: false,
+            inputType: inputType, // Report the problematic type
+            cacheKey: generateCacheKeyHash(trimmedInput), // Generate a cache key even for unsupported types for consistency if needed, or could be empty
+            timings: overallTimings,
+            usage: { inputTokens: 0, outputTokens: 0 },
+            fetchMethodUsed: 'N/A'
+        };
+    }
+    // --- END EARLY INPUT TYPE VALIDATION ---
+
     const cacheKey = inputType === 'url' ? trimmedInput : generateCacheKeyHash(trimmedInput);
 
     console.log(`[${requestId}] Received parse request. Input type: ${inputType}. Input length: ${trimmedInput.length}. Cache key: ${cacheKey}`);
@@ -119,7 +139,7 @@ export async function parseAndCacheRecipe(
                 handlerUsage = { inputTokens: 0, outputTokens: 0 };
             }
         }
-    } else {
+    } else if (inputType === 'raw_text') {
         const { preparedText, error: prepareError, timings: prepTimings } = extractFromRawText(trimmedInput, requestId);
         overallTimings.prepareText = prepTimings.prepareText;
 

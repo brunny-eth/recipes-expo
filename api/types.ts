@@ -1,5 +1,10 @@
 // api/types.ts
 
+// Remove incorrect import
+// import { StructuredIngredient } from "./utils/recipeUtils"; 
+import { GoogleGenerativeAI, GenerationConfig } from "@google/generative-ai";
+import { StandardizedUsage } from "./utils/usageUtils";
+
 // Structured Ingredient Type
 export type StructuredIngredient = {
   name: string;
@@ -34,5 +39,12 @@ export type SubstitutionSuggestion = {
 };
 
 // Gemini Model Type
-import { GoogleGenerativeAI, GenerationConfig } from "@google/generative-ai";
 export type GeminiModel = ReturnType<InstanceType<typeof GoogleGenerativeAI>['getGenerativeModel']>;
+
+// --- Shared Gemini Handler Response Type ---
+export type GeminiHandlerResponse = {
+    recipe: CombinedParsedRecipe | null;
+    error: string | null;
+    usage: StandardizedUsage;
+    timings: { geminiCombinedParse: number; };
+};

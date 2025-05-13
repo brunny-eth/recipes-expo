@@ -106,6 +106,7 @@ router.post('/parse', async (req: Request, res: Response) => {
   const { recipe, error, fromCache, inputType, cacheKey, timings, usage, fetchMethodUsed } = await parseAndCacheRecipe(input, geminiModel, scraperApiKey, scraperClient);
 
   if (error) {
+    console.error(`[API /parse Error] Failed to process input: ${input}`, error);
     return res.status(500).json({ error });
   }
 

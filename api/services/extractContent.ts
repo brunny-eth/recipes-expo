@@ -1,11 +1,15 @@
 import * as cheerio from 'cheerio';
 
 // Type definitions that might be shared or imported if structure grows
-type ExtractedContent = {
+export type ExtractedContent = {
   title: string | null;
   ingredientsText: string | null;
   instructionsText: string | null;
   recipeYieldText?: string | null;
+  isFallback?: boolean;
+  prepTime?: string | null;
+  cookTime?: string | null;
+  totalTime?: string | null;
 };
 
 /**
@@ -15,11 +19,17 @@ type ExtractedContent = {
  * @returns An object containing extracted title, ingredients text, and instructions text.
  */
 export function extractRecipeContent(html: string): ExtractedContent {
-  const $ = cheerio.load(html);
+  let $ = cheerio.load(html); // Load initial HTML
+
+  // Initialize extracted fields
   let title: string | null = null;
   let ingredientsText: string | null = null;
   let instructionsText: string | null = null;
   let recipeYieldText: string | null = null;
+  let isFallback = false;
+  let prepTime: string | null = null;
+  let cookTime: string | null = null;
+  let totalTime: string | null = null;
 
   // Tier 1: Try JSON-LD
   let recipeJson: any = null;
@@ -27,7 +37,16 @@ export function extractRecipeContent(html: string): ExtractedContent {
     if (recipeJson) return; // Stop if already found
     try {
       const scriptContent = $(element).html();
-      if (!scriptContent) return;
+      if (!scriptContent) {
+          // console.log('Skipping empty ld+json script tag.'); // Optional: Log skipped empty tags
+          return; 
+      }
+      
+      // --- Add Logging --- 
+      console.log(`Found potential JSON-LD script content (first 2000 chars):
+${scriptContent.slice(0, 2000)}`);
+      // --- End Logging --- 
+
       const jsonData = JSON.parse(scriptContent);
 
       // Check if jsonData is the recipe object or contains it in a graph
@@ -79,21 +98,75 @@ export function extractRecipeContent(html: string): ExtractedContent {
         recipeYieldText = String(recipeJson.recipeYield);
       }
     }
+
+    // --- Extract Time Fields from JSON-LD --- 
+    prepTime = recipeJson.prepTime || null;
+    cookTime = recipeJson.cookTime || null;
+    totalTime = recipeJson.totalTime || null;
+    // --- End Time Field Extraction --- 
+
     // Fallback title extraction if needed, only if JSON-LD didn't yield one
     if (!title) title = $('title').first().text() || $('h1').first().text() || null;
 
-    console.log(`Extracted from JSON-LD - Title: ${!!title}, Ingredients: ${!!ingredientsText}, Instructions: ${!!instructionsText}, Yield: ${!!recipeYieldText}`);
-    // If JSON-LD provides all key parts, prefer it and return early
-    if (title && ingredientsText && instructionsText && recipeYieldText) {
-        return { title, ingredientsText, instructionsText, recipeYieldText };
+    console.log(`Extracted from JSON-LD - Title: ${!!title}, Ingredients: ${!!ingredientsText}, Instructions: ${!!instructionsText}, Yield: ${!!recipeYieldText}, Prep: ${!!prepTime}, Cook: ${!!cookTime}, Total: ${!!totalTime}`);
+    // If JSON-LD provides the essentials (ingredients AND instructions), return it (including times)
+    if (ingredientsText && instructionsText) {
+        return { title, ingredientsText, instructionsText, recipeYieldText, isFallback, prepTime, cookTime, totalTime };
     }
-    // Continue to selector fallback if JSON-LD was incomplete
+    // Continue to selector fallback if JSON-LD was incomplete for essentials
   }
 
+  // --- Pre-stripping & Content Isolation (MOVED HERE) ---
+  // This runs if JSON-LD was not found or was incomplete for essentials.
+  console.log("JSON-LD not found or incomplete for essentials. Applying pre-stripping and attempting main content isolation before selector fallback.");
+  
+  // Create a new Cheerio instance from the original HTML for pre-stripping,
+  // as the original '$' might have been modified if mainContentHtml was previously loaded.
+  // However, we should operate on the version of '$' that reflects the current state.
+  // If mainContentHtml was *already* isolated due to a previous iteration (which shouldn't happen with this new flow),
+  // we'd want to use that. But since JSON-LD failed, we re-evaluate from potentially broader HTML.
+  // The initial '$' is still the full HTML at this point if JSON-LD parsing didn't result in an early return.
+
+  // Remove common non-content tags from the *current* Cheerio instance
+  $('script, style, iframe, noscript, footer, nav').remove();
+  // Remove common cookie/consent/modal elements
+  $('[id*="consent" i], [class*="consent" i], [id*="cookie" i], [class*="cookie" i], [class*="banner" i], [role="dialog" i], [aria-modal="true" i]').remove();
+
+  // Attempt to isolate the main content area from the *current* Cheerio instance
+  const mainSelectors = [
+      'article[id*="recipe" i]',
+      'div[id*="recipe" i]',
+      'div[class*="recipe-content" i]',
+      'div[class*="wprm-recipe-container" i]', // Common recipe plugin class
+      'main[id*="main" i]',
+      'main',
+      'article'
+  ];
+  let mainContentHtml: string | null = null;
+  for (const selector of mainSelectors) {
+      const mainElement = $(selector).first();
+      if (mainElement.length > 0) {
+          const potentialHtml = mainElement.html();
+          if (potentialHtml && potentialHtml.length > 500) {
+              console.log(`Found potential main content container using selector: ${selector}. Reloading Cheerio with this content.`);
+              mainContentHtml = potentialHtml;
+              break;
+          }
+      }
+  }
+
+  if (mainContentHtml) {
+      $ = cheerio.load(mainContentHtml); // Reload Cheerio with only the main content for subsequent selector parsing
+  } else {
+      console.log("Could not isolate a specific main content container after JSON-LD attempt, proceeding with pre-stripped body for selectors.");
+  }
+  // --- End Pre-stripping & Isolation ---
+
   // Tier 2: Fallback to Selectors (or run if JSON-LD was incomplete)
-  console.log("JSON-LD not found or incomplete for all fields. Trying selectors.");
-  if (!title) { // Only grab title from selectors if JSON-LD (or its internal fallback) didn't provide it
-    title = $('title').first().text() || $('h1').first().text() || null;
+  // Note: The console log for this was moved up to the start of the pre-stripping block.
+  if (!title) { // Title might have been parsed by JSON-LD even if other fields were missing
+    const titleFromSelectors = $('title').first().text() || $('h1').first().text() || null;
+    if (titleFromSelectors) title = titleFromSelectors;
   }
 
   // Ingredient Selectors
@@ -223,6 +296,31 @@ export function extractRecipeContent(html: string): ExtractedContent {
     }
   }
 
-  console.log(`Final Extracted Content - Title: ${!!title}, Ingredients: ${!!ingredientsText}, Instructions: ${!!instructionsText}, Yield: ${!!recipeYieldText}`);
-  return { title, ingredientsText, instructionsText, recipeYieldText };
+  // --- Fallback Logic (New Implementation) ---
+  // Fallback: use raw body text if no structured content was found or content is too short.
+  const minLengthThreshold = 50;
+  const ingredientsMissingOrShort = !ingredientsText || ingredientsText.length < minLengthThreshold;
+  const instructionsMissingOrShort = !instructionsText || instructionsText.length < minLengthThreshold;
+
+  if (ingredientsMissingOrShort || instructionsMissingOrShort) {
+    console.warn(`[extractContent] Fallback: using raw body text due to missing or short (${minLengthThreshold} chars) ingredients and/or instructions.`);
+    // Refined cleaning: Collapse multiple spaces, collapse multiple newlines, then trim.
+    const rawBodyText = $('body').text()
+      .replace(/ +/g, ' ')        // Collapse multiple spaces to one
+      .replace(/\n\s*\n/g, '\n')  // Collapse multiple newlines (optional whitespace between) to one
+      .trim();
+    isFallback = true; // Set the flag when fallback occurs
+
+    // Only overwrite if the original extraction was insufficient
+    if (ingredientsMissingOrShort) {
+      ingredientsText = rawBodyText;
+    }
+    if (instructionsMissingOrShort) {
+      instructionsText = rawBodyText;
+    }
+  }
+
+  console.log(`Final Extracted Content - Title: ${!!title}, Ingredients: ${!!ingredientsText}, Instructions: ${!!instructionsText}, Yield: ${!!recipeYieldText}, Prep: ${!!prepTime}, Cook: ${!!cookTime}, Total: ${!!totalTime}, Fallback Used: ${isFallback}`);
+  // Return structure includes the fallback flag again
+  return { title, ingredientsText, instructionsText, recipeYieldText, isFallback, prepTime, cookTime, totalTime };
 }

@@ -1,4 +1,4 @@
-import { extractRecipeContent } from '../extractContent';
+import { extractRecipeContent, ExtractedContent } from '../extractContent';
 
 describe('extractRecipeContent', () => {
 
@@ -26,7 +26,11 @@ describe('extractRecipeContent', () => {
                   "@type": "HowToStep",
                   "text": "Bake the cake."
                 }
-              ]
+              ],
+              "recipeYield": "4 servings",
+              "prepTime": "PT15M",
+              "cookTime": "PT30M",
+              "totalTime": "PT45M"
             }
           </script>
         </head>
@@ -41,11 +45,15 @@ describe('extractRecipeContent', () => {
         </body>
       </html>
     `;
-    const expected = {
+    const expected: ExtractedContent = {
       title: 'JSON-LD Recipe Title',
       ingredientsText: '1 cup Flour\n2 Eggs',
       instructionsText: 'Mix ingredients.\nBake the cake.',
-      recipeYieldText: null
+      recipeYieldText: '4 servings',
+      prepTime: 'PT15M',
+      cookTime: 'PT30M',
+      totalTime: 'PT45M',
+      isFallback: false
     };
     expect(extractRecipeContent(htmlWithJsonLd)).toEqual(expected);
   });
@@ -76,11 +84,15 @@ describe('extractRecipeContent', () => {
         </body>
       </html>
     `;
-    const expected = {
+    const expected: ExtractedContent = {
       title: 'Graph Recipe Title',
       ingredientsText: 'Ingredient A\nIngredient B',
       instructionsText: 'Single instruction step.',
-      recipeYieldText: null
+      recipeYieldText: null,
+      prepTime: null,
+      cookTime: null,
+      totalTime: null,
+      isFallback: false
     };
     expect(extractRecipeContent(htmlWithGraphJsonLd)).toEqual(expected);
   });
@@ -91,7 +103,7 @@ describe('extractRecipeContent', () => {
       <html>
         <head><title>CSS Selector Title</title></head>
         <body>
-          <h1>Another H1 Title</h1> 
+          <h1>Another H1 Title</h1>
           <ul class="ingredients">
             <li>Ingredient 1</li>
             <li itemprop="recipeIngredient">Ingredient 2</li>
@@ -103,22 +115,21 @@ describe('extractRecipeContent', () => {
         </body>
       </html>
     `;
-    const expectedTitle = 'CSS Selector Title';
-    const expectedIngredients = 'Ingredient 1\nIngredient 2';
-    const expectedInstructions = 'Step 1.\nStep 2.';
-
+    const expectedFallbackText = "Another H1 Title\n Ingredient 1\n Ingredient 2\n Step 1.\n Step 2.";
     const result = extractRecipeContent(htmlWithoutJsonLd);
 
-    expect(result.title).toEqual(expectedTitle);
-    
-    const sortLines = (text: string | null) => text ? text.split('\n').sort().join('\n') : null;
-
-    expect(sortLines(result.ingredientsText)).toEqual(sortLines(expectedIngredients));
-    expect(sortLines(result.instructionsText)).toEqual(sortLines(expectedInstructions));
+    expect(result.title).toEqual('CSS Selector Title');
+    expect(result.ingredientsText).toEqual(expectedFallbackText);
+    expect(result.instructionsText).toEqual(expectedFallbackText);
+    expect(result.recipeYieldText).toBeNull();
+    expect(result.prepTime).toBeNull();
+    expect(result.cookTime).toBeNull();
+    expect(result.totalTime).toBeNull();
+    expect(result.isFallback).toBe(true);
   });
 
   // Test Case 4: Incomplete JSON-LD (e.g., missing instructions), fallback for missing parts
-  test('should fallback to CSS selectors for parts missing in JSON-LD', () => {
+  test('should fallback to CSS selectors for parts missing in JSON-LD and handle short content fallback', () => {
     const htmlIncompleteJsonLd = `
       <html>
         <head>
@@ -140,17 +151,22 @@ describe('extractRecipeContent', () => {
         </body>
       </html>
     `;
-    const expected = {
-      title: 'Incomplete JSON Recipe', // From JSON-LD
-      ingredientsText: 'JSON Ingredient 1', // From JSON-LD
-      instructionsText: 'Selector Instruction 1\nSelector Instruction 2', // From CSS selector
-      recipeYieldText: null
+    const expectedFallbackText = "Selector Instruction 1\n Selector Instruction 2";
+    const expected: ExtractedContent = {
+      title: 'Incomplete JSON Recipe',
+      ingredientsText: expectedFallbackText,
+      instructionsText: expectedFallbackText,
+      recipeYieldText: null,
+      prepTime: null,
+      cookTime: null,
+      totalTime: null,
+      isFallback: true
     };
     expect(extractRecipeContent(htmlIncompleteJsonLd)).toEqual(expected);
   });
 
   // Test Case 5: No Recipe Content Found
-  test('should return nulls when no recipe content is found via JSON-LD or selectors', () => {
+  test('should return fallback body text when no recipe content is found via JSON-LD or selectors', () => {
     const htmlNoRecipe = `
       <html>
         <head><title>Just a Page</title></head>
@@ -159,17 +175,22 @@ describe('extractRecipeContent', () => {
         </body>
       </html>
     `;
-    const expected = {
-      title: 'Just a Page', // Title can usually be found
-      ingredientsText: null,
-      instructionsText: null,
-      recipeYieldText: null
+    const expectedFallbackText = "This page has no recipe information.";
+    const expected: ExtractedContent = {
+      title: 'Just a Page', // Title from <title>
+      ingredientsText: expectedFallbackText,
+      instructionsText: expectedFallbackText,
+      recipeYieldText: null,
+      prepTime: null,
+      cookTime: null,
+      totalTime: null,
+      isFallback: true
     };
     expect(extractRecipeContent(htmlNoRecipe)).toEqual(expected);
   });
 
   // Test Case 6: Different common selector patterns
-  test('should extract content using alternative common CSS selectors', () => {
+  test('should extract content using alternative common CSS selectors and handle short content fallback', () => {
     const htmlAlternativeSelectors = `
       <html>
         <head><title>Alt Selector Recipe</title></head>
@@ -183,15 +204,20 @@ describe('extractRecipeContent', () => {
         </body>
       </html>
     `;
-    const expected = {
+    const expectedFallbackText = "Tasty Ingredient A\n Easy Instruction 1";
+    const expected: ExtractedContent = {
       title: 'Alt Selector Recipe',
-      ingredientsText: 'Tasty Ingredient A',
-      instructionsText: 'Easy Instruction 1',
-      recipeYieldText: null
+      ingredientsText: expectedFallbackText,
+      instructionsText: expectedFallbackText,
+      recipeYieldText: null,
+      prepTime: null,
+      cookTime: null,
+      totalTime: null,
+      isFallback: true
     };
     expect(extractRecipeContent(htmlAlternativeSelectors)).toEqual(expected);
   });
-  
+
   // Test Case 7: Instructions as HowToSection in JSON-LD
   test('should extract instructions from HowToSection in JSON-LD', () => {
       const htmlWithHowToSection = `
@@ -228,17 +254,21 @@ describe('extractRecipeContent', () => {
         <body></body>
       </html>
     `;
-      const expected = {
+      const expected: ExtractedContent = {
           title: 'HowToSection Recipe Title',
           ingredientsText: 'Ingredient X\nIngredient Y',
           instructionsText: 'Combine flour and water.\nKnead the dough.\nPlace in oven.\nBake for 30 minutes.',
-          recipeYieldText: null
+          recipeYieldText: null,
+          prepTime: null,
+          cookTime: null,
+          totalTime: null,
+          isFallback: false
       };
       expect(extractRecipeContent(htmlWithHowToSection)).toEqual(expected);
   });
 
-  // Test Case 8: Malformed JSON-LD, fallback to CSS selectors
-  test('should ignore malformed JSON-LD and fallback to CSS selectors', () => {
+  // Test Case 8: Malformed JSON-LD, fallback to CSS selectors, then to body
+  test('should ignore malformed JSON-LD and fallback to CSS selectors, then to body if short', () => {
     const htmlWithMalformedJsonLd = `
       <html>
         <head>
@@ -267,26 +297,26 @@ describe('extractRecipeContent', () => {
     `;
 
     const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-
-    const expected = {
-      title: 'Selector Title After Malformed JSON', // Should fallback to h1 or title tag
-      ingredientsText: 'Selector Ingredient A\nSelector Ingredient B',
-      instructionsText: 'Selector Instruction 1\nSelector Instruction 2',
-      recipeYieldText: null
-    };
-
     const result = extractRecipeContent(htmlWithMalformedJsonLd);
     
-    // Title might pick <title> first if h1 isn't prioritized in fallback
-    // Let's adjust expected title based on current logic: <title> then <h1>
-    const expectedTitle = 'CSS Fallback Title'; // As per current title fallback logic
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      "Ignoring JSON-LD parsing error:", 
+      expect.any(SyntaxError)
+    );
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[extractContent] Fallback: using raw body text due to missing or short (50 chars) ingredients and/or instructions.')
+    );
 
-    expect(consoleWarnSpy).toHaveBeenCalled();
-    expect(result.title).toEqual(expectedTitle);
-
-    const sortLines = (text: string | null) => text ? text.split('\n').sort().join('\n') : null;
-    expect(sortLines(result.ingredientsText)).toEqual(sortLines(expected.ingredientsText));
-    expect(sortLines(result.instructionsText)).toEqual(sortLines(expected.instructionsText));
+    const expectedFallbackText = "Selector Title After Malformed JSON\n Selector Ingredient A\n Selector Ingredient B\n Selector Instruction 1\n Selector Instruction 2";
+    
+    expect(result.title).toEqual('CSS Fallback Title');
+    expect(result.ingredientsText).toEqual(expectedFallbackText);
+    expect(result.instructionsText).toEqual(expectedFallbackText);
+    expect(result.recipeYieldText).toBeNull();
+    expect(result.prepTime).toBeNull();
+    expect(result.cookTime).toBeNull();
+    expect(result.totalTime).toBeNull();
+    expect(result.isFallback).toBe(true);
 
     consoleWarnSpy.mockRestore();
   });

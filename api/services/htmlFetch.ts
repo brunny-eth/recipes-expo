@@ -39,6 +39,7 @@ export async function fetchHtmlWithFallback(
     }
     htmlContent = await response.text();
     console.log(`Successfully fetched HTML via Direct Fetch. Length: ${htmlContent.length}`);
+    console.log('[DEBUG htmlFetch] Raw HTML Content (Direct Fetch - first 500 chars):', htmlContent.substring(0, 500));
   } catch (directErr) {
     const directFetchError = directErr instanceof Error ? directErr : new Error(String(directErr));
     console.warn(`Direct fetch failed: ${directFetchError.message}`);
@@ -47,33 +48,53 @@ export async function fetchHtmlWithFallback(
     // Attempt 2: ScraperAPI Fallback
     if (scraperApiKey && scraperClient && (directFetchError.message.includes('Fetch failed: 403') || directFetchError)) {
       console.log(`Direct fetch failed. Falling back to ScraperAPI... Cause: ${directFetchError.message}`);
-      fetchMethodUsed = 'ScraperAPI Fallback';
+      
+      // Determine if rendering is needed based on domain
+      const needsRender = url.includes('foodnetwork.com'); // Add other domains as needed
+      const options = needsRender ? { render: true, autoparse: false } : {};
+      const attemptType = needsRender ? 'ScraperAPI Rendered (autoparse=false)' : 'ScraperAPI Initial';
+      fetchMethodUsed = attemptType;
+
       try {
-        // Use the passed-in client instance
-        const scraperResponse: any = await scraperClient.get(url); 
-        if (typeof scraperResponse === 'object' && scraperResponse !== null && typeof scraperResponse.body === 'string' && scraperResponse.body.length > 0) {
-          htmlContent = scraperResponse.body;
-          console.log(`Successfully fetched HTML via ScraperAPI Fallback. Length: ${htmlContent.length}`);
-          error = null; // Clear error as fallback succeeded
-        } else if (typeof scraperResponse === 'string' && scraperResponse.length > 0) {
-          htmlContent = scraperResponse;
-          console.log(`Successfully fetched HTML directly as string via ScraperAPI Fallback. Length: ${htmlContent.length}`);
-          error = null; // Clear error as fallback succeeded
-        } else {
-          let responseString = '';
-          try {
-            responseString = JSON.stringify(scraperResponse);
-          } catch (e) {
-            responseString = String(scraperResponse);
+          console.log(`[${attemptType}] Fetching URL: ${url}`);
+          const scraperResponse: any = await scraperClient.get(url, options); 
+
+          // Determine HTML content based on response type
+          let potentialHtml = '';
+          let statusCode: number | undefined = undefined;
+          if (typeof scraperResponse === 'object' && scraperResponse !== null) {
+              if (typeof scraperResponse.body === 'string') {
+                  potentialHtml = scraperResponse.body;
+              }
+              if (typeof scraperResponse.statusCode === 'number') {
+                  statusCode = scraperResponse.statusCode;
+              }
+          } else if (typeof scraperResponse === 'string') {
+              potentialHtml = scraperResponse;
           }
-          throw new Error(`ScraperAPI fallback returned unexpected response: ${responseString}`);
-        }
-      } catch (scraperErr) {
-        const scraperErrorMessage = scraperErr instanceof Error ? scraperErr.message : String(scraperErr);
-        console.error(`ScraperAPI fallback also failed:`, scraperErr);
-        // Keep the combined error message if fallback fails
-        error = new Error(`Direct fetch failed (${directFetchError.message}) and ScraperAPI fallback failed (${scraperErrorMessage})`);
+
+          // Validate the response
+          const isValidHtml = potentialHtml && potentialHtml.toLowerCase().includes('<html');
+          const isSuccessStatusCode = !statusCode || (statusCode >= 200 && statusCode < 300);
+
+          if (isSuccessStatusCode && isValidHtml) {
+              htmlContent = potentialHtml;
+              console.log(`[${attemptType}] Successfully fetched valid HTML. Length: ${htmlContent.length}`);
+              console.log(`[DEBUG htmlFetch] Raw HTML Content (${attemptType} - first 500 chars):`, htmlContent.substring(0, 500));
+              error = null; // Clear original direct fetch error as fallback succeeded
+          } else {
+              // Construct error message for the failed attempt
+              let failureReason = `returned ${statusCode || 'unknown status'}`;
+              if (!isValidHtml) failureReason += ", and HTML content was invalid or missing <html> tag";
+              throw new Error(`[${attemptType}] fallback failed: ${failureReason}`);
+          }
+      } catch (err) {
+          const scraperError = err instanceof Error ? err : new Error(String(err));
+          console.error(`[${attemptType}] Error:`, scraperError.message);
+          // If the ScraperAPI attempt fails, construct the final combined error message
+          error = new Error(`Direct fetch failed (${directFetchError.message}) and ScraperAPI fallback failed (${scraperError.message})`);
       }
+
     } else if (!scraperApiKey && directFetchError) {
          console.warn('Direct fetch failed and ScraperAPI key is missing. Cannot fallback.');
          // error is already set to directFetchError

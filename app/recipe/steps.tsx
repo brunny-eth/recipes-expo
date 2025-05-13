@@ -9,9 +9,10 @@ import MiniTimerDisplay from '@/components/MiniTimerDisplay';
 import { ActiveTool } from '@/components/ToolsModal';
 
 export default function StepsScreen() {
-  const params = useLocalSearchParams<{ instructionsData?: string, substitutionsText?: string }>();
+  const params = useLocalSearchParams<{ recipeData?: string }>();
   const router = useRouter();
   
+  const [recipeTitle, setRecipeTitle] = useState<string | null>(null);
   const [instructions, setInstructions] = useState<string[]>([]);
   const [substitutions, setSubstitutions] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -27,28 +28,40 @@ export default function StepsScreen() {
   // --- End Lifted Timer State ---
   
   useEffect(() => {
+    setIsLoading(true);
+    setError(null);
     try {
-      if (params.instructionsData) {
-        const parsedInstructions = JSON.parse(params.instructionsData);
-        if (Array.isArray(parsedInstructions)) {
-            setInstructions(parsedInstructions);
-        } else {
-            throw new Error("Instructions data is not an array.");
-        }
-      } else {
-        // Allow empty instructions, maybe show placeholder later
-        setInstructions([]); 
-      }
-      
-      // Set substitutions text (it's already a string or empty/null)
-      setSubstitutions(params.substitutionsText || null);
+      if (params.recipeData) {
+        const parsedData = JSON.parse(params.recipeData) as {
+          title?: string | null;
+          instructions?: string[] | null;
+          substitutions_text?: string | null;
+        };
 
-    } catch (e) {
-        console.error("Failed to parse instructions data:", e);
-        setError("Could not load recipe instructions.");
+        if (parsedData.instructions && Array.isArray(parsedData.instructions)) {
+            setInstructions(parsedData.instructions);
+        } else {
+            console.warn("[StepsScreen] Instructions missing or not an array in recipeData.");
+            setInstructions([]); 
+        }
+
+        setSubstitutions(parsedData.substitutions_text || null);
+        
+        setRecipeTitle(parsedData.title || 'Instructions'); 
+
+      } else {
+        setError("Recipe data not provided to steps screen.");
+        setInstructions([]);
+        setSubstitutions(null);
+      }
+    } catch (e: any) {
+        console.error("Failed to parse recipe data on steps screen:", e);
+        setError(`Could not load recipe data: ${e.message}`);
+        setInstructions([]);
+        setSubstitutions(null);
     }
     setIsLoading(false);
-  }, [params.instructionsData, params.substitutionsText]);
+  }, [params.recipeData]);
 
   // --- Lifted Timer Logic --- 
   const formatTime = (seconds: number) => {
@@ -152,7 +165,7 @@ export default function StepsScreen() {
         >
           <ArrowLeft size={24} color={COLORS.raisinBlack} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Instructions</Text>
+        <Text style={styles.headerTitle}>{recipeTitle || 'Instructions'}</Text>
         <TouchableOpacity style={styles.toolsButton} onPress={() => openToolsModal()}>
             <ToolsIcon size={24} color={COLORS.raisinBlack} />
         </TouchableOpacity>

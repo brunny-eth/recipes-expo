@@ -62,11 +62,11 @@ describe('fetchHtmlWithFallback', () => {
     const result = await fetchHtmlWithFallback('http://blocked.com', mockApiKey, mockScraperClient);
 
     expect(result.htmlContent).toBe(fallbackHtml);
-    expect(result.fetchMethodUsed).toBe('ScraperAPI Fallback');
+    expect(result.fetchMethodUsed).toBe('ScraperAPI Initial');
     expect(result.error).toBeNull();
     expect(global.fetch).toHaveBeenCalledTimes(1);
     expect(mockScraperClient.get).toHaveBeenCalledTimes(1);
-    expect(mockScraperClient.get).toHaveBeenCalledWith('http://blocked.com');
+    expect(mockScraperClient.get).toHaveBeenCalledWith('http://blocked.com', {});
   });
   
    test('should use ScraperAPI fallback if direct fetch returns non-403 error and API key exists', async () => {
@@ -81,7 +81,7 @@ describe('fetchHtmlWithFallback', () => {
     const result = await fetchHtmlWithFallback('http://servererror.com', mockApiKey, mockScraperClient);
 
     expect(result.htmlContent).toBe(fallbackHtml);
-    expect(result.fetchMethodUsed).toBe('ScraperAPI Fallback');
+    expect(result.fetchMethodUsed).toBe('ScraperAPI Initial');
     expect(result.error).toBeNull();
     expect(global.fetch).toHaveBeenCalledTimes(1);
     expect(mockScraperClient.get).toHaveBeenCalledTimes(1);
@@ -96,7 +96,7 @@ describe('fetchHtmlWithFallback', () => {
     const result = await fetchHtmlWithFallback('http://networkerror.com', mockApiKey, mockScraperClient);
 
     expect(result.htmlContent).toBe(fallbackHtml);
-    expect(result.fetchMethodUsed).toBe('ScraperAPI Fallback');
+    expect(result.fetchMethodUsed).toBe('ScraperAPI Initial');
     expect(result.error).toBeNull(); 
     expect(global.fetch).toHaveBeenCalledTimes(1);
     expect(mockScraperClient.get).toHaveBeenCalledTimes(1);
@@ -115,7 +115,7 @@ describe('fetchHtmlWithFallback', () => {
     const result = await fetchHtmlWithFallback('http://bothfail.com', mockApiKey, mockScraperClient);
 
     expect(result.htmlContent).toBe('');
-    expect(result.fetchMethodUsed).toBe('ScraperAPI Fallback'); // It attempted fallback
+    expect(result.fetchMethodUsed).toBe('ScraperAPI Initial');
     expect(result.error).toBeInstanceOf(Error);
     expect(result.error?.message).toContain('Fetch failed: 403 Forbidden');
     expect(result.error?.message).toContain('Scraper API failed');
@@ -135,8 +135,8 @@ describe('fetchHtmlWithFallback', () => {
     const result = await fetchHtmlWithFallback('http://directfailnokey.com', undefined, mockScraperClient);
 
     expect(result.htmlContent).toBe('');
-    expect(result.fetchMethodUsed).toBe('Direct Fetch'); // Fallback not attempted
-    expect(result.error).toEqual(directError); // Should be the original direct fetch error
+    expect(result.fetchMethodUsed).toBe('Direct Fetch');
+    expect(result.error).toEqual(directError);
     expect(global.fetch).toHaveBeenCalledTimes(1);
     expect(mockScraperClient.get).not.toHaveBeenCalled();
   });
@@ -149,7 +149,7 @@ describe('fetchHtmlWithFallback', () => {
     const result = await fetchHtmlWithFallback('http://fallbackstring.com', mockApiKey, mockScraperClient);
 
     expect(result.htmlContent).toBe(fallbackHtmlString);
-    expect(result.fetchMethodUsed).toBe('ScraperAPI Fallback');
+    expect(result.fetchMethodUsed).toBe('ScraperAPI Initial');
     expect(result.error).toBeNull();
     expect(mockScraperClient.get).toHaveBeenCalledTimes(1);
   });
@@ -162,9 +162,9 @@ describe('fetchHtmlWithFallback', () => {
     const result = await fetchHtmlWithFallback('http://badfallbackformat.com', mockApiKey, mockScraperClient);
 
     expect(result.htmlContent).toBe('');
-    expect(result.fetchMethodUsed).toBe('ScraperAPI Fallback'); 
+    expect(result.fetchMethodUsed).toBe('ScraperAPI Initial');
     expect(result.error).toBeInstanceOf(Error);
-    expect(result.error?.message).toContain('ScraperAPI fallback returned unexpected response');
+    expect(result.error?.message).toContain('[ScraperAPI Initial] fallback failed: returned unknown status, and HTML content was invalid or missing <html> tag');
     expect(mockScraperClient.get).toHaveBeenCalledTimes(1);
   });
 
