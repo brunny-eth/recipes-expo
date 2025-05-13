@@ -50,7 +50,8 @@ export async function fetchHtmlWithFallback(
       console.log(`Direct fetch failed. Falling back to ScraperAPI... Cause: ${directFetchError.message}`);
       
       // Determine if rendering is needed based on domain
-      const needsRender = url.includes('foodnetwork.com'); // Add other domains as needed
+      // const needsRender = url.includes('foodnetwork.com'); // Add other domains as needed // TEMP: Force false
+      const needsRender = false; // TEMP: Force false to bypass render:true for testing
       const options = needsRender ? { render: true, autoparse: false } : {};
       const attemptType = needsRender ? 'ScraperAPI Rendered (autoparse=false)' : 'ScraperAPI Initial';
       fetchMethodUsed = attemptType;
