@@ -33,37 +33,47 @@ export function extractRecipeContent(html: string): ExtractedContent {
 
   // Tier 1: Try JSON-LD
   let recipeJson: any = null;
+  let ldJsonBlocksScanned = 0; // For logging
+  let recipeFoundInLdJson = false; // For logging
+
   $('script[type="application/ld+json"]').each((_, element) => {
-    if (recipeJson) return; // Stop if already found
+    // if (recipeJson) return; // REMOVED: We want to scan all and pick the first valid Recipe
+    ldJsonBlocksScanned++;
     try {
       const scriptContent = $(element).html();
       if (!scriptContent) {
-          // console.log('Skipping empty ld+json script tag.'); // Optional: Log skipped empty tags
           return; 
       }
       
-      // --- Add Logging --- 
-      console.log(`Found potential JSON-LD script content (first 2000 chars):
-${scriptContent.slice(0, 2000)}`);
-      // --- End Logging --- 
+      console.log(`Found potential JSON-LD script content (first 2000 chars):\n${scriptContent.slice(0, 2000)}`);
 
       const jsonData = JSON.parse(scriptContent);
+      let candidate = null;
 
-      // Check if jsonData is the recipe object or contains it in a graph
-      if (jsonData['@type'] === 'Recipe') {
-        recipeJson = jsonData;
-      } else if (Array.isArray(jsonData) && jsonData.some(item => item['@type'] === 'Recipe')) {
-         recipeJson = jsonData.find(item => item['@type'] === 'Recipe');
-      } else if (jsonData['@graph'] && Array.isArray(jsonData['@graph'])) {
-         recipeJson = jsonData['@graph'].find((item: any) => item['@type'] === 'Recipe');
+      if (Array.isArray(jsonData)) {
+        candidate = jsonData.find(item => item && item['@type'] === 'Recipe');
+      } else if (jsonData && jsonData['@graph'] && Array.isArray(jsonData['@graph'])) {
+        candidate = jsonData['@graph'].find((item: any) => item && item['@type'] === 'Recipe');
+      } else if (jsonData && jsonData['@type'] === 'Recipe') {
+        candidate = jsonData;
       }
+
+      if (candidate && !recipeJson) { // If a recipe candidate is found and we haven't stored one yet
+        recipeJson = candidate;
+        recipeFoundInLdJson = true; // Mark that we found and are using a recipe from JSON-LD
+        // Do not return here; continue scanning in case a more complete Recipe object is found later?
+        // For now, per the suggestion, we take the first valid one.
+      }
+
     } catch (e) {
       console.warn("Ignoring JSON-LD parsing error:", e);
     }
   });
 
-  if (recipeJson) {
-    console.log("Found recipe via JSON-LD.");
+  console.log(`[JSON-LD Scan] Scanned ${ldJsonBlocksScanned} ld+json blocks. Recipe type found and used: ${recipeFoundInLdJson}.`); // Logging
+
+  if (recipeJson) { // This condition now means a valid Recipe object was found and assigned
+    console.log("Found and using recipe data from JSON-LD."); // Updated log message
     title = recipeJson.name || null;
     // Ingredients can be string[]
     if (Array.isArray(recipeJson.recipeIngredient)) {
