@@ -66,7 +66,7 @@ describe('fetchHtmlWithFallback', () => {
     expect(result.error).toBeNull();
     expect(global.fetch).toHaveBeenCalledTimes(1);
     expect(mockScraperClient.get).toHaveBeenCalledTimes(1);
-    expect(mockScraperClient.get).toHaveBeenCalledWith('http://blocked.com', {});
+    expect(mockScraperClient.get).toHaveBeenCalledWith('http://blocked.com', { country_code: 'us' });
   });
   
    test('should use ScraperAPI fallback if direct fetch returns non-403 error and API key exists', async () => {
