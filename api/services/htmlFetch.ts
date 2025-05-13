@@ -52,11 +52,14 @@ export async function fetchHtmlWithFallback(
       // Determine if rendering is needed based on domain
       // const needsRender = url.includes('foodnetwork.com'); // Add other domains as needed // TEMP: Force false
       const needsRender = false; // TEMP: Force false to bypass render:true for testing
-      const options = needsRender ? { render: true, autoparse: false } : {};
+      const options = needsRender
+        ? { render: true, autoparse: false, country_code: 'us' } 
+        : { country_code: 'us' }; 
       const attemptType = needsRender ? 'ScraperAPI Rendered (autoparse=false)' : 'ScraperAPI Initial';
       fetchMethodUsed = attemptType;
 
       try {
+          console.log(`[${attemptType}] ScraperAPI request options:`, JSON.stringify(options));
           console.log(`[${attemptType}] Fetching URL: ${url}`);
           const scraperResponse: any = await scraperClient.get(url, options); 
 
