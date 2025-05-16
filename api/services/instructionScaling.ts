@@ -1,4 +1,5 @@
 import { performance } from 'perf_hooks';
+import logger from '../lib/logger';
 
 type LLMResponse<T> = {
   [K in keyof T]: T[K];
@@ -61,6 +62,7 @@ ${instructionsToScale.map(s => `- ${s}`).join('\n')}
             promptTokens: response.usageMetadata?.promptTokenCount || 0,
             outputTokens: response.usageMetadata?.candidatesTokenCount || 0
           };
+          logger.info({ action: 'gemini_scale_instructions', timeMs, usage, promptLength: scalePrompt.length }, 'Gemini instruction scaling successful.');
           return {
             scaledInstructions: parsedResult.scaledInstructions.map((item: any) => String(item)),
             error: null,
@@ -71,15 +73,17 @@ ${instructionsToScale.map(s => `- ${s}`).join('\n')}
           throw new Error("Parsed JSON result did not have the expected 'scaledInstructions' array.");
         }
       } catch (parseErr) {
-        console.error('Failed to parse scaled instructions JSON from Gemini response:', parseErr);
-        console.error('Raw content that failed parsing:', responseText);
+        const err = parseErr as Error;
+        logger.error({ action: 'gemini_scale_instructions', err, responseText }, 'Failed to parse scaled instructions JSON from Gemini response.');
         return { scaledInstructions: null, error: 'Invalid JSON format received from AI instruction scaler.', usage: null, timeMs: null };
       }
     } else {
+      logger.warn({ action: 'gemini_scale_instructions' }, 'Empty response received from AI instruction scaler.');
       return { scaledInstructions: null, error: 'Empty response received from AI instruction scaler.', usage: null, timeMs: null };
     }
   } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : 'Unknown Gemini scale error';
-    return { scaledInstructions: null, error: errorMessage, usage: null, timeMs: null };
+    const error = err as Error;
+    logger.error({ action: 'gemini_scale_instructions', err: error }, 'Error during Gemini instruction scaling.');
+    return { scaledInstructions: null, error: error.message, usage: null, timeMs: null };
   }
 } 

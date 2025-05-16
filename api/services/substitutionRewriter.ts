@@ -1,5 +1,6 @@
 import { performance } from 'perf_hooks';
 import { formatMeasurement } from '../../utils/format';
+import logger from '../lib/logger';
 
 type LLMResponse<T> = {
   [K in keyof T]: T[K];
@@ -57,6 +58,7 @@ export async function rewriteForSubstitution(originalInstructions: string[], ori
                         promptTokens: response.usageMetadata?.promptTokenCount || 0,
                         outputTokens: response.usageMetadata?.candidatesTokenCount || 0
                     };
+                    logger.info({ action: 'gemini_rewrite_substitution', timeMs, usage, promptLength: rewritePrompt.length }, 'Gemini substitution rewrite successful.');
                     return {
                         rewrittenInstructions: parsedResult.rewrittenInstructions.filter((step: any) => typeof step === 'string'),
                         error: null,
@@ -67,14 +69,17 @@ export async function rewriteForSubstitution(originalInstructions: string[], ori
                     throw new Error("Parsed JSON result did not have the expected structure.");
                 }
             } catch (parseError) {
-                console.error('Raw content that failed parsing:', responseText);
-                throw parseError;
+                const err = parseError as Error;
+                logger.error({ action: 'gemini_rewrite_substitution', err, responseText }, 'Failed to parse substitution rewrite JSON from Gemini response.');
+                throw err;
             }
         } else {
+            logger.warn({ action: 'gemini_rewrite_substitution' }, 'Empty response received from AI instruction rewriter.');
             return { rewrittenInstructions: null, error: 'Empty response received from AI instruction rewriter.', usage: null, timeMs: null };
         }
     } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Unknown Gemini rewrite error';
-        return { rewrittenInstructions: null, error: errorMessage, usage: null, timeMs: null };
+        const error = err as Error;
+        logger.error({ action: 'gemini_rewrite_substitution', err: error }, 'Error during Gemini substitution rewrite.');
+        return { rewrittenInstructions: null, error: error.message, usage: null, timeMs: null };
     }
 } 

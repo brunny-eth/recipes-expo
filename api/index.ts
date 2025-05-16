@@ -1,8 +1,13 @@
 import express from 'express'
+import pinoHttp from 'pino-http'
+import logger from './lib/logger'
 import { recipeRouter } from './routes/recipes'
 import { ingredientRouter } from './routes/ingredients'
 
 const app = express()
+
+// Add pino-http middleware before other middleware and routes
+app.use(pinoHttp({ logger }))
 
 app.use(express.json())
 

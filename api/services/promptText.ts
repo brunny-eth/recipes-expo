@@ -2,6 +2,7 @@ import { CombinedParsedRecipe, GeminiModel, GeminiHandlerResponse } from '../typ
 import { truncateTextByLines } from '../utils/truncate';
 import { performance } from 'perf_hooks';
 import { normalizeUsageMetadata, StandardizedUsage } from '../utils/usageUtils';
+import { validateRecipeText } from '../utils/textValidation';
 
 export async function parseRawTextWithGemini(
   preparedText: string,
@@ -14,6 +15,30 @@ export async function parseRawTextWithGemini(
   let usage: StandardizedUsage = { inputTokens: 0, outputTokens: 0 };
   let recipe: CombinedParsedRecipe | null = null;
   let error: string | null = null;
+
+  // Validate prepared text
+  const validationResult = validateRecipeText(preparedText, requestId);
+  if (!validationResult.isValid) {
+    console.warn(`[${requestId}] Input validation failed: ${validationResult.error}`);
+    return {
+      recipe: null,
+      error: validationResult.error || 'Input validation failed.',
+      usage: { inputTokens: 0, outputTokens: 0 },
+      timings: { geminiCombinedParse: Date.now() - handlerStartTime }
+    };
+  }
+
+  // Add heuristic filter
+  const isLikelyGarbage = preparedText.length < 100 || !preparedText.match(/ingredients|directions|instructions/i);
+  if (isLikelyGarbage) {
+    console.warn(`[${requestId}] Input flagged as likely garbage: length ${preparedText.length}`);
+    return {
+      recipe: null,
+      error: 'Input does not appear to be a valid recipe (too short or missing keywords).',
+      usage: { inputTokens: 0, outputTokens: 0 }, // Default usage as no API call was made
+      timings: { geminiCombinedParse: Date.now() - handlerStartTime } // Time spent up to this point
+    };
+  }
 
   // Step 1: Truncate oversized text if needed
   const maxLength = 75000;

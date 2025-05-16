@@ -6,20 +6,21 @@ import { parseAndCacheRecipe } from '../services/parseRecipe';
 import { createRecipeWithIngredients } from '../services/recipeService';
 import { rewriteForSubstitution } from '../services/substitutionRewriter';
 import { scaleInstructions } from '../services/instructionScaling';
+import logger from '../lib/logger'; // Added import
 
 const router = Router()
 
 // --- Initialize ScraperAPI Client ---
 const scraperApiKey = process.env.SCRAPERAPI_KEY;
 if (!scraperApiKey) {
-  console.error('SCRAPERAPI_KEY environment variable is not set!');
+  logger.error({ context: 'init', missingKey: 'SCRAPERAPI_KEY', nodeEnv: process.env.NODE_ENV }, 'SCRAPERAPI_KEY environment variable is not set!');
 }
 const scraperClient = scraperapiClient(scraperApiKey || ''); 
 
 // --- Initialize Google AI Client ---
 const googleApiKey = process.env.GOOGLE_API_KEY;
 if (!googleApiKey) {
-  console.error('GOOGLE_API_KEY environment variable is not set!');
+  logger.error({ context: 'init', missingKey: 'GOOGLE_API_KEY', nodeEnv: process.env.NODE_ENV }, 'GOOGLE_API_KEY environment variable is not set!');
 }
 const genAI = new GoogleGenerativeAI(googleApiKey || '');
 const geminiConfig: GenerationConfig = {
@@ -50,9 +51,10 @@ router.get('/', async (req: Request, res: Response) => {
     
     if (error) throw error
     res.json(data)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'An unknown error occurred';
-    res.status(500).json({ error: message });
+  } catch (err) {
+    const error = err as Error;
+    logger.error({ requestId: (req as any).id, err: error, route: req.originalUrl, method: req.method }, 'Error fetching all recipes');
+    res.status(500).json({ error: error.message || 'An unknown error occurred' });
   }
 })
 
@@ -74,88 +76,116 @@ router.get('/:id', async (req: Request, res: Response) => {
     
     if (error) throw error
     res.json(data)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'An unknown error occurred';
-    res.status(500).json({ error: message });
+  } catch (err) {
+    const error = err as Error;
+    logger.error({ requestId: (req as any).id, err: error, route: req.originalUrl, method: req.method, params: req.params }, 'Error fetching single recipe');
+    res.status(500).json({ error: error.message || 'An unknown error occurred' });
   }
 })
 
 // Create new custom user-created recipe, NOT in full parsing flow; not currently being used 
 router.post('/', async (req: Request, res: Response) => {
-  const { title, servings, ingredients } = req.body;
+  try {
+    const { title, servings, ingredients } = req.body;
 
-  const { result, error } = await createRecipeWithIngredients({ title, servings, ingredients });
+    const { result, error: serviceError } = await createRecipeWithIngredients({ title, servings, ingredients });
 
-  if (error) {
-    return res.status(500).json({ error });
+    if (serviceError) {
+      // Log the service error before sending response
+      logger.error({ requestId: (req as any).id, err: new Error(serviceError), route: req.originalUrl, method: req.method, body: req.body }, 'Error creating custom recipe via service');
+      return res.status(500).json({ error: serviceError });
+    }
+
+    res.json(result);
+  } catch (err) {
+    const error = err as Error;
+    logger.error({ requestId: (req as any).id, err: error, route: req.originalUrl, method: req.method, body: req.body }, 'Unhandled exception in custom recipe creation');
+    res.status(500).json({ error: error.message || 'An unknown error occurred creating custom recipe' });
   }
-
-  res.json(result);
 });
 
 // --- Main Parsing Route --- 
 router.post('/parse', async (req: Request, res: Response) => {
-  const { input } = req.body;
-  if (!input || typeof input !== 'string' || input.trim() === '') {
-    return res.status(400).json({ error: 'Missing or empty "input" in request body' });
+  try {
+    const { input } = req.body;
+    // It's good practice to use req.id for logging if available from pino-http
+    const requestId = (req as any).id;
+
+    if (!input || typeof input !== 'string' || input.trim() === '') {
+      logger.warn({ requestId, route: req.originalUrl, method: req.method, inputReceived: input }, 'Missing or empty "input" in request body for /parse');
+      return res.status(400).json({ error: 'Missing or empty "input" in request body' });
+    }
+
+    if (!scraperApiKey) {
+      logger.error({ requestId, route: req.originalUrl, method: req.method, nodeEnv: process.env.NODE_ENV }, 'Server configuration error: Missing ScraperAPI key for /parse.');
+      return res.status(500).json({ error: 'Server configuration error: Missing ScraperAPI key.' });
+    }
+
+    const { recipe, error: parseError, fromCache, inputType, cacheKey, timings, usage, fetchMethodUsed } = await parseAndCacheRecipe(input, geminiModel, scraperApiKey, scraperClient);
+
+    if (parseError) {
+      // parseAndCacheRecipe already logs details, this is for the route context
+      logger.error({ requestId, route: req.originalUrl, method: req.method, input, errMessage: parseError }, `Failed to process input via parseAndCacheRecipe`);
+      return res.status(500).json({ error: parseError });
+    }
+
+    res.json({
+      message: `Recipe processing complete (${inputType}).`,
+      inputType,
+      fromCache,
+      cacheKey,
+      timings,
+      usage,
+      fetchMethodUsed,
+      recipe
+    });
+  } catch (err) {
+    const error = err as Error;
+    logger.error({ requestId: (req as any).id, err: error, route: req.originalUrl, method: req.method, body: req.body }, 'Unhandled exception in /parse route');
+    res.status(500).json({ error: error.message || 'An unknown server error occurred during parsing' });
   }
-
-  if (!scraperApiKey) {
-    return res.status(500).json({ error: 'Server configuration error: Missing ScraperAPI key.' });
-  }
-
-  const { recipe, error, fromCache, inputType, cacheKey, timings, usage, fetchMethodUsed } = await parseAndCacheRecipe(input, geminiModel, scraperApiKey, scraperClient);
-
-  if (error) {
-    console.error(`[API /parse Error] Failed to process input: ${input}`, error);
-    return res.status(500).json({ error });
-  }
-
-  res.json({
-    message: `Recipe processing complete (${inputType}).`,
-    inputType,
-    fromCache,
-    cacheKey,
-    timings,
-    usage,
-    fetchMethodUsed,
-    recipe
-  });
 });
 
 // --- Rewrite Instructions Endpoint ---
 router.post('/rewrite-instructions', async (req: Request, res: Response) => {
   try {
     const { originalInstructions, originalIngredientName, substitutedIngredientName } = req.body;
+    const requestId = (req as any).id;
+
     if (!originalInstructions || !Array.isArray(originalInstructions) || originalInstructions.length === 0) {
+      logger.warn({ requestId, route: req.originalUrl, method: req.method }, 'Missing or invalid original instructions');
       return res.status(400).json({ error: 'Missing or invalid original instructions' });
     }
     if (!originalIngredientName || !substitutedIngredientName) {
+      logger.warn({ requestId, route: req.originalUrl, method: req.method }, 'Missing original or substituted ingredient name');
       return res.status(400).json({ error: 'Missing original or substituted ingredient name' });
     }
 
     if (!googleApiKey) {
+      logger.error({ requestId, route: req.originalUrl, method: req.method, nodeEnv: process.env.NODE_ENV }, 'Server configuration error: Missing Google API key.');
       return res.status(500).json({ error: 'Server configuration error: Missing Google API key.' });
     }
 
-    const { rewrittenInstructions, error, usage, timeMs } = await rewriteForSubstitution(
+    const { rewrittenInstructions, error: rewriteError, usage, timeMs } = await rewriteForSubstitution(
       originalInstructions,
       originalIngredientName,
       substitutedIngredientName,
       geminiModel
     );
 
-    if (error || !rewrittenInstructions) {
-      console.error(`Failed to rewrite instructions with Gemini: ${error || 'Result was null'}`);
-      return res.status(500).json({ error: `Failed to rewrite instructions: ${error || 'Unknown error'}` });
+    if (rewriteError || !rewrittenInstructions) {
+      // rewriteForSubstitution service already logs details
+      logger.error({ requestId, route: req.originalUrl, method: req.method, errMessage: rewriteError || 'Result was null' }, `Failed to rewrite instructions with Gemini`);
+      return res.status(500).json({ error: `Failed to rewrite instructions: ${rewriteError || 'Unknown error'}` });
     } else {
+      logger.info({ requestId, route: req.originalUrl, method: req.method, usage, timeMs }, 'Successfully rewrote instructions.');
       res.json({ rewrittenInstructions, usage, timeMs });
     }
 
-  } catch (error) {
-    console.error('Error in /rewrite-instructions route processing:', error);
-    const message = error instanceof Error ? error.message : 'An unknown server error occurred';
-    res.status(500).json({ error: message });
+  } catch (err) {
+    const error = err as Error;
+    logger.error({ requestId: (req as any).id, err: error, route: req.originalUrl, method: req.method, body: req.body }, 'Error in /rewrite-instructions route processing');
+    res.status(500).json({ error: error.message || 'An unknown server error occurred' });
   }
 });
 
@@ -163,38 +193,45 @@ router.post('/rewrite-instructions', async (req: Request, res: Response) => {
 router.post('/scale-instructions', async (req: Request, res: Response) => {
   try {
     const { instructionsToScale, originalIngredients, scaledIngredients } = req.body;
+    const requestId = (req as any).id;
+
     if (!Array.isArray(instructionsToScale) || !Array.isArray(originalIngredients) || !Array.isArray(scaledIngredients)) {
+      logger.warn({ requestId, route: req.originalUrl, method: req.method }, 'Invalid input: instructions, originalIngredients, and scaledIngredients must be arrays.');
       return res.status(400).json({ error: 'Invalid input: instructions, originalIngredients, and scaledIngredients must be arrays.' });
     }
     if (instructionsToScale.length === 0) {
-      console.log("No instructions provided to scale.");
+      logger.info({ requestId, route: req.originalUrl, method: req.method }, "No instructions provided to scale, returning empty array.");
       return res.json({ scaledInstructions: [] });
     }
     if (originalIngredients.length !== scaledIngredients.length) {
-      console.warn("Original and scaled ingredient lists have different lengths. Scaling might be inaccurate.");
+      logger.warn({ requestId, route: req.originalUrl, method: req.method, originalLength: originalIngredients.length, scaledLength: scaledIngredients.length }, "Original and scaled ingredient lists have different lengths. Scaling might be inaccurate.");
     }
 
     if (!googleApiKey) {
+      logger.error({ requestId, route: req.originalUrl, method: req.method, nodeEnv: process.env.NODE_ENV }, 'Server configuration error: Missing Google API key.');
       return res.status(500).json({ error: 'Server configuration error: Missing Google API key.' });
     }
 
-    const { scaledInstructions, error, usage, timeMs } = await scaleInstructions(
+    const { scaledInstructions, error: scaleError, usage, timeMs } = await scaleInstructions(
       instructionsToScale,
       originalIngredients,
       scaledIngredients,
       geminiModel
     );
 
-    if (error || !scaledInstructions) {
-      console.error(`Failed to scale instructions with Gemini: ${error || 'Result was null'}`);
-      return res.status(500).json({ error: `Failed to scale instructions: ${error || 'Unknown error'}` });
+    if (scaleError || !scaledInstructions) {
+      // scaleInstructions service already logs details
+      logger.error({ requestId, route: req.originalUrl, method: req.method, errMessage: scaleError || 'Result was null' }, `Failed to scale instructions with Gemini`);
+      return res.status(500).json({ error: `Failed to scale instructions: ${scaleError || 'Unknown error'}` });
     } else {
+      logger.info({ requestId, route: req.originalUrl, method: req.method, usage, timeMs }, 'Successfully scaled instructions.');
       res.json({ scaledInstructions, usage, timeMs });
     }
 
-  } catch (error) {
-    console.error("Error in /scale-instructions route:", error);
-    res.status(500).json({ error: 'Internal server error processing instruction scaling request.' });
+  } catch (err) {
+    const error = err as Error;
+    logger.error({ requestId: (req as any).id, err: error, route: req.originalUrl, method: req.method, body: req.body }, 'Error in /scale-instructions route processing');
+    res.status(500).json({ error: error.message || 'Internal server error processing instruction scaling request.' });
   }
 });
 

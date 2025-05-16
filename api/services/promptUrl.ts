@@ -4,6 +4,8 @@ import { CombinedParsedRecipe, GeminiModel, GeminiHandlerResponse } from '../typ
 import { ExtractedContent } from './extractContent'; // Need this type
 import { normalizeUsageMetadata, StandardizedUsage } from '../utils/usageUtils'; // Import the new utility
 import { parseISODuration } from '../utils/timeUtils'; // Import the utility
+import { validateRecipeText } from '../utils/textValidation'; // Added import
+import logger from "../lib/logger"; // Corrected logger import path
 
 // --- New function for Gemini Parsing of URL content ---
 export async function parseUrlContentWithGemini(
@@ -53,6 +55,28 @@ ${cleanedRawBody.split('\n').slice(0, 50).join('\n')}`);
             console.log(`[${requestId}] Fallback raw body text within char limit (${safeRawBodyText.length} chars).`);
         }
 
+        // --- Validate Fallback Content ---
+        const fallbackValidationResult = validateRecipeText(safeRawBodyText, requestId);
+        if (!fallbackValidationResult.isValid) {
+            const errorMsg = fallbackValidationResult.error || 'Fallback content failed validation.';
+            // Updated logging
+            logger.warn({ 
+                requestId, 
+                reason: errorMsg, 
+                inputType: 'url-fallback',
+                length: safeRawBodyText.length 
+            }, 'Rejected fallback text before Gemini due to validation failure.');
+            // Updated return structure
+            return {
+                recipe: null,
+                error: `Input validation failed for fallback content: ${errorMsg}`,
+                usage: { inputTokens: 0, outputTokens: 0 },
+                timings: { geminiCombinedParse: 0 } // Gemini not called
+            };
+        }
+        console.log(`[${requestId}] Fallback content passed validation.`);
+        // --- End Validate Fallback Content ---
+
         // --- Skip Heuristic Filtering (Temporary) --- 
         console.log(`[${requestId}] Skipping heuristic filtering. Using character-truncated raw body text directly.`);
         const formattedRawText = `
@@ -73,6 +97,35 @@ ${safeRawBodyText}
         const safeIngredientsText = truncateTextByLines(cleanedIngredients, defaultMaxIngredientLines, "\n\n[INGREDIENTS TRUNCATED BY SYSTEM]");
         
         const safeInstructionsText = truncateTextByLines(extractedContent.instructionsText, defaultMaxInstructionLines, "\n\n[INSTRUCTIONS TRUNCATED BY SYSTEM]");
+
+        // --- Validate Standard Extracted Content ---
+        const combinedContentToValidate = (safeIngredientsText || '') + "\n\n" + (safeInstructionsText || '');
+        const standardValidationResult = validateRecipeText(combinedContentToValidate, requestId);
+        if (!standardValidationResult.isValid) {
+            const errorMsg = standardValidationResult.error || 'Standard extracted content failed validation.';
+            // Updated logging
+            logger.warn({ 
+                requestId, 
+                reason: errorMsg, 
+                inputType: 'url-standard',
+                length: combinedContentToValidate.length,
+                ingredientsLength: safeIngredientsText?.length || 0,
+                instructionsLength: safeInstructionsText?.length || 0
+            }, 'Rejected standard extracted text before Gemini due to validation failure.');
+            
+            if (!safeIngredientsText && !safeInstructionsText) {
+                 logger.warn({requestId, inputType: 'url-standard'}, 'Both ingredients and instructions text were empty after preparation, contributing to validation failure.');
+            }
+            // Updated return structure
+            return {
+                recipe: null,
+                error: `Input validation failed for standard extracted content: ${errorMsg}`,
+                usage: { inputTokens: 0, outputTokens: 0 },
+                timings: { geminiCombinedParse: 0 } // Gemini not called
+            };
+        }
+        console.log(`[${requestId}] Standard extracted content passed validation.`);
+        // --- End Validate Standard Extracted Content ---
         
         textToParse = `**Provided Text Sections:**\n\nTitle:\n${extractedContent.title || 'N/A'}\n\nExplicit Recipe Yield Text:\n${extractedContent.recipeYieldText || 'N/A'}\n\nIngredients Text:\n${safeIngredientsText || 'N/A'}\n\nInstructions Text:\n${safeInstructionsText || 'N/A'}`;
     }
