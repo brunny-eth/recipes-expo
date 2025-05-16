@@ -4,7 +4,8 @@ import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold, GenerationConfig,
 import scraperapiClient from 'scraperapi-sdk';
 import { parseAndCacheRecipe } from '../services/parseRecipe';
 import { createRecipeWithIngredients } from '../services/recipeService';
-import { rewriteForSubstitution, scaleInstructions } from '../services/instructionService';
+import { rewriteForSubstitution } from '../services/substitutionRewriter';
+import { scaleInstructions } from '../services/instructionScaling';
 
 const router = Router()
 
@@ -79,7 +80,7 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 })
 
-// Create new recipe
+// Create new custom user-created recipe, NOT in full parsing flow; not currently being used 
 router.post('/', async (req: Request, res: Response) => {
   const { title, servings, ingredients } = req.body;
 

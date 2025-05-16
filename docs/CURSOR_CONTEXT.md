@@ -7,6 +7,7 @@ This file provides guidance to Cursor about the codebase structure, patterns to 
 - **Modularity**: Use `/api/routes/<feature>.ts` for related endpoints.
 - **Error Handling**: Return meaningful JSON errors and HTTP status codes.
 - **Write Tests as New Code is Implemented, when needed**: Don't delete tests because they fail; problem-solve the test or the function
+- **Log usefully, in a way that helps me debug**
 
 ## File Structure
 ```
