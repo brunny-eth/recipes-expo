@@ -1,10 +1,3 @@
-blulinski@Brunos-MBP project 2 % find api utils -type f \( -name "*.ts" -o -name "*.js" \) ! -path "*/__tests__/*" | while read file; do
-  echo "===== $file =====" >> outputs/backend-code.txt
-  cat "$file" >> outputs/backend-code.txt
-  echo -e "\n" >> outputs/backend-code.txt
-done
-
-
 ===== api/types/database.types.ts =====
 export type Json =
   | string
@@ -230,6 +223,228 @@ export function generateCacheKeyHash(input: string): string {
   return createHash('sha256').update(input).digest('hex');
 } 
 
+===== api/utils/__tests__/detectInputType.test.ts =====
+import { detectInputType, InputType } from '../detectInputType';
+
+describe('detectInputType', () => {
+  // Test cases for URL detection
+  it('should detect valid URLs with http/https prefix', () => {
+    expect(detectInputType('http://example.com')).toBe<InputType>('url');
+    expect(detectInputType('https://example.com')).toBe<InputType>('url');
+    expect(detectInputType('https://www.example.com/path?query=value#fragment')).toBe<InputType>('url');
+  });
+
+  it('should detect valid URLs without http/https prefix but with domain pattern', () => {
+    expect(detectInputType('example.com')).toBe<InputType>('url');
+    expect(detectInputType('www.example.com')).toBe<InputType>('url');
+    expect(detectInputType('example.co.uk/path')).toBe<InputType>('url');
+    expect(detectInputType('sub.domain.example.com')).toBe<InputType>('url');
+  });
+
+  it('should detect URLs with few lines', () => {
+    // TODO: Review detectInputType logic for multi-line URL-like strings.
+    // Currently, internal newlines cause it to be treated as raw_text.
+    expect(detectInputType('example.com\nsecond line')).toBe<InputType>('raw_text');
+    expect(detectInputType('example.com\nsecond line\nthird line')).toBe<InputType>('raw_text');
+  });
+
+  // Test cases for raw text detection
+  it('should detect raw text when no URL pattern is matched', () => {
+    expect(detectInputType('This is a simple sentence.')).toBe<InputType>('raw_text');
+    expect(detectInputType('Ingredients:\n1 cup flour\n2 eggs')).toBe<InputType>('raw_text');
+  });
+
+  it('should detect raw text for domain-like strings with too many lines', () => {
+    expect(detectInputType('example.com\nsecond line\nthird line\nfourth line')).toBe<InputType>('raw_text');
+  });
+
+  it('should detect raw text for inputs that might look like URLs but are not', () => {
+    expect(detectInputType('file.txt')).toBe<InputType>('url'); // This is an edge case, could be debated based on strictness
+    expect(detectInputType('localhost:3000')).toBe<InputType>('raw_text'); // No TLD
+    expect(detectInputType('not a url . com')).toBe<InputType>('raw_text'); // Contains spaces
+  });
+
+  it('should handle empty or whitespace-only strings as raw_text', () => {
+    expect(detectInputType('')).toBe<InputType>('raw_text');
+    expect(detectInputType('   ')).toBe<InputType>('raw_text');
+  });
+
+  // Test cases from original isProbablyUrl logic (if any specific examples are known)
+  it('should correctly classify based on original isProbablyUrl logic', () => {
+    // Example: "contains a period and no whitespace"
+    expect(detectInputType('word.word')).toBe<InputType>('url');
+    // Example: "contains a period but also whitespace"
+    expect(detectInputType('word.word with space')).toBe<InputType>('raw_text');
+    expect(detectInputType(' text with.period ')).toBe<InputType>('raw_text');
+  });
+}); 
+
+===== api/utils/__tests__/preprocessText.test.ts =====
+import { preprocessRawRecipeText } from '../preprocessText';
+
+describe('preprocessRawRecipeText', () => {
+  test('should trim leading and trailing whitespace', () => {
+    const inputText = '  \n Recipe Text \t ';
+    const expectedText = 'Recipe Text';
+    expect(preprocessRawRecipeText(inputText)).toBe(expectedText);
+  });
+
+  test('should normalize CRLF line breaks to LF', () => {
+    const inputText = 'Line 1\r\nLine 2';
+    const expectedText = 'Line 1\nLine 2';
+    expect(preprocessRawRecipeText(inputText)).toBe(expectedText);
+  });
+
+  test('should normalize CR line breaks to LF', () => {
+    const inputText = 'Line 1\rLine 2';
+    const expectedText = 'Line 1\nLine 2';
+    expect(preprocessRawRecipeText(inputText)).toBe(expectedText);
+  });
+
+  test('should keep existing LF line breaks', () => {
+    const inputText = 'Line 1\nLine 2';
+    const expectedText = 'Line 1\nLine 2';
+    expect(preprocessRawRecipeText(inputText)).toBe(expectedText);
+  });
+
+  test('should reduce 3 or more consecutive newlines to exactly 2', () => {
+    const inputText = 'Line 1\n\n\nLine 2\n\n\n\n\nLine 3';
+    const expectedText = 'Line 1\n\nLine 2\n\nLine 3';
+    expect(preprocessRawRecipeText(inputText)).toBe(expectedText);
+  });
+
+  test('should keep single and double newlines as they are', () => {
+    const inputText = 'Line 1\nLine 2\n\nLine 3';
+    const expectedText = 'Line 1\nLine 2\n\nLine 3';
+    expect(preprocessRawRecipeText(inputText)).toBe(expectedText);
+  });
+
+  test('should handle combined trimming, normalization, and blank line reduction', () => {
+    const inputText = '  Start\r\n\n\n\nMiddle line\rEnd  \n ';
+    const expectedText = 'Start\n\nMiddle line\nEnd';
+    expect(preprocessRawRecipeText(inputText)).toBe(expectedText);
+  });
+
+  test('should return empty string for empty input', () => {
+    expect(preprocessRawRecipeText('')).toBe('');
+  });
+
+  test('should return empty string for whitespace-only input', () => {
+    expect(preprocessRawRecipeText('   \t\n  ')).toBe('');
+  });
+}); 
+
+===== api/utils/__tests__/truncate.test.ts =====
+import { truncateTextByLines } from '../truncate';
+
+// Mock console.log before tests run
+let consoleSpy: jest.SpyInstance;
+beforeAll(() => {
+  consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+});
+
+// Restore console.log after tests finish
+afterAll(() => {
+  consoleSpy.mockRestore();
+});
+
+describe('truncateTextByLines', () => {
+  const text = 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5';
+
+  test('should truncate text when lines exceed maxLines', () => {
+    const maxLines = 3;
+    const expected = 'Line 1\nLine 2\nLine 3\n\n[CONTENT TRUNCATED]';
+    expect(truncateTextByLines(text, maxLines)).toBe(expected);
+  });
+
+  test('should not truncate text when lines are equal to maxLines', () => {
+    const maxLines = 5;
+    expect(truncateTextByLines(text, maxLines)).toBe(text);
+  });
+
+  test('should not truncate text when lines are less than maxLines', () => {
+    const maxLines = 10;
+    expect(truncateTextByLines(text, maxLines)).toBe(text);
+  });
+
+  test('should use custom marker when provided', () => {
+    const maxLines = 2;
+    const customMarker = '... [MORE] ...';
+    const expected = `Line 1\nLine 2${customMarker}`;
+    expect(truncateTextByLines(text, maxLines, customMarker)).toBe(expected);
+  });
+
+  test('should handle text with fewer lines than maxLines gracefully', () => {
+    const shortText = 'Line A\nLine B';
+    const maxLines = 5;
+    expect(truncateTextByLines(shortText, maxLines)).toBe(shortText);
+  });
+
+  test('should return empty string for null input', () => {
+    expect(truncateTextByLines(null, 5)).toBe('');
+  });
+
+  test('should return empty string for undefined input', () => {
+    expect(truncateTextByLines(undefined, 5)).toBe('');
+  });
+
+  test('should return empty string for empty string input', () => {
+    expect(truncateTextByLines('', 5)).toBe('');
+  });
+
+  test('should handle maxLines of 0 correctly', () => {
+    const expected = '\n\n[CONTENT TRUNCATED]'; // Returns only the marker
+    expect(truncateTextByLines(text, 0)).toBe(expected);
+  });
+
+  test('should handle text with trailing newlines correctly when truncating', () => {
+    const textWithTrailing = 'Line 1\nLine 2\n\n';
+    const maxLines = 1;
+    const expected = 'Line 1\n\n[CONTENT TRUNCATED]';
+    expect(truncateTextByLines(textWithTrailing, maxLines)).toBe(expected);
+  });
+
+   test('should handle text with trailing newlines correctly when not truncating', () => {
+    const textWithTrailing = 'Line 1\nLine 2\n\n';
+    const maxLines = 4;
+    expect(truncateTextByLines(textWithTrailing, maxLines)).toBe(textWithTrailing);
+  });
+}); 
+
+===== api/utils/__tests__/hash.test.ts =====
+import { generateCacheKeyHash } from '../hash';
+import { createHash } from 'crypto';
+
+describe('generateCacheKeyHash', () => {
+  test('should generate a consistent SHA256 hash for a given input', () => {
+    const input = 'My test recipe text';
+    const expectedHash = createHash('sha256').update(input).digest('hex'); // Calculate expected hash
+    
+    expect(generateCacheKeyHash(input)).toBe(expectedHash);
+    // Verify it's consistent by calling again
+    expect(generateCacheKeyHash(input)).toBe(expectedHash); 
+  });
+
+  test('should generate a different hash for different input', () => {
+    const input1 = 'Recipe A';
+    const input2 = 'Recipe B';
+    expect(generateCacheKeyHash(input1)).not.toBe(generateCacheKeyHash(input2));
+  });
+
+  test('should generate a consistent hash for an empty string', () => {
+    const input = '';
+    const expectedHash = createHash('sha256').update(input).digest('hex');
+    expect(generateCacheKeyHash(input)).toBe(expectedHash);
+  });
+
+  test('should generate a hash of the expected length (SHA256 hex = 64 chars)', () => {
+    const input = 'Some random text';
+    const hash = generateCacheKeyHash(input);
+    expect(hash).toHaveLength(64);
+    expect(/^[a-f0-9]{64}$/.test(hash)).toBe(true); // Check if it contains only hex characters
+  });
+}); 
+
 ===== api/utils/detectInputType.ts =====
 export type InputType = 'url' | 'raw_text' | 'audio' | 'image' | 'video';
 
@@ -427,7 +642,8 @@ import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold, GenerationConfig,
 import scraperapiClient from 'scraperapi-sdk';
 import { parseAndCacheRecipe } from '../services/parseRecipe';
 import { createRecipeWithIngredients } from '../services/recipeService';
-import { rewriteForSubstitution, scaleInstructions } from '../services/instructionService';
+import { rewriteForSubstitution } from '../services/substitutionRewriter';
+import { scaleInstructions } from '../services/instructionScaling';
 
 const router = Router()
 
@@ -502,7 +718,7 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 })
 
-// Create new recipe
+// Create new custom user-created recipe, NOT in full parsing flow; not currently being used 
 router.post('/', async (req: Request, res: Response) => {
   const { title, servings, ingredients } = req.body;
 
@@ -896,6 +1112,88 @@ export async function fetchHtmlWithFallback(
     }
   }
   return { htmlContent, fetchMethodUsed, error };
+} 
+
+===== api/services/substitutionRewriter.ts =====
+import { performance } from 'perf_hooks';
+import { formatMeasurement } from '../../utils/format';
+
+type LLMResponse<T> = {
+  [K in keyof T]: T[K];
+} & {
+  error: string | null;
+  usage: { promptTokens: number; outputTokens: number } | null;
+  timeMs: number | null;
+};
+
+export async function rewriteForSubstitution(originalInstructions: string[], originalIngredientName: string, substitutedIngredientName: string, geminiModel: any): Promise<LLMResponse<{ rewrittenInstructions: string[] | null }>> {
+    const cleanedSubstitutedIngredientName = formatMeasurement(Number(substitutedIngredientName));
+
+    const rewritePrompt = `
+    You are an expert cooking assistant. You will rewrite cooking instructions to reflect ingredient substitutions based on user preferences.
+    
+    Original Ingredient: "${originalIngredientName}"
+    Substituted Ingredient: "${cleanedSubstitutedIngredientName}"
+    
+    Consider:
+    - Preparation differences (e.g. tofu may need pressing, beans may need soaking)
+    - Cooking time or method changes based on the substituted ingredient
+    - Flavor or texture impacts
+    - Any changes in food safety or allergen concerns
+    
+    If no meaningful change is required, return the original steps unchanged.
+    
+    Respond with ONLY a valid JSON object:
+    {
+      "rewrittenInstructions": [ ... ] // each step as a plain string, without numbering
+    }
+    
+    Original Instructions:
+    ${originalInstructions.map(s => `- ${s}`).join('\n')}
+`;
+
+    const startTime = performance.now();
+
+    try {
+        if (rewritePrompt.length > 100000) {
+            throw new Error(`Rewrite prompt too large (${rewritePrompt.length} chars).`);
+        }
+
+        const result = await geminiModel.generateContent(rewritePrompt);
+        const response = result.response;
+        const responseText = response.text();
+
+        const endTime = performance.now();
+        const timeMs = endTime - startTime;
+
+        if (responseText) {
+            try {
+                const parsedResult: any = JSON.parse(responseText);
+                if (typeof parsedResult === 'object' && parsedResult !== null && Array.isArray(parsedResult.rewrittenInstructions)) {
+                    const usage = {
+                        promptTokens: response.usageMetadata?.promptTokenCount || 0,
+                        outputTokens: response.usageMetadata?.candidatesTokenCount || 0
+                    };
+                    return {
+                        rewrittenInstructions: parsedResult.rewrittenInstructions.filter((step: any) => typeof step === 'string'),
+                        error: null,
+                        usage,
+                        timeMs
+                    };
+                } else {
+                    throw new Error("Parsed JSON result did not have the expected structure.");
+                }
+            } catch (parseError) {
+                console.error('Raw content that failed parsing:', responseText);
+                throw parseError;
+            }
+        } else {
+            return { rewrittenInstructions: null, error: 'Empty response received from AI instruction rewriter.', usage: null, timeMs: null };
+        }
+    } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Unknown Gemini rewrite error';
+        return { rewrittenInstructions: null, error: errorMessage, usage: null, timeMs: null };
+    }
 } 
 
 ===== api/services/extractContent.ts =====
@@ -1366,6 +1664,505 @@ export async function createRecipeWithIngredients({ title, servings, ingredients
         return { result: null, error: message };
     }
 } 
+
+===== api/services/__tests__/htmlFetch.test.ts =====
+import { fetchHtmlWithFallback } from '../htmlFetch';
+
+// Mock the global fetch function
+global.fetch = jest.fn();
+
+// Create a mock ScraperAPI client
+const mockScraperClient = {
+  get: jest.fn(),
+};
+
+// Define default mock API key
+const mockApiKey = 'test-scraper-api-key';
+
+// Store original console methods
+const originalConsoleLog = console.log;
+const originalConsoleWarn = console.warn;
+const originalConsoleError = console.error;
+
+describe('fetchHtmlWithFallback', () => {
+  beforeEach(() => {
+    // Reset mocks before each test
+    (global.fetch as jest.Mock).mockClear();
+    mockScraperClient.get.mockClear();
+    // Suppress console output during tests
+    console.log = jest.fn();
+    console.warn = jest.fn();
+    console.error = jest.fn();
+  });
+
+  afterEach(() => {
+    // Restore console output after each test
+    console.log = originalConsoleLog;
+    console.warn = originalConsoleWarn;
+    console.error = originalConsoleError;
+  });
+
+  test('should return HTML from direct fetch on success', async () => {
+    const mockHtml = '<html><body>Direct Success</body></html>';
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      text: async () => mockHtml,
+    });
+
+    const result = await fetchHtmlWithFallback('http://example.com', mockApiKey, mockScraperClient);
+
+    expect(result.htmlContent).toBe(mockHtml);
+    expect(result.fetchMethodUsed).toBe('Direct Fetch');
+    expect(result.error).toBeNull();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(mockScraperClient.get).not.toHaveBeenCalled();
+  });
+
+  test('should use ScraperAPI fallback if direct fetch returns 403', async () => {
+    const fallbackHtml = '<html><body>Fallback Success</body></html>';
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      statusText: 'Forbidden',
+    });
+    mockScraperClient.get.mockResolvedValueOnce({ body: fallbackHtml }); // Simulate SDK response structure
+
+    const result = await fetchHtmlWithFallback('http://blocked.com', mockApiKey, mockScraperClient);
+
+    expect(result.htmlContent).toBe(fallbackHtml);
+    expect(result.fetchMethodUsed).toBe('ScraperAPI Initial');
+    expect(result.error).toBeNull();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(mockScraperClient.get).toHaveBeenCalledTimes(1);
+    expect(mockScraperClient.get).toHaveBeenCalledWith('http://blocked.com', { country_code: 'us' });
+  });
+  
+   test('should use ScraperAPI fallback if direct fetch returns non-403 error and API key exists', async () => {
+    const fallbackHtml = '<html><body>Fallback Success After 500</body></html>';
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+    });
+    mockScraperClient.get.mockResolvedValueOnce({ body: fallbackHtml });
+
+    const result = await fetchHtmlWithFallback('http://servererror.com', mockApiKey, mockScraperClient);
+
+    expect(result.htmlContent).toBe(fallbackHtml);
+    expect(result.fetchMethodUsed).toBe('ScraperAPI Initial');
+    expect(result.error).toBeNull();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(mockScraperClient.get).toHaveBeenCalledTimes(1);
+  });
+
+  test('should use ScraperAPI fallback if direct fetch throws network error and API key exists', async () => {
+    const fallbackHtml = '<html><body>Fallback Success After Network Error</body></html>';
+    const networkError = new Error('Network request failed');
+    (global.fetch as jest.Mock).mockRejectedValueOnce(networkError);
+    mockScraperClient.get.mockResolvedValueOnce({ body: fallbackHtml });
+
+    const result = await fetchHtmlWithFallback('http://networkerror.com', mockApiKey, mockScraperClient);
+
+    expect(result.htmlContent).toBe(fallbackHtml);
+    expect(result.fetchMethodUsed).toBe('ScraperAPI Initial');
+    expect(result.error).toBeNull(); 
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(mockScraperClient.get).toHaveBeenCalledTimes(1);
+  });
+
+  test('should return error if direct fetch fails and ScraperAPI fallback also fails', async () => {
+    const directError = new Error('Fetch failed: 403 Forbidden');
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        statusText: 'Forbidden'
+    });
+    const fallbackError = new Error('Scraper API failed');
+    mockScraperClient.get.mockRejectedValueOnce(fallbackError);
+
+    const result = await fetchHtmlWithFallback('http://bothfail.com', mockApiKey, mockScraperClient);
+
+    expect(result.htmlContent).toBe('');
+    expect(result.fetchMethodUsed).toBe('ScraperAPI Initial');
+    expect(result.error).toBeInstanceOf(Error);
+    expect(result.error?.message).toContain('Fetch failed: 403 Forbidden');
+    expect(result.error?.message).toContain('Scraper API failed');
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(mockScraperClient.get).toHaveBeenCalledTimes(1);
+  });
+
+  test('should return direct fetch error if API key is missing and direct fetch fails', async () => {
+     const directError = new Error('Fetch failed: 403 Forbidden');
+     (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        statusText: 'Forbidden'
+    });
+
+    // Pass undefined for apiKey
+    const result = await fetchHtmlWithFallback('http://directfailnokey.com', undefined, mockScraperClient);
+
+    expect(result.htmlContent).toBe('');
+    expect(result.fetchMethodUsed).toBe('Direct Fetch');
+    expect(result.error).toEqual(directError);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(mockScraperClient.get).not.toHaveBeenCalled();
+  });
+
+  test('should handle scraper returning plain string successfully', async () => {
+    const fallbackHtmlString = '<html><body>Fallback String Success</body></html>';
+    (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Direct fetch failed'));
+    mockScraperClient.get.mockResolvedValueOnce(fallbackHtmlString); // Simulate direct string response
+
+    const result = await fetchHtmlWithFallback('http://fallbackstring.com', mockApiKey, mockScraperClient);
+
+    expect(result.htmlContent).toBe(fallbackHtmlString);
+    expect(result.fetchMethodUsed).toBe('ScraperAPI Initial');
+    expect(result.error).toBeNull();
+    expect(mockScraperClient.get).toHaveBeenCalledTimes(1);
+  });
+
+   test('should return error if ScraperAPI returns unexpected response format', async () => {
+    (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Direct fetch failed'));
+    // Simulate unexpected response (not string, not object with .body)
+    mockScraperClient.get.mockResolvedValueOnce({ someOtherKey: 'value' }); 
+
+    const result = await fetchHtmlWithFallback('http://badfallbackformat.com', mockApiKey, mockScraperClient);
+
+    expect(result.htmlContent).toBe('');
+    expect(result.fetchMethodUsed).toBe('ScraperAPI Initial');
+    expect(result.error).toBeInstanceOf(Error);
+    expect(result.error?.message).toContain('[ScraperAPI Initial] fallback failed: returned unknown status, and HTML content was invalid or missing <html> tag');
+    expect(mockScraperClient.get).toHaveBeenCalledTimes(1);
+  });
+
+}); 
+
+===== api/services/__tests__/extractContent.test.ts =====
+import { extractRecipeContent, ExtractedContent } from '../extractContent';
+
+describe('extractRecipeContent', () => {
+
+  // Test Case 1: Valid JSON-LD
+  test('should extract content correctly from valid JSON-LD', () => {
+    const htmlWithJsonLd = `
+      <html>
+        <head>
+          <title>Fallback Title</title>
+          <script type="application/ld+json">
+            {
+              "@context": "https://schema.org/",
+              "@type": "Recipe",
+              "name": "JSON-LD Recipe Title",
+              "recipeIngredient": [
+                "1 cup Flour",
+                "2 Eggs"
+              ],
+              "recipeInstructions": [
+                {
+                  "@type": "HowToStep",
+                  "text": "Mix ingredients."
+                },
+                {
+                  "@type": "HowToStep",
+                  "text": "Bake the cake."
+                }
+              ],
+              "recipeYield": "4 servings",
+              "prepTime": "PT15M",
+              "cookTime": "PT30M",
+              "totalTime": "PT45M"
+            }
+          </script>
+        </head>
+        <body>
+          <h1>HTML Title</h1>
+          <div class="ingredients">
+            <ul><li>HTML Ingredient</li></ul>
+          </div>
+           <div class="instructions">
+            <ol><li>HTML Instruction</li></ol>
+          </div>
+        </body>
+      </html>
+    `;
+    const expected: ExtractedContent = {
+      title: 'JSON-LD Recipe Title',
+      ingredientsText: '1 cup Flour\n2 Eggs',
+      instructionsText: 'Mix ingredients.\nBake the cake.',
+      recipeYieldText: '4 servings',
+      prepTime: 'PT15M',
+      cookTime: 'PT30M',
+      totalTime: 'PT45M',
+      isFallback: false
+    };
+    expect(extractRecipeContent(htmlWithJsonLd)).toEqual(expected);
+  });
+
+  // Test Case 2: JSON-LD in @graph
+  test('should extract content correctly from JSON-LD within @graph', () => {
+    const htmlWithGraphJsonLd = `
+      <html>
+        <head><title>Graph Test</title></head>
+        <body>
+          <script type="application/ld+json">
+            {
+              "@context": "https://schema.org/",
+              "@graph": [
+                {
+                  "@type": "WebSite",
+                  "name": "Website Name"
+                },
+                {
+                  "@type": "Recipe",
+                  "name": "Graph Recipe Title",
+                  "recipeIngredient": ["Ingredient A", "Ingredient B"],
+                  "recipeInstructions": "Single instruction step."
+                }
+              ]
+            }
+          </script>
+        </body>
+      </html>
+    `;
+    const expected: ExtractedContent = {
+      title: 'Graph Recipe Title',
+      ingredientsText: 'Ingredient A\nIngredient B',
+      instructionsText: 'Single instruction step.',
+      recipeYieldText: null,
+      prepTime: null,
+      cookTime: null,
+      totalTime: null,
+      isFallback: false
+    };
+    expect(extractRecipeContent(htmlWithGraphJsonLd)).toEqual(expected);
+  });
+
+  // Test Case 3: Fallback to CSS Selectors (No JSON-LD)
+  test('should extract content using CSS selectors when JSON-LD is missing', () => {
+    const htmlWithoutJsonLd = `
+      <html>
+        <head><title>CSS Selector Title</title></head>
+        <body>
+          <h1>Another H1 Title</h1>
+          <ul class="ingredients">
+            <li>Ingredient 1</li>
+            <li itemprop="recipeIngredient">Ingredient 2</li>
+          </ul>
+          <div class="wprm-recipe-instructions">
+            <p>Step 1.</p>
+            <li>Step 2.</li>
+          </div>
+        </body>
+      </html>
+    `;
+    const expectedFallbackText = "Another H1 Title\n Ingredient 1\n Ingredient 2\n Step 1.\n Step 2.";
+    const result = extractRecipeContent(htmlWithoutJsonLd);
+
+    expect(result.title).toEqual('CSS Selector Title');
+    expect(result.ingredientsText).toEqual(expectedFallbackText);
+    expect(result.instructionsText).toEqual(expectedFallbackText);
+    expect(result.recipeYieldText).toBeNull();
+    expect(result.prepTime).toBeNull();
+    expect(result.cookTime).toBeNull();
+    expect(result.totalTime).toBeNull();
+    expect(result.isFallback).toBe(true);
+  });
+
+  // Test Case 4: Incomplete JSON-LD (e.g., missing instructions), fallback for missing parts
+  test('should fallback to CSS selectors for parts missing in JSON-LD and handle short content fallback', () => {
+    const htmlIncompleteJsonLd = `
+      <html>
+        <head>
+          <title>Fallback Title</title>
+          <script type="application/ld+json">
+            {
+              "@context": "https://schema.org/",
+              "@type": "Recipe",
+              "name": "Incomplete JSON Recipe",
+              "recipeIngredient": ["JSON Ingredient 1"]
+            }
+          </script>
+        </head>
+        <body>
+          <ol class="instructions">
+             <li>Selector Instruction 1</li>
+             <li>Selector Instruction 2</li>
+          </ol>
+        </body>
+      </html>
+    `;
+    const expectedFallbackText = "Selector Instruction 1\n Selector Instruction 2";
+    const expected: ExtractedContent = {
+      title: 'Incomplete JSON Recipe',
+      ingredientsText: expectedFallbackText,
+      instructionsText: expectedFallbackText,
+      recipeYieldText: null,
+      prepTime: null,
+      cookTime: null,
+      totalTime: null,
+      isFallback: true
+    };
+    expect(extractRecipeContent(htmlIncompleteJsonLd)).toEqual(expected);
+  });
+
+  // Test Case 5: No Recipe Content Found
+  test('should return fallback body text when no recipe content is found via JSON-LD or selectors', () => {
+    const htmlNoRecipe = `
+      <html>
+        <head><title>Just a Page</title></head>
+        <body>
+          <p>This page has no recipe information.</p>
+        </body>
+      </html>
+    `;
+    const expectedFallbackText = "This page has no recipe information.";
+    const expected: ExtractedContent = {
+      title: 'Just a Page', // Title from <title>
+      ingredientsText: expectedFallbackText,
+      instructionsText: expectedFallbackText,
+      recipeYieldText: null,
+      prepTime: null,
+      cookTime: null,
+      totalTime: null,
+      isFallback: true
+    };
+    expect(extractRecipeContent(htmlNoRecipe)).toEqual(expected);
+  });
+
+  // Test Case 6: Different common selector patterns
+  test('should extract content using alternative common CSS selectors and handle short content fallback', () => {
+    const htmlAlternativeSelectors = `
+      <html>
+        <head><title>Alt Selector Recipe</title></head>
+        <body>
+          <div class="tasty-recipes-ingredients">
+             <ul><li>Tasty Ingredient A</li></ul>
+          </div>
+          <ol class="easyrecipe-instructions">
+            <li>Easy Instruction 1</li>
+          </ol>
+        </body>
+      </html>
+    `;
+    const expectedFallbackText = "Tasty Ingredient A\n Easy Instruction 1";
+    const expected: ExtractedContent = {
+      title: 'Alt Selector Recipe',
+      ingredientsText: expectedFallbackText,
+      instructionsText: expectedFallbackText,
+      recipeYieldText: null,
+      prepTime: null,
+      cookTime: null,
+      totalTime: null,
+      isFallback: true
+    };
+    expect(extractRecipeContent(htmlAlternativeSelectors)).toEqual(expected);
+  });
+
+  // Test Case 7: Instructions as HowToSection in JSON-LD
+  test('should extract instructions from HowToSection in JSON-LD', () => {
+      const htmlWithHowToSection = `
+      <html>
+        <head>
+          <title>HowToSection Test</title>
+          <script type="application/ld+json">
+            {
+              "@context": "https://schema.org/",
+              "@type": "Recipe",
+              "name": "HowToSection Recipe Title",
+              "recipeIngredient": ["Ingredient X", "Ingredient Y"],
+              "recipeInstructions": [
+                {
+                  "@type": "HowToSection",
+                  "name": "Make the dough",
+                  "itemListElement": [
+                    {"@type": "HowToStep", "text": "Combine flour and water."},
+                    {"@type": "HowToStep", "text": "Knead the dough."}
+                  ]
+                },
+                 {
+                  "@type": "HowToSection",
+                  "name": "Bake",
+                  "itemListElement": [
+                    {"@type": "HowToStep", "text": "Place in oven."},
+                    {"@type": "HowToStep", "text": "Bake for 30 minutes."}
+                  ]
+                }
+              ]
+            }
+          </script>
+        </head>
+        <body></body>
+      </html>
+    `;
+      const expected: ExtractedContent = {
+          title: 'HowToSection Recipe Title',
+          ingredientsText: 'Ingredient X\nIngredient Y',
+          instructionsText: 'Combine flour and water.\nKnead the dough.\nPlace in oven.\nBake for 30 minutes.',
+          recipeYieldText: null,
+          prepTime: null,
+          cookTime: null,
+          totalTime: null,
+          isFallback: false
+      };
+      expect(extractRecipeContent(htmlWithHowToSection)).toEqual(expected);
+  });
+
+  // Test Case 8: Malformed JSON-LD, fallback to CSS selectors, then to body
+  test('should ignore malformed JSON-LD and fallback to CSS selectors, then to body if short', () => {
+    const htmlWithMalformedJsonLd = `
+      <html>
+        <head>
+          <title>CSS Fallback Title</title>
+          <script type="application/ld+json">
+            {
+              "@context": "https://schema.org/",
+              "@type": "Recipe",
+              "name": "Malformed JSON Recipe Title",
+              "recipeIngredient": ["JSON Ing 1", "JSON Ing 2"], // Trailing comma here is an error
+            }
+          </script>
+        </head>
+        <body>
+          <h1 class="recipe-title">Selector Title After Malformed JSON</h1>
+          <ul class="ingredients">
+            <li>Selector Ingredient A</li>
+            <li>Selector Ingredient B</li>
+          </ul>
+          <div class="instructions">
+            <p>Selector Instruction 1</p>
+            <p>Selector Instruction 2</p>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const result = extractRecipeContent(htmlWithMalformedJsonLd);
+    
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      "Ignoring JSON-LD parsing error:", 
+      expect.any(SyntaxError)
+    );
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[extractContent] Fallback: using raw body text due to missing or short (50 chars) ingredients and/or instructions.')
+    );
+
+    const expectedFallbackText = "Selector Title After Malformed JSON\n Selector Ingredient A\n Selector Ingredient B\n Selector Instruction 1\n Selector Instruction 2";
+    
+    expect(result.title).toEqual('CSS Fallback Title');
+    expect(result.ingredientsText).toEqual(expectedFallbackText);
+    expect(result.instructionsText).toEqual(expectedFallbackText);
+    expect(result.recipeYieldText).toBeNull();
+    expect(result.prepTime).toBeNull();
+    expect(result.cookTime).toBeNull();
+    expect(result.totalTime).toBeNull();
+    expect(result.isFallback).toBe(true);
+
+    consoleWarnSpy.mockRestore();
+  });
+
+}); 
 
 ===== api/services/parseRecipe.ts =====
 import { GeminiModel, CombinedParsedRecipe, GeminiHandlerResponse } from '../types';
@@ -1854,9 +2651,8 @@ export function extractFromRawText(
   return { preparedText, error: null, timings };
 } 
 
-===== api/services/instructionService.ts =====
+===== api/services/instructionScaling.ts =====
 import { performance } from 'perf_hooks';
-import { formatMeasurement } from '../../utils/format';
 
 type LLMResponse<T> = {
   [K in keyof T]: T[K];
@@ -1865,76 +2661,6 @@ type LLMResponse<T> = {
   usage: { promptTokens: number; outputTokens: number } | null;
   timeMs: number | null;
 };
-
-export async function rewriteForSubstitution(originalInstructions: string[], originalIngredientName: string, substitutedIngredientName: string, geminiModel: any): Promise<LLMResponse<{ rewrittenInstructions: string[] | null }>> {
-    const cleanedSubstitutedIngredientName = formatMeasurement(Number(substitutedIngredientName));
-
-    const rewritePrompt = `
-    You are an expert cooking assistant. You will rewrite cooking instructions to reflect a single ingredient substitution.
-    
-    Original Ingredient: "${originalIngredientName}"
-    Substituted Ingredient: "${substitutedIngredientName}"
-    
-    Consider:
-    - Preparation differences (e.g. tofu may need pressing, beans may need soaking)
-    - Cooking time or method changes
-    - Flavor or texture impacts
-    - Any changes in food safety or allergen concerns
-    
-    If no meaningful change is required, return the original steps unchanged.
-    
-    Respond with ONLY a valid JSON object:
-    {
-      "rewrittenInstructions": [ ... ] // each step as a plain string, without numbering
-    }
-    
-    Original Instructions:
-    ${originalInstructions.map(s => `- ${s}`).join('\n')}
-`;
-
-    const startTime = performance.now();
-
-    try {
-        if (rewritePrompt.length > 100000) {
-            throw new Error(`Rewrite prompt too large (${rewritePrompt.length} chars).`);
-        }
-
-        const result = await geminiModel.generateContent(rewritePrompt);
-        const response = result.response;
-        const responseText = response.text();
-
-        const endTime = performance.now();
-        const timeMs = endTime - startTime;
-
-        if (responseText) {
-            try {
-                const parsedResult: any = JSON.parse(responseText);
-                if (typeof parsedResult === 'object' && parsedResult !== null && Array.isArray(parsedResult.rewrittenInstructions)) {
-                    const usage = {
-                        promptTokens: response.usageMetadata?.promptTokenCount || 0,
-                        outputTokens: response.usageMetadata?.candidatesTokenCount || 0
-                    };
-                    return {
-                        rewrittenInstructions: parsedResult.rewrittenInstructions.filter((step: any) => typeof step === 'string'),
-                        error: null,
-                        usage,
-                        timeMs
-                    };
-                } else {
-                    throw new Error("Parsed JSON result did not have the expected structure.");
-                }
-            } catch (parseError) {
-                console.error('Raw content that failed parsing:', responseText);
-                throw parseError;
-            }
-        } else {
-            return { rewrittenInstructions: null, error: 'Empty response received from AI instruction rewriter.', usage: null, timeMs: null };
-        }
-    } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Unknown Gemini rewrite error';
-        return { rewrittenInstructions: null, error: errorMessage, usage: null, timeMs: null };
-    }
-}
 
 export async function scaleInstructions(
   instructionsToScale: string[],
@@ -1946,7 +2672,7 @@ export async function scaleInstructions(
   const scaledIngredientsDesc = scaledIngredients.map((ing: any) => `${ing.amount || ''} ${ing.unit || ''} ${ing.name}`.trim()).join(', ');
 
   const scalePrompt = `
-You are an expert recipe editor. Your task is to rewrite recipe instructions to reflect updated ingredient quantities.
+You are an expert recipe editor. Your task is to rewrite recipe instructions to reflect changes in ingredient quantities.
 
 Original ingredients: [${originalIngredientsDesc}]
 Scaled ingredients: [${scaledIngredientsDesc}]
@@ -1955,7 +2681,7 @@ Update **only** ingredient quantities that are explicitly stated (e.g., "2 cups 
 
 **Rules**:
 - Use the exact scaled quantity if numeric.
-- For whole or indivisible ingredients (e.g. eggs, bay leaves, cinnamon sticks), round sensibly.
+- For whole or indivisible ingredients (e.g. eggs, bay leaves, cinnamon sticks), round sensibly upwards.
 - Be precise. If the original says "Add 2 tbsp olive oil" and the scaled amount is "1 tbsp", rewrite as "Add 1 tbsp olive oil".
 
 Respond with ONLY a valid JSON object:
