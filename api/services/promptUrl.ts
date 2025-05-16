@@ -94,38 +94,38 @@ ${safeRawBodyText}
         const cleanedIngredients = extractedContent.ingredientsText
             ? extractedContent.ingredientsText.split('\n').map(line => line.trim()).filter(line => line).join('\n')
             : null;
-        const safeIngredientsText = truncateTextByLines(cleanedIngredients, defaultMaxIngredientLines, "\n\n[INGREDIENTS TRUNCATED BY SYSTEM]");
         
-        const safeInstructionsText = truncateTextByLines(extractedContent.instructionsText, defaultMaxInstructionLines, "\n\n[INSTRUCTIONS TRUNCATED BY SYSTEM]");
-
-        // --- Validate Standard Extracted Content ---
-        const combinedContentToValidate = (safeIngredientsText || '') + "\n\n" + (safeInstructionsText || '');
-        const standardValidationResult = validateRecipeText(combinedContentToValidate, requestId);
+        // --- VALIDATE BEFORE TRUNCATION ---
+        const ingredientsForValidation = cleanedIngredients ? `Ingredients:\n${cleanedIngredients}` : '';
+        const instructionsForValidation = extractedContent.instructionsText ? `Instructions:\n${extractedContent.instructionsText}` : '';
+        const fullContentToValidate = ingredientsForValidation + "\n\n" + instructionsForValidation;
+        const standardValidationResult = validateRecipeText(fullContentToValidate, requestId);
         if (!standardValidationResult.isValid) {
-            const errorMsg = standardValidationResult.error || 'Standard extracted content failed validation.';
-            // Updated logging
+            const errorMsg = standardValidationResult.error || 'Standard extracted content failed validation (pre-truncation).';
             logger.warn({ 
                 requestId, 
                 reason: errorMsg, 
-                inputType: 'url-standard',
-                length: combinedContentToValidate.length,
-                ingredientsLength: safeIngredientsText?.length || 0,
-                instructionsLength: safeInstructionsText?.length || 0
-            }, 'Rejected standard extracted text before Gemini due to validation failure.');
+                inputType: 'url-standard-full', // Indicate validation on full text
+                length: fullContentToValidate.length,
+                ingredientsLength: cleanedIngredients?.length || 0,
+                instructionsLength: extractedContent.instructionsText?.length || 0
+            }, 'Rejected standard extracted text (full) before Gemini due to validation failure.');
             
-            if (!safeIngredientsText && !safeInstructionsText) {
-                 logger.warn({requestId, inputType: 'url-standard'}, 'Both ingredients and instructions text were empty after preparation, contributing to validation failure.');
+            if (!cleanedIngredients && !extractedContent.instructionsText) {
+                 logger.warn({requestId, inputType: 'url-standard-full'}, 'Both full ingredients and instructions text were empty, contributing to validation failure.');
             }
-            // Updated return structure
             return {
                 recipe: null,
-                error: `Input validation failed for standard extracted content: ${errorMsg}`,
+                error: `Input validation failed for standard extracted content (full): ${errorMsg}`,
                 usage: { inputTokens: 0, outputTokens: 0 },
-                timings: { geminiCombinedParse: 0 } // Gemini not called
+                timings: { geminiCombinedParse: 0 }
             };
         }
-        console.log(`[${requestId}] Standard extracted content passed validation.`);
-        // --- End Validate Standard Extracted Content ---
+        console.log(`[${requestId}] Full standard extracted content passed validation.`);
+        // --- END VALIDATE BEFORE TRUNCATION ---
+
+        const safeIngredientsText = truncateTextByLines(cleanedIngredients, defaultMaxIngredientLines, "\n\n[INGREDIENTS TRUNCATED BY SYSTEM]");
+        const safeInstructionsText = truncateTextByLines(extractedContent.instructionsText, defaultMaxInstructionLines, "\n\n[INSTRUCTIONS TRUNCATED BY SYSTEM]");
         
         textToParse = `**Provided Text Sections:**\n\nTitle:\n${extractedContent.title || 'N/A'}\n\nExplicit Recipe Yield Text:\n${extractedContent.recipeYieldText || 'N/A'}\n\nIngredients Text:\n${safeIngredientsText || 'N/A'}\n\nInstructions Text:\n${safeInstructionsText || 'N/A'}`;
     }
