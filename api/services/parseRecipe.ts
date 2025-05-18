@@ -211,6 +211,13 @@ export async function parseAndCacheRecipe(
     logger.info({ requestId, success: !!finalRecipeData, inputType, fromCache: false, fetchMethod: fetchMethodUsed, timings: overallTimings, action: 'parse_request_complete' }, `Request complete.`);
     logger.info({ requestId, usage: handlerUsage, action: 'final_token_usage' }, `Final Token Usage.`);
 
+    logger.debug({
+      requestId,
+      finalRecipeTitle: finalRecipeData?.title,
+      numIngredients: finalRecipeData?.ingredients?.length ?? 0,
+      servings: finalRecipeData?.recipeYield
+    }, "Final structured recipe returned to client");
+
     return {
         recipe: finalRecipeData,
         error: null,

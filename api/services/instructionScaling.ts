@@ -1,5 +1,6 @@
 import { performance } from 'perf_hooks';
 import logger from '../lib/logger';
+import { stripMarkdownFences } from '../utils/stripMarkdownFences';
 
 type LLMResponse<T> = {
   [K in keyof T]: T[K];
@@ -56,7 +57,11 @@ ${instructionsToScale.map(s => `- ${s}`).join('\n')}
 
     if (responseText) {
       try {
-        const parsedResult: any = JSON.parse(responseText);
+        const cleanText = stripMarkdownFences(responseText);
+        if (responseText !== cleanText) {
+          logger.info({ source: 'instructionScaling.ts' }, "Stripped markdown fences from Gemini response.");
+        }
+        const parsedResult: any = JSON.parse(cleanText);
         if (parsedResult && Array.isArray(parsedResult.scaledInstructions)) {
           const usage = {
             promptTokens: response.usageMetadata?.promptTokenCount || 0,

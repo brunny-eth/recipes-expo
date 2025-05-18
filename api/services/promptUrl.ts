@@ -6,6 +6,7 @@ import { normalizeUsageMetadata, StandardizedUsage } from '../utils/usageUtils';
 import { parseISODuration } from '../utils/timeUtils'; // Import the utility
 import { validateRecipeText } from '../utils/textValidation'; // Added import
 import logger from "../lib/logger"; // Corrected logger import path
+import { stripMarkdownFences } from '../utils/stripMarkdownFences';
 
 // --- New function for Gemini Parsing of URL content ---
 export async function parseUrlContentWithGemini(
@@ -207,6 +208,12 @@ ${combinedPromptForUrl.substring(0, 1000)}`);
     console.log(`[${requestId}] Sending combined parsing request to Gemini for extracted URL content (prompt length: ${combinedPromptForUrl.length})`);
     const geminiCombinedStartTime = Date.now();
 
+    logger.debug({ 
+        requestId, 
+        promptLength: combinedPromptForUrl.length,
+        promptPrefix: combinedPromptForUrl.substring(0, 200), // First 200 chars of prompt
+        textToParsePreview: textToParse.substring(0,500) // First 500 chars of the actual recipe text part
+    }, "Preparing to call Gemini for URL content");
 
     try {
         if (combinedPromptForUrl.length > 150000) { // Keep safety check
@@ -216,17 +223,24 @@ ${combinedPromptForUrl.substring(0, 1000)}`);
         const response = result.response;
         const responseText = response.text();
 
+        logger.debug({
+            requestId,
+            responseTextPreview: responseText ? responseText.substring(0, 500) : "EMPTY", // First 500 chars of response
+            usageMetadata: response.usageMetadata
+        }, "Received response from Gemini for URL content");
 
         usage = normalizeUsageMetadata(response.usageMetadata, 'gemini');
-
 
         const previewText = responseText ? (responseText.length > 300 ? responseText.substring(0, 300) + "..." : responseText) : "EMPTY";
         console.log(`[${requestId}] Gemini (URL Parse) raw JSON response preview: ${previewText}`);
 
-
         if (responseText) {
             try {
-                combinedParsedResult = JSON.parse(responseText) as CombinedParsedRecipe;
+                const cleanText = stripMarkdownFences(responseText);
+                if (responseText !== cleanText) {
+                    logger.info({ requestId, source: 'promptUrl.ts' }, "Stripped markdown fences from Gemini response.");
+                }
+                combinedParsedResult = JSON.parse(cleanText) as CombinedParsedRecipe;
                 // Basic validation (copied from old handler)
                 if (typeof combinedParsedResult !== 'object' || combinedParsedResult === null) {
                     throw new Error("Parsed JSON is not an object.");
@@ -266,10 +280,8 @@ ${combinedPromptForUrl.substring(0, 1000)}`);
         }
     }
 
-
     const geminiCombinedParseTime = Date.now() - geminiCombinedStartTime;
     const totalTime = Date.now() - handlerStartTime;
-
 
     if (!processingError && !combinedParsedResult) {
          // This state shouldn't really happen if responseText was non-empty and JSON parsing succeeded but resulted in null/undefined? Add warning.
@@ -277,10 +289,8 @@ ${combinedPromptForUrl.substring(0, 1000)}`);
         processingError = 'AI parsing completed without error but yielded no result.'; // Assign an error if no recipe found
     }
 
-
     console.log(`[${requestId}] Gemini URL content parsing finished. Time=${geminiCombinedParseTime}ms (Total Step Time=${totalTime}ms)`);
     console.log(`[${requestId}] Token Usage (URL Gemini Step): Input=${usage.inputTokens}, Output=${usage.outputTokens}`);
-
 
     return {
         recipe: combinedParsedResult,

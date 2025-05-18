@@ -17,50 +17,107 @@ const gcd = (a: number, b: number): number => {
   return b === 0 ? a : gcd(b, a % b);
 };
 
+// --- Unicode Fractions Definition ---
+const UNICODE_FRACTIONS: { [key: string]: number } = {
+  // Vulgar Fractions block (U+00BC–U+00BE)
+  '¼': 0.25, '½': 0.5, '¾': 0.75,
+  // Number Forms block (U+2150–U+215F) - selected common ones
+  '⅐': 1/7, '⅑': 1/9, '⅒': 1/10, // Note: 1/10 is 0.1
+  '⅓': 1/3, '⅔': 2/3,
+  '⅕': 1/5, '⅖': 2/5, '⅗': 3/5, '⅘': 4/5,
+  '⅙': 1/6, '⅚': 5/6,
+  '⅛': 1/8, '⅜': 3/8, '⅝': 5/8, '⅞': 7/8,
+  '↉': 0, // Used for 0/3 in some contexts, effectively zero.
+  // Add more as needed, e.g. U+2189  vulgar fraction zero thirds
+};
+
+// Generate a regex fragment for matching any of the defined unicode fraction characters
+const unicodeFractionCharsRegexFragment = Object.keys(UNICODE_FRACTIONS)
+  .map(char => char.replace(/[.*+?^${}()|[\]\\\\]/g, '\\\\$&')) // Escape special regex chars
+  .join('');
+
 // --- Main Parsing Function ---
 export const parseAmountString = (amountStr: string | null | undefined): number | null => {
   if (amountStr === null || amountStr === undefined || typeof amountStr !== 'string') {
     return null;
   }
-  const trimmedAmount = amountStr.trim();
-  if (!trimmedAmount || isNaN(parseFloat(trimmedAmount.charAt(0)))) {
-    // Handle empty strings or strings not starting with a number (e.g., "to taste")
-    return null; 
+
+  let currentAmountStr = amountStr.trim();
+  if (!currentAmountStr) {
+    return null;
   }
 
-  // Check for mixed numbers (e.g., "1 1/2")
-  const mixedNumberMatch = trimmedAmount.match(/^(\d+)\s+(\d+\/\d+)$/);
-  if (mixedNumberMatch) {
-    const whole = parseFloat(mixedNumberMatch[1]);
-    const fracDecimal = fractionToDecimal(mixedNumberMatch[2]);
+  // 1. Handle "approx" or "~" prefix
+  // This modifies currentAmountStr for subsequent parsing attempts
+  if (currentAmountStr.startsWith('~')) {
+    currentAmountStr = currentAmountStr.substring(1).trim();
+  } else if (currentAmountStr.toLowerCase().startsWith('approx ')) {
+    currentAmountStr = currentAmountStr.substring('approx '.length).trim();
+  } else if (currentAmountStr.toLowerCase().startsWith('approx.')) {
+    currentAmountStr = currentAmountStr.substring('approx.'.length).trim();
+  }
+  // Re-check if currentAmountStr became empty after stripping prefix
+  if (!currentAmountStr) {
+    return null; // e.g., if input was just "~" or "approx "
+  }
+
+  // 2. Check for standalone Unicode fraction (e.g., "½")
+  if (UNICODE_FRACTIONS.hasOwnProperty(currentAmountStr)) {
+    return UNICODE_FRACTIONS[currentAmountStr];
+  }
+
+  // 3. Check for mixed numbers with Unicode fraction (e.g., "1 ½")
+  if (unicodeFractionCharsRegexFragment) { // Only if map is not empty and fragment was generated
+    const mixedUnicodeMatch = currentAmountStr.match(
+        new RegExp(`^(\\d+)\\s+([${unicodeFractionCharsRegexFragment}])$`)
+    );
+    if (mixedUnicodeMatch) {
+        const whole = parseFloat(mixedUnicodeMatch[1]);
+        const fracChar = mixedUnicodeMatch[2];
+        if (UNICODE_FRACTIONS.hasOwnProperty(fracChar)) { // Ensure fracChar is a valid key
+            return whole + UNICODE_FRACTIONS[fracChar as keyof typeof UNICODE_FRACTIONS];
+        }
+    }
+  }
+
+  // 4. Check for mixed numbers with ASCII fraction (e.g., "1 1/2")
+  const mixedNumberMatchOld = currentAmountStr.match(/^(\d+)\s+(\d+\/\d+)$/);
+  if (mixedNumberMatchOld) {
+    const whole = parseFloat(mixedNumberMatchOld[1]);
+    const fracDecimal = fractionToDecimal(mixedNumberMatchOld[2]);
     if (fracDecimal !== null) {
       return whole + fracDecimal;
     }
   }
 
-  // Check for simple fractions (e.g., "1/2")
-  const fractionMatch = trimmedAmount.match(/^(\d+\/\d+)$/);
-  if (fractionMatch) {
-    return fractionToDecimal(fractionMatch[1]);
-  }
-
-  // Check for simple decimals or whole numbers (e.g., "1.5", "2")
-  // Use parseFloat which handles decimals and whole numbers
-  const num = parseFloat(trimmedAmount);
-  if (!isNaN(num)) {
-    return num;
+  // 5. Check for simple ASCII fractions (e.g., "1/2")
+  const fractionMatchOld = currentAmountStr.match(/^(\d+\/\d+)$/);
+  if (fractionMatchOld) {
+    return fractionToDecimal(fractionMatchOld[1]);
   }
   
-  // Handle ranges (e.g., "2-3") - take the first number
-  const rangeMatch = trimmedAmount.match(/^(\d+(\.\d+)?)\s*-\s*\d+/);
-   if (rangeMatch) {
-     const firstNum = parseFloat(rangeMatch[1]);
-     if (!isNaN(firstNum)) {
-       return firstNum;
-     }
-   }
+  // 6. Handle ranges (e.g., "2-3", "1 to 2") - take the first number
+  // Parses "X-Y" or "X to Y" (case-insensitive for "to")
+  const rangeMatch = currentAmountStr.match(/^(\d+(?:\.\d+)?)\s*(?:-|to)\s*\d+/i);
+  if (rangeMatch) {
+    const firstNum = parseFloat(rangeMatch[1]);
+    if (!isNaN(firstNum)) {
+      return firstNum;
+    }
+  }
+  
+  // 7. Check for simple decimals or whole numbers (e.g., "1.5", "2", "0.5 apples")
+  // This attempts to parse a leading number from the string.
+  // It allows for trailing text (like units) which parseFloat handles by ignoring.
+  if (/^(\d|\.\d)/.test(currentAmountStr)) { // Check if it starts like a number
+    const num = parseFloat(currentAmountStr);
+    if (!isNaN(num)) {
+      return num; // parseFloat will extract "2" from "2 apples"
+    }
+  }
 
-  // If none of the above match, it's likely not a standard quantifiable amount
+  // If none of the above specific formats match, return null.
+  // This covers cases like "to taste", "a pinch", or other non-numeric/unhandled amounts.
   return null;
 };
 

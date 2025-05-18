@@ -1,5 +1,6 @@
 import { fetchHtmlWithFallback } from './htmlFetch';
 import { extractRecipeContent, ExtractedContent } from './extractContent'; // Import ExtractedContent type
+import logger from '../lib/logger';
 
 type FetchExtractTimings = {
   fetchHtml: number;
@@ -67,10 +68,10 @@ export async function fetchAndExtractFromUrl(
 
       // --- ADDED DEBUG LOG ---
       if (extractedContent) {
-        console.log('[DEBUG urlProcessor] Extracted ingredientsText (first 500 chars):', extractedContent.ingredientsText ? extractedContent.ingredientsText.substring(0, 500) : 'null/empty');
-        console.log('[DEBUG urlProcessor] Extracted instructionsText (first 500 chars):', extractedContent.instructionsText ? extractedContent.instructionsText.substring(0, 500) : 'null/empty');
+        logger.debug({ requestId, url, ingredientsTextPreview: extractedContent.ingredientsText ? extractedContent.ingredientsText.substring(0, 500) : 'null/empty' }, '[DEBUG urlProcessor] Extracted ingredientsText');
+        logger.debug({ requestId, url, instructionsTextPreview: extractedContent.instructionsText ? extractedContent.instructionsText.substring(0, 500) : 'null/empty' }, '[DEBUG urlProcessor] Extracted instructionsText');
       } else {
-        console.log('[DEBUG urlProcessor] extractedContent is null after extractRecipeContent');
+        logger.debug({ requestId, url }, '[DEBUG urlProcessor] extractedContent is null after extractRecipeContent');
       }
       // --- END DEBUG LOG ---
 

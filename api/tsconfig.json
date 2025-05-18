@@ -10,18 +10,8 @@
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
     "baseUrl": ".",
-    "typeRoots": [
-      "./types"
-    ]
+    "typeRoots": ["./types", "../types"]
   },
-  "include": [
-    "routes/**/*.ts"
-  ],
-  "files": [
-    "types/scraperapi-sdk.d.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "../node_modules"
-  ]
-} 
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules"]
+}

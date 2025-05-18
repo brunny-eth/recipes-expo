@@ -3,6 +3,8 @@ import { truncateTextByLines } from '../utils/truncate';
 import { performance } from 'perf_hooks';
 import { normalizeUsageMetadata, StandardizedUsage } from '../utils/usageUtils';
 import { validateRecipeText } from '../utils/textValidation';
+import logger from '../lib/logger';
+import { stripMarkdownFences } from '../utils/stripMarkdownFences';
 
 export async function parseRawTextWithGemini(
   preparedText: string,
@@ -105,6 +107,13 @@ ${safeText}
   console.log(`[${requestId}] Sending Gemini request (prompt length: ${rawTextPrompt.length}).`);
   const geminiStart = Date.now();
 
+  logger.debug({ 
+      requestId, 
+      promptLength: rawTextPrompt.length,
+      promptPreview: rawTextPrompt.substring(0, 200), // First 200 chars of prompt
+      textPreview: safeText.substring(0,500) // First 500 chars of the actual recipe text part
+  }, "Preparing to call Gemini for raw text");
+
   try {
     if (rawTextPrompt.length > 150000) {
       throw new Error(`Prompt too large (${rawTextPrompt.length} chars).`);
@@ -114,6 +123,12 @@ ${safeText}
     const response = result.response;
     const text = response.text();
 
+    logger.debug({
+        requestId,
+        responseTextPreview: text ? text.substring(0, 500) : "EMPTY", // First 500 chars of response
+        usageMetadata: response.usageMetadata
+    }, "Received response from Gemini for raw text");
+
     usage = normalizeUsageMetadata(response.usageMetadata, 'gemini');
 
     const preview = text ? text.slice(0, 300) + (text.length > 300 ? '...' : '') : 'EMPTY';
@@ -121,7 +136,11 @@ ${safeText}
 
     if (text) {
       try {
-        recipe = JSON.parse(text);
+        const cleanText = stripMarkdownFences(text);
+        if (text !== cleanText) {
+            logger.info({ requestId, source: 'promptText.ts' }, "Stripped markdown fences from Gemini response.");
+        }
+        recipe = JSON.parse(cleanText);
 
         if (!recipe || typeof recipe !== 'object') throw new Error('Parsed JSON is not a valid object.');
 
