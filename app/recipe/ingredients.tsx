@@ -8,6 +8,8 @@ import IngredientSubstitutionModal from './IngredientSubstitutionModal';
 import { StructuredIngredient, SubstitutionSuggestion } from '@/api/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { formatMeasurement } from '@/utils/format';
+import { coerceToStructuredIngredients } from '@/utils/ingredientHelpers';
+import { getScaledYieldText } from '@/utils/recipeUtils';
 
 // --- Types ---
 // Added SubstitutionSuggestion type matching backend/modal
@@ -16,16 +18,16 @@ import { formatMeasurement } from '@/utils/format';
 type IngredientsNavParams = {
     title: string | null;
     originalIngredients: StructuredIngredient[] | string[] | null; 
-    scaledIngredients: StructuredIngredient[] | null; // This is what we display primarily
+    scaledIngredients: StructuredIngredient[] | null;
     instructions: string[] | null;
     substitutions_text: string | null;
-    originalYield: string | null;
-    selectedServings: number;
-    // Add potentially missing fields, make them optional as their presence might vary
+    originalYieldDisplay: string | null; // Renamed from originalYield, and it's the display string
+    scaleFactor: number; // Added
+    // Optional fields (ensure they are handled if not present)
     prepTime?: string | null;
     cookTime?: string | null;
     totalTime?: string | null;
-    nutrition?: { [key: string]: any; } | null; // Keep nutrition flexible or define more strictly
+    nutrition?: { [key: string]: any; } | null;
 };
 // --- End Types ---
 
@@ -86,22 +88,15 @@ export default function IngredientsScreen() {
   const params = useLocalSearchParams<{ recipeData?: string }>();
   const router = useRouter();
   
-  // State for the data received via navigation
   const [navData, setNavData] = useState<IngredientsNavParams | null>(null);
-  // State specifically for the ingredients being displayed (initially the scaled ones)
   const [displayIngredients, setDisplayIngredients] = useState<StructuredIngredient[] | null>(null);
-  // State to hold the original, unscaled ingredients for scaling instructions
   const [originalIngredientsList, setOriginalIngredientsList] = useState<StructuredIngredient[] | string[] | null>(null);
-  // State for servings
-  const [originalServings, setOriginalServings] = useState<number | null>(null);
-  const [selectedServings, setSelectedServings] = useState<number | null>(null);
   
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [checkedIngredients, setCheckedIngredients] = useState<{ [key: number]: boolean }>({});
   const [substitutionModalVisible, setSubstitutionModalVisible] = useState(false);
   const [selectedIngredient, setSelectedIngredient] = useState<StructuredIngredient | null>(null);
-  // Updated appliedSubstitution to include amount/unit potentially
   const [appliedSubstitution, setAppliedSubstitution] = useState<{
      originalIndex: number; 
      originalName: string; 
@@ -110,9 +105,7 @@ export default function IngredientsScreen() {
   const [isRewriting, setIsRewriting] = useState(false); // For substitution rewrite
   const [isScalingInstructions, setIsScalingInstructions] = useState(false); // For scaling instructions
   const [isHelpModalVisible, setIsHelpModalVisible] = useState(false); // <-- New state for help modal
-  // Keep the state for the *original* selected ingredient data
   const [selectedIngredientOriginalData, setSelectedIngredientOriginalData] = useState<StructuredIngredient | null>(null);
-  // Add state to hold the *processed* (scaled) suggestions for the modal
   const [processedSubstitutionsForModal, setProcessedSubstitutionsForModal] = useState<SubstitutionSuggestion[] | null>(null);
 
   useEffect(() => {
@@ -139,14 +132,12 @@ export default function IngredientsScreen() {
         setNavData(parsedNavData);
 
         const ingredientsForDisplay = parsedNavData.scaledIngredients || []; 
-        console.log("[IngredientsScreen] Ingredients for display (before setState):", JSON.stringify(ingredientsForDisplay, null, 2));
+        console.log("[IngredientsScreen] Ingredients for display (from navParams):", JSON.stringify(ingredientsForDisplay, null, 2));
         setDisplayIngredients(ingredientsForDisplay); 
 
-        setOriginalIngredientsList(parsedNavData.originalIngredients); 
-
-        const originalServingsNum = parseInt(parsedNavData.originalYield || '1', 10);
-        setOriginalServings(!isNaN(originalServingsNum) && originalServingsNum > 0 ? originalServingsNum : 1);
-        setSelectedServings(parsedNavData.selectedServings); 
+        // Coerce originalIngredients when setting them for the list used in API calls
+        const structuredOriginals = coerceToStructuredIngredients(parsedNavData.originalIngredients);
+        setOriginalIngredientsList(structuredOriginals); 
 
         setAppliedSubstitution(null); 
         setCheckedIngredients({}); 
@@ -172,7 +163,7 @@ export default function IngredientsScreen() {
 
     let finalInstructions = navData.instructions || [];
     let finalSubstitutionsText = navData.substitutions_text || '';
-    const needsScaling = originalServings !== null && selectedServings !== null && originalServings !== selectedServings;
+    const needsScaling = navData.scaleFactor !== 1;
 
     // --- 1. Handle Substitution Rewriting (if applicable) --- 
     if (appliedSubstitution) {
@@ -202,8 +193,8 @@ export default function IngredientsScreen() {
     }
 
     // --- 2. Handle Instruction Scaling (if applicable) --- 
-    if (needsScaling && originalIngredientsList) {
-        console.log(`Servings changed (${originalServings} -> ${selectedServings}). Scaling instructions...`);
+    if (needsScaling && originalIngredientsList && originalIngredientsList.length > 0) {
+        console.log(`Scaling instructions for ${navData.scaleFactor}x of "${navData.originalYieldDisplay || 'original recipe'}"...`);
         setIsScalingInstructions(true);
         try {
             const backendUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
@@ -238,7 +229,7 @@ export default function IngredientsScreen() {
           title: navData.title,
           instructions: finalInstructions,
           substitutions_text: finalSubstitutionsText,
-          recipeYield: `${selectedServings} servings`,
+          recipeYield: getScaledYieldText(navData.originalYieldDisplay, navData.scaleFactor),
           prepTime: navData.prepTime,
           cookTime: navData.cookTime,
           totalTime: navData.totalTime,
@@ -246,7 +237,7 @@ export default function IngredientsScreen() {
         })
       }
     });
-  }, [navData, displayIngredients, originalServings, selectedServings, appliedSubstitution, originalIngredientsList, router]);
+  }, [navData, displayIngredients, originalIngredientsList, appliedSubstitution, router]);
 
   const toggleCheckIngredient = (index: number) => {
     setCheckedIngredients(prev => ({
@@ -260,16 +251,16 @@ export default function IngredientsScreen() {
       
       // --- Scaling Logic --- 
       let scaledSuggestions: SubstitutionSuggestion[] | null = null;
-      if (ingredient.suggested_substitutions && originalServings !== null && selectedServings !== null && originalServings > 0) {
-           const scalingFactor = selectedServings / originalServings;
-           console.log(`Scaling substitutions by factor: ${scalingFactor} (Selected: ${selectedServings}, Original: ${originalServings})`);
+      if (ingredient.suggested_substitutions && navData && navData.scaleFactor !== null && navData.scaleFactor !== 1) {
+           const scalingFactor = navData.scaleFactor;
+           console.log(`Scaling substitutions by factor: ${scalingFactor} (Selected: ${navData.scaleFactor}, Original: 1)`);
 
            scaledSuggestions = ingredient.suggested_substitutions.map(sub => {
                let finalAmount: string | number | null = sub.amount ?? null; // Default to null if undefined/null
 
                // Attempt to scale only if amount exists and is a number
                if (sub.amount != null && !isNaN(Number(sub.amount))) { 
-                    const scalingFactor = selectedServings / originalServings; // Recalculate inside safe scope if needed, or use outer one
+                    const scalingFactor = navData.scaleFactor; // Recalculate inside safe scope if needed, or use outer one
                     try {
                         const originalAmount = Number(sub.amount); // Safe to convert here
                         const calculatedAmount = originalAmount * scalingFactor;
@@ -296,8 +287,8 @@ export default function IngredientsScreen() {
       } else {
           // Use original suggestions if no scaling is needed/possible
           scaledSuggestions = ingredient.suggested_substitutions || null;
-          if (originalServings === null || selectedServings === null || originalServings <= 0) {
-             console.log("Skipping substitution scaling: Invalid servings data.");
+          if (navData && navData.scaleFactor === null || navData && navData.scaleFactor === 1) {
+             console.log("Skipping substitution scaling: Invalid scale factor data.");
           } else {
              console.log("No substitutions found to scale.");
           }
@@ -395,6 +386,14 @@ export default function IngredientsScreen() {
         </Animated.View>
         
         <ScrollView style={styles.ingredientsList} showsVerticalScrollIndicator={false}>
+          {navData && navData.scaleFactor !== 1 && (
+            <View style={styles.scaleInfoBanner}>
+              <Text style={styles.scaleInfoText}>
+                {`Showing ingredients for: ${getScaledYieldText(navData.originalYieldDisplay, navData.scaleFactor)}`}
+              </Text>
+            </View>
+          )}
+
           {displayIngredients && displayIngredients.length > 0 ? (
               displayIngredients.map((ingredient, index) => {
                 const isChecked = !!checkedIngredients[index];
@@ -554,6 +553,14 @@ export default function IngredientsScreen() {
       </Animated.View>
       
       <ScrollView style={styles.ingredientsList} showsVerticalScrollIndicator={false}>
+        {navData && navData.scaleFactor !== 1 && (
+          <View style={styles.scaleInfoBanner}>
+            <Text style={styles.scaleInfoText}>
+              {`Showing ingredients for: ${getScaledYieldText(navData.originalYieldDisplay, navData.scaleFactor)}`}
+            </Text>
+          </View>
+        )}
+
         {displayIngredients && displayIngredients.length > 0 ? (
             displayIngredients.map((ingredient, index) => {
               const isChecked = !!checkedIngredients[index];
@@ -934,4 +941,16 @@ const styles = StyleSheet.create({
     padding: 5,
   },
   // --- End Help Modal Styles ---
+  scaleInfoBanner: {
+    backgroundColor: COLORS.primary,
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  scaleInfoText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 16,
+    color: COLORS.white,
+    textAlign: 'center',
+  },
 });

@@ -5,7 +5,9 @@
     "paths": {
       "@/*": ["./*"]
     },
-    "typeRoots": ["./types", "./node_modules/@types"]
+    "typeRoots": ["./types", "./node_modules/@types"],
+    "moduleResolution": "node16",
+    "module": "node16"
   },
   "include": [
     "**/*.ts",

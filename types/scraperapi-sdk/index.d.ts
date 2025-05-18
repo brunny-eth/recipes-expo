@@ -6,6 +6,7 @@ declare module 'scraperapi-sdk' {
     // put: (url: string, data: any, options?: any) => Promise<any>;
   }
 
-  function scraperapiClient(apiKey: string): ScraperAPIClient;
+  // This defines scraperapiClient as a function that takes an apiKey string and returns any (the client instance).
+  function scraperapiClient(apiKey: string): any;
   export default scraperapiClient;
 } 

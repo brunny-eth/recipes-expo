@@ -33,11 +33,20 @@ const safetySettings = [
   { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
   { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
 ];
-const geminiModel = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash-latest",
-    generationConfig: geminiConfig,
-    safetySettings: safetySettings,
-});
+
+// Add try/catch for Gemini model initialization
+let geminiModel: any; // Use 'any' or a more specific type if available for GenerativeModel
+try {
+  geminiModel = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash-latest",
+      generationConfig: geminiConfig,
+      safetySettings: safetySettings,
+  });
+} catch (e) {
+  logger.error({ context: 'init', error: e, message: (e as Error).message, stack: (e as Error).stack }, '❌ Failed to initialize Gemini model');
+  // Depending on how critical this is, you might want to prevent the app from starting
+  // or allow it to run in a degraded state if other routes don't depend on geminiModel.
+}
 
 // Get all recipes
 router.get('/', async (req: Request, res: Response) => {
@@ -106,9 +115,10 @@ router.post('/', async (req: Request, res: Response) => {
 
 // --- Main Parsing Route --- 
 router.post('/parse', async (req: Request, res: Response) => {
+  // Add logging for incoming request body
+  logger.info({ body: req.body, requestId: (req as any).id, route: req.originalUrl, method: req.method }, '[parse] Incoming request');
   try {
     const { input } = req.body;
-    // It's good practice to use req.id for logging if available from pino-http
     const requestId = (req as any).id;
 
     if (!input || typeof input !== 'string' || input.trim() === '') {
@@ -116,6 +126,11 @@ router.post('/parse', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Missing or empty "input" in request body' });
     }
 
+    // Temporarily stub out parseAndCacheRecipe and return a simple success message
+    // logger.info({ requestId, route: req.originalUrl, method: req.method, inputReceived: input }, '[STUB] /parse route hit, returning stubbed success.');
+    // return res.json({ message: 'Stub parse success', input: req.body.input });
+
+    // Original logic - temporarily commented out
     if (!scraperApiKey) {
       logger.error({ requestId, route: req.originalUrl, method: req.method, nodeEnv: process.env.NODE_ENV }, 'Server configuration error: Missing ScraperAPI key for /parse.');
       return res.status(500).json({ error: 'Server configuration error: Missing ScraperAPI key.' });
@@ -124,7 +139,6 @@ router.post('/parse', async (req: Request, res: Response) => {
     const { recipe, error: parseError, fromCache, inputType, cacheKey, timings, usage, fetchMethodUsed } = await parseAndCacheRecipe(input, geminiModel, scraperApiKey, scraperClient);
 
     if (parseError) {
-      // parseAndCacheRecipe already logs details, this is for the route context
       logger.error({ requestId, route: req.originalUrl, method: req.method, input, errMessage: parseError }, `Failed to process input via parseAndCacheRecipe`);
       return res.status(500).json({ error: parseError });
     }
@@ -141,8 +155,18 @@ router.post('/parse', async (req: Request, res: Response) => {
     });
   } catch (err) {
     const error = err as Error;
-    logger.error({ requestId: (req as any).id, err: error, route: req.originalUrl, method: req.method, body: req.body }, 'Unhandled exception in /parse route');
-    res.status(500).json({ error: error.message || 'An unknown server error occurred during parsing' });
+    // Updated logging to match the requested format more closely for unhandled exceptions
+    logger.error({
+        requestId: (req as any).id,
+        message: '💥 Error in /api/recipes/parse:', // Specific message from user request
+        errorObject: error, // Keep the full error object for structured logging
+        errorMessage: error.message,
+        stack: error.stack,
+        route: req.originalUrl,
+        method: req.method,
+        body: req.body
+    }, 'Unhandled exception in /parse route');
+    res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 });
 

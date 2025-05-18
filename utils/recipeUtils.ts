@@ -121,6 +121,86 @@ export const parseAmountString = (amountStr: string | null | undefined): number 
   return null;
 };
 
+// Helper to parse a "servings" or "yield" string (e.g., "6-8 servings", "Makes 4", "About 10 tacos")
+// It extracts the first number, or averages a range.
+export const parseServingsValue = (yieldStr: string | null | undefined): number | null => {
+  if (yieldStr === null || yieldStr === undefined || typeof yieldStr !== 'string') {
+    return null;
+  }
+
+  let processedStr = yieldStr.trim().toLowerCase();
+  if (!processedStr) {
+    return null;
+  }
+
+  // Strip common prefixes
+  const prefixes = ["makes ", "about ", "approx ", "approx.", "~"];
+  for (const prefix of prefixes) {
+    if (processedStr.startsWith(prefix)) {
+      processedStr = processedStr.substring(prefix.length).trim();
+      // Re-check if empty after stripping
+      if (!processedStr) return null;
+      break; // Assume only one such prefix
+    }
+  }
+
+  // Regex to capture:
+  // 1. A leading number (integer or decimal)
+  // 2. Optionally, a range indicator ("-" or "to", case-insensitive) followed by a second number.
+  // Example: "8-10", "8 to 10", "8"
+  const servingsRegex = /(\d+(?:\.\d+)?)(?:\s*(?:-|to)\s*(\d+(?:\.\d+)?))?/i;
+  const match = processedStr.match(servingsRegex);
+
+  if (match) {
+    const firstNumStr = match[1];
+    const secondNumStr = match[2]; // This will be undefined if not a range
+
+    const firstNum = parseFloat(firstNumStr);
+
+    if (secondNumStr) { // It's a range like "N-M" or "N to M"
+      const secondNum = parseFloat(secondNumStr);
+      if (!isNaN(firstNum) && !isNaN(secondNum)) {
+        // For a range like "8-10", use the average, rounded
+        return Math.round((firstNum + secondNum) / 2);
+      } else if (!isNaN(firstNum)) {
+        // If the second part of the range is invalid, fall back to the first number
+        return firstNum;
+      }
+    } else if (!isNaN(firstNum)) {
+      // Not a range, or only the first part of a range was valid, and it's a number
+      return firstNum;
+    }
+  }
+
+  // If the regex does not match (e.g., string doesn't start with a number in the expected format)
+  return null;
+};
+
+/**
+ * Generates a display string for a potentially scaled recipe yield.
+ * @param yieldStr The original recipe yield string (e.g., "6-8 servings", "12 tacos").
+ * @param factor The scaling factor applied (e.g., 0.5, 1, 2.5).
+ * @returns A user-friendly string describing the scaled yield.
+ */
+export function getScaledYieldText(yieldStr: string | null | undefined, factor: number): string {
+  const originalDisplay = yieldStr || "original quantity";
+
+  if (factor === 1 || isNaN(factor) || factor <=0) {
+    return yieldStr || "Original quantity"; // Return original string if no scaling or invalid factor
+  }
+
+  const baseServings = parseServingsValue(yieldStr);
+
+  if (baseServings && baseServings > 0) {
+    const scaledNumericYield = Math.round(baseServings * factor * 10) / 10; // Round to 1 decimal for display
+    // Avoid saying "~0" for very small scaled amounts if original base was, for example, 1 and factor 0.1
+    const displayScaledNumeric = scaledNumericYield > 0 ? `~${scaledNumericYield}` : "a small amount";
+    return `${displayScaledNumeric} (now ${factor}x of ${originalDisplay})`;
+  }
+  
+  // Fallback if original yield string couldn't be parsed into a number but there's a scale factor
+  return `${factor}x of the ${originalDisplay}`;
+}
 
 // --- Formatting Function ---
 const FRACTION_MAP: { [key: number]: string } = {
@@ -196,11 +276,10 @@ export const formatAmountNumber = (num: number | null): string | null => {
 // --- Scaling Function ---
 export const scaleIngredient = (
   ingredient: StructuredIngredient,
-  originalServings: number,
-  newServings: number
+  scaleFactor: number
 ): StructuredIngredient => {
-  // Don't scale if servings are invalid or the same
-  if (isNaN(originalServings) || originalServings <= 0 || isNaN(newServings) || newServings <= 0 || originalServings === newServings) {
+  // Don't scale if scaleFactor is invalid or 1 (no change)
+  if (isNaN(scaleFactor) || scaleFactor <= 0 || scaleFactor === 1) {
     return ingredient;
   }
     
@@ -211,7 +290,7 @@ export const scaleIngredient = (
     return ingredient;
   }
 
-  const scaleFactor = newServings / originalServings;
+  // Calculate new amount using the direct scaleFactor
   const newAmountNum = originalAmountNum * scaleFactor;
 
   const newAmountStr = formatAmountNumber(newAmountNum);

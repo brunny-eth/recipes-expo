@@ -4,8 +4,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, ChevronRight, Clock } from 'lucide-react-native'; // Removed Zap, PieChart
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { COLORS } from '@/constants/theme';
-import { scaleIngredient } from '@/utils/recipeUtils'; // Correct import path assuming utils is under root/src or similar alias
+import { scaleIngredient, parseServingsValue, getScaledYieldText } from '@/utils/recipeUtils'; // Correct import path assuming utils is under root/src or similar alias
 import { StructuredIngredient } from '@/api/types';
+import { coerceToStructuredIngredients } from '@/utils/ingredientHelpers'; // Import the new helper
 
 // --- Define Types (Matching Backend Output) ---
 // Re-define types here or import from a shared types file
@@ -24,35 +25,14 @@ type ParsedRecipe = {
 // Type for data passed to IngredientsScreen
 type IngredientsNavParams = {
     title: string | null;
-    originalIngredients: StructuredIngredient[] | string[] | null; // Unscaled
-    scaledIngredients: StructuredIngredient[] | null; // Scaled
+    originalIngredients: StructuredIngredient[] | string[] | null;
+    scaledIngredients: StructuredIngredient[] | null;
     instructions: string[] | null;
     substitutions_text: string | null;
-    originalYield: string | null;
-    selectedServings: number;
+    originalYieldDisplay: string | null;
+    scaleFactor: number;
 };
 // --- End Types ---
-
-// --- NEW Helper Function to parse yield string ---
-function parseYieldString(yieldStr: string | null | undefined): number | null {
-  if (!yieldStr) return null;
-  // Try to get the first number in the string
-  // This regex handles integers, and potentially the first number in a range like "4-6"
-  const match = yieldStr.match(/\d+/);
-  if (match && match[0]) {
-    const num = parseInt(match[0], 10);
-    return !isNaN(num) && num > 0 ? num : null;
-  }
-  // Fallback for simple worded numbers (optional, can be expanded)
-  // This is a very basic example, a more robust library might be needed for complex cases
-  const lowerYieldStr = yieldStr.toLowerCase();
-  if (lowerYieldStr.includes("one")) return 1;
-  if (lowerYieldStr.includes("two")) return 2;
-  // Add more common words if necessary
-
-  return null;
-}
-// --- End NEW Helper Function ---
 
 export default function RecipeSummaryScreen() {
   const params = useLocalSearchParams<{ recipeData?: string }>();
@@ -61,7 +41,10 @@ export default function RecipeSummaryScreen() {
   const [recipe, setRecipe] = useState<ParsedRecipe | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedServings, setSelectedServings] = useState<number>(4); // Default servings
+  
+  // NEW state for original yield value and selected scale factor
+  const [originalYieldValue, setOriginalYieldValue] = useState<number | null>(null);
+  const [selectedScaleFactor, setSelectedScaleFactor] = useState<number>(1.0); // Default to 1x
 
   useEffect(() => {
     if (params.recipeData) {
@@ -69,14 +52,11 @@ export default function RecipeSummaryScreen() {
         const parsed = JSON.parse(params.recipeData) as ParsedRecipe;
         setRecipe(parsed);
         
-        // Use the new parseYieldString helper, with a default of 4 if null or invalid
-        const yieldNum = parseYieldString(parsed.recipeYield) ?? 4; 
+        // Use the new parseServingsValue helper
+        const yieldNum = parseServingsValue(parsed.recipeYield); 
+        setOriginalYieldValue(yieldNum); // Store the parsed numeric yield (can be null)
+        setSelectedScaleFactor(1.0); // Reset scale factor when recipe changes
 
-        if (yieldNum > 0) { // isNaN check is covered by parseYieldString returning null
-          setSelectedServings(yieldNum);
-        } else {
-          setSelectedServings(4); // Explicitly default to 4 if yieldNum ended up not positive
-        }
       } catch (e) {
         console.error("Failed to parse recipe data on summary screen:", e);
         setError("Could not load recipe details.");
@@ -87,57 +67,42 @@ export default function RecipeSummaryScreen() {
     setIsLoading(false);
   }, [params.recipeData]);
 
-  const handleServingsChange = (servings: number) => {
-    setSelectedServings(servings);
+  const handleScaleFactorChange = (factor: number) => {
+    setSelectedScaleFactor(factor);
   };
 
   const navigateToIngredients = () => {
     if (!recipe || !recipe.ingredients) return;
 
-    const originalIngredients = recipe.ingredients; // Keep the original list
-    const originalYield = recipe.recipeYield || null;
-    const originalServingsNum = parseInt(originalYield || '1', 10);
-    const validOriginalServings = (!isNaN(originalServingsNum) && originalServingsNum > 0) ? originalServingsNum : 1; 
-
+    // Use the helper to coerce ingredients
+    const structuredOriginals: StructuredIngredient[] = coerceToStructuredIngredients(recipe.ingredients);
+    
     let scaledIngredients: StructuredIngredient[] | null = null;
-    if (Array.isArray(originalIngredients)) {
-       const structuredOriginals = originalIngredients.map(ing => {
-           if (typeof ing === 'string') {
-               return { name: ing, amount: null, unit: null, suggested_substitutions: null }; // Convert string to basic object
-           } 
-           // Ensure it matches StructuredIngredient shape, add missing optional keys if needed
-           return { 
-                name: ing.name, 
-                amount: ing.amount,
-                unit: ing.unit,
-                suggested_substitutions: ing.suggested_substitutions || null
-            }; 
-       }).filter(ing => typeof ing === 'object' && ing !== null) as StructuredIngredient[];
 
+    if (structuredOriginals.length > 0) {
         scaledIngredients = structuredOriginals.map(ingredient => 
-            scaleIngredient(ingredient, validOriginalServings, selectedServings)
+            scaleIngredient(ingredient, selectedScaleFactor)
         );
     } else {
-        console.warn("Original ingredients are not in a scalable format (expected array).");
-        // If original aren't scalable, pass them along as-is for scaled too?
-        scaledIngredients = null; // Or handle as appropriate
+        console.warn("No valid structured ingredients to scale after coercion.");
+        // Pass an empty array or null, depending on desired downstream handling
+        scaledIngredients = []; 
     }
     
-    // Prepare data for navigation
     const navParams: IngredientsNavParams = {
         title: recipe.title,
-        originalIngredients: originalIngredients, // Pass original
-        scaledIngredients: scaledIngredients,     // Pass scaled
+        originalIngredients: structuredOriginals, // Pass the coerced originals
+        scaledIngredients: scaledIngredients,
         instructions: recipe.instructions,
         substitutions_text: recipe.substitutions_text,
-        originalYield: originalYield,             // Pass original yield string
-        selectedServings: selectedServings        // Pass the target servings count
+        originalYieldDisplay: recipe.recipeYield || null,
+        scaleFactor: selectedScaleFactor
     };
 
     router.push({
       pathname: '/recipe/ingredients',
       params: { 
-        recipeData: JSON.stringify(navParams) // Pass the whole structured object
+        recipeData: JSON.stringify(navParams)
       }
     });
   };
@@ -161,7 +126,19 @@ export default function RecipeSummaryScreen() {
       );
   }
 
-  const servingOptions = [1, 2, 4, 6, 8]; // Example options
+  // Define scale factor options
+  const scaleFactorOptions = [
+    { label: 'Half', value: 0.5 },
+    { label: 'Original', value: 1.0 },
+    { label: '1.5x', value: 1.5 },
+    { label: '2x', value: 2.0 },
+    { label: '4x', value: 4.0 },
+  ];
+
+  // Use the new helper for scaled yield text display
+  const displayableYieldText = recipe.recipeYield || "its original quantity";
+  // For the text indicating what it makes *now* after scaling:
+  const currentScaledResultText = getScaledYieldText(recipe.recipeYield, selectedScaleFactor);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -170,7 +147,7 @@ export default function RecipeSummaryScreen() {
          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
            <ArrowLeft size={24} color={COLORS.textDark} />
          </TouchableOpacity>
-         <Text style={styles.headerTitle}>{recipe.title || 'Recipe Summary'}</Text>
+         <Text style={styles.headerTitle} numberOfLines={1} ellipsizeMode="tail">{recipe.title || 'Recipe Summary'}</Text>
          <View style={{ width: 40 }} /> 
       </View>
 
@@ -180,21 +157,33 @@ export default function RecipeSummaryScreen() {
         {/* Servings Selector */} 
         <Text style={styles.sectionTitle}>Adjust Recipe Size</Text>
         <Text style={styles.servingQuestionPrompt}>
-          {`This recipe is currently set for ${recipe.recipeYield ? `${recipe.recipeYield} servings` : 'its original servings'}. How many servings would you like to prepare?`}
+          {/* Display initial yield string, then the result of scaling if factor is not 1 */}
+          {`This recipe makes ${displayableYieldText}.`}
+          {selectedScaleFactor !== 1.0 && 
+            ` You are viewing a version scaled to: ${currentScaledResultText}.`}
         </Text>
         <View style={styles.servingsContainer}>
-          {servingOptions.map(num => (
+          {scaleFactorOptions.map(option => (
             <TouchableOpacity 
-              key={num}
-              style={[styles.servingButton, selectedServings === num && styles.servingButtonSelected]}
-              onPress={() => handleServingsChange(num)}
+              key={option.value}
+              style={[styles.servingButton, selectedScaleFactor === option.value && styles.servingButtonSelected]}
+              onPress={() => handleScaleFactorChange(option.value)}
             >
-              <Text style={[styles.servingButtonText, selectedServings === num && styles.servingButtonTextSelected]}>{num}</Text>
+              <Text style={[styles.servingButtonText, selectedScaleFactor === option.value && styles.servingButtonTextSelected]}>
+                {option.label}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
-        {(recipe.recipeYield && selectedServings !== parseInt(recipe.recipeYield, 10)) && (
-             <Text style={styles.originalYieldText}>Original recipe makes {recipe.recipeYield}</Text>
+        {/* 
+          The old originalYieldText that showed a complex string can be simplified or removed 
+          as the main prompt now includes the scaled result more clearly.
+          If we want to keep a note about the original, it can be simpler.
+        */}
+        {selectedScaleFactor !== 1.0 && recipe.recipeYield && (
+             <Text style={styles.originalYieldText}>
+                (Original recipe makes: {recipe.recipeYield})
+             </Text>
         )}
 
         {/* Time Info */} 
