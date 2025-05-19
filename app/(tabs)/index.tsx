@@ -181,7 +181,7 @@ export default function HomeScreen() {
             <View style={styles.inputContainer}>
               <TextInput
                 style={styles.input}
-                placeholder="  Paste a recipe link here"
+                placeholder="  Paste a recipe link or recipe text here"
                 placeholderTextColor={COLORS.darkGray}
                 value={recipeUrl}
                 onChangeText={setRecipeUrl}
