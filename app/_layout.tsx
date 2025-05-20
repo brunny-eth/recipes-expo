@@ -32,7 +32,6 @@ export default function RootLayout() {
       }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="recipe/ingredients" options={{ presentation: 'card' }} />
-        <Stack.Screen name="recipe/prep" options={{ presentation: 'card' }} />
         <Stack.Screen name="recipe/steps" options={{ presentation: 'card' }} />
         <Stack.Screen name="+not-found" />
       </Stack>
