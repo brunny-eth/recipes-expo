@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import logger from '../lib/logger';
 
 // Type definitions that might be shared or imported if structure grows
 export type ExtractedContent = {
@@ -18,7 +19,7 @@ export type ExtractedContent = {
  * @param html The HTML content string.
  * @returns An object containing extracted title, ingredients text, and instructions text.
  */
-export function extractRecipeContent(html: string): ExtractedContent {
+export function extractRecipeContent(html: string): ExtractedContent | null {
   let $ = cheerio.load(html); // Load initial HTML
 
   // Initialize extracted fields
@@ -327,6 +328,23 @@ export function extractRecipeContent(html: string): ExtractedContent {
     }
     if (instructionsMissingOrShort) {
       instructionsText = rawBodyText;
+    }
+  }
+
+  // --- Content Quality Filter for Fallback ---
+  // Only run if isFallback is true
+  if (isFallback) {
+    // 1. If both ingredientsText and instructionsText are missing or < 50 chars, return null
+    const ingLen = ingredientsText ? ingredientsText.length : 0;
+    const instLen = instructionsText ? instructionsText.length : 0;
+    if (ingLen < 50 && instLen < 50) {
+      logger.warn({ reason: 'fallback extraction contained no usable data (both ingredients and instructions missing or too short)' }, '[extractRecipeContent] Fallback extraction rejected: both ingredients and instructions missing or too short');
+      return null;
+    }
+    // 2. If ingredientsText is present but contains no numeric characters, return null
+    if (ingredientsText && !ingredientsText.match(/[\d¼½¾⅓⅔⅛⅜⅝⅞]/)) {
+      logger.warn({ reason: 'fallback extraction: ingredientsText contains no numeric characters' }, '[extractRecipeContent] Fallback extraction rejected: ingredientsText contains no numeric characters');
+      return null;
     }
   }
 
