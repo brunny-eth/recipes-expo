@@ -31,7 +31,6 @@ export default function RootLayout() {
         contentStyle: { backgroundColor: COLORS.background }
       }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="recipe/[id]" options={{ presentation: 'card' }} />
         <Stack.Screen name="recipe/ingredients" options={{ presentation: 'card' }} />
         <Stack.Screen name="recipe/prep" options={{ presentation: 'card' }} />
         <Stack.Screen name="recipe/steps" options={{ presentation: 'card' }} />

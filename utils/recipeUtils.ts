@@ -212,14 +212,21 @@ const FRACTION_MAP: { [key: number]: string } = {
   0.75: '3/4',
   0.875: '7/8',
 };
-const FRACTION_PRECISION = 0.01; // How close a decimal needs to be to a known fraction
+const FRACTION_PRECISION = 0.02; // Increased from 0.01 to avoid over-matching small rounding artifacts
 
 export const formatAmountNumber = (num: number | null): string | null => {
+  console.log("[debug-format] running with input:", num);
   if (num === null || isNaN(num)) return null;
   if (num <= 0) return null; // Don't format non-positive numbers typically
 
   const wholePart = Math.floor(num);
   const decimalPart = num - wholePart;
+
+  // If the decimal part is very close to 0 or 1, just round it
+  if (decimalPart < 0.13 || decimalPart > 0.87) {
+    const rounded = Math.round(num);
+    return rounded.toString();
+  }
 
   let fractionStr = '';
 
@@ -269,6 +276,7 @@ export const formatAmountNumber = (num: number | null): string | null => {
   const separator = wholePart > 0 && fractionStr ? ' ' : '';
 
   const result = `${wholeStr}${separator}${fractionStr}`;
+  console.log("[debug-format]", num, "=>", result);
   return result.trim() || null; // Return null if empty (e.g., input was 0)
 };
 
@@ -292,8 +300,10 @@ export const scaleIngredient = (
 
   // Calculate new amount using the direct scaleFactor
   const newAmountNum = originalAmountNum * scaleFactor;
-
-  const newAmountStr = formatAmountNumber(newAmountNum);
+  
+  // Round to 3 decimal places to avoid floating point noise
+  const cleanedAmountNum = Math.round(newAmountNum * 1000) / 1000;
+  const newAmountStr = formatAmountNumber(cleanedAmountNum);
 
   // Return a *new* ingredient object with the updated amount
   return {

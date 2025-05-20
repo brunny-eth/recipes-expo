@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator, Platform, Alert, Modal, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, ChevronRight, X } from 'lucide-react-native';
@@ -9,7 +9,7 @@ import { StructuredIngredient, SubstitutionSuggestion } from '@/api/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { formatMeasurement } from '@/utils/format';
 import { coerceToStructuredIngredients } from '@/utils/ingredientHelpers';
-import { getScaledYieldText } from '@/utils/recipeUtils';
+import { getScaledYieldText, scaleIngredient, parseAmountString, formatAmountNumber } from '@/utils/recipeUtils';
 
 // --- Types ---
 // Added SubstitutionSuggestion type matching backend/modal
@@ -89,9 +89,6 @@ export default function IngredientsScreen() {
   const router = useRouter();
   
   const [navData, setNavData] = useState<IngredientsNavParams | null>(null);
-  const [displayIngredients, setDisplayIngredients] = useState<StructuredIngredient[] | null>(null);
-  const [originalIngredientsList, setOriginalIngredientsList] = useState<StructuredIngredient[] | string[] | null>(null);
-  
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [checkedIngredients, setCheckedIngredients] = useState<{ [key: number]: boolean }>({});
@@ -100,13 +97,33 @@ export default function IngredientsScreen() {
   const [appliedSubstitution, setAppliedSubstitution] = useState<{
      originalIndex: number; 
      originalName: string; 
-     substitution: SubstitutionSuggestion // Use the richer type here
+     substitution: SubstitutionSuggestion
   } | null>(null);
-  const [isRewriting, setIsRewriting] = useState(false); // For substitution rewrite
-  const [isScalingInstructions, setIsScalingInstructions] = useState(false); // For scaling instructions
-  const [isHelpModalVisible, setIsHelpModalVisible] = useState(false); // <-- New state for help modal
+  const [isRewriting, setIsRewriting] = useState(false);
+  const [isScalingInstructions, setIsScalingInstructions] = useState(false);
+  const [isHelpModalVisible, setIsHelpModalVisible] = useState(false);
   const [selectedIngredientOriginalData, setSelectedIngredientOriginalData] = useState<StructuredIngredient | null>(null);
   const [processedSubstitutionsForModal, setProcessedSubstitutionsForModal] = useState<SubstitutionSuggestion[] | null>(null);
+
+  // Use useMemo for displayIngredients calculation
+  const displayIngredients = useMemo(() => {
+    if (!navData) return null;
+
+    const scale = navData.scaleFactor || 1;
+    const usingOriginal = navData.scaleFactor === 1 || !navData.scaledIngredients;
+
+    const source = usingOriginal
+      ? navData.originalIngredients
+      : navData.scaledIngredients;
+
+    if (!source) return null;
+
+    const structured = coerceToStructuredIngredients(source);
+    // Only scale if using original
+    return usingOriginal
+      ? structured.map(i => scaleIngredient(i, scale))
+      : structured;
+  }, [navData]);
 
   useEffect(() => {
     const showTip = async () => {
@@ -130,15 +147,6 @@ export default function IngredientsScreen() {
         const parsedNavData = JSON.parse(params.recipeData) as IngredientsNavParams;
         console.log("[IngredientsScreen] Parsed Nav Data:", JSON.stringify(parsedNavData, null, 2)); 
         setNavData(parsedNavData);
-
-        const ingredientsForDisplay = parsedNavData.scaledIngredients || []; 
-        console.log("[IngredientsScreen] Ingredients for display (from navParams):", JSON.stringify(ingredientsForDisplay, null, 2));
-        setDisplayIngredients(ingredientsForDisplay); 
-
-        // Coerce originalIngredients when setting them for the list used in API calls
-        const structuredOriginals = coerceToStructuredIngredients(parsedNavData.originalIngredients);
-        setOriginalIngredientsList(structuredOriginals); 
-
         setAppliedSubstitution(null); 
         setCheckedIngredients({}); 
         setError(null);
@@ -146,8 +154,6 @@ export default function IngredientsScreen() {
         console.error("Failed to parse recipe data:", e);
         setError("Could not load recipe data.");
         setNavData(null); 
-        setDisplayIngredients(null);
-        setOriginalIngredientsList(null);
       }
     } else {
       setError("Recipe data not provided.");
@@ -193,7 +199,7 @@ export default function IngredientsScreen() {
     }
 
     // --- 2. Handle Instruction Scaling (if applicable) --- 
-    if (needsScaling && originalIngredientsList && originalIngredientsList.length > 0) {
+    if (needsScaling && displayIngredients.length > 0) {
         console.log(`Scaling instructions for ${navData.scaleFactor}x of "${navData.originalYieldDisplay || 'original recipe'}"...`);
         setIsScalingInstructions(true);
         try {
@@ -203,7 +209,7 @@ export default function IngredientsScreen() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     instructionsToScale: finalInstructions,
-                    originalIngredients: originalIngredientsList,
+                    originalIngredients: navData.originalIngredients,
                     scaledIngredients: displayIngredients,
                 }),
             });
@@ -223,7 +229,7 @@ export default function IngredientsScreen() {
 
     // --- 3. Navigate to Steps Screen --- 
     router.push({
-      pathname: '/recipe/steps', // Use absolute path
+      pathname: '/recipe/steps',
       params: {
         recipeData: JSON.stringify({
           title: navData.title,
@@ -237,7 +243,7 @@ export default function IngredientsScreen() {
         })
       }
     });
-  }, [navData, displayIngredients, originalIngredientsList, appliedSubstitution, router]);
+  }, [navData, displayIngredients, appliedSubstitution, router]);
 
   const toggleCheckIngredient = (index: number) => {
     setCheckedIngredients(prev => ({
@@ -256,32 +262,33 @@ export default function IngredientsScreen() {
            console.log(`Scaling substitutions by factor: ${scalingFactor} (Selected: ${navData.scaleFactor}, Original: 1)`);
 
            scaledSuggestions = ingredient.suggested_substitutions.map(sub => {
-               let finalAmount: string | number | null = sub.amount ?? null; // Default to null if undefined/null
+               let finalAmount: string | number | null = sub.amount ?? null;
 
-               // Attempt to scale only if amount exists and is a number
-               if (sub.amount != null && !isNaN(Number(sub.amount))) { 
-                    const scalingFactor = navData.scaleFactor; // Recalculate inside safe scope if needed, or use outer one
-                    try {
-                        const originalAmount = Number(sub.amount); // Safe to convert here
-                        const calculatedAmount = originalAmount * scalingFactor;
-                        finalAmount = parseFloat(calculatedAmount.toFixed(2)); 
-                        console.log(`Scaled ${sub.name} amount from ${sub.amount} to ${finalAmount}`);
-                    } catch (e) {
-                        console.error("Error scaling substitution amount:", e);
-                        finalAmount = sub.amount; // Fallback to original if scaling calculation fails
-                    }
-               } else if (sub.amount != null) {
-                   // Keep original non-numeric amount if it exists
-                   finalAmount = sub.amount; 
-                   console.log(`Kept original non-numeric amount: ${sub.amount} for ${sub.name}`);
+               // Use parseAmountString for consistent handling of amounts
+               if (sub.amount != null) {
+                   try {
+                       const parsedAmount = parseAmountString(String(sub.amount));
+                       if (parsedAmount !== null) {
+                           const calculatedAmount = parsedAmount * scalingFactor;
+                           finalAmount = formatAmountNumber(calculatedAmount) || calculatedAmount.toFixed(2);
+                           console.log(`Scaled ${sub.name} amount from ${sub.amount} to ${finalAmount}`);
+                       } else {
+                           // Keep original non-numeric amount if parsing fails
+                           finalAmount = sub.amount;
+                           console.log(`Kept original non-numeric amount: ${sub.amount} for ${sub.name}`);
+                       }
+                   } catch (e) {
+                       console.error("Error scaling substitution amount:", e);
+                       finalAmount = sub.amount; // Fallback to original if scaling fails
+                   }
                } else {
                    console.log(`Amount was null or undefined for ${sub.name}, keeping as null.`);
-                   finalAmount = null; // Ensure it remains null
+                   finalAmount = null;
                }
 
                return {
                    ...sub,
-                   amount: finalAmount // Use the final, type-safe amount
+                   amount: finalAmount
                };
            });
       } else {
@@ -300,70 +307,86 @@ export default function IngredientsScreen() {
       setSubstitutionModalVisible(true);
   };
 
-  const handleApplySubstitution = (substitution: SubstitutionSuggestion) => { // Expect full suggestion object
-      // Check 1: Are these null?
-      if (!selectedIngredientOriginalData || !displayIngredients) { 
-          console.error("Apply error: Missing original ingredient data or display list.");
-          return; // <-- Exit Point 1
+  const handleApplySubstitution = (substitution: SubstitutionSuggestion) => {
+    if (!selectedIngredientOriginalData || !displayIngredients) { 
+      console.error("Apply error: Missing original ingredient data or display list.");
+      return;
+    }
+
+    const originalIngredientNameFromState = selectedIngredientOriginalData.name;
+    console.log(`Attempting to find index for: "${originalIngredientNameFromState}"`);
+    
+    const index = displayIngredients.findIndex(ing => 
+      ing.name === originalIngredientNameFromState || 
+      ing.name.includes(`(substituted for ${originalIngredientNameFromState})`)
+    );
+
+    console.log(`Found index: ${index}`);
+
+    if (index === -1) { 
+      console.error(`Apply error: Cannot find ingredient matching "${originalIngredientNameFromState}" in display list.`);
+      console.log("Current displayIngredients names:", displayIngredients.map(i => i.name));
+      return;
+    }
+    
+    const currentDisplayName = displayIngredients[index].name;
+    let originalNameForSub = selectedIngredientOriginalData.name;
+    if (currentDisplayName.includes('(substituted for')) {
+      const match = currentDisplayName.match(/\(substituted for (.*?)\)/);
+      if (match && match[1]) {
+        originalNameForSub = match[1];
       }
+    }
 
-      const originalIngredientNameFromState = selectedIngredientOriginalData.name;
-      console.log(`Attempting to find index for: "${originalIngredientNameFromState}"`); // <-- Added Log
+    console.log(`Applying substitution: ${substitution.name} (Amount: ${substitution.amount}, Unit: ${substitution.unit}) for original ${originalNameForSub} at index ${index}`);
+    
+    setAppliedSubstitution({ 
+      originalIndex: index, 
+      originalName: originalNameForSub,
+      substitution: substitution
+    });
+
+    // Update navData with the substituted ingredient
+    setNavData(prevNavData => {
+      if (!prevNavData) return prevNavData;
       
-      // Check 2: Finding the index.
-      const index = displayIngredients.findIndex(ing => 
-          ing.name === originalIngredientNameFromState || // Find by exact match first
-          ing.name.includes(`(substituted for ${originalIngredientNameFromState})`) // Or if it was already substituted
-      );
-
-      console.log(`Found index: ${index}`); // <-- Added Log
-
-      // Check 3: If index is -1, the function exits.
-      if (index === -1) { 
-          console.error(`Apply error: Cannot find ingredient matching "${originalIngredientNameFromState}" in display list.`);
-          console.log("Current displayIngredients names:", displayIngredients.map(i => i.name)); // <-- Added Log
-          return; // <-- Exit Point 2
+      const newNavData = { ...prevNavData };
+      const source = newNavData.scaleFactor === 1 ? newNavData.originalIngredients : newNavData.scaledIngredients;
+      
+      if (Array.isArray(source)) {
+        const newSource = source.map((item, i) => {
+          if (i === index) {
+            // Convert string to StructuredIngredient if needed
+            const baseIngredient = typeof item === 'string' 
+              ? { name: item, amount: null, unit: null, suggested_substitutions: null }
+              : item;
+            
+            return {
+              ...baseIngredient,
+              name: `${substitution.name} (substituted for ${originalNameForSub})`,
+              amount: substitution.amount != null ? String(substitution.amount) : null,
+              unit: substitution.unit || null,
+              suggested_substitutions: null
+            };
+          }
+          return item;
+        });
+        
+        if (newNavData.scaleFactor === 1) {
+          // For originalIngredients, we need to maintain the same type as input
+          newNavData.originalIngredients = newSource as typeof newNavData.originalIngredients;
+        } else {
+          // For scaledIngredients, we know it's always StructuredIngredient[]
+          newNavData.scaledIngredients = newSource as StructuredIngredient[];
+        }
       }
       
-      // Determine the 'true' original name before this substitution is applied
-      const currentDisplayName = displayIngredients[index].name;
-      let originalNameForSub = selectedIngredientOriginalData.name; // Default to the name passed into the modal
-      if (currentDisplayName.includes('(substituted for')) {
-           const match = currentDisplayName.match(/\(substituted for (.*?)\)/);
-           if (match && match[1]) {
-               originalNameForSub = match[1];
-           }
-      }
+      return newNavData;
+    });
 
-      console.log(`Applying substitution: ${substitution.name} (Amount: ${substitution.amount}, Unit: ${substitution.unit}) for original ${originalNameForSub} at index ${index}`);
-      
-      // Store the full substitution details, including potential amount/unit
-      setAppliedSubstitution({ 
-          originalIndex: index, 
-          originalName: originalNameForSub, // Use the actual original name for rewrite context
-          substitution: substitution // Store the full substitution object
-      });
-
-      setDisplayIngredients(prevIngredients => {
-         if (!prevIngredients) return prevIngredients;
-         const newIngredients = [...prevIngredients];
-         
-         // Update the ingredient at the found index
-         newIngredients[index] = {
-             ...newIngredients[index], // Keep other potential fields
-             name: `${substitution.name} (substituted for ${originalNameForSub})`, // Update name
-             amount: substitution.amount != null ? String(substitution.amount) : null, // Use suggestion's amount (convert to string if number)
-             unit: substitution.unit || null, // Use suggestion's unit
-             suggested_substitutions: null 
-         };
-         return newIngredients;
-      });
-
-      // Close modal (Should be reached if no errors above)
-      console.log("Closing modal and clearing states..."); // <-- Added Log
-      setSubstitutionModalVisible(false);
-      setSelectedIngredientOriginalData(null); // Clear original data state
-      setProcessedSubstitutionsForModal(null); // Clear processed suggestions
+    setSubstitutionModalVisible(false);
+    setSelectedIngredientOriginalData(null);
+    setProcessedSubstitutionsForModal(null);
   };
 
   // --- RENDER LOGIC --- 
@@ -422,33 +445,11 @@ export default function IngredientsScreen() {
                         {/* Display Name (already includes substitution info if applied) */}
                         {String(ingredient.name)}
                         {/* Display Quantity/Unit */}
-                        {(ingredient.amount || ingredient.unit) && (() => { // Use IIFE to calculate formatted amount
-                          let displayAmount = '';
-                          if (ingredient.amount) {
-                            const numAmount = Number(ingredient.amount);
-                            // Round based on magnitude
-                            let roundedAmount;
-                            if (numAmount >= 10) {
-                                // If amount is 10 or more, round to nearest whole number
-                                roundedAmount = Math.round(numAmount);
-                            } else {
-                                // Otherwise, round to 2 decimal places for potential fractions
-                                roundedAmount = Math.round(numAmount * 100) / 100;
-                            }
-                            displayAmount = formatMeasurement(roundedAmount);
-                          }
-                          const displayUnit = ingredient.unit ? ` ${abbreviateUnit(ingredient.unit)}` : '';
-                          
-                          // Only render the parenthetical part if there is content
-                          if (displayAmount || displayUnit) {
-                             return (
-                               <Text style={styles.ingredientQuantityParenthetical}>
-                                 {` (${displayAmount}${displayUnit})`}
-                               </Text>
-                             );
-                          }
-                          return null;
-                        })()}
+                        {(ingredient.amount || ingredient.unit) && (
+                          <Text style={styles.ingredientQuantityParenthetical}>
+                            {` (${ingredient.amount || ''}${ingredient.unit ? ` ${abbreviateUnit(ingredient.unit)}` : ''})`}
+                          </Text>
+                        )}
                       </Text>
 
                       {/* Substitution Button - Show only if NOT already substituted */}
@@ -589,33 +590,11 @@ export default function IngredientsScreen() {
                       {/* Display Name (already includes substitution info if applied) */}
                       {String(ingredient.name)}
                       {/* Display Quantity/Unit */}
-                      {(ingredient.amount || ingredient.unit) && (() => { // Use IIFE to calculate formatted amount
-                        let displayAmount = '';
-                        if (ingredient.amount) {
-                          const numAmount = Number(ingredient.amount);
-                          // Round based on magnitude
-                          let roundedAmount;
-                          if (numAmount >= 10) {
-                              // If amount is 10 or more, round to nearest whole number
-                              roundedAmount = Math.round(numAmount);
-                          } else {
-                              // Otherwise, round to 2 decimal places for potential fractions
-                              roundedAmount = Math.round(numAmount * 100) / 100;
-                          }
-                          displayAmount = formatMeasurement(roundedAmount);
-                        }
-                        const displayUnit = ingredient.unit ? ` ${abbreviateUnit(ingredient.unit)}` : '';
-                        
-                        // Only render the parenthetical part if there is content
-                        if (displayAmount || displayUnit) {
-                           return (
-                             <Text style={styles.ingredientQuantityParenthetical}>
-                               {` (${displayAmount}${displayUnit})`}
-                             </Text>
-                           );
-                        }
-                        return null;
-                      })()}
+                      {(ingredient.amount || ingredient.unit) && (
+                        <Text style={styles.ingredientQuantityParenthetical}>
+                          {` (${ingredient.amount || ''}${ingredient.unit ? ` ${abbreviateUnit(ingredient.unit)}` : ''})`}
+                        </Text>
+                      )}
                     </Text>
 
                     {/* Substitution Button - Show only if NOT already substituted */}
