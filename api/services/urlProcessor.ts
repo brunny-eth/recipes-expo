@@ -75,7 +75,7 @@ export async function fetchAndExtractFromUrl(
       }
       // --- END DEBUG LOG ---
 
-      if (!extractedContent.ingredientsText || !extractedContent.instructionsText) {
+      if (extractedContent && (!extractedContent.ingredientsText || !extractedContent.instructionsText)) {
           console.warn(`[${requestId}] Failed to extract clear ingredients or instructions using cheerio for URL: ${url}. Proceeding with partial data.`);
       } else {
           console.log(`[${requestId}] Successfully extracted content sections for URL: ${url}.`);
