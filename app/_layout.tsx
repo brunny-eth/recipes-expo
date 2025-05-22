@@ -1,3 +1,4 @@
+import React from 'react';
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -5,6 +6,7 @@ import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { useFonts, Poppins_400Regular, Poppins_500Medium, Poppins_600SemiBold, Poppins_700Bold } from '@expo-google-fonts/poppins';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { COLORS } from '@/constants/theme';
+import { ErrorModalProvider } from '@/context/ErrorModalContext';
 
 export default function RootLayout() {
   useFrameworkReady();
@@ -25,18 +27,20 @@ export default function RootLayout() {
   }
 
   return (
-    <>
-      <Stack screenOptions={{ 
-        headerShown: false,
-        contentStyle: { backgroundColor: COLORS.background }
-      }}>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="recipe/ingredients" options={{ presentation: 'card' }} />
-        <Stack.Screen name="recipe/steps" options={{ presentation: 'card' }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
-    </>
+    <ErrorModalProvider>
+      <>
+        <Stack screenOptions={{ 
+          headerShown: false,
+          contentStyle: { backgroundColor: COLORS.background }
+        }}>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="recipe/ingredients" options={{ presentation: 'card' }} />
+          <Stack.Screen name="recipe/steps" options={{ presentation: 'card' }} />
+          <Stack.Screen name="+not-found" />
+        </Stack>
+        <StatusBar style="auto" />
+      </>
+    </ErrorModalProvider>
   );
 }
 

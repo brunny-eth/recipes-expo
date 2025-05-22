@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Play, Pause, RotateCcw } from 'lucide-react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
 
 // Props expected from the parent (StepsScreen)
@@ -56,13 +56,13 @@ export default function TimerTool({
           disabled={timeRemaining === 0 && !isActive}
         >
           {isActive ? (
-            <Pause size={32} color={COLORS.textDark} />
+            <MaterialCommunityIcons name="pause" size={32} color={COLORS.textDark} />
           ) : (
-            <Play size={32} color={timeRemaining === 0 ? COLORS.darkGray : COLORS.textDark} />
+            <MaterialCommunityIcons name="play" size={32} color={timeRemaining === 0 ? COLORS.darkGray : COLORS.textDark} />
           )}
         </TouchableOpacity>
         <TouchableOpacity style={styles.controlButton} onPress={handleReset}>
-          <RotateCcw size={32} color={COLORS.textDark} />
+          <MaterialCommunityIcons name="replay" size={32} color={COLORS.textDark} />
         </TouchableOpacity>
       </View>
     </View>

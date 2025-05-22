@@ -9,7 +9,7 @@ import {
   SafeAreaView,
   Modal,
 } from 'react-native';
-import { X, SlidersHorizontal } from 'lucide-react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -77,7 +77,8 @@ export default function ToolsModal({
                {/* <SlidersHorizontal size={22} color={COLORS.textDark} /> */}
               <Text style={styles.title}>Tools</Text>
               <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-                <X size={24} color={COLORS.textDark} />
+                {/* <X size={24} color={COLORS.textDark} /> */}
+                <MaterialCommunityIcons name="close" size={24} color={COLORS.textDark} />
               </TouchableOpacity>
             </View>
 
@@ -87,7 +88,7 @@ export default function ToolsModal({
                 timeRemaining={timeRemaining}
                 isActive={isActive}
                 formatTime={formatTime}
-                addTime={addTime}
+                addSeconds={addTime}
                 handleStartPause={handleStartPause}
                 handleReset={handleReset}
               />

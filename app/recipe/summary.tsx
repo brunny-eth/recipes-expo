@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, ChevronRight, Clock } from 'lucide-react-native'; // Removed Zap, PieChart
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { COLORS } from '@/constants/theme';
 import { scaleIngredient, parseServingsValue, getScaledYieldText } from '@/utils/recipeUtils'; // Correct import path assuming utils is under root/src or similar alias
 import { StructuredIngredient } from '@/api/types';
 import { coerceToStructuredIngredients } from '@/utils/ingredientHelpers'; // Import the new helper
+import { useErrorModal } from '@/context/ErrorModalContext'; // Added import
+import InlineErrorBanner from '@/components/InlineErrorBanner'; // Import the new component
 
 // --- Define Types (Matching Backend Output) ---
 // Re-define types here or import from a shared types file
@@ -37,35 +39,56 @@ type IngredientsNavParams = {
 export default function RecipeSummaryScreen() {
   const params = useLocalSearchParams<{ recipeData?: string }>();
   const router = useRouter();
+  const { showError } = useErrorModal(); // Added hook usage
   
   const [recipe, setRecipe] = useState<ParsedRecipe | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   
   // NEW state for original yield value and selected scale factor
   const [originalYieldValue, setOriginalYieldValue] = useState<number | null>(null);
   const [selectedScaleFactor, setSelectedScaleFactor] = useState<number>(1.0); // Default to 1x
 
   useEffect(() => {
+    setIsLoading(true); // Start loading
+    setRecipe(null); // Reset recipe on new data
+
     if (params.recipeData) {
       try {
         const parsed = JSON.parse(params.recipeData) as ParsedRecipe;
+        if (!parsed || typeof parsed !== 'object' || Object.keys(parsed).length === 0) { // Added check for empty/invalid parsed object
+          console.error("Parsed recipe data is empty or invalid on summary screen.");
+          showError({
+            title: "Error Loading Summary",
+            message: "Recipe data is invalid. Please go back and try again."
+          });
+          setIsLoading(false);
+          return;
+        }
         setRecipe(parsed);
         
-        // Use the new parseServingsValue helper
         const yieldNum = parseServingsValue(parsed.recipeYield); 
-        setOriginalYieldValue(yieldNum); // Store the parsed numeric yield (can be null)
-        setSelectedScaleFactor(1.0); // Reset scale factor when recipe changes
+        setOriginalYieldValue(yieldNum);
+        setSelectedScaleFactor(1.0);
 
-      } catch (e) {
+      } catch (e: any) {
         console.error("Failed to parse recipe data on summary screen:", e);
-        setError("Could not load recipe details.");
+        showError({
+          title: "Error Loading Summary",
+          message: `Could not load recipe details: ${e.message}. Please go back and try again.`
+        });
+        setIsLoading(false); // Ensure loading is false on error
+        return; // Prevent further processing
       }
     } else {
-      setError("Recipe data not provided.");
+      showError({
+        title: "Error Loading Summary",
+        message: "Recipe data not provided. Please go back and try again."
+      });
+      setIsLoading(false); // Ensure loading is false on error
+      return; // Prevent further processing
     }
-    setIsLoading(false);
-  }, [params.recipeData]);
+    setIsLoading(false); // Finish loading successfully
+  }, [params.recipeData, showError, router]); // Added showError and router
 
   const handleScaleFactorChange = (factor: number) => {
     setSelectedScaleFactor(factor);
@@ -102,7 +125,8 @@ export default function RecipeSummaryScreen() {
     router.push({
       pathname: '/recipe/ingredients',
       params: { 
-        recipeData: JSON.stringify(navParams)
+        recipeData: JSON.stringify(navParams) // Reverted to original
+        // recipeData: "this is not valid json for ingredients" // Temporary change for testing
       }
     });
   };
@@ -115,13 +139,13 @@ export default function RecipeSummaryScreen() {
       );
   }
 
-  if (error || !recipe) {
+  if (!recipe) { 
       return (
         <SafeAreaView style={styles.centeredStatusContainer}>
-          <Text style={styles.errorText}>{error || 'Recipe data could not be loaded.'}</Text>
-          <TouchableOpacity style={styles.backButtonSimple} onPress={() => router.canGoBack() ? router.back() : router.replace('/')}>
-               <Text style={styles.backButtonText}>Go Back</Text>
-           </TouchableOpacity>
+           <InlineErrorBanner 
+                message="Could not load recipe summary. The data might be missing or corrupted."
+                showGoBackButton={true}
+            />
         </SafeAreaView>
       );
   }
@@ -145,7 +169,7 @@ export default function RecipeSummaryScreen() {
       {/* Header */} 
       <View style={styles.header}>
          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-           <ArrowLeft size={24} color={COLORS.textDark} />
+           <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textDark} />
          </TouchableOpacity>
          <Text style={styles.headerTitle} numberOfLines={1} ellipsizeMode="tail">{recipe.title || 'Recipe Summary'}</Text>
          <View style={{ width: 40 }} /> 
@@ -191,21 +215,21 @@ export default function RecipeSummaryScreen() {
              <View style={[styles.infoBox, styles.timeInfoBox]}>
                  {recipe.prepTime && (
                      <View style={styles.infoItem}>
-                         <Clock size={20} color={COLORS.secondary} />
+                         <MaterialCommunityIcons name="clock-outline" size={20} color={COLORS.secondary} />
                          <Text style={styles.infoValue}>{recipe.prepTime}</Text>
                          <Text style={styles.infoLabel}>Prep Time</Text>
                      </View>
                  )}
                  {recipe.cookTime && (
                       <View style={styles.infoItem}>
-                         <Clock size={20} color={COLORS.secondary} />
+                         <MaterialCommunityIcons name="clock-outline" size={20} color={COLORS.secondary} />
                          <Text style={styles.infoValue}>{recipe.cookTime}</Text>
                          <Text style={styles.infoLabel}>Cook Time</Text>
                       </View>
                  )}
                   {recipe.totalTime && (
                       <View style={styles.infoItem}>
-                         <Clock size={20} color={COLORS.secondary} />
+                         <MaterialCommunityIcons name="clock-outline" size={20} color={COLORS.secondary} />
                          <Text style={styles.infoValue}>{recipe.totalTime}</Text>
                          <Text style={styles.infoLabel}>Total Time</Text>
                       </View>
@@ -219,7 +243,7 @@ export default function RecipeSummaryScreen() {
       <View style={styles.footer}>
         <TouchableOpacity style={styles.nextButton} onPress={navigateToIngredients}>
             <Text style={styles.nextButtonText}>Go to Ingredients</Text>
-            <ChevronRight size={20} color={COLORS.white} />
+            <MaterialCommunityIcons name="chevron-right" size={20} color={COLORS.white} />
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -245,13 +269,14 @@ const styles = StyleSheet.create({
   headerTitle: {
       flex: 1,
       textAlign: 'center',
-      fontFamily: 'Poppins-SemiBold',
+      fontFamily: 'Poppins-Bold',
       fontSize: 18,
       color: COLORS.textDark,
       marginHorizontal: 5,
   },
   scrollContent: {
-      padding: 20,
+      paddingHorizontal: 20,
+      paddingBottom: Platform.OS === 'ios' ? 100 : 80, // Ensure space for the footer button
   },
   infoBox: {
       flexDirection: 'row',
@@ -283,14 +308,15 @@ const styles = StyleSheet.create({
   infoLabel: {
       fontFamily: 'Poppins-Regular',
       fontSize: 12,
-      color: COLORS.textGray,
+      color: COLORS.gray,
       marginTop: 2,
   },
   sectionTitle: {
       fontFamily: 'Poppins-SemiBold',
       fontSize: 18,
       color: COLORS.textDark,
-      marginBottom: 15,
+      marginTop: 24,
+      marginBottom: 12,
   },
   servingsContainer: {
       flexDirection: 'row',
@@ -321,10 +347,11 @@ const styles = StyleSheet.create({
   },
   originalYieldText: {
       fontFamily: 'Poppins-Regular',
-      fontSize: 12,
-      color: COLORS.textGray,
+      fontSize: 13,
+      color: COLORS.gray,
       textAlign: 'center',
-      marginBottom: 25,
+      marginTop: 8,
+      marginBottom: 16,
   },
   footer: { /* Similar to other footers */
     padding: 20,
@@ -374,9 +401,11 @@ const styles = StyleSheet.create({
   },
   servingQuestionPrompt: {
     fontFamily: 'Poppins-Regular',
-    fontSize: 16,
-    color: COLORS.textDark,
-    marginBottom: 10,
+    fontSize: 15,
+    color: COLORS.gray,
+    marginBottom: 16,
+    lineHeight: 22,
+    textAlign: 'center',
   },
   // Add styles for loading/error states if needed
 }); 

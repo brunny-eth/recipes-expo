@@ -1,22 +1,24 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, SafeAreaView, Platform, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, SafeAreaView, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, CircleCheck as CheckCircle2, Hammer as ToolsIcon } from 'lucide-react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 import { COLORS } from '@/constants/theme';
 import ToolsModal from '@/components/ToolsModal';
 import MiniTimerDisplay from '@/components/MiniTimerDisplay';
 import { ActiveTool } from '@/components/ToolsModal';
+import { useErrorModal } from '@/context/ErrorModalContext';
+import InlineErrorBanner from '@/components/InlineErrorBanner';
 
 export default function StepsScreen() {
   const params = useLocalSearchParams<{ recipeData?: string }>();
   const router = useRouter();
+  const { showError } = useErrorModal();
   
   const [recipeTitle, setRecipeTitle] = useState<string | null>(null);
   const [instructions, setInstructions] = useState<string[]>([]);
   const [substitutions, setSubstitutions] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [completedSteps, setCompletedSteps] = useState<{[key: number]: boolean}>({});
   const [isToolsPanelVisible, setIsToolsPanelVisible] = useState(false);
   const [initialToolToShow, setInitialToolToShow] = useState<ActiveTool>(null);
@@ -24,12 +26,11 @@ export default function StepsScreen() {
   // --- Lifted Timer State --- 
   const [timerTimeRemaining, setTimerTimeRemaining] = useState(0); // Time in seconds
   const [isTimerActive, setIsTimerActive] = useState(false);
-  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const timerIntervalRef = useRef<number | null>(null);
   // --- End Lifted Timer State ---
   
   useEffect(() => {
     setIsLoading(true);
-    setError(null);
     try {
       if (params.recipeData) {
         const parsedData = JSON.parse(params.recipeData) as {
@@ -50,18 +51,28 @@ export default function StepsScreen() {
         setRecipeTitle(parsedData.title || 'Instructions'); 
 
       } else {
-        setError("Recipe data not provided to steps screen.");
+        showError({
+          title: "Error Loading Steps",
+          message: "Recipe data was not provided. Please go back and try again."
+        });
         setInstructions([]);
         setSubstitutions(null);
+        setIsLoading(false);
+        return;
       }
     } catch (e: any) {
         console.error("Failed to parse recipe data on steps screen:", e);
-        setError(`Could not load recipe data: ${e.message}`);
+        showError({
+          title: "Error Loading Steps",
+          message: `Could not load recipe data: ${e.message}. Please go back and try again.`
+        });
         setInstructions([]);
         setSubstitutions(null);
+        setIsLoading(false);
+        return;
     }
     setIsLoading(false);
-  }, [params.recipeData]);
+  }, [params.recipeData, showError, router]);
 
   // --- Lifted Timer Logic --- 
   const formatTime = (seconds: number) => {
@@ -85,7 +96,7 @@ export default function StepsScreen() {
       setIsTimerActive(false);
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
       // Optional: Add sound/vibration feedback here
-      Alert.alert("Timer Finished!"); 
+      showError({ title: "Timer", message: "Time's up!" });
     }
 
     // Cleanup interval
@@ -94,7 +105,7 @@ export default function StepsScreen() {
         clearInterval(timerIntervalRef.current);
       }
     };
-  }, [isTimerActive, timerTimeRemaining]);
+  }, [isTimerActive, timerTimeRemaining, showError]);
 
   const handleTimerStartPause = () => {
     if (timerTimeRemaining > 0) {
@@ -119,17 +130,6 @@ export default function StepsScreen() {
     return (
       <SafeAreaView style={styles.centeredStatusContainer}>
         <ActivityIndicator size="large" color={COLORS.primary} />
-      </SafeAreaView>
-    );
-  }
-
-  if (error) {
-    return (
-      <SafeAreaView style={styles.centeredStatusContainer}>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.backButtonSimple} onPress={() => router.back()}>
-          <Text style={styles.backButtonText}>Go Back</Text>
-        </TouchableOpacity>
       </SafeAreaView>
     );
   }
@@ -163,11 +163,11 @@ export default function StepsScreen() {
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <ArrowLeft size={24} color={COLORS.raisinBlack} />
+          <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.raisinBlack} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{recipeTitle || 'Instructions'}</Text>
         <TouchableOpacity style={styles.toolsButton} onPress={() => openToolsModal()}>
-            <ToolsIcon size={24} color={COLORS.raisinBlack} />
+            <MaterialCommunityIcons name="tools" size={24} color={COLORS.raisinBlack} />
         </TouchableOpacity>
       </Animated.View>
       
@@ -188,7 +188,7 @@ export default function StepsScreen() {
                     completedSteps[index] && styles.stepNumberCompleted,
                   ]}>
                     {completedSteps[index] ? (
-                      <CheckCircle2 size={24} color={COLORS.white} />
+                      <MaterialCommunityIcons name="check-circle" size={24} color={COLORS.white} />
                     ) : (
                       <Text style={styles.stepNumberText}>
                         {index + 1}
@@ -229,7 +229,12 @@ export default function StepsScreen() {
               </Animated.View>
             ))
           ) : (
-            <Text style={styles.placeholderText}>No instructions found.</Text>
+            <View style={styles.centeredStatusContainerForBanner}> 
+              <InlineErrorBanner 
+                message="Could not load recipe steps. Data might be missing or invalid."
+                showGoBackButton={true}
+              />
+            </View>
           )}
         
         {substitutions && (
@@ -363,7 +368,7 @@ const styles = StyleSheet.create({
     lineHeight: 22, 
   },
   stepTextCompleted: {
-    color: COLORS.textGray,
+    color: COLORS.gray,
     textDecorationLine: 'line-through',
   },
   markCompleteButton: {
@@ -422,26 +427,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.background, 
   },
-  errorText: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 16,
-    color: COLORS.error,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  backButtonSimple: {
-     marginTop: 15,
-     paddingVertical: 10,
-     paddingHorizontal: 20,
-     backgroundColor: COLORS.lightGray,
-     borderRadius: 8,
-  },
-  backButtonText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 16,
-    color: COLORS.textDark,
+  centeredStatusContainerForBanner: {
+    flex: 1,
+    justifyContent: 'flex-start',
+    alignItems: 'stretch',
+    paddingTop: 20,
   },
   placeholderText: {
     fontFamily: 'Poppins-Italic',

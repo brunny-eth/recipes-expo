@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator, Platform, Alert, Modal, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, ChevronRight, X } from 'lucide-react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { COLORS } from '@/constants/theme';
 import IngredientSubstitutionModal from './IngredientSubstitutionModal';
@@ -10,6 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { formatMeasurement } from '@/utils/format';
 import { coerceToStructuredIngredients } from '@/utils/ingredientHelpers';
 import { getScaledYieldText, scaleIngredient, parseAmountString, formatAmountNumber } from '@/utils/recipeUtils';
+import { useErrorModal } from '@/context/ErrorModalContext';
 
 // --- Types ---
 // Added SubstitutionSuggestion type matching backend/modal
@@ -87,10 +88,10 @@ const SAMPLE_RECIPES: Record<string, Recipe> = { ... };
 export default function IngredientsScreen() {
   const params = useLocalSearchParams<{ recipeData?: string }>();
   const router = useRouter();
+  const { showError } = useErrorModal();
   
   const [navData, setNavData] = useState<IngredientsNavParams | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [checkedIngredients, setCheckedIngredients] = useState<{ [key: number]: boolean }>({});
   const [substitutionModalVisible, setSubstitutionModalVisible] = useState(false);
   const [selectedIngredient, setSelectedIngredient] = useState<StructuredIngredient | null>(null);
@@ -140,26 +141,48 @@ export default function IngredientsScreen() {
   }, []);
 
   useEffect(() => {
-    setIsLoading(true); 
-    if (params.recipeData) {
+    setIsLoading(true);
+    setNavData(null); // Reset navData on new params
+
+    if (params.recipeData && typeof params.recipeData === 'string') { // Ensure it exists and is a string
       try {
-        console.log("[IngredientsScreen] Raw recipeData param:", params.recipeData);
+        console.log("[IngredientsScreen] Attempting to parse recipeData param:", params.recipeData);
         const parsedNavData = JSON.parse(params.recipeData) as IngredientsNavParams;
-        console.log("[IngredientsScreen] Parsed Nav Data:", JSON.stringify(parsedNavData, null, 2)); 
+        // console.log("[IngredientsScreen] Parsed Nav Data:", JSON.stringify(parsedNavData, null, 2)); 
+
+        if (!parsedNavData || typeof parsedNavData !== 'object' || Object.keys(parsedNavData).length === 0) {
+          console.error("[IngredientsScreen] Parsed nav data is empty or invalid. Original data:", params.recipeData);
+          showError({
+            title: "Error Loading Ingredients",
+            message: "Ingredient data is invalid. Please go back and try again."
+          });
+          setIsLoading(false);
+          return;
+        }
+
         setNavData(parsedNavData);
         setAppliedSubstitution(null); 
         setCheckedIngredients({}); 
-        setError(null);
-      } catch (e) {
-        console.error("Failed to parse recipe data:", e);
-        setError("Could not load recipe data.");
-        setNavData(null); 
+      } catch (e: any) { 
+        console.error(`[IngredientsScreen] Failed to parse recipeData. Error: ${e.message}. Raw data:`, params.recipeData);
+        showError({
+            title: "Error Loading Ingredients",
+            message: `Could not load ingredient data: ${e.message}. Please go back and try again.`
+        });
+        setIsLoading(false);
+        return;
       }
     } else {
-      setError("Recipe data not provided.");
+      console.error("[IngredientsScreen] Recipe data not provided or not a string in params. Received:", params.recipeData);
+      showError({
+        title: "Error Loading Ingredients",
+        message: "Recipe data not provided. Please go back and try again."
+      });
+      setIsLoading(false);
+      return;
     }
     setIsLoading(false); 
-  }, [params.recipeData]);
+  }, [params.recipeData, showError, router]);
 
   const navigateToNextScreen = useCallback(async () => {
     if (!navData || !displayIngredients) { 
@@ -192,7 +215,10 @@ export default function IngredientsScreen() {
         else throw new Error("Invalid format for rewritten instructions.");
       } catch (rewriteError) {
         console.error("Error rewriting instructions:", rewriteError);
-        Alert.alert("Rewrite Failed", `Could not adjust instructions for substitution. Proceeding with previous version.`);
+        showError({ 
+          title: "Update Failed", 
+          message: "We couldn't update the recipe steps for the ingredient substitution. The original steps will be used."
+        });
       } finally {
         setIsRewriting(false);
       }
@@ -221,7 +247,10 @@ export default function IngredientsScreen() {
              } else throw new Error("Invalid format for scaled instructions.");
         } catch (scalingError) {
             console.error("Error scaling instructions:", scalingError);
-            Alert.alert("Instruction Scaling Failed", `Could not automatically scale instruction quantities. Proceeding with unscaled quantities in text.`);
+            showError({
+              title: "Update Failed",
+              message: "We couldn't automatically adjust ingredient quantities in the recipe steps. The original quantities will be shown."
+            });
         } finally {
             setIsScalingInstructions(false);
         }
@@ -243,7 +272,7 @@ export default function IngredientsScreen() {
         })
       }
     });
-  }, [navData, displayIngredients, appliedSubstitution, router]);
+  }, [navData, displayIngredients, appliedSubstitution, router, showError]);
 
   const toggleCheckIngredient = (index: number) => {
     setCheckedIngredients(prev => ({
@@ -389,156 +418,27 @@ export default function IngredientsScreen() {
     setProcessedSubstitutionsForModal(null);
   };
 
-  // --- RENDER LOGIC --- 
-  // --- Log #3: Check state right before render --- 
-  console.log("[IngredientsScreen] displayIngredients state before render:", JSON.stringify(displayIngredients, null, 2));
-
   // --- Conditional Rendering (SHOULD BE AFTER ALL HOOKS) ---
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <Animated.View entering={FadeIn.duration(300)} style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <ArrowLeft size={24} color={COLORS.raisinBlack} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle} numberOfLines={1}>{navData?.title || 'Ingredients'}</Text>
-          <View style={styles.placeholder} />
-        </Animated.View>
-        
-        <ScrollView style={styles.ingredientsList} showsVerticalScrollIndicator={false}>
-          {navData && navData.scaleFactor !== 1 && (
-            <View style={styles.scaleInfoBanner}>
-              <Text style={styles.scaleInfoText}>
-                {`Showing ingredients for: ${getScaledYieldText(navData.originalYieldDisplay, navData.scaleFactor)}`}
-              </Text>
-            </View>
-          )}
-
-          {displayIngredients && displayIngredients.length > 0 ? (
-              displayIngredients.map((ingredient, index) => {
-                const isChecked = !!checkedIngredients[index];
-                // Check if this specific ingredient is the one that was substituted
-                const isSubstituted = appliedSubstitution?.originalIndex === index;
-                
-                return (
-                  <TouchableOpacity 
-                    key={`ing-${index}`} 
-                    style={[styles.ingredientItemContainer, isSubstituted && styles.ingredientItemSubstituted]}
-                    onPress={() => toggleCheckIngredient(index)}
-                    activeOpacity={0.7} 
-                  >
-                    {/* Checkbox Visual */}
-                    <View 
-                      style={[styles.checkboxBase, isChecked && styles.checkboxChecked]}
-                      testID={`checkbox-${ingredient.name}`}
-                    >
-                      {isChecked && <View style={styles.checkboxInnerCheck} />}
-                    </View>
-                    
-                    {/* Ingredient Text Container - Using combined structure */}
-                    <View style={styles.ingredientNameContainer}> 
-                      {/* Combined Text Element */}
-                      <Text style={[styles.ingredientName, isChecked && styles.ingredientTextChecked, isSubstituted && styles.ingredientNameSubstituted]} numberOfLines={0}> 
-                        {/* Display Name (already includes substitution info if applied) */}
-                        {String(ingredient.name)}
-                        {/* Display Quantity/Unit */}
-                        {(ingredient.amount || ingredient.unit) && (
-                          <Text style={styles.ingredientQuantityParenthetical}>
-                            {` (${ingredient.amount || ''}${ingredient.unit ? ` ${abbreviateUnit(ingredient.unit)}` : ''})`}
-                          </Text>
-                        )}
-                      </Text>
-
-                      {/* Substitution Button - Show only if NOT already substituted */}
-                      {!isSubstituted && 
-                       ingredient.suggested_substitutions && 
-                       ingredient.suggested_substitutions.length > 0 && 
-                       ingredient.suggested_substitutions.some(sub => sub && sub.name != null) && (
-                        <TouchableOpacity 
-                          style={styles.infoButton}
-                          onPress={() => openSubstitutionModal(ingredient)}
-                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                          testID={`substitution-button-${ingredient.name}`}
-                        >
-                          <Text style={styles.infoButtonText}>S</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })
-            ) : (
-              <Text style={styles.placeholderText}>No ingredients found.</Text>
-            )}
-        </ScrollView>
-
-        <View style={styles.footer}>
-          <Pressable 
-            style={[
-              styles.nextButton, 
-              (isRewriting || isScalingInstructions) && styles.nextButtonDisabled
-            ]}
-            onPress={navigateToNextScreen}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            disabled={isRewriting || isScalingInstructions}
-          >
-            {(isRewriting || isScalingInstructions) && (
-              <ActivityIndicator size="small" color={COLORS.white} style={{ marginRight: 8 }}/>
-            )}
-            <Text style={styles.nextButtonText}>
-              {isRewriting ? 'Adjusting Steps...' : isScalingInstructions ? 'Scaling Steps...' : 'Go to Steps'}
-            </Text>
-            {!(isRewriting || isScalingInstructions) && <ChevronRight size={20} color={COLORS.white} />}
-          </Pressable>
-        </View>
-
-        {/* Substitution Modal - Pass processed suggestions */}
-        {selectedIngredientOriginalData && (
-          <IngredientSubstitutionModal
-            visible={substitutionModalVisible}
-            onClose={() => {
-              setSubstitutionModalVisible(false);
-              setSelectedIngredientOriginalData(null); // Clear original data state
-              setProcessedSubstitutionsForModal(null); // Clear processed suggestions
-            }}
-            ingredientName={selectedIngredientOriginalData.name} // Use name from original data
-            substitutions={processedSubstitutionsForModal} // Pass the scaled suggestions
-            onApply={handleApplySubstitution}
-          />
-        )}
-
-        {/* Help Modal */}
-        <Modal
-          visible={isHelpModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setIsHelpModalVisible(false)} // For Android back button
-        >
-          <Pressable 
-            style={styles.helpModalBackdrop} 
-            onPress={() => setIsHelpModalVisible(false)} // Dismiss on backdrop press
-          >
-            <Pressable style={styles.helpModalContent} onPress={() => {}}> 
-              {/* Prevent backdrop press from triggering through content */}
-              <Text style={styles.helpModalText}>
-                Tip: substitute out an ingredient in the recipe by clicking the S next to the ingredient name. The recipe will adjust accordingly!
-              </Text>
-              <TouchableOpacity 
-                style={styles.helpModalCloseButton} 
-                onPress={() => setIsHelpModalVisible(false)}
-              >
-                <X size={20} color={COLORS.textDark} />
-              </TouchableOpacity>
-            </Pressable>
-          </Pressable>
-        </Modal>
-
+      <SafeAreaView style={styles.centeredStatusContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
       </SafeAreaView>
     );
   }
+
+  if (!navData) {
+    return (
+      <SafeAreaView style={styles.centeredStatusContainer}>
+        <TouchableOpacity style={styles.backButtonSimple} onPress={() => router.canGoBack() ? router.back() : router.replace('/')}>
+            <Text style={styles.backButtonText}>Go Back</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
+  // --- RENDER LOGIC (assuming navData is available) --- 
+  console.log("[IngredientsScreen] displayIngredients state before render:", JSON.stringify(displayIngredients, null, 2));
 
   return (
     <SafeAreaView style={styles.container}>
@@ -547,7 +447,7 @@ export default function IngredientsScreen() {
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <ArrowLeft size={24} color={COLORS.raisinBlack} />
+          <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{navData?.title || 'Ingredients'}</Text>
         <View style={styles.placeholder} />
@@ -636,7 +536,7 @@ export default function IngredientsScreen() {
           <Text style={styles.nextButtonText}>
             {isRewriting ? 'Adjusting Steps...' : isScalingInstructions ? 'Scaling Steps...' : 'Go to Steps'}
           </Text>
-          {!(isRewriting || isScalingInstructions) && <ChevronRight size={20} color={COLORS.white} />}
+          {!(isRewriting || isScalingInstructions) && <MaterialCommunityIcons name="chevron-right" size={20} color={COLORS.white} />}
         </Pressable>
       </View>
 
@@ -675,7 +575,7 @@ export default function IngredientsScreen() {
               style={styles.helpModalCloseButton} 
               onPress={() => setIsHelpModalVisible(false)}
             >
-              <X size={20} color={COLORS.textDark} />
+              <MaterialCommunityIcons name="close" size={20} color={COLORS.textDark} />
             </TouchableOpacity>
           </Pressable>
         </Pressable>

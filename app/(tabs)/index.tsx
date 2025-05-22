@@ -6,9 +6,10 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, Keyboard, A
 import { useRouter, useNavigation } from 'expo-router';
 import Animated, { FadeIn, FadeInDown, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
 import { COLORS } from '@/constants/theme';
-import { ArrowRight } from 'lucide-react-native';
 import ChefIcon from '@/assets/images/Chef.svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useErrorModal } from '@/context/ErrorModalContext';
+import { useHandleError } from '@/hooks/useHandleError';
 
 export default function HomeScreen() {
   const [recipeUrl, setRecipeUrl] = useState('');
@@ -17,6 +18,8 @@ export default function HomeScreen() {
   const navigation = useNavigation();
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const { showError } = useErrorModal();
+  const handleError = useHandleError();
 
   // Reset loading state when component mounts
   useEffect(() => {
@@ -61,73 +64,67 @@ export default function HomeScreen() {
   }, []);
 
   const handleSubmit = async () => {
-    // --- REMOVE Strict URL Validation, keep only a basic check for non-empty input ---
-    // const urlPattern = new RegExp('^(https?:\\/\\/)?'+
-    // '((([a-z\\d]([a-z\\d-]*[a-z\\d])*)\\.?)+[a-z]{2,}|((\\d{1,3}\\.){3}\\d{1,3}))'+
-    // '(\\:\\d+)?(\\/[-a-z\\d%_.~+]*)*'+
-    // '(\\?[;&a-z\\d%_.~+=-]*)?'+
-    // '(\\#[-a-z\\d_]*)?$','i');
-
-    // if (!recipeUrl || !urlPattern.test(recipeUrl)) {
-    //     Alert.alert("Invalid Input", "Please enter a valid recipe URL starting with http:// or https://");
-    //     return; // Stop execution if validation fails
-    // }
-
     if (!recipeUrl || recipeUrl.trim() === '') {
-        Alert.alert("Input Required", "Please paste a recipe URL or recipe text.");
-        return; // Stop execution if input is empty
+        showError({ title: "Input Required", message: "Please paste a recipe URL or recipe text." });
+        return;
     }
-    // --- End Validation Update ---
-
-    // if (!recipeUrl) return; // This check is somewhat redundant now but safe to keep
-    // Renaming recipeUrl to recipeInput for clarity, though the state variable name remains recipeUrl
     const recipeInput = recipeUrl.trim();
-    
     Keyboard.dismiss();
     setIsLoading(true);
     
-    // TODO: Replace with your actual local IP and port if different
-    const backendUrl = 'http://192.168.1.99:3000/api/recipes/parse'; 
+    const baseBackendUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+    const endpoint = '/api/recipes/parse';
+    const backendUrl = `${baseBackendUrl}${endpoint}`;
 
     try {
-      console.log(`Sending request to: ${backendUrl} with URL: ${recipeInput}`);
+      console.log(`Sending request to: ${backendUrl} with input: ${recipeInput}`);
       const response = await fetch(backendUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json', // Added to signal we prefer JSON
         },
-        body: JSON.stringify({ input: recipeInput }), // Changed from url: recipeUrl to input: recipeInput
+        body: JSON.stringify({ input: recipeInput }),
       });
 
-      const result = await response.json();
-
       if (response.ok) {
-        console.log('Backend response:', JSON.stringify(result, null, 2));
-
-        if (result.recipe) {
-          console.log('Recipe data found in response.');
-          console.log("Attempting navigation to /recipe/summary..."); 
-          router.push({
-            pathname: '/recipe/summary',
-            params: { recipeData: JSON.stringify(result.recipe) }
-          });
-          console.log("Navigation call finished."); 
-        } else {
-          console.error("Parsed recipe data key ('recipe') is missing in the response object:", result);
-          alert('Error: Received incomplete recipe data from server.');
+        try {
+          const result = await response.json();
+          if (result.recipe) {
+            router.push({
+              pathname: '/recipe/summary',
+              params: { recipeData: JSON.stringify(result.recipe) }
+            });
+          } else {
+            console.error("Parsed recipe data key ('recipe') is missing in the response object:", result);
+            showError({ title: "Data Error", message: "Received incomplete recipe data from the server. Please check the format." });
+          }
+        } catch (jsonError: any) {
+          console.error("[HomeScreen] JSON parsing error even though response.ok was true. Status:", response.status, "Error:", jsonError);
+          const rawText = await response.text(); // Try to get raw text
+          console.error("[HomeScreen] Raw response text for jsonError:", rawText);
+          handleError(`Failed to parse server response: ${jsonError.message}. Server sent: ${rawText.substring(0,100)}...`, "ResponseParsingError");
         }
-
       } else {
-        console.error(`Backend responded with status: ${response.status}`);
-        console.error('Backend error:', result);
-        alert(`Error: ${result.error || 'Failed to parse recipe'}`);
+        const responseText = await response.text(); // Get text for non-ok responses
+        console.error(`[HomeScreen] Backend responded with status: ${response.status}. Response text:`, responseText);
+        // Try to parse as JSON if it might contain an error object, otherwise use the text
+        let backendErrorMsg = `Failed to process recipe (status ${response.status}).`;
+        try {
+          const errorJson = JSON.parse(responseText);
+          if (errorJson && errorJson.error) {
+            backendErrorMsg = errorJson.error;
+          }
+        } catch (e) {
+          // Not JSON, or no .error field, use the raw text if it's not too long
+          backendErrorMsg = responseText.length < 200 ? responseText : backendErrorMsg;
+        }
+        handleError(backendErrorMsg, "RecipeParsingBackend");
       }
-    } catch (error) {
-      console.error('Network error:', error);
-      // Handle network errors (e.g., server unreachable)
-      alert(`Network Error: ${error instanceof Error ? error.message : 'Could not connect to server'}`);
+    } catch (error: any) { // Catching network errors or other unexpected client-side errors
+      console.error("[HomeScreen] Catch all handleSubmit error:", error);
+      handleError(error, "RecipeParsingClient"); 
     } finally {
-      // Ensure loading state is turned off regardless of success or failure
       setIsLoading(false); 
     }
   };
@@ -193,7 +190,7 @@ export default function HomeScreen() {
                 onPress={handleSubmit}
                 disabled={!recipeUrl}
               >
-                <ArrowRight size={20} color={COLORS.white} />
+                <Text style={{color: COLORS.white}}>Go</Text>
               </TouchableOpacity>
             </View>
             <View style={{ flex: 1 }} />

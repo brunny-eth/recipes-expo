@@ -8,7 +8,7 @@ import {
   Pressable,
   SafeAreaView,
 } from 'react-native';
-import { X } from 'lucide-react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, {
   FadeIn,
   FadeOut,
@@ -107,7 +107,7 @@ export default function ToolsModal({
         <Pressable style={styles.centeredView} onPress={onClose}>
           <Pressable style={styles.modalView} onPress={(e) => e.stopPropagation()}>
             <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <X size={24} color={COLORS.darkGray} />
+              <MaterialCommunityIcons name="close" size={24} color={COLORS.darkGray} />
             </TouchableOpacity>
 
             <View style={styles.toolButtonContainer}>

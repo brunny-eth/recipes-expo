@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import { StyleSheet, Platform } from 'react-native';
-import { Bookmark as BookmarkIcon } from 'lucide-react-native';
+// import { Bookmark as BookmarkIcon } from 'lucide-react-native'; // Removed import
+import { MaterialCommunityIcons } from '@expo/vector-icons'; // Added import
 import { COLORS } from '@/constants/theme';
 import ChefIcon from '@/assets/images/Chef.svg';
 
@@ -19,14 +20,17 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color, size }) => <ChefIcon width={size} height={size} />,
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => <ChefIcon width={size} height={size} />,
         }}
       />
       <Tabs.Screen
         name="saved"
         options={{
           title: 'Saved',
-          tabBarIcon: ({ color, size }) => <BookmarkIcon size={size} color={color} />,
+          // tabBarIcon: ({ color, size }) => <BookmarkIcon size={size} color={color} />,
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
+            <MaterialCommunityIcons name="bookmark-outline" size={size} color={color} />
+          ),
         }}
       />
     </Tabs>

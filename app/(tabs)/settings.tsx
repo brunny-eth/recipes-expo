@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, Switch, TouchableOpacity, ScrollView } from 'react-native';
 import { useState } from 'react';
 import { COLORS } from '@/constants/theme';
-import { ExternalLink, Mail, Heart } from 'lucide-react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function SettingsScreen() {
   const [darkMode, setDarkMode] = useState(false);
@@ -56,22 +56,22 @@ export default function SettingsScreen() {
           
           <TouchableOpacity style={styles.linkRow}>
             <Text style={styles.linkText}>Privacy Policy</Text>
-            <ExternalLink size={20} color={COLORS.primary} />
+            <MaterialCommunityIcons name="open-in-new" size={20} color={COLORS.primary} />
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.linkRow}>
             <Text style={styles.linkText}>Terms of Service</Text>
-            <ExternalLink size={20} color={COLORS.primary} />
+            <MaterialCommunityIcons name="open-in-new" size={20} color={COLORS.primary} />
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.linkRow}>
             <Text style={styles.linkText}>Contact Us</Text>
-            <Mail size={20} color={COLORS.primary} />
+            <MaterialCommunityIcons name="email-outline" size={20} color={COLORS.primary} />
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.linkRow}>
             <Text style={styles.linkText}>Support Development</Text>
-            <Heart size={20} color={COLORS.primary} />
+            <MaterialCommunityIcons name="heart-outline" size={20} color={COLORS.primary} />
           </TouchableOpacity>
         </View>
         

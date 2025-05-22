@@ -12,7 +12,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { COLORS } from '@/constants/theme';
-import { Send } from 'lucide-react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { sendMessageToGemini } from '@/utils/geminiApi';
 
 interface Message {
@@ -143,7 +143,7 @@ export default function HelpTool({ recipeInstructions, recipeSubstitutions }: He
           editable={!isLoading}
         />
         <TouchableOpacity style={styles.sendButton} onPress={handleSend} disabled={isLoading}>
-          <Send size={24} color={isLoading ? COLORS.textGray : COLORS.primary} />
+          <MaterialCommunityIcons name="send" size={24} color={isLoading ? COLORS.textGray : COLORS.primary} />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>

@@ -1,25 +1,29 @@
 export const COLORS = {
-  raisinBlack: '#32292F',
-  tiffanyBlue: '#99E1D9',
-  mintCream: '#F0F7F4',
-  verdigris: '#70ABAF',
-  wenge: '#705D56',
+  raisinBlack: '#262322',
+  tiffanyBlue: '#A6E4D9',
+  mintCream: '#F2FBF9',
+  verdigris: '#5CA8A1',
+  wenge: '#645959',
 
-  primary: '#FF6B6B',
-  primaryLight: '#FFE2E2',
-  secondary: '#4ECDC4',
-  accent: '#FFD166',
+  primary: '#FF6347',
+  primaryLight: '#FF8A65',
+  secondary: '#4CAF50',
+  accent: '#FFC107',
   
-  background: '#F0F7F4',
+  background: '#FDFDFC',
   white: '#FFFFFF',
+  black: '#000000',
   
-  textDark: '#32292F',
-  textGray: '#888888',
+  textDark: '#333333',
+  textLight: '#FFFFFF',
   
-  lightGray: '#EEEEEE',
-  darkGray: '#666666',
+  lightGray: '#D3D3D3',
+  gray: '#808080',
   
-  success: '#4BB543',
-  error: '#FF3B30',
-  warning: '#FF9500',
+  darkGray: '#4F4F4F',
+  
+  error: '#D32F2F',
+  errorBackground: '#FFEBEE',
+  success: '#2E7D32',
+  warning: '#FFA000',
 };

@@ -8,7 +8,7 @@ import {
   ScrollView,
   Pressable,
 } from 'react-native';
-import { X } from 'lucide-react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, {
   FadeIn,
   FadeOut,
@@ -89,7 +89,7 @@ export default function IngredientSubstitutionModal({
           <View style={styles.header}>
             <Text style={styles.title}>Substitute {ingredientName}</Text>
             <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <X size={24} color={COLORS.textDark} />
+              <MaterialCommunityIcons name="close" size={24} color={COLORS.textDark} />
             </TouchableOpacity>
           </View>
 

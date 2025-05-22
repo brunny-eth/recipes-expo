@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { COLORS } from '@/constants/theme';
-import { Bookmark } from 'lucide-react-native';
+// import { Bookmark } from 'lucide-react-native'; // Removed import
 
 export default function SavedScreen() {
   return (
@@ -8,7 +8,8 @@ export default function SavedScreen() {
       <Text style={styles.title}>Saved Recipes</Text>
       
       <View style={styles.emptyContainer}>
-        <Bookmark size={48} color={COLORS.lightGray} />
+        {/* <Bookmark size={48} color={COLORS.lightGray} /> */}
+        <Text style={{fontSize: 24, color: COLORS.lightGray, marginBottom: 10}}>[BM]</Text> {/* Placeholder */}
         <Text style={styles.emptyText}>No saved recipes yet</Text>
         <Text style={styles.emptySubtext}>
           When you save a recipe, it will appear here for quick access

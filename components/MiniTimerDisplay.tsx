@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Timer } from 'lucide-react-native';
+// import { Timer } from 'lucide-react-native'; // Removed import
+import { MaterialCommunityIcons } from '@expo/vector-icons'; // Added import
 import { COLORS } from '@/constants/theme';
 
 interface MiniTimerDisplayProps {
@@ -12,7 +13,8 @@ interface MiniTimerDisplayProps {
 export default function MiniTimerDisplay({ timeRemaining, formatTime, onPress }: MiniTimerDisplayProps) {
   return (
     <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
-      <Timer size={18} color={COLORS.white} style={styles.icon}/>
+      {/* <Timer size={18} color={COLORS.white} style={styles.icon}/> */}
+      <MaterialCommunityIcons name="timer-outline" size={18} color={COLORS.white} style={styles.icon}/>
       <Text style={styles.timeText}>{formatTime(timeRemaining)}</Text>
     </TouchableOpacity>
   );

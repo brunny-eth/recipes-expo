@@ -118,6 +118,12 @@ router.post('/parse', async (req: Request, res: Response) => {
   // Add logging for incoming request body
   logger.info({ body: req.body, requestId: (req as any).id, route: req.originalUrl, method: req.method }, '[parse] Incoming request');
   try {
+    // ---- TEMPORARY TEST CODE: Force backend error ----
+    // logger.info({ requestId: (req as any).id, message: "FORCED BACKEND ERROR FOR TESTING /parse" });
+    // return res.status(500).json({ error: "Intentional backend test error" });
+    // ---- END TEMPORARY TEST CODE ----
+
+    // Original code restored
     const { input } = req.body;
     const requestId = (req as any).id;
 
@@ -126,11 +132,6 @@ router.post('/parse', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Missing or empty "input" in request body' });
     }
 
-    // Temporarily stub out parseAndCacheRecipe and return a simple success message
-    // logger.info({ requestId, route: req.originalUrl, method: req.method, inputReceived: input }, '[STUB] /parse route hit, returning stubbed success.');
-    // return res.json({ message: 'Stub parse success', input: req.body.input });
-
-    // Original logic - temporarily commented out
     if (!scraperApiKey) {
       logger.error({ requestId, route: req.originalUrl, method: req.method, nodeEnv: process.env.NODE_ENV }, 'Server configuration error: Missing ScraperAPI key for /parse.');
       return res.status(500).json({ error: 'Server configuration error: Missing ScraperAPI key.' });
@@ -153,13 +154,13 @@ router.post('/parse', async (req: Request, res: Response) => {
       fetchMethodUsed,
       recipe
     });
+    
   } catch (err) {
     const error = err as Error;
-    // Updated logging to match the requested format more closely for unhandled exceptions
     logger.error({
         requestId: (req as any).id,
-        message: '💥 Error in /api/recipes/parse:', // Specific message from user request
-        errorObject: error, // Keep the full error object for structured logging
+        message: '💥 Error in /api/recipes/parse:', 
+        errorObject: error, 
         errorMessage: error.message,
         stack: error.stack,
         route: req.originalUrl,
