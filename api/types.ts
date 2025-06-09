@@ -11,6 +11,7 @@ export type StructuredIngredient = {
   amount: string | null;
   unit: string | null;
   suggested_substitutions?: SubstitutionSuggestion[] | null;
+  preparation?: string | null;
 };
 
 // Combined Parsed Recipe Type

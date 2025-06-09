@@ -120,6 +120,7 @@ export default function IngredientsScreen() {
     if (!source) return null;
 
     const structured = coerceToStructuredIngredients(source);
+    console.log("Structured ingredients with potential preparation fields:", JSON.stringify(structured, null, 2));
     // Only scale if using original
     return usingOriginal
       ? structured.map(i => scaleIngredient(i, scale))
@@ -468,6 +469,8 @@ export default function IngredientsScreen() {
               // Check if this specific ingredient is the one that was substituted
               const isSubstituted = appliedSubstitution?.originalIndex === index;
               
+              console.log('Ingredient:', ingredient);
+
               return (
                 <TouchableOpacity 
                   key={`ing-${index}`} 
@@ -489,6 +492,11 @@ export default function IngredientsScreen() {
                     <Text style={[styles.ingredientName, isChecked && styles.ingredientTextChecked, isSubstituted && styles.ingredientNameSubstituted]} numberOfLines={0}> 
                       {/* Display Name (already includes substitution info if applied) */}
                       {String(ingredient.name)}
+                      {ingredient.preparation && (
+                        <Text style={styles.ingredientPreparation}>
+                          {` ${ingredient.preparation}`}
+                        </Text>
+                      )}
                       {/* Display Quantity/Unit */}
                       {(ingredient.amount || ingredient.unit) && (
                         <Text style={styles.ingredientQuantityParenthetical}>
@@ -831,5 +839,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.white,
     textAlign: 'center',
+  },
+  ingredientPreparation: {
+    fontFamily: 'Poppins-Italic',
+    fontSize: 14,
+    color: COLORS.darkGray,
+    marginTop: 2,
+    marginLeft: 2,
   },
 });

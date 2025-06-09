@@ -30,6 +30,7 @@ export const coerceToStructuredIngredients = (
           amount: null,
           unit: null,
           suggested_substitutions: null,
+          preparation: null,
         });
       }
     } else if (typeof ing === 'object' && ing.name) { // Basic check for an object that could be an ingredient
@@ -40,6 +41,7 @@ export const coerceToStructuredIngredients = (
         suggested_substitutions: Array.isArray(ing.suggested_substitutions) 
             ? ing.suggested_substitutions 
             : null, // Ensure it's an array or null
+        preparation: ing.preparation !== undefined ? ing.preparation : null,
       });
     } else {
       // Log or handle cases where an object is not a valid ingredient structure if necessary

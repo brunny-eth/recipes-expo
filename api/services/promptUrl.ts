@@ -136,67 +136,93 @@ ${safeRawBodyText}
 
 Your goal is to parse ALL information from the provided text sections into a single, specific JSON object.
 
-**Important Note:** If processing 'Raw Page Content' (due to fallback), use the provided raw text. If processing separate 'Ingredients Text' and 'Instructions Text', use those specific sections.
+**Important Note:** If processing 'Raw Page Content' (due to fallback), use the provided raw text. If processing separate 'Ingredients Text' and 'Instructions Text' are provided, use them primarily.
+
+---
+
+**Examples of correct ingredient extraction:**
+
+- "1 medium onion (peeled and diced)"  
+  → name: "onion", amount: "1", unit: "medium", preparation: "peeled and diced"
+
+- "3 cloves garlic, minced"  
+  → name: "garlic", amount: "3", unit: "cloves", preparation: "minced"
+
+- "¼ cup parsley, finely chopped"  
+  → name: "parsley", amount: "0.25", unit: "cup", preparation: "finely chopped"
+
+---
 
 **Desired JSON Structure:**
-{ 
-  "title": "string | null", 
+{
+  "title": "string | null",
   "ingredients": [
-    { 
-      "name": "string", 
-      "amount": "string | null", 
-      "unit": "string | null", 
+    {
+      "name": "string",               // e.g., "onion"
+      "amount": "string | null",     // e.g., "1", "1.5"
+      "unit": "string | null",       // e.g., "cup", "clove", "medium"
+      "preparation": "string | null",// e.g., "chopped", "minced", "peeled and diced"
       "suggested_substitutions": [
-        { 
-          "name": "string", 
-          "amount": "string | number | null", 
-          "unit": "string | null", 
-          "description": "string | null" 
+        {
+          "name": "string",
+          "amount": "string | number | null",
+          "unit": "string | null",
+          "description": "string | null"
         }
-      ] | null 
+      ] | null
     }
-  ] | null, 
-  "instructions": "array of strings, each a single step without numbering | null", 
-  "substitutions_text": "string | null", 
-  "recipeYield": "string | null", // Examples: "6 servings", "12 cookies", "Makes one 9-inch pie"
-  "prepTime": "string | null",     // Examples: "15 minutes", "20 min", "Approx. 10 mins"
-  "cookTime": "string | null",     // Examples: "1 hour", "45 min", "90 minutes"
-  "totalTime": "string | null",    // Examples: "1 hr 15 min", "About 1 hour"
-  "nutrition": { 
-    "calories": "string | null", // Example: "350 kcal", "400 calories per serving"
-    "protein": "string | null"  // Example: "15g protein", "20 grams protein"
-  } | null 
+  ] | null,
+  "instructions": "array of strings, each a single step without numbering | null",
+  "substitutions_text": "string | null",
+  "recipeYield": "string | null",
+  "prepTime": "string | null",
+  "cookTime": "string | null",
+  "totalTime": "string | null",
+  "nutrition": {
+    "calories": "string | null",
+    "protein": "string | null"
+  } | null
 }
 
-**Parsing Rules:**
-1.  **Sections:** Parse the data from the 'Provided Text Sections' below. 
-    - If 'Raw Page Content' is provided, attempt to find title, ingredients, instructions, etc., within it.
-    - If separate 'Ingredients Text' and 'Instructions Text' are provided, use them primarily.
-    - If a section (title, ingredients, instructions) cannot be found or is empty (appears as 'N/A' or is blank), use null for its value in the JSON. If text is present but seems nonsensical, too short, or clearly not a recipe, also consider using null for those arrays.
-2.  **Instructions Array:** 
-    - ONLY include actionable cooking/preparation steps. Split the provided instructions text into logical step-by-step actions. EXCLUDE serving suggestions, anecdotes, tips, etc. Ensure steps do not have numbering.
-    - **Clarity for Sub-groups:** If an instruction refers to combining a sub-group of ingredients (e.g., 'dressing ingredients', 'tahini ranch ingredients'), and those ingredients are part of the main ingredient list you parsed, rephrase the instruction to explicitly list those specific ingredients. For example, instead of 'combine tahini ranch ingredients', if tahini, chives, and parsley are the ranch ingredients, the instruction should be 'combine tahini, dried chives, and dried parsley, whisking in water to thin...'.
-3.  **Ingredients Array:** 
-    - Parse the provided ingredients text into the structured array shown above.
-    - **Convert Fractions:** Convert all fractional amounts (e.g., "1 1/2", "3/4") to their decimal representation (e.g., "1.5", "0.75") for the main ingredient's "amount".
-    - **Handle Variations:** Handle ranges or optional parts. Use null if a part (amount, unit) isn't clearly identifiable.
-    - **Quantity Handling:** If an ingredient clearly lacks a quantity (e.g., 'fresh cilantro'), set main "amount" to null and main "unit" to "to taste" or "as needed".
-    - **Exclusions:** Do NOT include ingredients that are variations of 'sea salt', 'salt', 'black pepper', or 'pepper' in the final array.
-4.  **Ingredient Substitutions:**
-    - For each parsed ingredient (except salt/pepper), suggest 1-2 sensible culinary substitutions.
-    - Each substitution suggestion MUST be an object with "name" (string), "amount" (string/number/null - the *equivalent* amount), "unit" (string/null), and optional "description" (string/null).
-    - Base substitution amount/unit on volume/weight where possible, adjust for flavor/texture.
-    - If no good substitutions come to mind, use null for "suggested_substitutions".
-5.  **Substitutions Text:** Attempt to find any *explicit substitution notes* mentioned within the original INSTRUCTIONS text and place them in the top-level "substitutions_text" field, otherwise use null.
-6.  **Metadata:** 
-    - **VERY IMPORTANT:** If a value for a field (like prepTime, cookTime, totalTime, recipeYield, nutrition) is not explicitly found in the provided text, you MUST return \`null\` for that field in the JSON. DO NOT use "N/A", "0", or make up values. Be precise.
-    - **recipeYield:** Your primary source for recipe yield (servings) should be the "Explicit Recipe Yield Text" provided below. This text is specifically extracted from fields likely to contain only the yield. Parse the yield description from this text (e.g., "Servings: 6" becomes "6 servings"; "Makes 2 dozen cookies" becomes "2 dozen cookies"; "Yield: 1 loaf" becomes "1 loaf"). If this explicit text is missing, empty, or clearly not a yield, then secondarily look for terms like "serves", "makes", "yields", "servings" in the main "Instructions Text" or "Ingredients Text", and extract the description. If no yield is found, use null.
-    - **Time Fields (prepTime, cookTime, totalTime):** Look for explicit mentions like "Prep Time: 15 min", "Cook: 45 minutes", "Total Time: 1 hr". Extract the value exactly as stated (e.g., "15 min", "45 minutes", "1 hr"). Return null if not found.
-    - **Nutrition:** Look for nutrition information, specifically "calories" and "protein". Extract the values if present (e.g., "350 kcal", "15g protein"). The entire "nutrition" object should be null if neither calories nor protein is found. If one is found but not the other, return the found value and null for the missing one within the nutrition object.
-7.  **Output:** Ensure the output is ONLY the single, strictly valid JSON object described. Do not include explanations, markdown formatting, or any text outside the JSON structure.
+---
 
-${textToParse}
-`;
+**Parsing Rules:**
+
+1. **Sections:** Use the appropriate source — either structured text or raw fallback — to find all fields. If a field is clearly missing or nonsensical, return "null".
+
+2. **Ingredients Array:**
+   - Extract "name", "amount", "unit", and "preparation" if present.
+   - The "preparation" field should include descriptive phrases like “minced”, “chopped”, “finely chopped”, “peeled and diced”.
+   - "preparation" may appear at the end of the line or in parentheses.
+   - Do **not** include preparation in the "name" field.
+   - Convert fractions (e.g., "1 1/2") to decimal ("1.5").
+   - Skip salt, pepper, or similar generic seasonings unless they have substitutions.
+   - If an amount or unit is clearly missing, use "null".
+
+3. **Instructions Array:**
+   - Extract clear cooking steps. No numbering.
+   - Exclude unrelated text like anecdotes or serving suggestions.
+   - Replace vague ingredient group references ("the dressing ingredients") with specific items if possible.
+
+4. **Substitutions:**
+   - Provide 1–2 culinary substitutions for each ingredient (except salt/pepper).
+   - Use structured objects with name, amount, unit, and optional description.
+
+5. **substitutions_text:**
+   - Extract any substitution notes found in the instructions (e.g., “you can use shallots instead of onions”).
+
+6. **Time and Yield:**
+   - Use the explicit recipe yield text first. If missing, look for phrases like “serves 4” or “makes 1 loaf”.
+   - Parse all time fields only if they are explicitly written.
+   - Return "null" if fields are missing.
+
+7. **Nutrition:**
+   - Extract calories and protein, if available.
+   - Omit the object if both values are missing.
+
+---
+
+${textToParse}`;
 
     // --- ADDED DEBUG LOG ---
     console.log(`[DEBUG promptUrl] Gemini Prompt for ${requestId} (first 1000 chars):
