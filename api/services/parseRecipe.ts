@@ -49,6 +49,7 @@ export async function parseAndCacheRecipe(
     };
     let handlerUsage: StandardizedUsage = { inputTokens: 0, outputTokens: 0 };
     let fetchMethodUsed: string | undefined = 'N/A';
+    let isFallback = false; // Ensure isFallback is always a boolean
 
     // Wrap the core logic in a try/catch block
     try {
@@ -132,6 +133,7 @@ export async function parseAndCacheRecipe(
                 processingError = fetchExtractError || 'Failed to fetch or extract content from URL.';
                 logger.error({ requestId, error: processingError }, `URL processing failed during fetch/extract`);
             } else {
+                isFallback = !!extractedContent.isFallback; // Ensure isFallback is a boolean
                 const totalLength = (extractedContent?.ingredientsText?.length ?? 0) + (extractedContent?.instructionsText?.length ?? 0);
                 logger.info({ requestId, fetchExtractMs: (overallTimings.fetchHtml ?? 0) + (overallTimings.extractContent ?? 0), method: fetchMethodUsed, combinedTextLength: totalLength }, `URL content prepared.`);
                 geminiResponse = await parseUrlContentWithGemini(extractedContent, requestId, geminiModel);
@@ -185,6 +187,23 @@ export async function parseAndCacheRecipe(
             overallTimings.total = Date.now() - requestStartTime;
             logger.error({ requestId, error: processingError, inputType, timings: overallTimings }, `Processing ultimately failed for input.`);
             return { recipe: null, error: processingError, fromCache: false, inputType, cacheKey, timings: overallTimings, usage: handlerUsage, fetchMethodUsed };
+        }
+
+        // Add a final guard post-Gemini
+        const isEmptyRecipe = (
+            !finalRecipeData?.title &&
+            (!finalRecipeData?.ingredients || finalRecipeData.ingredients.length === 0) &&
+            (!finalRecipeData?.instructions || finalRecipeData.instructions.length === 0)
+        );
+
+        if (isEmptyRecipe) {
+            logger.warn({ requestId }, "[parse] Gemini returned empty recipe — likely a non-recipe page. Rejecting.");
+            throw new Error("No recipe found on that page.");
+        }
+
+        if (isFallback && isEmptyRecipe) {
+            // fallback mode, and Gemini found nothing — hard fail
+            throw new Error("This page doesn't appear to contain a recipe.");
         }
 
         if (finalRecipeData) {
