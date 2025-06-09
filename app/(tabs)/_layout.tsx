@@ -26,10 +26,10 @@ export default function TabLayout() {
       <Tabs.Screen
         name="saved"
         options={{
-          title: 'Saved',
+          title: 'Favorites',
           // tabBarIcon: ({ color, size }) => <BookmarkIcon size={size} color={color} />,
           tabBarIcon: ({ color, size }: { color: string; size: number }) => (
-            <MaterialCommunityIcons name="bookmark-outline" size={size} color={color} />
+            <MaterialCommunityIcons name="heart-outline" size={size} color={color} />
           ),
         }}
       />

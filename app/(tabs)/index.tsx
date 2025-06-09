@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
 import { useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Image, Keyboard, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Keyboard, ActivityIndicator, KeyboardAvoidingView, Platform, View as RNView } from 'react-native';
 import { useRouter, useNavigation } from 'expo-router';
 import Animated, { FadeIn, FadeInDown, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
 import { COLORS } from '@/constants/theme';
@@ -16,7 +16,7 @@ export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const navigation = useNavigation();
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [isInputFocused, setIsInputFocused] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { showError } = useErrorModal();
   const handleError = useHandleError();
@@ -47,13 +47,13 @@ export default function HomeScreen() {
     const keyboardDidShowListener = Keyboard.addListener(
       'keyboardDidShow',
       () => {
-        setKeyboardVisible(true);
+        // No longer need to manage keyboardVisible state
       }
     );
     const keyboardDidHideListener = Keyboard.addListener(
       'keyboardDidHide',
       () => {
-        setKeyboardVisible(false);
+        // No longer need to manage keyboardVisible state
       }
     );
 
@@ -152,38 +152,40 @@ export default function HomeScreen() {
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoidingView}
+        enabled={isInputFocused}
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-        >
+        <RNView style={styles.outerContainer}>
           <Animated.View 
             entering={FadeIn.duration(500)}
             style={styles.logoContainer}
           >
             <ChefIcon width={120} height={120} />
           </Animated.View>
+          
           <Animated.View 
             entering={FadeInDown.delay(300).duration(500)}
             style={styles.contentContainer}
           >
-            <View style={{ height: 16 }} />
             <Text style={styles.title}>Sift and Serve</Text>
             <View style={styles.featuresContainer}>
               <Text style={styles.featureText}>No essays.</Text>
               <Text style={styles.featureText}>No ads.</Text>
               <Text style={styles.featureText}>Just the recipe you came for.</Text>
             </View>
-            <View style={{ height: 24 }} />
+          </Animated.View>
+
+          <View style={styles.inputWrapper}>
             <View style={styles.inputContainer}>
               <TextInput
                 style={styles.input}
-                placeholder="  Paste a recipe link or recipe text here"
+                placeholder="Paste a recipe URL or text here"
                 placeholderTextColor={COLORS.darkGray}
                 value={recipeUrl}
                 onChangeText={setRecipeUrl}
                 autoCapitalize="none"
                 autoCorrect={false}
+                onFocus={() => setIsInputFocused(true)}
+                onBlur={() => setIsInputFocused(false)}
               />
               <TouchableOpacity 
                 style={[styles.submitButton, !recipeUrl ? styles.submitButtonDisabled : null]} 
@@ -193,9 +195,8 @@ export default function HomeScreen() {
                 <Text style={{color: COLORS.white}}>Go</Text>
               </TouchableOpacity>
             </View>
-            <View style={{ flex: 1 }} />
-          </Animated.View>
-        </ScrollView>
+          </View>
+        </RNView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -205,25 +206,22 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 24,
   },
   keyboardAvoidingView: {
     flex: 1,
   },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 40,
+  outerContainer: {
+    flex: 1,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingBottom: 24,
   },
   logoContainer: {
     alignItems: 'center',
-    marginTop: 68,
-    marginBottom: 30,
+    paddingTop: 60, // Adjust as needed
   },
   contentContainer: {
     alignItems: 'center',
-    paddingTop: 18,
   },
   title: {
     fontFamily: 'Poppins-Bold',
@@ -233,7 +231,6 @@ const styles = StyleSheet.create({
   },
   featuresContainer: {
     alignItems: 'center',
-    marginBottom: 30,
   },
   featureText: {
     fontFamily: 'Poppins-Medium',
@@ -241,26 +238,29 @@ const styles = StyleSheet.create({
     color: COLORS.textDark,
     marginBottom: 8,
   },
+  inputWrapper: {
+    // This wrapper ensures the input stays at the bottom
+  },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
-    marginTop: 8,
+    position: 'relative',
   },
   input: {
     flex: 1,
-    height: 56,
+    height: 50,
+    backgroundColor: COLORS.white,
     borderWidth: 1,
     borderColor: 'rgba(0, 0, 0, 0.5)',
     borderRadius: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 15,
+    paddingRight: 60, // Make space for the button
     fontFamily: 'Poppins-Regular',
-    fontSize: 16,
-    color: COLORS.textDark,
   },
   submitButton: {
     position: 'absolute',
-    right: 8,
+    right: 10,
     height: 40,
     width: 40,
     backgroundColor: COLORS.primary,
