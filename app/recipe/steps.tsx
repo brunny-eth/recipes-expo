@@ -165,12 +165,15 @@ export default function StepsScreen() {
         >
           <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.raisinBlack} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{recipeTitle || 'Instructions'}</Text>
         <TouchableOpacity style={styles.toolsButton} onPress={() => openToolsModal()}>
             <MaterialCommunityIcons name="tools" size={24} color={COLORS.raisinBlack} />
         </TouchableOpacity>
       </Animated.View>
       
+      {recipeTitle && (
+        <Text style={styles.pageTitle}>{recipeTitle}</Text>
+      )}
+
       <ScrollView 
         style={styles.stepsContainer}
         showsVerticalScrollIndicator={false}
@@ -294,9 +297,10 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'ios' ? 0 : 10,
-    paddingBottom: 10,
+    paddingBottom: 6,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.lightGray,
     backgroundColor: COLORS.white,
@@ -304,20 +308,18 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
   },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 18,
-    color: COLORS.raisinBlack,
-    marginHorizontal: 10,
-  },
-  placeholder: {
-    // width: 24 + 16, // Can be removed if tools button is sized correctly
-  },
   stepsContainer: {
     paddingHorizontal: 20,
     paddingTop: 10,
+  },
+  pageTitle: {
+    fontFamily: 'Poppins-Bold',
+    fontSize: 20,
+    color: COLORS.textDark,
+    textAlign: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    lineHeight: 26,
   },
   stepItem: {
     flexDirection: 'row',
@@ -464,8 +466,5 @@ const styles = StyleSheet.create({
   },
   toolsButton: {
     padding: 8,
-    position: 'absolute',
-    right: 16,
-    top: Platform.OS === 'ios' ? 0 : 10,
   },
 });

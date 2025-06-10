@@ -94,6 +94,9 @@ export default function RecipeSummaryScreen() {
     setSelectedScaleFactor(factor);
   };
 
+  // Clean the title to remove attribution text like " - by Publisher"
+  const cleanTitle = recipe?.title?.replace(/\s*[–-]\s*by\s+.*$/i, '').trim();
+
   const navigateToIngredients = () => {
     if (!recipe || !recipe.ingredients) return;
 
@@ -113,7 +116,7 @@ export default function RecipeSummaryScreen() {
     }
     
     const navParams: IngredientsNavParams = {
-        title: recipe.title,
+        title: cleanTitle || recipe.title,
         originalIngredients: structuredOriginals, // Pass the coerced originals
         scaledIngredients: scaledIngredients,
         instructions: recipe.instructions,
@@ -171,9 +174,12 @@ export default function RecipeSummaryScreen() {
          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
            <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textDark} />
          </TouchableOpacity>
-         <Text style={styles.headerTitle} numberOfLines={1} ellipsizeMode="tail">{recipe.title || 'Recipe Summary'}</Text>
          <View style={{ width: 40 }} /> 
       </View>
+      
+      {cleanTitle && (
+        <Text style={styles.pageTitle}>{cleanTitle}</Text>
+      )}
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Nutrition Info Section Removed */}
@@ -259,24 +265,31 @@ const styles = StyleSheet.create({
   header: { /* Similar to other headers */
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingTop: Platform.OS === 'ios' ? 0 : 10,
+    paddingBottom: 6,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.lightGray,
     backgroundColor: COLORS.white,
   },
-  backButton: { padding: 8 },
-  headerTitle: {
-      flex: 1,
-      textAlign: 'center',
-      fontFamily: 'Poppins-Bold',
-      fontSize: 18,
-      color: COLORS.textDark,
-      marginHorizontal: 5,
+  backButton: {
+    padding: 8,
+    marginLeft: -8, // Offset padding for visual alignment
+  },
+  pageTitle: {
+    fontFamily: 'Poppins-Bold',
+    fontSize: 20,
+    color: COLORS.textDark,
+    textAlign: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    lineHeight: 26,
   },
   scrollContent: {
-      paddingHorizontal: 20,
-      paddingBottom: Platform.OS === 'ios' ? 100 : 80, // Ensure space for the footer button
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: Platform.OS === 'ios' ? 100 : 80, // Ensure space for the footer button
   },
   infoBox: {
       flexDirection: 'row',

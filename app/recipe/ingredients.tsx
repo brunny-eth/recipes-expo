@@ -450,9 +450,12 @@ export default function IngredientsScreen() {
         >
           <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textDark} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{navData?.title || 'Ingredients'}</Text>
         <View style={styles.placeholder} />
       </Animated.View>
+      
+      {navData?.title && (
+        <Text style={styles.pageTitle}>{navData.title}</Text>
+      )}
       
       <ScrollView style={styles.ingredientsList} showsVerticalScrollIndicator={false}>
         {navData && navData.scaleFactor !== 1 && (
@@ -601,22 +604,25 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'ios' ? 0 : 10,
     paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.lightGray,
+    backgroundColor: COLORS.white,
   },
   backButton: {
     padding: 8, 
   },
-  headerTitle: {
-    flex: 1,
+  pageTitle: {
+    fontFamily: 'Poppins-Bold',
+    fontSize: 20,
+    color: COLORS.textDark,
     textAlign: 'center',
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 18,
-    color: COLORS.raisinBlack,
-    marginHorizontal: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    lineHeight: 26,
   },
   placeholder: {
     width: 24 + 16,
