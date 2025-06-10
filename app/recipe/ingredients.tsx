@@ -461,7 +461,7 @@ export default function IngredientsScreen() {
         {navData && navData.scaleFactor !== 1 && (
           <View style={styles.scaleInfoBanner}>
             <Text style={styles.scaleInfoText}>
-              {`Showing ingredients for: ${getScaledYieldText(navData.originalYieldDisplay, navData.scaleFactor)}`}
+              {`Showing ${navData.scaleFactor}x scaled up ingredients`}
             </Text>
           </View>
         )}
@@ -519,7 +519,7 @@ export default function IngredientsScreen() {
                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         testID={`substitution-button-${ingredient.name}`}
                       >
-                        <Text style={styles.infoButtonText}>S</Text>
+                        <MaterialCommunityIcons name="swap-horizontal" size={18} color={COLORS.primary} />
                       </TouchableOpacity>
                     )}
                   </View>
@@ -545,7 +545,7 @@ export default function IngredientsScreen() {
             <ActivityIndicator size="small" color={COLORS.white} style={{ marginRight: 8 }}/>
           )}
           <Text style={styles.nextButtonText}>
-            {isRewriting ? 'Adjusting Steps...' : isScalingInstructions ? 'Scaling Steps...' : 'Go to Steps'}
+            {isRewriting ? 'Customizing instructions...' : isScalingInstructions ? 'Making sure everything lines up...' : 'Go to Steps'}
           </Text>
           {!(isRewriting || isScalingInstructions) && <MaterialCommunityIcons name="chevron-right" size={20} color={COLORS.white} />}
         </Pressable>
@@ -783,16 +783,13 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   infoButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 4,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: COLORS.lightGray,
-    marginLeft: 5,
-  },
-  infoButtonText: {
-    fontFamily: 'Poppins-Bold',
-    fontSize: 12,
-    color: COLORS.primary, 
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
   },
   // --- Help Modal Styles ---
   helpModalBackdrop: {
@@ -835,14 +832,14 @@ const styles = StyleSheet.create({
   },
   // --- End Help Modal Styles ---
   scaleInfoBanner: {
-    backgroundColor: COLORS.primary,
-    padding: 10,
+    backgroundColor: COLORS.darkGray,
+    padding: 12,
     borderRadius: 8,
-    marginBottom: 10,
+    marginBottom: 15,
   },
   scaleInfoText: {
     fontFamily: 'Poppins-Medium',
-    fontSize: 16,
+    fontSize: 15,
     color: COLORS.white,
     textAlign: 'center',
   },

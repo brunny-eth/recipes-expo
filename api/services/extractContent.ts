@@ -1,6 +1,14 @@
 import * as cheerio from 'cheerio';
 import logger from '../lib/logger';
 
+// Helper to fix protocol-relative URLs
+const ensureAbsoluteUrl = (url: string | null): string | null => {
+  if (url && url.startsWith('//')) {
+    return `https:${url}`;
+  }
+  return url;
+};
+
 // Type definitions that might be shared or imported if structure grows
 export type ExtractedContent = {
   title: string | null;
@@ -92,11 +100,14 @@ export function extractRecipeContent(html: string, sourceUrl?: string): Extracte
     // if (recipeJson) return; // REMOVED: We want to scan all and pick the first valid Recipe
     ldJsonBlocksScanned++;
     try {
-      const scriptContent = $(element).html();
-      if (!scriptContent) {
+      const scriptContentRaw = $(element).html();
+      if (!scriptContentRaw) {
           return; 
       }
       
+      // Sanitize control characters that can break JSON.parse, then log for debugging
+      const scriptContent = scriptContentRaw.replace(/[\u0000-\u001F]/g, '');
+
       console.log(`Found potential JSON-LD script content (first 2000 chars):\n${scriptContent.slice(0, 2000)}`);
 
       const jsonData = JSON.parse(scriptContent);
@@ -131,19 +142,19 @@ export function extractRecipeContent(html: string, sourceUrl?: string): Extracte
     
     if (recipeJson.image) {
         if (typeof recipeJson.image === 'string') {
-            image = recipeJson.image;
+            image = ensureAbsoluteUrl(recipeJson.image);
         } else if (Array.isArray(recipeJson.image) && recipeJson.image.length > 0) {
             const firstImage = recipeJson.image[0];
             if (typeof firstImage === 'string') {
-                image = firstImage;
+                image = ensureAbsoluteUrl(firstImage);
             } else if (typeof firstImage === 'object' && firstImage.url) {
-                image = firstImage.url;
+                image = ensureAbsoluteUrl(firstImage.url);
             }
         } else if (typeof recipeJson.image === 'object' && recipeJson.image.url) {
-            image = recipeJson.image.url;
+            image = ensureAbsoluteUrl(recipeJson.image.url);
         }
     }
-    thumbnailUrl = recipeJson.thumbnailUrl || null;
+    thumbnailUrl = ensureAbsoluteUrl(recipeJson.thumbnailUrl || null);
 
     // Ingredients can be string[]
     if (Array.isArray(recipeJson.recipeIngredient)) {
@@ -186,7 +197,7 @@ export function extractRecipeContent(html: string, sourceUrl?: string): Extracte
     // --- End Time Field Extraction --- 
 
     // Fallback title extraction if needed, only if JSON-LD didn't yield one
-    if (!title) title = $('title').first().text() || $('h1').first().text() || null;
+    // if (!title) title = $('title').first().text() || $('h1').first().text() || null; // REMOVED FOR CONSOLIDATION
 
     console.log(`Extracted from JSON-LD - Title: ${!!title}, Description: ${!!description}, Image: ${!!image}, Ingredients: ${!!ingredientsText}, Instructions: ${!!instructionsText}, Yield: ${!!recipeYieldText}, Prep: ${!!prepTime}, Cook: ${!!cookTime}, Total: ${!!totalTime}`);
     // If JSON-LD provides the essentials (ingredients AND instructions), return it (including times)
@@ -194,6 +205,22 @@ export function extractRecipeContent(html: string, sourceUrl?: string): Extracte
         return { title, description, image, thumbnailUrl, sourceUrl: sourceUrl ?? null, ingredientsText, instructionsText, recipeYieldText, isFallback, prepTime, cookTime, totalTime };
     }
     // Continue to selector fallback if JSON-LD was incomplete for essentials
+  }
+
+  // Tier 1.5: Fallback to meta tags if JSON-LD parsing failed or was incomplete for metadata
+  if (!description) {
+    description = $('meta[name="description"]').attr('content') || $('meta[property="og:description"]').attr('content') || null;
+  }
+  if (!image) {
+    image = ensureAbsoluteUrl($('meta[property="og:image"]').attr('content') || null);
+  }
+  if (image && !thumbnailUrl) { // if we have an image but no thumbnail, use it for both
+    thumbnailUrl = image;
+  }
+
+  // Fallback title extraction if needed (consolidated)
+  if (!title) {
+    title = $('meta[property="og:title"]').attr('content') || $('title').first().text() || null;
   }
 
   // --- Pre-stripping & Content Isolation (MOVED HERE) ---
@@ -250,10 +277,12 @@ export function extractRecipeContent(html: string, sourceUrl?: string): Extracte
 
   // Tier 2: Fallback to Selectors (or run if JSON-LD was incomplete)
   // Note: The console log for this was moved up to the start of the pre-stripping block.
+  /* MOVED
   if (!title) { // Title might have been parsed by JSON-LD even if other fields were missing
     const titleFromSelectors = $('title').first().text() || $('h1').first().text() || null;
     if (titleFromSelectors) title = titleFromSelectors;
   }
+  */
 
   // Ingredient Selectors
   if (!ingredientsText) {
