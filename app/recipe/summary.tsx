@@ -182,7 +182,7 @@ export default function RecipeSummaryScreen() {
   // For the text indicating what it makes *now* after scaling:
   const originalYieldNum = parseServingsValue(recipe.recipeYield);
   const scaledYieldNum = originalYieldNum ? originalYieldNum * selectedScaleFactor : null;
-  const scaledYieldText = scaledYieldNum ? `~${formatAmountNumber(scaledYieldNum)}` : `its original quantity`;
+  const scaledYieldText = scaledYieldNum ? `${formatAmountNumber(scaledYieldNum)}` : `its original quantity`;
 
   return (
     <SafeAreaView style={styles.container}>

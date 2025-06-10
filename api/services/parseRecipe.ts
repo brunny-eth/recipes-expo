@@ -11,6 +11,26 @@ import scraperapiClient from 'scraperapi-sdk';
 import { StandardizedUsage } from '../utils/usageUtils';
 import logger from '../lib/logger';
 
+function normalizeServings(servingRaw: string | null): string | null {
+    if (!servingRaw) return null;
+  
+    const parts = servingRaw.split(',').map(s => s.trim());
+    const unique = [...new Set(parts)];
+
+    // 1. Try to find a clean numeric part
+    const numericPart = unique.find(s => /^\d+(\.\d+)?$/.test(s));
+    if (numericPart) return numericPart;
+
+    // 2. Try to extract lower bound from range like "4-6" or "4 – 6"
+    for (const part of unique) {
+        const rangeMatch = part.match(/(\d+(\.\d+)?)[\s–-]+(\d+(\.\d+)?)/); // handles "4-6", "4 – 6"
+        if (rangeMatch) return rangeMatch[1]; // return the first (lower) number
+    }
+
+    // 3. Fallback to first part
+    return unique[0];
+}
+
 // Define a maximum length for output previews
 const MAX_PREVIEW_LENGTH = 100;
 
@@ -212,6 +232,11 @@ export async function parseAndCacheRecipe(
         }
 
         if (finalRecipeData) {
+            // Normalize servings field before caching or returning
+            if (finalRecipeData.recipeYield) {
+                finalRecipeData.recipeYield = normalizeServings(finalRecipeData.recipeYield);
+            }
+
             const preview = finalRecipeData.title
                 ? finalRecipeData.title.substring(0, MAX_PREVIEW_LENGTH) + (finalRecipeData.title.length > MAX_PREVIEW_LENGTH ? '...' : '')
                 : '(No title found)';
