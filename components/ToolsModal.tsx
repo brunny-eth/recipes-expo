@@ -77,7 +77,7 @@ export default function ToolsModal({
       case 'units':
         return <UnitsTool />;
       case 'help':
-        return <HelpTool recipeInstructions={recipeInstructions} recipeSubstitutions={recipeSubstitutions} />;
+        return <HelpTool recipeInstructions={recipeInstructions} />;
       default:
         return (
           <View style={styles.placeholderContainer}>
@@ -86,14 +86,6 @@ export default function ToolsModal({
           </View>
         );
     }
-  };
-
-  const getButtonStyle = (tool: ActiveTool) => {
-    return [
-      styles.toolButton,
-      activeTool === tool ? styles.activeToolButton : styles.inactiveToolButton,
-      activeTool === tool && styles.activeToolButtonShadow,
-    ];
   };
 
   return (
@@ -109,27 +101,6 @@ export default function ToolsModal({
             <TouchableOpacity style={styles.closeButton} onPress={onClose}>
               <MaterialCommunityIcons name="close" size={24} color={COLORS.darkGray} />
             </TouchableOpacity>
-
-            <View style={styles.toolButtonContainer}>
-              <TouchableOpacity
-                style={getButtonStyle('timer')}
-                onPress={() => setActiveTool('timer')}
-              >
-                <Text style={styles.toolButtonText}>Timer</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={getButtonStyle('units')}
-                onPress={() => setActiveTool('units')}
-              >
-                <Text style={styles.toolButtonText}>Units</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={getButtonStyle('help')}
-                onPress={() => setActiveTool('help')}
-              >
-                <Text style={styles.toolButtonText}>Help</Text>
-              </TouchableOpacity>
-            </View>
 
             <View style={[
               styles.toolContentContainer,
@@ -179,41 +150,6 @@ const styles = StyleSheet.create({
     padding: 5,
     zIndex: 10,
   },
-  toolButtonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '100%',
-    marginBottom: 25,
-  },
-  toolButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-    marginHorizontal: 5,
-    minWidth: 80,
-    alignItems: 'center',
-  },
-  activeToolButton: {
-    backgroundColor: '#f4bfbf',
-  },
-  inactiveToolButton: {
-    backgroundColor: '#fbeded',
-  },
-  activeToolButtonShadow: {
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 4,
-  },
-  toolButtonText: {
-    color: COLORS.textDark,
-    fontSize: 16,
-    fontWeight: '500',
-  },
   toolContentContainer: {
     width: '100%',
     alignItems: 'center',
@@ -243,7 +179,7 @@ const styles = StyleSheet.create({
   },
   toolPlaceholderText: {
     fontSize: 16,
-    color: COLORS.textGray,
+    color: COLORS.darkGray,
     marginTop: 20,
   },
 }); 

@@ -28,10 +28,15 @@ interface HelpToolProps {
 }
 
 export default function HelpTool({ recipeInstructions, recipeSubstitutions }: HelpToolProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: 'intro-message',
+      text: "I'm ready to help with your recipe! Ask me anything.",
+      sender: 'bot'
+    }
+  ]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isFirstMessageSent, setIsFirstMessageSent] = useState(false);
 
   const handleSend = async () => {
     if (inputText.trim() === '' || isLoading) return;
@@ -47,26 +52,23 @@ export default function HelpTool({ recipeInstructions, recipeSubstitutions }: He
     setIsLoading(true);
 
     const historyForApi = messages
+      .filter(msg => msg.id !== 'intro-message')
       .map(msg => ({
         role: msg.sender === 'user' ? 'user' : 'model' as 'user' | 'model',
         parts: [{ text: msg.text }],
       }))
       .reverse();
+      
+    const context = `
+      Recipe Instructions:
+      ---
+      ${(recipeInstructions || []).join('\n')}
+      ---
+    `;
 
-    let botResponseText: string | null = null;
-    if (!isFirstMessageSent) {
-      botResponseText = await sendMessageToGemini(
-        newUserMessage.text,
-        [],
-        {
-          instructions: recipeInstructions || [],
-          substitutions: recipeSubstitutions,
-        }
-      );
-      setIsFirstMessageSent(true);
-    } else {
-      botResponseText = await sendMessageToGemini(newUserMessage.text, historyForApi);
-    }
+    const messageWithContext = `${context}\n\nUser Question: ${newUserMessage.text}`;
+
+    const botResponseText = await sendMessageToGemini(messageWithContext, historyForApi);
     
     setIsLoading(false);
 
@@ -102,16 +104,6 @@ export default function HelpTool({ recipeInstructions, recipeSubstitutions }: He
       </Text>
     </View>
   );
-  
-  useEffect(() => {
-    if (recipeInstructions && recipeInstructions.length > 0 && messages.length === 0 && !isFirstMessageSent) {
-      const introMessage: Message = {
-        id: 'intro-message',
-        text: "I'm ready to help with your recipe! Ask me anything.",
-        sender: 'bot'
-      };
-    }
-  }, [recipeInstructions, messages, isFirstMessageSent]);
 
   return (
     <KeyboardAvoidingView
@@ -138,12 +130,12 @@ export default function HelpTool({ recipeInstructions, recipeSubstitutions }: He
           value={inputText}
           onChangeText={setInputText}
           placeholder="Ask about your recipe..."
-          placeholderTextColor={COLORS.textGray}
+          placeholderTextColor={COLORS.darkGray}
           multiline
           editable={!isLoading}
         />
         <TouchableOpacity style={styles.sendButton} onPress={handleSend} disabled={isLoading}>
-          <MaterialCommunityIcons name="send" size={24} color={isLoading ? COLORS.textGray : COLORS.primary} />
+          <MaterialCommunityIcons name="send" size={24} color={isLoading ? COLORS.darkGray : COLORS.primary} />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>

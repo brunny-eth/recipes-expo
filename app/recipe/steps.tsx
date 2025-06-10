@@ -21,11 +21,11 @@ export default function StepsScreen() {
   const [recipeTitle, setRecipeTitle] = useState<string | null>(null);
   const [instructions, setInstructions] = useState<string[]>([]);
   const [ingredients, setIngredients] = useState<StructuredIngredient[]>([]);
-  const [substitutions, setSubstitutions] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [completedSteps, setCompletedSteps] = useState<{[key: number]: boolean}>({});
   const [isToolsPanelVisible, setIsToolsPanelVisible] = useState(false);
   const [initialToolToShow, setInitialToolToShow] = useState<ActiveTool>(null);
+  const [isHeaderToolsVisible, setIsHeaderToolsVisible] = useState(false);
   
   // --- Tooltip State ---
   const [selectedIngredient, setSelectedIngredient] = useState<StructuredIngredient | null>(null);
@@ -45,7 +45,6 @@ export default function StepsScreen() {
         const parsedData = JSON.parse(params.recipeData) as {
           title?: string | null;
           instructions?: string[] | null;
-          substitutions_text?: string | null;
           ingredients?: StructuredIngredient[] | null;
         };
 
@@ -55,8 +54,6 @@ export default function StepsScreen() {
             console.warn("[StepsScreen] Instructions missing or not an array in recipeData.");
             setInstructions([]); 
         }
-
-        setSubstitutions(parsedData.substitutions_text || null);
         
         setRecipeTitle(parsedData.title || 'Instructions'); 
 
@@ -70,7 +67,6 @@ export default function StepsScreen() {
           message: "Recipe data was not provided. Please go back and try again."
         });
         setInstructions([]);
-        setSubstitutions(null);
         setIsLoading(false);
         return;
       }
@@ -81,7 +77,6 @@ export default function StepsScreen() {
           message: `Could not load recipe data: ${e.message}. Please go back and try again.`
         });
         setInstructions([]);
-        setSubstitutions(null);
         setIsLoading(false);
         return;
     }
@@ -265,11 +260,53 @@ export default function StepsScreen() {
         >
           <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.raisinBlack} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.toolsButton} onPress={() => openToolsModal()}>
+        <TouchableOpacity style={styles.toolsButton} onPress={() => setIsHeaderToolsVisible(true)}>
             <MaterialCommunityIcons name="tools" size={24} color={COLORS.raisinBlack} />
         </TouchableOpacity>
       </Animated.View>
       
+      <Modal
+        transparent
+        visible={isHeaderToolsVisible}
+        animationType="fade"
+        onRequestClose={() => setIsHeaderToolsVisible(false)}
+      >
+        <Pressable style={styles.headerToolsBackdrop} onPress={() => setIsHeaderToolsVisible(false)}>
+          <View style={styles.headerToolsContainer}>
+            <TouchableOpacity
+              style={styles.headerToolButton}
+              onPress={() => {
+                setIsHeaderToolsVisible(false);
+                openToolsModal('timer');
+              }}
+            >
+              <MaterialCommunityIcons name="timer-outline" size={24} color={COLORS.textDark} />
+              <Text style={styles.headerToolButtonText}>Timer</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerToolButton}
+              onPress={() => {
+                setIsHeaderToolsVisible(false);
+                openToolsModal('units');
+              }}
+            >
+              <MaterialCommunityIcons name="ruler" size={24} color={COLORS.textDark} />
+              <Text style={styles.headerToolButtonText}>Units</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.headerToolButton}
+              onPress={() => {
+                setIsHeaderToolsVisible(false);
+                openToolsModal('help');
+              }}
+            >
+              <MaterialCommunityIcons name="help-circle-outline" size={24} color={COLORS.textDark} />
+              <Text style={styles.headerToolButtonText}>Help</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
+
       {recipeTitle && (
         <Text style={styles.pageTitle}>{recipeTitle}</Text>
       )}
@@ -325,13 +362,6 @@ export default function StepsScreen() {
             </View>
           )}
         
-        {substitutions && (
-            <View style={styles.substitutionsContainer}>
-                <Text style={styles.sectionTitle}>Substitution Notes</Text>
-                <Text style={styles.substitutionsText}>{substitutions}</Text>
-            </View>
-        )}
-        
         <View style={{ height: 100 }} />
       </ScrollView>
       
@@ -360,7 +390,6 @@ export default function StepsScreen() {
           handleTimerStartPause={handleTimerStartPause}
           handleTimerReset={handleTimerReset}
           recipeInstructions={instructions}
-          recipeSubstitutions={substitutions}
       />
 
       {!isToolsPanelVisible && isTimerActive && timerTimeRemaining > 0 && (
@@ -553,28 +582,37 @@ const styles = StyleSheet.create({
     marginTop: 20,
     textAlign: 'center',
   },
-  substitutionsContainer: {
-    marginTop: 30,
-    padding: 15,
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.secondary,
-  },
-  sectionTitle: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 16,
-    color: COLORS.textDark,
-    marginBottom: 8,
-  },
-  substitutionsText: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 14,
-    color: COLORS.textDark,
-    lineHeight: 20,
-  },
   toolsButton: {
     padding: 8,
+  },
+  headerToolsBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+  },
+  headerToolsContainer: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 82 : 48,
+    right: 16,
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    padding: 8,
+    shadowColor: COLORS.textDark,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  headerToolButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+  },
+  headerToolButtonText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize: 16,
+    color: COLORS.textDark,
+    marginLeft: 12,
   },
   // --- Tooltip Styles ---
   tooltipBackdrop: {
