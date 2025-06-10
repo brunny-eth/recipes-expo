@@ -20,6 +20,7 @@ export type CombinedParsedRecipe = {
   description?: string | null;
   image?: string | null;
   thumbnailUrl?: string | null;
+  sourceUrl?: string | null;
   ingredients: StructuredIngredient[] | null;
   instructions: string[] | null;
   substitutions_text: string | null;

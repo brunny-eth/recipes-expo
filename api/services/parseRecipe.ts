@@ -167,6 +167,7 @@ export async function parseAndCacheRecipe(
                             finalRecipeData.description = extractedContent.description ?? null;
                             finalRecipeData.image = extractedContent.image ?? null;
                             finalRecipeData.thumbnailUrl = extractedContent.thumbnailUrl ?? null;
+                            finalRecipeData.sourceUrl = extractedContent.sourceUrl ?? null;
                         }
                     }
                     overallTimings.geminiParse = geminiResponse.timings.geminiCombinedParse;

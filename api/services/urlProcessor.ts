@@ -63,7 +63,7 @@ export async function fetchAndExtractFromUrl(
   console.log(`[${requestId}] Pre-processing HTML with cheerio for URL: ${url}...`);
   const extractStartTime = Date.now();
   try {
-      extractedContent = extractRecipeContent(htmlContent);
+      extractedContent = extractRecipeContent(htmlContent, url);
       timings.extractContent = Date.now() - extractStartTime;
 
       // --- ADDED DEBUG LOG ---

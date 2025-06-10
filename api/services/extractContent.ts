@@ -7,6 +7,7 @@ export type ExtractedContent = {
   description?: string | null;
   image?: string | null;
   thumbnailUrl?: string | null;
+  sourceUrl?: string | null;
   ingredientsText: string | null;
   instructionsText: string | null;
   recipeYieldText?: string | null;
@@ -66,7 +67,7 @@ const isValidInstruction = (text: string): boolean => {
  * @param html The HTML content string.
  * @returns An object containing extracted title, ingredients text, and instructions text.
  */
-export function extractRecipeContent(html: string): ExtractedContent | null {
+export function extractRecipeContent(html: string, sourceUrl?: string): ExtractedContent | null {
   let $ = cheerio.load(html); // Load initial HTML
 
   // Initialize extracted fields
@@ -190,7 +191,7 @@ export function extractRecipeContent(html: string): ExtractedContent | null {
     console.log(`Extracted from JSON-LD - Title: ${!!title}, Description: ${!!description}, Image: ${!!image}, Ingredients: ${!!ingredientsText}, Instructions: ${!!instructionsText}, Yield: ${!!recipeYieldText}, Prep: ${!!prepTime}, Cook: ${!!cookTime}, Total: ${!!totalTime}`);
     // If JSON-LD provides the essentials (ingredients AND instructions), return it (including times)
     if (ingredientsText && instructionsText) {
-        return { title, description, image, thumbnailUrl, ingredientsText, instructionsText, recipeYieldText, isFallback, prepTime, cookTime, totalTime };
+        return { title, description, image, thumbnailUrl, sourceUrl: sourceUrl ?? null, ingredientsText, instructionsText, recipeYieldText, isFallback, prepTime, cookTime, totalTime };
     }
     // Continue to selector fallback if JSON-LD was incomplete for essentials
   }
@@ -580,5 +581,5 @@ export function extractRecipeContent(html: string): ExtractedContent | null {
   // Add logging for instructionsText
   console.log("[extractRecipeContent] Final instructionsText preview:\n", instructionsText?.slice(0, 500));
   // Return structure includes the fallback flag again
-  return { title, description, image, thumbnailUrl, ingredientsText, instructionsText, recipeYieldText, isFallback, prepTime, cookTime, totalTime };
+  return { title, description, image, thumbnailUrl, sourceUrl: sourceUrl ?? null, ingredientsText, instructionsText, recipeYieldText, isFallback, prepTime, cookTime, totalTime };
 }

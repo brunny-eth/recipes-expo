@@ -1,14 +1,90 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator, Platform, Dimensions, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator, Platform, Dimensions, Image, Linking } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, { FadeIn } from 'react-native-reanimated';
+import { decode } from 'he';
 import { COLORS } from '@/constants/theme';
 import { scaleIngredient, parseServingsValue, getScaledYieldText, parseAmountString, formatAmountNumber } from '@/utils/recipeUtils'; // Correct import path assuming utils is under root/src or similar alias
 import { StructuredIngredient } from '@/api/types';
 import { coerceToStructuredIngredients } from '@/utils/ingredientHelpers'; // Import the new helper
 import { useErrorModal } from '@/context/ErrorModalContext'; // Added import
 import InlineErrorBanner from '@/components/InlineErrorBanner'; // Import the new component
+
+const ALLERGENS = [
+  {
+    key: 'dairy',
+    match: [
+      'milk', 'cheese', 'butter', 'cream', 'yogurt', 'feta',
+      'parmesan', 'mozzarella', 'ricotta', 'custard', 'whey'
+    ]
+  },
+  {
+    key: 'nuts',
+    match: [
+      'almond', 'cashew', 'walnut', 'pecan', 'hazelnut', 'macadamia',
+      'pistachio', 'brazil nut', 'nut butter', 'nut'
+    ]
+  },
+  {
+    key: 'peanuts',
+    match: ['peanut', 'peanut butter']
+  },
+  {
+    key: 'gluten',
+    match: [
+      'flour', 'wheat', 'bread', 'breadcrumbs', 'pasta', 'semolina',
+      'barley', 'rye', 'spelt', 'farro', 'bulgur', 'couscous'
+    ]
+  },
+  {
+    key: 'soy',
+    match: ['soy', 'soybean', 'tofu', 'tempeh', 'edamame', 'soy sauce']
+  },
+  {
+    key: 'egg',
+    match: ['egg', 'mayonnaise', 'mayo', 'aioli']
+  },
+  {
+    key: 'shellfish',
+    match: [
+      'shrimp', 'prawn', 'crab', 'lobster', 'clam', 'mussel',
+      'scallop', 'oyster', 'langoustine'
+    ]
+  },
+  {
+    key: 'fish',
+    match: [
+      'salmon', 'tuna', 'cod', 'trout', 'haddock', 'anchovy', 'sardine',
+      'mackerel', 'halibut', 'bass', 'snapper'
+    ]
+  },
+  {
+    key: 'sesame',
+    match: ['sesame', 'tahini']
+  },
+  {
+    key: 'mustard',
+    match: ['mustard', 'mustard seed']
+  }
+];
+
+const extractAllergens = (ingredients: StructuredIngredient[] | string[] | null): string[] => {
+    if (!ingredients) return [];
+
+    const structuredIngredients = coerceToStructuredIngredients(ingredients);
+    if (!structuredIngredients || structuredIngredients.length === 0) return [];
+
+    const ingredientNames = structuredIngredients.map(i => i.name?.toLowerCase().trim().normalize('NFKC') ?? '');
+
+    return ALLERGENS
+        .filter(allergen =>
+            ingredientNames.some(name =>
+                allergen.match.some(term => name.includes(term))
+            )
+        )
+        .map(allergen => allergen.key);
+};
 
 // --- Calculate Button Widths ---
 const screenWidth = Dimensions.get('window').width;
@@ -34,6 +110,7 @@ type ParsedRecipe = {
   cookTime?: string | null;
   totalTime?: string | null;
   nutrition?: { calories?: string | null; protein?: string | null; [key: string]: any } | null;
+  sourceUrl?: string | null;
 };
 
 // Type for data passed to IngredientsScreen
@@ -76,6 +153,7 @@ export default function RecipeSummaryScreen() {
           setIsLoading(false);
           return;
         }
+
         setRecipe(parsed);
         
         const yieldNum = parseServingsValue(parsed.recipeYield); 
@@ -101,6 +179,11 @@ export default function RecipeSummaryScreen() {
     }
     setIsLoading(false); // Finish loading successfully
   }, [params.recipeData, showError, router]); // Added showError and router
+
+  const detectedAllergens = React.useMemo(() => {
+    if (!recipe) return [];
+    return extractAllergens(recipe.ingredients);
+  }, [recipe]);
 
   const handleScaleFactorChange = (factor: number) => {
     setSelectedScaleFactor(factor);
@@ -210,13 +293,25 @@ export default function RecipeSummaryScreen() {
             </View>
         </View>
 
-        {/* Nutrition Info Section Removed */}
+        {/* --- Metadata Sections --- */}
+        
+        {/* Description */}
+        {recipe.description && (
+          <>
+            <Text style={styles.sectionTitle}>Description</Text>
+            <Text style={styles.sectionSubtext}>
+              {decode(recipe.description.length > 150 
+                ? `${recipe.description.substring(0, 150)}...`
+                : recipe.description)}
+            </Text>
+          </>
+        )}
 
         {/* Servings Selector */} 
         <Text style={styles.sectionTitle}>Adjust Recipe Size</Text>
-        <Text style={styles.servingQuestionPrompt}>
+        <Text style={styles.sectionSubtext}>
           {selectedScaleFactor === 1.0
-            ? `This recipe makes ${displayableYieldText}.`
+            ? `This recipe makes ${displayableYieldText}. We make it easy to scale it up or down.`
             : `Now scaled to ${scaledYieldText} (from ${recipe.recipeYield} originally).`}
         </Text>
         <View style={styles.servingsContainer}>
@@ -232,6 +327,28 @@ export default function RecipeSummaryScreen() {
             </TouchableOpacity>
           ))}
         </View>
+
+        {/* Allergen Info */}
+        {detectedAllergens && detectedAllergens.length > 0 && (
+            <>
+                <Text style={styles.sectionTitle}>Allergens</Text>
+                <Text style={styles.sectionSubtext}>
+                    This recipe contains {detectedAllergens.join(', ')}. You can substitute them out on the Ingredients page.
+                </Text>
+            </>
+        )}
+
+        {/* Original Source */}
+        {recipe.sourceUrl && (
+          <>
+            <Text style={styles.sectionTitle}>Original Recipe Source</Text>
+            <TouchableOpacity onPress={() => Linking.openURL(recipe.sourceUrl!)}>
+              <Text style={styles.sourceLink}>
+                {recipe.sourceUrl.replace(/^https?:\/\//, '').replace(/\/$/, '').toLowerCase()}
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
 
       </ScrollView>
 
@@ -297,13 +414,28 @@ const styles = StyleSheet.create({
       fontFamily: 'Poppins-SemiBold',
       fontSize: 18,
       color: COLORS.textDark,
-      marginTop: 24,
-      marginBottom: 12,
+      marginBottom: 8,
       textAlign: 'left',
+  },
+  sectionSubtext: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 15,
+    color: COLORS.gray,
+    marginBottom: 24, // Spacing between sections
+    lineHeight: 22,
+    textAlign: 'left',
+  },
+  sourceLink: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 15,
+    color: COLORS.primary,
+    textDecorationLine: 'underline',
+    marginBottom: 24,
+    lineHeight: 22,
   },
   servingsContainer: {
       flexDirection: 'row',
-      marginBottom: 10,
+      marginBottom: 24, // Increased for consistency
       gap: servingsContainerGap,
   },
   servingButton: {
