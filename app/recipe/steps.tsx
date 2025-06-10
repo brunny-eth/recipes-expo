@@ -1,5 +1,6 @@
+import React from 'react';
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, SafeAreaView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, SafeAreaView, Platform, Modal, Pressable } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
@@ -9,6 +10,8 @@ import MiniTimerDisplay from '@/components/MiniTimerDisplay';
 import { ActiveTool } from '@/components/ToolsModal';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import InlineErrorBanner from '@/components/InlineErrorBanner';
+import { StructuredIngredient } from '@/api/types';
+import { abbreviateUnit } from '@/utils/format';
 
 export default function StepsScreen() {
   const params = useLocalSearchParams<{ recipeData?: string }>();
@@ -17,12 +20,18 @@ export default function StepsScreen() {
   
   const [recipeTitle, setRecipeTitle] = useState<string | null>(null);
   const [instructions, setInstructions] = useState<string[]>([]);
+  const [ingredients, setIngredients] = useState<StructuredIngredient[]>([]);
   const [substitutions, setSubstitutions] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [completedSteps, setCompletedSteps] = useState<{[key: number]: boolean}>({});
   const [isToolsPanelVisible, setIsToolsPanelVisible] = useState(false);
   const [initialToolToShow, setInitialToolToShow] = useState<ActiveTool>(null);
   
+  // --- Tooltip State ---
+  const [selectedIngredient, setSelectedIngredient] = useState<StructuredIngredient | null>(null);
+  const [isTooltipVisible, setIsTooltipVisible] = useState(false);
+  // --- End Tooltip State ---
+
   // --- Lifted Timer State --- 
   const [timerTimeRemaining, setTimerTimeRemaining] = useState(0); // Time in seconds
   const [isTimerActive, setIsTimerActive] = useState(false);
@@ -37,6 +46,7 @@ export default function StepsScreen() {
           title?: string | null;
           instructions?: string[] | null;
           substitutions_text?: string | null;
+          ingredients?: StructuredIngredient[] | null;
         };
 
         if (parsedData.instructions && Array.isArray(parsedData.instructions)) {
@@ -49,6 +59,10 @@ export default function StepsScreen() {
         setSubstitutions(parsedData.substitutions_text || null);
         
         setRecipeTitle(parsedData.title || 'Instructions'); 
+
+        if (parsedData.ingredients && Array.isArray(parsedData.ingredients)) {
+          setIngredients(parsedData.ingredients);
+        }
 
       } else {
         showError({
@@ -126,6 +140,89 @@ export default function StepsScreen() {
   };
   // --- End Lifted Timer Logic ---
 
+  // --- Ingredient Tooltip Logic ---
+  const handleIngredientPress = (ingredient: StructuredIngredient) => {
+    setSelectedIngredient(ingredient);
+    setIsTooltipVisible(true);
+  };
+
+  const escapeRegex = (string: string) => {
+    return string.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+  };
+
+  const renderHighlightedInstruction = (step: string, isCompleted: boolean, isActive: boolean) => {
+    if (!ingredients || ingredients.length === 0) {
+      return (
+        <Text style={[styles.stepText, isCompleted && styles.stepTextCompleted, isActive && styles.activeStepText]}>
+          {step}
+        </Text>
+      );
+    }
+
+    const searchTermsWithIng = ingredients.flatMap(ing => {
+      const baseName = ing.name.split(' (substituted for')[0].trim();
+      if (!baseName) return [];
+
+      const terms = new Set<string>();
+      terms.add(baseName);
+
+      const words = baseName.split(' ');
+      if (words.length > 1) {
+        words.forEach(word => {
+          if (word.length > 3) {
+            terms.add(word);
+          }
+        });
+      }
+
+      const finalTerms = new Set<string>(terms);
+      terms.forEach(term => {
+        const lowerTerm = term.toLowerCase();
+        if (lowerTerm.endsWith('s')) {
+          finalTerms.add(term.slice(0, -1));
+        } else {
+          if (!term.includes(' ')) {
+            finalTerms.add(term + 's');
+          }
+        }
+      });
+      
+      return Array.from(finalTerms).map(term => ({ ingredient: ing, searchTerm: term }));
+    })
+    .filter(item => item.searchTerm);
+
+    const uniqueSearchTermItems = Array.from(new Map(searchTermsWithIng.map(item => [item.searchTerm.toLowerCase(), item])).values());
+    uniqueSearchTermItems.sort((a, b) => b.searchTerm.length - a.searchTerm.length);
+
+    if (uniqueSearchTermItems.length === 0) {
+      return <Text style={[styles.stepText, isCompleted && styles.stepTextCompleted, isActive && styles.activeStepText]}>{step}</Text>;
+    }
+
+    const regex = new RegExp(`(${uniqueSearchTermItems.map(item => escapeRegex(item.searchTerm)).join('|')})`, 'gi');
+    const parts = step.split(regex);
+
+    return (
+      <Text style={[styles.stepText, isCompleted && styles.stepTextCompleted, isActive && styles.activeStepText]}>
+        {parts.filter(part => part).map((part, index) => {
+          const matchedItem = uniqueSearchTermItems.find(item => item.searchTerm.toLowerCase() === part.toLowerCase());
+          if (matchedItem) {
+            return (
+              <Text
+                key={index}
+                style={[styles.highlightedText, isCompleted && styles.stepTextCompleted]}
+                onPress={!isCompleted ? () => handleIngredientPress(matchedItem.ingredient) : undefined}
+              >
+                {part}
+              </Text>
+            );
+          }
+          return <Text key={index}>{part}</Text>;
+        })}
+      </Text>
+    );
+  };
+  // --- End Ingredient Tooltip Logic ---
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.centeredStatusContainer}>
@@ -156,6 +253,9 @@ export default function StepsScreen() {
     openToolsModal('timer');
   };
 
+  const firstUncompletedIndex = instructions.findIndex((_, index) => !completedSteps[index]);
+  const activeStepIndex = firstUncompletedIndex === -1 ? null : firstUncompletedIndex;
+
   return (
     <SafeAreaView style={styles.container}>
       <Animated.View entering={FadeIn.duration(300)} style={styles.header}>
@@ -180,56 +280,41 @@ export default function StepsScreen() {
       >
         {instructions.length > 0 ? (
             instructions.map((step, index) => (
-              <Animated.View
+              <TouchableOpacity
                 key={`step-${index}`}
-                entering={FadeInUp.delay(index * 50).duration(300)}
-                style={styles.stepItem}
+                onPress={() => toggleStepCompleted(index)}
+                activeOpacity={0.6}
               >
-                <View style={styles.stepNumberContainer}>
-                  <View style={[
-                    styles.stepNumber,
-                    completedSteps[index] && styles.stepNumberCompleted,
-                  ]}>
-                    {completedSteps[index] ? (
-                      <MaterialCommunityIcons name="check-circle" size={24} color={COLORS.white} />
-                    ) : (
-                      <Text style={styles.stepNumberText}>
-                        {index + 1}
-                      </Text>
+                <Animated.View
+                  entering={FadeInUp.delay(index * 50).duration(300)}
+                  style={[
+                    styles.stepItem,
+                    index === activeStepIndex && styles.activeStep
+                  ]}
+                >
+                  <View style={styles.stepNumberContainer}>
+                    <View style={[
+                      styles.stepNumber,
+                      completedSteps[index] && styles.stepNumberCompleted,
+                    ]}>
+                      {completedSteps[index] ? (
+                        <MaterialCommunityIcons name="check-circle" size={24} color={COLORS.white} />
+                      ) : (
+                        <Text style={styles.stepNumberText}>
+                          {index + 1}
+                        </Text>
+                      )}
+                    </View>
+                    {index < instructions.length - 1 && !completedSteps[index] && (
+                      <View style={styles.stepConnector} />
                     )}
                   </View>
-                  {index < instructions.length - 1 && (
-                    <View style={[
-                      styles.stepConnector,
-                      completedSteps[index] && styles.stepConnectorCompleted
-                    ]} />
-                  )}
-                </View>
-                
-                <View style={styles.stepContent}>
-                  <Text style={[
-                    styles.stepText,
-                    completedSteps[index] && styles.stepTextCompleted
-                  ]}>
-                    {step}
-                  </Text>
                   
-                  <TouchableOpacity
-                    style={[
-                      styles.markCompleteButton,
-                      completedSteps[index] && styles.markCompleteButtonActive
-                    ]}
-                    onPress={() => toggleStepCompleted(index)}
-                  >
-                    <Text style={[
-                      styles.markCompleteText,
-                      completedSteps[index] && styles.markCompleteTextActive
-                    ]}>
-                      {completedSteps[index] ? 'Completed' : 'Mark as Complete'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </Animated.View>
+                  <View style={styles.stepContent}>
+                    {renderHighlightedInstruction(step, !!completedSteps[index], index === activeStepIndex)}
+                  </View>
+                </Animated.View>
+              </TouchableOpacity>
             ))
           ) : (
             <View style={styles.centeredStatusContainerForBanner}> 
@@ -285,6 +370,31 @@ export default function StepsScreen() {
               onPress={handleMiniTimerPress}
           />
       )}
+
+      <Modal
+        transparent
+        visible={isTooltipVisible}
+        animationType="fade"
+        onRequestClose={() => setIsTooltipVisible(false)}
+      >
+        <Pressable style={styles.tooltipBackdrop} onPress={() => setIsTooltipVisible(false)}>
+          <Pressable style={styles.tooltipContainer}>
+            {selectedIngredient && (
+              <>
+                <Text style={styles.tooltipTitle}>{selectedIngredient.name}</Text>
+                {(selectedIngredient.amount || selectedIngredient.unit) && (
+                  <Text style={styles.tooltipText}>
+                    {selectedIngredient.amount || ''} {abbreviateUnit(selectedIngredient.unit || '')}
+                  </Text>
+                )}
+                {selectedIngredient.preparation && (
+                   <Text style={styles.tooltipPreparationText}>{selectedIngredient.preparation}</Text>
+                )}
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -323,8 +433,22 @@ const styles = StyleSheet.create({
   },
   stepItem: {
     flexDirection: 'row',
-    marginBottom: 20,
+    marginBottom: 15,
     alignItems: 'flex-start',
+    padding: 5,
+    borderRadius: 10,
+  },
+  activeStep: {
+    transform: [{ scale: 1.02 }],
+    backgroundColor: 'rgba(0,0,0,0.04)',
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 3,
   },
   stepNumberContainer: {
     alignItems: 'center',
@@ -355,9 +479,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.lightGray,
     marginVertical: 4,
   },
-  stepConnectorCompleted: {
-    backgroundColor: COLORS.primary,
-  },
   stepContent: {
     flex: 1,
     paddingBottom: 10,
@@ -373,25 +494,13 @@ const styles = StyleSheet.create({
     color: COLORS.gray,
     textDecorationLine: 'line-through',
   },
-  markCompleteButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-    alignSelf: 'flex-start',
+  activeStepText: {
+    fontSize: 18,
+    lineHeight: 26,
   },
-  markCompleteButtonActive: {
-    backgroundColor: COLORS.primaryLight,
-    borderColor: COLORS.primaryLight,
-  },
-  markCompleteText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 12,
+  highlightedText: {
+    fontFamily: 'Poppins-SemiBold',
     color: COLORS.primary,
-  },
-  markCompleteTextActive: {
-    color: COLORS.primary, 
   },
   completionContainer: {
     position: 'absolute',
@@ -466,5 +575,48 @@ const styles = StyleSheet.create({
   },
   toolsButton: {
     padding: 8,
+  },
+  // --- Tooltip Styles ---
+  tooltipBackdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  tooltipContainer: {
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    padding: 20,
+    width: '80%',
+    maxWidth: 300,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  tooltipTitle: {
+    fontFamily: 'Poppins-Bold',
+    fontSize: 18,
+    color: COLORS.textDark,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  tooltipText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 16,
+    color: COLORS.textDark,
+    textAlign: 'center',
+  },
+  tooltipPreparationText: {
+    fontFamily: 'Poppins-Italic',
+    fontSize: 14,
+    color: COLORS.darkGray,
+    marginTop: 4,
+    textAlign: 'center',
   },
 });

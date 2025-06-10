@@ -7,7 +7,7 @@ import { COLORS } from '@/constants/theme';
 import IngredientSubstitutionModal from './IngredientSubstitutionModal';
 import { StructuredIngredient, SubstitutionSuggestion } from '@/api/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { formatMeasurement } from '@/utils/format';
+import { formatMeasurement, abbreviateUnit } from '@/utils/format';
 import { coerceToStructuredIngredients } from '@/utils/ingredientHelpers';
 import { getScaledYieldText, scaleIngredient, parseAmountString, formatAmountNumber } from '@/utils/recipeUtils';
 import { useErrorModal } from '@/context/ErrorModalContext';
@@ -33,48 +33,7 @@ type IngredientsNavParams = {
 // --- End Types ---
 
 // --- Helper function for unit abbreviation (kept for display) ---
-export const abbreviateUnit = (unit: string | null): string | null => {
-  if (!unit) return null;
-  const lowerUnit = unit.toLowerCase();
-  switch (lowerUnit) {
-    case 'teaspoon':
-    case 'teaspoons':
-      return 'tsp';
-    case 'tablespoon':
-    case 'tablespoons':
-      return 'tbsp';
-    case 'pound':
-    case 'pounds':
-      return 'lb';
-    case 'kilogram':
-    case 'kilograms':
-      return 'kg';
-    case 'gram':
-    case 'grams':
-      return 'g';
-    case 'ounce':
-    case 'ounces':
-      return 'oz';
-    case 'milliliter':
-    case 'milliliters':
-      return 'ml';
-    case 'liter':
-    case 'liters':
-      return 'l';
-    case 'cup':
-    case 'cups':
-        return 'cup'; // Or keep as 'cup'
-    case 'pinch':
-    case 'pinches':
-        return 'pinch'; // Or keep as 'pinch'
-    case 'dash':
-    case 'dashes':
-        return 'dash'; // Or keep as 'dash'
-    // Add more common units as needed
-    default:
-      return unit; // Return original if no abbreviation found
-  }
-};
+/* This function has been moved to utils/format.ts */
 // --- End Helper function ---
 
 // --- Comment out old types/data ---
@@ -265,6 +224,7 @@ export default function IngredientsScreen() {
           title: navData.title,
           instructions: finalInstructions,
           substitutions_text: finalSubstitutionsText,
+          ingredients: displayIngredients,
           recipeYield: getScaledYieldText(navData.originalYieldDisplay, navData.scaleFactor),
           prepTime: navData.prepTime,
           cookTime: navData.cookTime,

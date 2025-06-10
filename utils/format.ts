@@ -22,4 +22,46 @@ export function formatMeasurement(amount: number): string {
   if (whole === 0 && closest.value === 1) return '1'; // e.g. 0.99 rounds to 1
   if (closest.value === 0) return `${whole}`;
   return whole > 0 ? `${whole} ${closest.label}` : `${closest.label}`;
-} 
+}
+
+export const abbreviateUnit = (unit: string | null): string | null => {
+  if (!unit) return null;
+  const lowerUnit = unit.toLowerCase();
+  switch (lowerUnit) {
+    case 'teaspoon':
+    case 'teaspoons':
+      return 'tsp';
+    case 'tablespoon':
+    case 'tablespoons':
+      return 'tbsp';
+    case 'pound':
+    case 'pounds':
+      return 'lb';
+    case 'kilogram':
+    case 'kilograms':
+      return 'kg';
+    case 'gram':
+    case 'grams':
+      return 'g';
+    case 'ounce':
+    case 'ounces':
+      return 'oz';
+    case 'milliliter':
+    case 'milliliters':
+      return 'ml';
+    case 'liter':
+    case 'liters':
+      return 'l';
+    case 'cup':
+    case 'cups':
+        return 'cup'; 
+    case 'pinch':
+    case 'pinches':
+        return 'pinch';
+    case 'dash':
+    case 'dashes':
+        return 'dash';
+    default:
+      return unit;
+  }
+}; 
