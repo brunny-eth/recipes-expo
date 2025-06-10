@@ -4,6 +4,9 @@ import logger from '../lib/logger';
 // Type definitions that might be shared or imported if structure grows
 export type ExtractedContent = {
   title: string | null;
+  description?: string | null;
+  image?: string | null;
+  thumbnailUrl?: string | null;
   ingredientsText: string | null;
   instructionsText: string | null;
   recipeYieldText?: string | null;
@@ -68,6 +71,9 @@ export function extractRecipeContent(html: string): ExtractedContent | null {
 
   // Initialize extracted fields
   let title: string | null = null;
+  let description: string | null = null;
+  let image: string | null = null;
+  let thumbnailUrl: string | null = null;
   let ingredientsText: string | null = null;
   let instructionsText: string | null = null;
   let recipeYieldText: string | null = null;
@@ -120,6 +126,24 @@ export function extractRecipeContent(html: string): ExtractedContent | null {
   if (recipeJson) { // This condition now means a valid Recipe object was found and assigned
     console.log("Found and using recipe data from JSON-LD."); // Updated log message
     title = recipeJson.name || null;
+    description = recipeJson.description || null;
+    
+    if (recipeJson.image) {
+        if (typeof recipeJson.image === 'string') {
+            image = recipeJson.image;
+        } else if (Array.isArray(recipeJson.image) && recipeJson.image.length > 0) {
+            const firstImage = recipeJson.image[0];
+            if (typeof firstImage === 'string') {
+                image = firstImage;
+            } else if (typeof firstImage === 'object' && firstImage.url) {
+                image = firstImage.url;
+            }
+        } else if (typeof recipeJson.image === 'object' && recipeJson.image.url) {
+            image = recipeJson.image.url;
+        }
+    }
+    thumbnailUrl = recipeJson.thumbnailUrl || null;
+
     // Ingredients can be string[]
     if (Array.isArray(recipeJson.recipeIngredient)) {
        ingredientsText = recipeJson.recipeIngredient.join('\n');
@@ -163,10 +187,10 @@ export function extractRecipeContent(html: string): ExtractedContent | null {
     // Fallback title extraction if needed, only if JSON-LD didn't yield one
     if (!title) title = $('title').first().text() || $('h1').first().text() || null;
 
-    console.log(`Extracted from JSON-LD - Title: ${!!title}, Ingredients: ${!!ingredientsText}, Instructions: ${!!instructionsText}, Yield: ${!!recipeYieldText}, Prep: ${!!prepTime}, Cook: ${!!cookTime}, Total: ${!!totalTime}`);
+    console.log(`Extracted from JSON-LD - Title: ${!!title}, Description: ${!!description}, Image: ${!!image}, Ingredients: ${!!ingredientsText}, Instructions: ${!!instructionsText}, Yield: ${!!recipeYieldText}, Prep: ${!!prepTime}, Cook: ${!!cookTime}, Total: ${!!totalTime}`);
     // If JSON-LD provides the essentials (ingredients AND instructions), return it (including times)
     if (ingredientsText && instructionsText) {
-        return { title, ingredientsText, instructionsText, recipeYieldText, isFallback, prepTime, cookTime, totalTime };
+        return { title, description, image, thumbnailUrl, ingredientsText, instructionsText, recipeYieldText, isFallback, prepTime, cookTime, totalTime };
     }
     // Continue to selector fallback if JSON-LD was incomplete for essentials
   }
@@ -556,5 +580,5 @@ export function extractRecipeContent(html: string): ExtractedContent | null {
   // Add logging for instructionsText
   console.log("[extractRecipeContent] Final instructionsText preview:\n", instructionsText?.slice(0, 500));
   // Return structure includes the fallback flag again
-  return { title, ingredientsText, instructionsText, recipeYieldText, isFallback, prepTime, cookTime, totalTime };
+  return { title, description, image, thumbnailUrl, ingredientsText, instructionsText, recipeYieldText, isFallback, prepTime, cookTime, totalTime };
 }

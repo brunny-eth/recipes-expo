@@ -143,6 +143,11 @@ export async function parseAndCacheRecipe(
                         logger.error({ requestId, error: processingError }, `URL processing failed during Gemini parse`);
                     } else {
                         finalRecipeData = geminiResponse.recipe;
+                        if (finalRecipeData && extractedContent) {
+                            finalRecipeData.description = extractedContent.description ?? null;
+                            finalRecipeData.image = extractedContent.image ?? null;
+                            finalRecipeData.thumbnailUrl = extractedContent.thumbnailUrl ?? null;
+                        }
                     }
                     overallTimings.geminiParse = geminiResponse.timings.geminiCombinedParse;
                     handlerUsage = geminiResponse.usage;

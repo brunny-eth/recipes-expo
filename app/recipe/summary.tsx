@@ -1,19 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator, Platform, Dimensions, Image } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { COLORS } from '@/constants/theme';
-import { scaleIngredient, parseServingsValue, getScaledYieldText } from '@/utils/recipeUtils'; // Correct import path assuming utils is under root/src or similar alias
+import { scaleIngredient, parseServingsValue, getScaledYieldText, parseAmountString, formatAmountNumber } from '@/utils/recipeUtils'; // Correct import path assuming utils is under root/src or similar alias
 import { StructuredIngredient } from '@/api/types';
 import { coerceToStructuredIngredients } from '@/utils/ingredientHelpers'; // Import the new helper
 import { useErrorModal } from '@/context/ErrorModalContext'; // Added import
 import InlineErrorBanner from '@/components/InlineErrorBanner'; // Import the new component
 
+// --- Calculate Button Widths ---
+const screenWidth = Dimensions.get('window').width;
+const contentHorizontalPadding = 20;
+const servingsContainerGap = 8;
+const numButtons = 5;
+const availableWidth = screenWidth - (contentHorizontalPadding * 2);
+const buttonTotalGap = servingsContainerGap * (numButtons - 1);
+const buttonWidth = (availableWidth - buttonTotalGap) / numButtons;
+
 // --- Define Types (Matching Backend Output) ---
 // Re-define types here or import from a shared types file
 type ParsedRecipe = {
   title: string | null;
+  description?: string | null;
+  image?: string | null;
+  thumbnailUrl?: string | null;
   ingredients: StructuredIngredient[] | string[] | null; // This holds the ORIGINAL ingredients initially
   instructions: string[] | null;
   substitutions_text: string | null;
@@ -94,8 +106,11 @@ export default function RecipeSummaryScreen() {
     setSelectedScaleFactor(factor);
   };
 
-  // Clean the title to remove attribution text like " - by Publisher"
-  const cleanTitle = recipe?.title?.replace(/\s*[–-]\s*by\s+.*$/i, '').trim();
+  // Clean the title to remove attribution text and "Recipe" suffix
+  const cleanTitle = recipe?.title
+    ?.replace(/\s*(?:[–-]\s*)?by\s+.*$/i, '') // Remove " - by Publisher"
+    .replace(/\s+recipe\s*$/i, '') // Remove "Recipe" from the end
+    .trim();
 
   const navigateToIngredients = () => {
     if (!recipe || !recipe.ingredients) return;
@@ -165,7 +180,9 @@ export default function RecipeSummaryScreen() {
   // Use the new helper for scaled yield text display
   const displayableYieldText = recipe.recipeYield || "its original quantity";
   // For the text indicating what it makes *now* after scaling:
-  const currentScaledResultText = getScaledYieldText(recipe.recipeYield, selectedScaleFactor);
+  const originalYieldNum = parseServingsValue(recipe.recipeYield);
+  const scaledYieldNum = originalYieldNum ? originalYieldNum * selectedScaleFactor : null;
+  const scaledYieldText = scaledYieldNum ? `~${formatAmountNumber(scaledYieldNum)}` : `its original quantity`;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -177,20 +194,30 @@ export default function RecipeSummaryScreen() {
          <View style={{ width: 40 }} /> 
       </View>
       
-      {cleanTitle && (
-        <Text style={styles.pageTitle}>{cleanTitle}</Text>
-      )}
-
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.recipeInfoContainer}>
+            {(recipe.image || recipe.thumbnailUrl) && (
+                <Image
+                    source={{ uri: (recipe.image || recipe.thumbnailUrl) as string }}
+                    style={styles.recipeImage}
+                    resizeMode="cover"
+                />
+            )}
+            <View style={styles.recipeTextContainer}>
+                {cleanTitle && (
+                    <Text style={styles.pageTitle}>{cleanTitle}</Text>
+                )}
+            </View>
+        </View>
+
         {/* Nutrition Info Section Removed */}
 
         {/* Servings Selector */} 
         <Text style={styles.sectionTitle}>Adjust Recipe Size</Text>
         <Text style={styles.servingQuestionPrompt}>
-          {/* Display initial yield string, then the result of scaling if factor is not 1 */}
-          {`This recipe makes ${displayableYieldText}.`}
-          {selectedScaleFactor !== 1.0 && 
-            ` You are viewing a version scaled to: ${currentScaledResultText}.`}
+          {selectedScaleFactor === 1.0
+            ? `This recipe makes ${displayableYieldText}.`
+            : `Now scaled to ${scaledYieldText} (from ${recipe.recipeYield} originally).`}
         </Text>
         <View style={styles.servingsContainer}>
           {scaleFactorOptions.map(option => (
@@ -205,43 +232,6 @@ export default function RecipeSummaryScreen() {
             </TouchableOpacity>
           ))}
         </View>
-        {/* 
-          The old originalYieldText that showed a complex string can be simplified or removed 
-          as the main prompt now includes the scaled result more clearly.
-          If we want to keep a note about the original, it can be simpler.
-        */}
-        {selectedScaleFactor !== 1.0 && recipe.recipeYield && (
-             <Text style={styles.originalYieldText}>
-                (Original recipe makes: {recipe.recipeYield})
-             </Text>
-        )}
-
-        {/* Time Info */} 
-         {(recipe.prepTime || recipe.cookTime || recipe.totalTime) && (
-             <View style={[styles.infoBox, styles.timeInfoBox]}>
-                 {recipe.prepTime && (
-                     <View style={styles.infoItem}>
-                         <MaterialCommunityIcons name="clock-outline" size={20} color={COLORS.secondary} />
-                         <Text style={styles.infoValue}>{recipe.prepTime}</Text>
-                         <Text style={styles.infoLabel}>Prep Time</Text>
-                     </View>
-                 )}
-                 {recipe.cookTime && (
-                      <View style={styles.infoItem}>
-                         <MaterialCommunityIcons name="clock-outline" size={20} color={COLORS.secondary} />
-                         <Text style={styles.infoValue}>{recipe.cookTime}</Text>
-                         <Text style={styles.infoLabel}>Cook Time</Text>
-                      </View>
-                 )}
-                  {recipe.totalTime && (
-                      <View style={styles.infoItem}>
-                         <MaterialCommunityIcons name="clock-outline" size={20} color={COLORS.secondary} />
-                         <Text style={styles.infoValue}>{recipe.totalTime}</Text>
-                         <Text style={styles.infoLabel}>Total Time</Text>
-                      </View>
-                 )}
-             </View>
-          )}
 
       </ScrollView>
 
@@ -279,50 +269,29 @@ const styles = StyleSheet.create({
   },
   pageTitle: {
     fontFamily: 'Poppins-Bold',
-    fontSize: 20,
+    fontSize: 18,
     color: COLORS.textDark,
-    textAlign: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    lineHeight: 26,
+    textAlign: 'left',
+    lineHeight: 24,
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 10,
+    paddingTop: 16,
     paddingBottom: Platform.OS === 'ios' ? 100 : 80, // Ensure space for the footer button
   },
-  infoBox: {
-      flexDirection: 'row',
-      justifyContent: 'space-around',
-      alignItems: 'center',
-      backgroundColor: COLORS.white,
-      padding: 15,
-      borderRadius: 12,
-      marginBottom: 25,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.08,
-      shadowRadius: 3,
-      elevation: 2,
+  recipeInfoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
   },
-  timeInfoBox: {
-      justifyContent: 'space-between', // Adjust for 3 items
+  recipeTextContainer: {
+    flex: 1,
   },
-  infoItem: {
-      alignItems: 'center',
-      minWidth: 80, // Give items some minimum space
-  },
-  infoValue: {
-      fontFamily: 'Poppins-Bold',
-      fontSize: 20,
-      color: COLORS.textDark,
-      marginTop: 5,
-  },
-  infoLabel: {
-      fontFamily: 'Poppins-Regular',
-      fontSize: 12,
-      color: COLORS.gray,
-      marginTop: 2,
+  recipeImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    marginRight: 16,
   },
   sectionTitle: {
       fontFamily: 'Poppins-SemiBold',
@@ -330,20 +299,20 @@ const styles = StyleSheet.create({
       color: COLORS.textDark,
       marginTop: 24,
       marginBottom: 12,
+      textAlign: 'left',
   },
   servingsContainer: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
       marginBottom: 10,
+      gap: servingsContainerGap,
   },
   servingButton: {
-      paddingVertical: 12,
-      paddingHorizontal: 18,
+      width: buttonWidth,
+      paddingVertical: 10,
       borderRadius: 8,
       borderWidth: 1,
       borderColor: COLORS.lightGray,
       backgroundColor: COLORS.white,
-      minWidth: 45, // Ensure buttons have size
       alignItems: 'center',
   },
   servingButtonSelected: {
@@ -352,19 +321,11 @@ const styles = StyleSheet.create({
   },
   servingButtonText: {
       fontFamily: 'Poppins-Medium',
-      fontSize: 16,
+      fontSize: 14,
       color: COLORS.textDark,
   },
   servingButtonTextSelected: {
       color: COLORS.primary,
-  },
-  originalYieldText: {
-      fontFamily: 'Poppins-Regular',
-      fontSize: 13,
-      color: COLORS.gray,
-      textAlign: 'center',
-      marginTop: 8,
-      marginBottom: 16,
   },
   footer: { /* Similar to other footers */
     padding: 20,
@@ -418,7 +379,7 @@ const styles = StyleSheet.create({
     color: COLORS.gray,
     marginBottom: 16,
     lineHeight: 22,
-    textAlign: 'center',
+    textAlign: 'left',
   },
   // Add styles for loading/error states if needed
 }); 
