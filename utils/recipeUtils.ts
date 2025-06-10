@@ -203,81 +203,82 @@ export function getScaledYieldText(yieldStr: string | null | undefined, factor: 
 }
 
 // --- Formatting Function ---
-const FRACTION_MAP: { [key: number]: string } = {
-  0.125: '1/8',
-  0.25: '1/4',
-  0.33: '1/3', 0.333: '1/3', 0.3333: '1/3',
-  0.5: '1/2',
-  0.66: '2/3', 0.666: '2/3', 0.6667: '2/3',
-  0.75: '3/4',
-  0.875: '7/8',
+const UNICODE_FRACTION_MAP: Record<string, string> = {
+    '1/2': '½', '1/3': '⅓', '2/3': '⅔', '1/4': '¼', '3/4': '¾',
+    '1/5': '⅕', '2/5': '⅖', '3/5': '⅗', '4/5': '⅘', '1/6': '⅙',
+    '5/6': '⅚', '1/8': '⅛', '3/8': '⅜', '5/8': '⅝', '7/8': '⅞'
 };
-const FRACTION_PRECISION = 0.02; // Increased from 0.01 to avoid over-matching small rounding artifacts
+
+const FRACTION_MAP_DECIMAL_TO_ASCII: { [key: number]: string } = {
+  0.125: '1/8', 0.166: '1/6', 0.1667: '1/6', 0.2: '1/5',
+  0.25: '1/4', 0.33: '1/3', 0.333: '1/3', 0.3333: '1/3',
+  0.375: '3/8', 0.4: '2/5', 0.5: '1/2', 0.6: '3/5',
+  0.625: '5/8', 0.66: '2/3', 0.666: '2/3', 0.6667: '2/3',
+  0.75: '3/4', 0.8: '4/5', 0.833: '5/6', 0.8333: '5/6', 0.875: '7/8',
+};
+
+const FRACTION_PRECISION = 0.02;
+
+function decimalToUnicodeFraction(decimal: number): string | null {
+  if (decimal <= 0) return null;
+
+  let bestAsciiMatch = '';
+  let minDiff = 1;
+  
+  for (const decimalVal in FRACTION_MAP_DECIMAL_TO_ASCII) {
+    const diff = Math.abs(decimal - parseFloat(decimalVal));
+    if (diff < FRACTION_PRECISION && diff < minDiff) {
+      minDiff = diff;
+      bestAsciiMatch = FRACTION_MAP_DECIMAL_TO_ASCII[decimalVal as unknown as keyof typeof FRACTION_MAP_DECIMAL_TO_ASCII];
+    }
+  }
+  
+  if (bestAsciiMatch) {
+    return UNICODE_FRACTION_MAP[bestAsciiMatch] || bestAsciiMatch;
+  }
+
+  const tolerance = 1.0E-6;
+  let h1 = 1; let h2 = 0;
+  let k1 = 0; let k2 = 1;
+  let b = decimal;
+  do {
+      let a = Math.floor(b);
+      let aux = h1; h1 = a * h1 + h2; h2 = aux;
+      aux = k1; k1 = a * k1 + k2; k2 = aux;
+      b = 1 / (b - a);
+  } while (Math.abs(decimal - h1 / k1) > decimal * tolerance && k1 <= 16);
+
+  if (k1 > 0 && k1 <= 16) {
+      const asciiFraction = `${h1}/${k1}`;
+      return UNICODE_FRACTION_MAP[asciiFraction] || asciiFraction;
+  }
+  
+  return null;
+}
 
 export const formatAmountNumber = (num: number | null): string | null => {
-  console.log("[debug-format] running with input:", num);
-  if (num === null || isNaN(num)) return null;
-  if (num <= 0) return null; // Don't format non-positive numbers typically
+  if (num === null || isNaN(num) || num <= 0) {
+      return null;
+  }
 
   const wholePart = Math.floor(num);
   const decimalPart = num - wholePart;
 
-  // If the decimal part is very close to 0 or 1, just round it
-  if (decimalPart < 0.13 || decimalPart > 0.87) {
-    const rounded = Math.round(num);
-    return rounded.toString();
+  if (decimalPart < FRACTION_PRECISION) {
+    return wholePart > 0 ? wholePart.toString() : null;
+  }
+  if (decimalPart > (1 - FRACTION_PRECISION)) {
+    return (wholePart + 1).toString();
   }
 
-  let fractionStr = '';
-
-  if (decimalPart > FRACTION_PRECISION) {
-    let bestMatch = '';
-    let minDiff = 1;
-
-    // Find closest fraction in our map
-    for (const decimalVal in FRACTION_MAP) {
-      const diff = Math.abs(decimalPart - parseFloat(decimalVal));
-      if (diff < FRACTION_PRECISION && diff < minDiff) {
-        minDiff = diff;
-        bestMatch = FRACTION_MAP[decimalVal];
-      }
-    }
-
-    if (bestMatch) {
-        fractionStr = bestMatch;
-    } else {
-        // If no close fraction, maybe round to 1 or 2 decimal places?
-        // Or attempt to convert to a generic fraction
-        const tolerance = 1.0E-6;
-        let h1 = 1; let h2 = 0;
-        let k1 = 0; let k2 = 1;
-        let b = decimalPart;
-        do {
-            let a = Math.floor(b);
-            let aux = h1; h1 = a * h1 + h2; h2 = aux;
-            aux = k1; k1 = a * k1 + k2; k2 = aux;
-            b = 1 / (b - a);
-        } while (Math.abs(decimalPart - h1 / k1) > decimalPart * tolerance && k1 <= 16); // Limit denominator
-
-        if (k1 <= 16) { // Only use if denominator is reasonable
-            fractionStr = `${h1}/${k1}`;
-        } else {
-            // Fallback: Round decimal if no good fraction found
-             fractionStr = parseFloat(decimalPart.toFixed(2)).toString(); 
-             // Remove leading zero if present (e.g., "0.33" -> ".33") - stylistic choice
-             if (fractionStr.startsWith('0.')) {
-                 fractionStr = fractionStr.substring(1);
-             }
-        }
-    }
+  const fractionStr = decimalToUnicodeFraction(decimalPart);
+  
+  if (fractionStr) {
+      const wholeStr = wholePart > 0 ? wholePart.toString() : '';
+      return `${wholeStr}${fractionStr}`;
   }
 
-  const wholeStr = wholePart > 0 ? wholePart.toString() : '';
-  const separator = wholePart > 0 && fractionStr ? ' ' : '';
-
-  const result = `${wholeStr}${separator}${fractionStr}`;
-  console.log("[debug-format]", num, "=>", result);
-  return result.trim() || null; // Return null if empty (e.g., input was 0)
+  return parseFloat(num.toFixed(1)).toString();
 };
 
 
