@@ -58,7 +58,7 @@ export default function TimerTool({
           {isActive ? (
             <MaterialCommunityIcons name="pause" size={32} color={COLORS.textDark} />
           ) : (
-            <MaterialCommunityIcons name="play" size={32} color={timeRemaining === 0 ? COLORS.darkGray : COLORS.textDark} />
+            <MaterialCommunityIcons name="play" size={32} color={COLORS.textDark} />
           )}
         </TouchableOpacity>
         <TouchableOpacity style={styles.controlButton} onPress={handleReset}>
@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   quickAddButton: {
-    backgroundColor: COLORS.lightGray,
+    backgroundColor: COLORS.secondary,
     paddingVertical: 10,
     paddingHorizontal: 15,
     borderRadius: 25,
@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
   },
   quickAddButtonText: {
     fontSize: 14,
-    color: COLORS.textDark,
+    color: COLORS.white,
     fontWeight: '500',
   },
   controlsContainer: {
@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     width: '70%',
   },
   controlButton: {
-    backgroundColor: '#fbeded',
+    backgroundColor: COLORS.primaryLight,
     padding: 15,
     borderRadius: 50,
     marginHorizontal: 10,

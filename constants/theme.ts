@@ -1,27 +1,20 @@
 export const COLORS = {
-  raisinBlack: '#262322',
-  tiffanyBlue: '#A6E4D9',
-  mintCream: '#F2FBF9',
-  verdigris: '#5CA8A1',
-  wenge: '#645959',
+  primary: '#B05B3B', // Primary Accent: burnt orange
+  primaryLight: '#D7AD9D', // A lighter shade of primary for backgrounds/hovers
+  secondary: '#5C6B73', // Tertiary/Border for secondary or disabled states
 
-  primary: '#FF6347',
-  primaryLight: '#FF8A65',
-  secondary: '#4CAF50',
-  accent: '#FFC107',
-  
-  background: '#FDFDFC',
+  background: '#F5F3EC', // Main app background
   white: '#FFFFFF',
   black: '#000000',
-  
-  textDark: '#333333',
+
+  textDark: '#27241F', // Neutral Text
   textLight: '#FFFFFF',
-  
-  lightGray: '#D3D3D3',
-  gray: '#808080',
-  
-  darkGray: '#4F4F4F',
-  
+
+  // Using Tertiary/Border color for grays and borders
+  lightGray: '#5C6B73',
+  gray: '#5C6B73',
+  darkGray: '#5C6B73',
+
   error: '#D32F2F',
   errorBackground: '#FFEBEE',
   success: '#2E7D32',

@@ -258,10 +258,10 @@ export default function StepsScreen() {
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.raisinBlack} />
+          <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textDark} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.toolsButton} onPress={() => setIsHeaderToolsVisible(true)}>
-            <MaterialCommunityIcons name="tools" size={24} color={COLORS.raisinBlack} />
+            <MaterialCommunityIcons name="tools" size={24} color={COLORS.textDark} />
         </TouchableOpacity>
       </Animated.View>
       
@@ -431,7 +431,7 @@ export default function StepsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.background,
   },
   header: {
     flexDirection: 'row',
@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
     paddingBottom: 6,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.lightGray,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.background,
   },
   backButton: {
     padding: 8,
