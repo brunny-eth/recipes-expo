@@ -133,6 +133,7 @@ export default function RecipeSummaryScreen() {
   
   const [recipe, setRecipe] = useState<ParsedRecipe | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   
   // NEW state for original yield value and selected scale factor
   const [originalYieldValue, setOriginalYieldValue] = useState<number | null>(null);
@@ -299,20 +300,32 @@ export default function RecipeSummaryScreen() {
         {/* --- Metadata Sections --- */}
         
         {/* Description */}
-        {recipe.description && (
-          <>
-            <Text style={styles.sectionTitle}>Description</Text>
-            <Text style={styles.sectionSubtext}>
-              {decode(recipe.description.length > 150 
-                ? `${recipe.description.substring(0, 150)}...`
-                : recipe.description)}
-            </Text>
-          </>
-        )}
+        {recipe.description && (() => {
+          const fullDescription = decode(recipe.description);
+          const sentences = fullDescription.split(/(?<=[.!?])\s+/);
+          const firstSentence = sentences[0] || fullDescription;
+          const canBeTruncated = sentences.length > 1 || (sentences.length === 1 && fullDescription.length > firstSentence.length);
+
+          return (
+            <>
+              <Text style={styles.sectionTitle}>Description</Text>
+              <Text style={styles.sectionSubtext}>
+                {isDescriptionExpanded ? fullDescription : firstSentence}
+                {canBeTruncated && (
+                  <Text style={styles.readMoreToggle} onPress={() => setIsDescriptionExpanded(prev => !prev)}>
+                    {isDescriptionExpanded ? ' Read less' : ' Read more'}
+                  </Text>
+                )}
+              </Text>
+            </>
+          );
+        })()}
+
+        {recipe.description && <View style={styles.divider} />}
 
         {/* Servings Selector */} 
         <Text style={styles.sectionTitle}>Adjust Recipe Size</Text>
-        <Text style={styles.sectionSubtext}>
+        <Text style={styles.helperText}>
           {selectedScaleFactor === 1.0
             ? `This recipe makes ${displayableYieldText}. We make it easy to scale it up or down.`
             : `Now scaled to ${scaledYieldText} (from ${recipe.recipeYield} originally).`}
@@ -331,12 +344,21 @@ export default function RecipeSummaryScreen() {
           ))}
         </View>
 
+        <View style={styles.divider} />
+
         {/* Allergen Info */}
         {detectedAllergens && detectedAllergens.length > 0 && (
             <>
                 <Text style={styles.sectionTitle}>Allergens</Text>
-                <Text style={styles.sectionSubtext}>
-                    This recipe contains {detectedAllergens.join(', ')}. You can substitute them out on the Ingredients page.
+                <Text style={styles.helperText}>
+                    This recipe contains{' '}
+                    {detectedAllergens.map((allergen, index) => (
+                      <React.Fragment key={allergen}>
+                        <Text style={styles.allergenText}>{allergen}</Text>
+                        {index < detectedAllergens.length - 1 && ', '}
+                      </React.Fragment>
+                    ))}
+                    . You can substitute them out on the Ingredients page.
                 </Text>
             </>
         )}
@@ -344,12 +366,11 @@ export default function RecipeSummaryScreen() {
         {/* Original Source */}
         {recipe.sourceUrl && (
           <>
-            <Text style={styles.sectionTitle}>Original Recipe Source</Text>
-            <TouchableOpacity onPress={() => Linking.openURL(recipe.sourceUrl!)}>
-              <Text style={styles.sourceLink}>
-                {recipe.sourceUrl.replace(/^https?:\/\//, '').replace(/\/$/, '').toLowerCase()}
-              </Text>
-            </TouchableOpacity>
+            <View style={styles.divider} />
+            <Text style={styles.sectionTitle}>From the Original Author</Text>
+            <Text style={styles.sourceLink} onPress={() => Linking.openURL(recipe.sourceUrl!)}>
+              Visit ↗︎
+            </Text>
           </>
         )}
 
@@ -423,29 +444,44 @@ const styles = StyleSheet.create({
       color: COLORS.textDark,
       marginBottom: 8,
       textAlign: 'left',
+      marginTop: 12,
   },
   sectionSubtext: {
     ...bodyText,
     color: COLORS.gray,
-    marginBottom: 24, // Spacing between sections
+    marginBottom: 12,
     lineHeight: 22,
     textAlign: 'left',
   },
-  sourceLink: {
+  helperText: {
     ...bodyText,
-    color: COLORS.primary,
-    textDecorationLine: 'underline',
-    marginBottom: 24,
+    color: '#8e8e8e',
+    marginBottom: 16,
     lineHeight: 22,
+    textAlign: 'left',
+  },
+  readMoreToggle: {
+    ...captionStrongText,
+    color: COLORS.primary,
+    marginLeft: 8,
+  },
+  allergenText: {
+    ...bodyStrongText,
+    color: COLORS.textDark, // Using a darker tone for emphasis as requested
+    fontWeight: '600',
+  },
+  sourceLink: {
+    ...bodyStrongText,
+    color: COLORS.primary,
   },
   servingsContainer: {
       flexDirection: 'row',
-      marginBottom: 24, // Increased for consistency
+      marginBottom: 12,
       gap: servingsContainerGap,
   },
   servingButton: {
       width: buttonWidth,
-      paddingVertical: 10,
+      paddingVertical: 8,
       borderRadius: 8,
       borderWidth: 1,
       borderColor: COLORS.lightGray,
@@ -515,6 +551,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     lineHeight: 22,
     textAlign: 'left',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#e6e0d9',
+    marginVertical: 12,
   },
   // Add styles for loading/error states if needed
 }); 
