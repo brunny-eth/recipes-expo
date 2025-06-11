@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
+import { titleText, captionStrongText } from '@/constants/typography';
 
 // Props expected from the parent (StepsScreen)
 interface TimerToolProps {
@@ -76,8 +77,8 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   timerDisplay: {
+    ...titleText,
     fontSize: 56,
-    fontWeight: 'bold',
     color: COLORS.textDark,
     marginBottom: 25,
     fontVariant: ['tabular-nums'],
@@ -97,9 +98,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   quickAddButtonText: {
+    ...captionStrongText,
     fontSize: 14,
     color: COLORS.white,
-    fontWeight: '500',
   },
   controlsContainer: {
     flexDirection: 'row',

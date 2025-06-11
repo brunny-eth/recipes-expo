@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator, Platform, Alert, Modal, Pressable } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator, Platform, Alert, Modal, Pressable, Image } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -11,6 +11,7 @@ import { formatMeasurement, abbreviateUnit } from '@/utils/format';
 import { coerceToStructuredIngredients } from '@/utils/ingredientHelpers';
 import { getScaledYieldText, scaleIngredient, parseAmountString, formatAmountNumber } from '@/utils/recipeUtils';
 import { useErrorModal } from '@/context/ErrorModalContext';
+import { titleText, bodyStrongText, bodyText, captionText } from '@/constants/typography';
 
 // --- Types ---
 // Added SubstitutionSuggestion type matching backend/modal
@@ -410,6 +411,7 @@ export default function IngredientsScreen() {
         >
           <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textDark} />
         </TouchableOpacity>
+        <Image source={require('@/assets/images/meez_logo.png')} style={styles.headerLogo} />
         <View style={styles.placeholder} />
       </Animated.View>
       
@@ -575,14 +577,19 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8, 
   },
+  headerLogo: {
+    width: 70,
+    height: 25,
+    resizeMode: 'center',
+    marginTop: 2,
+  },
   pageTitle: {
-    fontFamily: 'Poppins-Bold',
-    fontSize: 20,
+    ...titleText,
     color: COLORS.textDark,
     textAlign: 'center',
     paddingHorizontal: 20,
     paddingVertical: 12,
-    lineHeight: 26,
+    lineHeight: 34,
   },
   placeholder: {
     width: 24 + 16,
@@ -595,8 +602,7 @@ const styles = StyleSheet.create({
      marginBottom: 12,
   },
   ingredientTextSimple: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 16,
+    ...bodyText,
     color: COLORS.textDark,
     lineHeight: 24,
   },
@@ -618,8 +624,7 @@ const styles = StyleSheet.create({
       backgroundColor: COLORS.darkGray, // Or another disabled color
   },
   nextButtonText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 16,
+    ...bodyStrongText,
     color: COLORS.white,
     marginRight: 8,
   },
@@ -631,8 +636,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   errorText: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 16,
+    ...bodyText,
     color: COLORS.error, 
     textAlign: 'center',
     marginBottom: 20,
@@ -645,13 +649,12 @@ const styles = StyleSheet.create({
      borderRadius: 8,
   },
   backButtonText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 16,
+    ...bodyStrongText,
     color: COLORS.textDark,
   },
    placeholderText: {
-    fontFamily: 'Poppins-Italic',
-    fontSize: 14,
+    ...captionText,
+    fontStyle: 'italic',
     color: COLORS.darkGray,
     marginTop: 5,
     textAlign: 'center',
@@ -718,8 +721,7 @@ const styles = StyleSheet.create({
       justifyContent: 'space-between',
   },
   ingredientName: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 16,
+    ...bodyStrongText,
     color: COLORS.textDark,
     lineHeight: 24,
     flexShrink: 1, // Allow text to shrink if needed, but prefer wrapping
@@ -727,15 +729,14 @@ const styles = StyleSheet.create({
   },
   ingredientNameFullWidth: { // May no longer be needed, merged into ingredientName
     // ... keep for now, might remove later if unused ...
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 16,
+    ...bodyStrongText,
     color: COLORS.textDark,
     lineHeight: 24,
     flex: 1,
     marginRight: 8,
   },
   ingredientQuantityParenthetical: { // Style for the (qty unit) part
-    fontFamily: 'Poppins-Regular', // Less emphasis
+    ...bodyText,
     fontSize: 15, // Slightly smaller
     color: COLORS.darkGray, // Lighter color
   },
@@ -780,8 +781,7 @@ const styles = StyleSheet.create({
     maxWidth: 400,
   },
   helpModalText: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 16,
+    ...bodyText,
     color: COLORS.textDark,
     textAlign: 'center',
     lineHeight: 24,
@@ -800,14 +800,14 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   scaleInfoText: {
-    fontFamily: 'Poppins-Medium',
+    ...bodyStrongText,
     fontSize: 15,
     color: COLORS.white,
     textAlign: 'center',
   },
   ingredientPreparation: {
-    fontFamily: 'Poppins-Italic',
-    fontSize: 14,
+    ...captionText,
+    fontStyle: 'italic',
     color: COLORS.darkGray,
     marginTop: 2,
     marginLeft: 2,

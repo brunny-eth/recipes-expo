@@ -11,6 +11,7 @@ import {
 import { Picker } from '@react-native-picker/picker';
 import { COLORS } from '@/constants/theme';
 import { convertUnits, availableUnits, Unit, getUnitDisplayName } from '@/utils/units';
+import { sectionHeaderText, bodyText, captionText, bodyStrongText } from '@/constants/typography';
 
 export default function UnitsTool() {
   const [amount, setAmount] = useState<string>('1');
@@ -113,8 +114,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   title: {
-    fontSize: 20,
-    fontWeight: '600',
+    ...sectionHeaderText,
     color: COLORS.textDark,
     marginBottom: 20,
   },
@@ -134,7 +134,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: Platform.OS === 'ios' ? 12 : 8,
-    fontSize: 16,
+    ...bodyText,
     textAlign: 'center',
     marginRight: 5,
   },
@@ -153,12 +153,12 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   pickerItem: {
-    fontSize: 14,
+    ...captionText,
     height: Platform.OS === 'ios' ? 100 : undefined,
   },
   equalsText: {
+    ...bodyStrongText,
     fontSize: 18,
-    fontWeight: 'bold',
     color: COLORS.textDark,
     marginHorizontal: 5,
   },
@@ -169,8 +169,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   resultText: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    ...sectionHeaderText,
+    fontFamily: 'Inter-SemiBold, sans-serif',
     color: COLORS.primary,
     textAlign: 'center',
   },

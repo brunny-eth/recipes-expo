@@ -1,6 +1,6 @@
 import React from 'react';
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, SafeAreaView, Platform, Modal, Pressable } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, SafeAreaView, Platform, Modal, Pressable, Image } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
@@ -12,6 +12,7 @@ import { useErrorModal } from '@/context/ErrorModalContext';
 import InlineErrorBanner from '@/components/InlineErrorBanner';
 import { StructuredIngredient } from '@/api/types';
 import { abbreviateUnit } from '@/utils/format';
+import { titleText, sectionHeaderText, bodyText, bodyStrongText, captionText } from '@/constants/typography';
 
 export default function StepsScreen() {
   const params = useLocalSearchParams<{ recipeData?: string }>();
@@ -260,6 +261,7 @@ export default function StepsScreen() {
         >
           <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textDark} />
         </TouchableOpacity>
+        <Image source={require('@/assets/images/meez_logo.png')} style={styles.headerLogo} />
         <TouchableOpacity style={styles.toolsButton} onPress={() => setIsHeaderToolsVisible(true)}>
             <MaterialCommunityIcons name="tools" size={24} color={COLORS.textDark} />
         </TouchableOpacity>
@@ -447,18 +449,27 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
   },
+  headerLogo: {
+    width: 70,
+    height: 25,
+    resizeMode: 'center',
+    marginTop: 2,
+  },
+  headerMeezText: {
+    ...captionText,
+    color: COLORS.darkGray,
+  },
   stepsContainer: {
     paddingHorizontal: 20,
     paddingTop: 10,
   },
   pageTitle: {
-    fontFamily: 'Poppins-Bold',
-    fontSize: 20,
+    ...titleText,
     color: COLORS.textDark,
     textAlign: 'center',
     paddingHorizontal: 20,
     paddingVertical: 12,
-    lineHeight: 26,
+    lineHeight: 34,
   },
   stepItem: {
     flexDirection: 'row',
@@ -498,8 +509,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
   },
   stepNumberText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 16,
+    ...bodyStrongText,
     color: COLORS.textDark,
   },
   stepConnector: {
@@ -513,8 +523,7 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   stepText: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 15,
+    ...bodyText,
     color: COLORS.textDark,
     marginBottom: 12,
     lineHeight: 22, 
@@ -524,11 +533,12 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
   },
   activeStepText: {
+    ...bodyText,
     fontSize: 18,
     lineHeight: 26,
   },
   highlightedText: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: bodyStrongText.fontFamily,
     color: COLORS.primary,
   },
   completionContainer: {
@@ -551,14 +561,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   completionTitle: {
-    fontFamily: 'Poppins-Bold',
-    fontSize: 18,
+    ...sectionHeaderText,
     color: COLORS.primary,
     marginBottom: 4,
   },
   completionText: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 15,
+    ...bodyText,
     color: COLORS.textDark,
     marginBottom: 15, 
   },
@@ -576,8 +584,8 @@ const styles = StyleSheet.create({
     paddingTop: 20,
   },
   placeholderText: {
-    fontFamily: 'Poppins-Italic',
-    fontSize: 14,
+    ...captionText,
+    fontStyle: 'italic',
     color: COLORS.darkGray,
     marginTop: 20,
     textAlign: 'center',
@@ -609,8 +617,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
   },
   headerToolButtonText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 16,
+    ...bodyStrongText,
     color: COLORS.textDark,
     marginLeft: 12,
   },
@@ -638,21 +645,19 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   tooltipTitle: {
-    fontFamily: 'Poppins-Bold',
-    fontSize: 18,
+    ...sectionHeaderText,
     color: COLORS.textDark,
     marginBottom: 8,
     textAlign: 'center',
   },
   tooltipText: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 16,
+    ...bodyText,
     color: COLORS.textDark,
     textAlign: 'center',
   },
   tooltipPreparationText: {
-    fontFamily: 'Poppins-Italic',
-    fontSize: 14,
+    ...captionText,
+    fontStyle: 'italic',
     color: COLORS.darkGray,
     marginTop: 4,
     textAlign: 'center',

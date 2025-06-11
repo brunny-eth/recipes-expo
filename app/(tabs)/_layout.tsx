@@ -3,7 +3,7 @@ import { StyleSheet, Platform } from 'react-native';
 // import { Bookmark as BookmarkIcon } from 'lucide-react-native'; // Removed import
 import { MaterialCommunityIcons } from '@expo/vector-icons'; // Added import
 import { COLORS } from '@/constants/theme';
-import ChefIcon from '@/assets/images/Chef.svg';
+import { captionText } from '@/constants/typography';
 
 export default function TabLayout() {
   return (
@@ -20,7 +20,9 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color, size }: { color: string; size: number }) => <ChefIcon width={size} height={size} />,
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
+            <MaterialCommunityIcons name="home-outline" size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -43,10 +45,10 @@ const styles = StyleSheet.create({
     borderTopColor: COLORS.lightGray,
     height: 60,
     paddingBottom: Platform.OS === 'ios' ? 20 : 8,
-    paddingTop: 8,
+    paddingTop: 4,
   },
   tabBarLabel: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 12,
+    ...captionText,
+    fontSize: 11,
   },
 });

@@ -14,6 +14,7 @@ import {
 import { COLORS } from '@/constants/theme';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { sendMessageToGemini } from '@/utils/geminiApi';
+import { bodyText } from '@/constants/typography';
 
 interface Message {
   id: string;
@@ -182,11 +183,11 @@ const styles = StyleSheet.create({
     borderColor: COLORS.error,
   },
   userMessageText: {
-    fontSize: 16,
+    ...bodyText,
     color: COLORS.white,
   },
   botMessageText: {
-    fontSize: 16,
+    ...bodyText,
     color: COLORS.textDark,
   },
   inputContainer: {
@@ -207,7 +208,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingTop: Platform.OS === 'ios' ? 12 : 10,
     paddingBottom: Platform.OS === 'ios' ? 12 : 10,
-    fontSize: 16,
+    ...bodyText,
     marginRight: 10,
     color: COLORS.textDark,
   },

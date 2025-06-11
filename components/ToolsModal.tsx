@@ -7,6 +7,7 @@ import {
   Modal,
   Pressable,
   SafeAreaView,
+  Image,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, {
@@ -17,10 +18,10 @@ import Animated, {
 } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 import { COLORS } from '@/constants/theme';
-import ChefHat from '@/assets/images/Chef.svg';
 import TimerTool from './TimerTool';
 import UnitsTool from './UnitsTool';
 import HelpTool from './HelpTool';
+import { sectionHeaderText } from '@/constants/typography';
 
 export type ActiveTool = 'timer' | 'units' | 'help' | null;
 
@@ -81,7 +82,7 @@ export default function ToolsModal({
       default:
         return (
           <View style={styles.placeholderContainer}>
-            <ChefHat width={80} height={80} style={styles.chefIcon} />
+            <Image source={require('@/assets/images/meez_logo.png')} style={[styles.chefIcon, { width: 80, height: 80 }]} />
             <Text style={styles.placeholderText}>Click on a Tool to use it</Text>
           </View>
         );
@@ -172,10 +173,10 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   placeholderText: {
+    ...sectionHeaderText,
     fontSize: 18,
     color: COLORS.darkGray,
     textAlign: 'center',
-    fontWeight: '600',
   },
   toolPlaceholderText: {
     fontSize: 16,

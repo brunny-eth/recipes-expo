@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
+import { bodyText, captionStrongText } from '@/constants/typography';
 
 interface InlineErrorBannerProps {
   message: string;
@@ -77,8 +78,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   messageText: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 15,
+    ...bodyText,
     color: COLORS.error,
     lineHeight: 20,
   },
@@ -101,22 +101,19 @@ const styles = StyleSheet.create({
     marginBottom: 8, // Add margin if both buttons are shown
   },
   retryButtonText: {
+    ...captionStrongText,
     color: COLORS.white,
-    fontFamily: 'Poppins-Medium',
-    fontSize: 14,
   },
   goBackButton: {
     backgroundColor: COLORS.lightGray, // Or another distinct color
   },
   goBackButtonText: {
+    ...captionStrongText,
     color: COLORS.textDark,
-    fontFamily: 'Poppins-Medium',
-    fontSize: 14,
   },
   buttonText: { // General button text, can be overridden by specific button styles
+    ...captionStrongText,
     color: COLORS.white,
-    fontFamily: 'Poppins-Medium',
-    fontSize: 14,
   },
 });
 

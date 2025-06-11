@@ -1,21 +1,19 @@
 import React from 'react';
-import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useFrameworkReady } from '@/hooks/useFrameworkReady';
-import { useFonts, Poppins_400Regular, Poppins_500Medium, Poppins_600SemiBold, Poppins_700Bold } from '@expo-google-fonts/poppins';
+import { useFonts } from 'expo-font';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { COLORS } from '@/constants/theme';
 import { ErrorModalProvider } from '@/context/ErrorModalContext';
+import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 
 export default function RootLayout() {
   useFrameworkReady();
   
   const [fontsLoaded] = useFonts({
-    'Poppins-Regular': Poppins_400Regular,
-    'Poppins-Medium': Poppins_500Medium,
-    'Poppins-SemiBold': Poppins_600SemiBold,
-    'Poppins-Bold': Poppins_700Bold,
+    'Recoleta-Medium': require('../assets/fonts/Recoleta-Medium.otf'),
+    'Inter-Regular': require('../assets/fonts/Inter-Regular.ttf'),
+    'Inter-SemiBold': require('../assets/fonts/Inter-SemiBold.ttf'),
   });
 
   if (!fontsLoaded) {

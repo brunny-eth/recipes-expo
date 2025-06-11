@@ -16,7 +16,8 @@ import Animated, {
   SlideOutDown,
 } from 'react-native-reanimated';
 import { COLORS } from '@/constants/theme';
-import { abbreviateUnit } from './ingredients'; // Import helper if needed
+import { abbreviateUnit } from '@/utils/format';
+import { sectionHeaderText, bodyStrongText, captionText } from '@/constants/typography';
 
 interface SubstitutionOption {
   id: string;
@@ -170,8 +171,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   title: {
-    fontFamily: 'Poppins-Bold',
-    fontSize: 20,
+    ...sectionHeaderText,
     color: COLORS.textDark,
   },
   closeButton: {
@@ -220,26 +220,23 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   optionName: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 16,
+    ...bodyStrongText,
     color: COLORS.textDark,
     flexShrink: 1, // Allow name to wrap
     marginRight: 8, // Space between name and quantity
   },
   optionQuantity: { // Style for the quantity text
-    fontFamily: 'Poppins-Regular',
-    fontSize: 14,
+    ...captionText,
     color: COLORS.darkGray,
     textAlign: 'right',
   },
   optionDescription: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 14,
+    ...captionText,
     color: COLORS.darkGray,
   },
   noSuggestionsText: {
-      fontFamily: 'Poppins-Italic',
-      fontSize: 14,
+      ...captionText,
+      fontStyle: 'italic',
       color: COLORS.darkGray,
       textAlign: 'center',
       paddingVertical: 20,
@@ -251,11 +248,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   applyButtonDisabled: {
-    backgroundColor: COLORS.textGray,
+    backgroundColor: COLORS.darkGray,
   },
   applyButtonText: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 16,
+    ...bodyStrongText,
     color: COLORS.white,
   },
 }); 

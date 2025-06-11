@@ -1,33 +1,31 @@
-import { useState, useEffect } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
-import { useCallback } from 'react';
-import { useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Keyboard, ActivityIndicator, KeyboardAvoidingView, Platform, View as RNView } from 'react-native';
-import { useRouter, useNavigation } from 'expo-router';
-import Animated, { FadeIn, FadeInDown, useAnimatedStyle, withRepeat, withTiming } from 'react-native-reanimated';
+import React from 'react';
+import { useFocusEffect, useNavigation } from 'expo-router';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Keyboard, ActivityIndicator, KeyboardAvoidingView, Platform, View as RNView, Image } from 'react-native';
+import { useRouter } from 'expo-router';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { COLORS } from '@/constants/theme';
-import ChefIcon from '@/assets/images/Chef.svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import { useHandleError } from '@/hooks/useHandleError';
+import { titleText, bodyText, bodyStrongText, captionText } from '@/constants/typography';
 
 export default function HomeScreen() {
-  const [recipeUrl, setRecipeUrl] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [recipeUrl, setRecipeUrl] = React.useState('');
+  const [isLoading, setIsLoading] = React.useState(false);
   const router = useRouter();
   const navigation = useNavigation();
-  const [isInputFocused, setIsInputFocused] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [isInputFocused, setIsInputFocused] = React.useState(false);
+  const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   const { showError } = useErrorModal();
   const handleError = useHandleError();
 
   // Reset loading state when component mounts
-  useEffect(() => {
+  React.useEffect(() => {
     setIsLoading(false);
   }, []);
 
   useFocusEffect(
-    useCallback(() => {
+    React.useCallback(() => {
       setIsLoading(false);
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
@@ -37,13 +35,13 @@ export default function HomeScreen() {
   );
 
   // Update navigation options
-  useEffect(() => {
+  React.useEffect(() => {
     navigation.setOptions({
       headerLeft: () => null, // Remove back button
     });
   }, [navigation]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
       'keyboardDidShow',
       () => {
@@ -136,7 +134,7 @@ export default function HomeScreen() {
           entering={FadeIn.duration(500)}
           style={styles.logoContainer}
         >
-          <ChefIcon width={120} height={120} />
+          <Image source={require('@/assets/images/meez_logo.png')} style={{ width: 250, height: 120 }} />
           <Text style={styles.loadingText}>Loading....</Text>
           <View style={styles.loadingIndicator} />
           <Text style={styles.loadingHint}>
@@ -159,18 +157,17 @@ export default function HomeScreen() {
             entering={FadeIn.duration(500)}
             style={styles.logoContainer}
           >
-            <ChefIcon width={120} height={120} />
+            <Image source={require('@/assets/images/meez_logo.png')} style={{ width: 150, height: 150 }} />
           </Animated.View>
           
           <Animated.View 
             entering={FadeInDown.delay(300).duration(500)}
             style={styles.contentContainer}
           >
-            <Text style={styles.title}>Sift and Serve</Text>
             <View style={styles.featuresContainer}>
-              <Text style={styles.featureText}>No essays.</Text>
-              <Text style={styles.featureText}>No ads.</Text>
-              <Text style={styles.featureText}>Just the recipe you came for.</Text>
+              <Text style={styles.mainFeatureText}>No essays. No ads.</Text>
+              <Text style={styles.mainFeatureText}>Just the recipe.</Text>
+              <Text style={styles.featureText}>Skip the scrolling and start cooking.</Text>
             </View>
           </Animated.View>
 
@@ -178,7 +175,7 @@ export default function HomeScreen() {
             <View style={styles.inputContainer}>
               <TextInput
                 style={styles.input}
-                placeholder="Paste a recipe URL or text here"
+                placeholder="Drop a recipe link or text."
                 placeholderTextColor={COLORS.darkGray}
                 value={recipeUrl}
                 onChangeText={setRecipeUrl}
@@ -192,7 +189,7 @@ export default function HomeScreen() {
                 onPress={handleSubmit}
                 disabled={!recipeUrl}
               >
-                <Text style={{color: COLORS.white}}>Go</Text>
+                <Text style={styles.submitButtonText}>Go</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -218,28 +215,35 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-    paddingTop: 60, // Adjust as needed
+    paddingTop: 60, // Adjust this value to move the logo up or down
   },
   contentContainer: {
     alignItems: 'center',
   },
-  title: {
-    fontFamily: 'Poppins-Bold',
-    fontSize: 28,
-    color: COLORS.textDark,
-    marginBottom: 16,
-  },
   featuresContainer: {
     alignItems: 'center',
+    paddingHorizontal: 20,
+    marginTop: -48,
+  },
+  mainFeatureText: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 30,
+    color: COLORS.textDark,
+    textAlign: 'center',
+    marginBottom: 12,
+    lineHeight: 34,
   },
   featureText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 18,
-    color: COLORS.textDark,
-    marginBottom: 8,
+    fontFamily: 'Inter-Regular',
+    fontSize: 16,
+    color: COLORS.textDark, // instead of darkGray
+    opacity: 0.7, // gives contrast without using a different color
+    textAlign: 'center',
+    maxWidth: 300,
+    marginTop: 6,
   },
   inputWrapper: {
-    // This wrapper ensures the input stays at the bottom
+    marginBottom: 50, // Adjust this value to move the input bar up or down
   },
   inputContainer: {
     flexDirection: 'row',
@@ -248,44 +252,49 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   input: {
+    ...bodyText,
     flex: 1,
     height: 50,
     backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.5)',
     borderRadius: 8,
     paddingHorizontal: 15,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
     paddingRight: 60, // Make space for the button
-    fontFamily: 'Poppins-Regular',
   },
   submitButton: {
     position: 'absolute',
-    right: 10,
-    height: 40,
-    width: 40,
+    right: 6,
+    height: 38,
+    width: 50,
     backgroundColor: COLORS.primary,
-    borderRadius: 20,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
   submitButtonDisabled: {
-    backgroundColor: COLORS.lightGray,
+    backgroundColor: COLORS.darkGray,
+  },
+  submitButtonText: {
+    ...bodyStrongText,
+    color: COLORS.white,
   },
   loadingText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 20,
-    color: COLORS.textDark,
+    ...bodyStrongText,
     marginTop: 20,
-    marginBottom: 24,
+    fontSize: 18,
+    color: COLORS.textDark,
   },
   loadingIndicator: {
-    marginBottom: 30,
+    width: 60,
+    height: 3,
+    backgroundColor: COLORS.primary,
+    marginVertical: 15,
   },
   loadingHint: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 20,
-    color: COLORS.textDark,
+    ...captionText,
+    color: COLORS.darkGray,
     textAlign: 'center',
-    maxWidth: '80%',
+    paddingHorizontal: 40,
   },
 });

@@ -10,6 +10,7 @@ import { StructuredIngredient } from '@/api/types';
 import { coerceToStructuredIngredients } from '@/utils/ingredientHelpers'; // Import the new helper
 import { useErrorModal } from '@/context/ErrorModalContext'; // Added import
 import InlineErrorBanner from '@/components/InlineErrorBanner'; // Import the new component
+import { titleText, sectionHeaderText, bodyText, captionStrongText, bodyStrongText, captionText } from '@/constants/typography';
 
 const ALLERGENS = [
   {
@@ -274,6 +275,7 @@ export default function RecipeSummaryScreen() {
          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
            <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textDark} />
          </TouchableOpacity>
+         <Image source={require('@/assets/images/meez_logo.png')} style={styles.headerLogo} />
          <View style={{ width: 40 }} /> 
       </View>
       
@@ -369,7 +371,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  header: { /* Similar to other headers */
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -384,12 +386,17 @@ const styles = StyleSheet.create({
     padding: 8,
     marginLeft: -8, // Offset padding for visual alignment
   },
+  headerLogo: {
+    width: 70,
+    height: 25,
+    resizeMode: 'center',
+    marginTop: 2,
+  },
   pageTitle: {
-    fontFamily: 'Poppins-Bold',
-    fontSize: 18,
+    ...titleText,
     color: COLORS.textDark,
     textAlign: 'left',
-    lineHeight: 24,
+    lineHeight: 34,
   },
   scrollContent: {
     paddingHorizontal: 20,
@@ -411,23 +418,20 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   sectionTitle: {
-      fontFamily: 'Poppins-SemiBold',
-      fontSize: 18,
+      ...sectionHeaderText,
       color: COLORS.textDark,
       marginBottom: 8,
       textAlign: 'left',
   },
   sectionSubtext: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 15,
+    ...bodyText,
     color: COLORS.gray,
     marginBottom: 24, // Spacing between sections
     lineHeight: 22,
     textAlign: 'left',
   },
   sourceLink: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 15,
+    ...bodyText,
     color: COLORS.primary,
     textDecorationLine: 'underline',
     marginBottom: 24,
@@ -452,8 +456,7 @@ const styles = StyleSheet.create({
       borderColor: COLORS.primary,
   },
   servingButtonText: {
-      fontFamily: 'Poppins-Medium',
-      fontSize: 14,
+      ...captionStrongText,
       color: COLORS.textDark,
   },
   servingButtonTextSelected: {
@@ -474,8 +477,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   nextButtonText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 16,
+    ...bodyStrongText,
     color: COLORS.white,
     marginRight: 8,
   },
@@ -485,6 +487,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     backgroundColor: COLORS.background,
+    textAlign: 'center',
+    marginBottom: 20,
   },
   errorText: {
     fontFamily: 'Poppins-Regular',
@@ -501,13 +505,11 @@ const styles = StyleSheet.create({
      borderRadius: 8,
   },
   backButtonText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize: 16,
+    ...bodyStrongText,
     color: COLORS.textDark,
   },
   servingQuestionPrompt: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 15,
+    ...bodyText,
     color: COLORS.gray,
     marginBottom: 16,
     lineHeight: 22,
