@@ -18,7 +18,6 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({ recip
     const router = useRouter();
     const alreadyNavigated = useRef(false);
     const [isParsingFinished, setIsParsingFinished] = useState(false);
-    const [isChecklistComplete, setIsChecklistComplete] = useState(false);
     const [recipeData, setRecipeData] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
     const [componentKey, setComponentKey] = useState(0);
@@ -63,31 +62,20 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({ recip
     }, [recipeInput, componentKey]);
     
     useEffect(() => {
-        if (isParsingFinished && isChecklistComplete) {
-            if (!error && recipeData && !alreadyNavigated.current) {
-                alreadyNavigated.current = true;
-                console.log('[Router Push]', recipeData);
-                console.log('[LoadingExperienceScreen] useEffect: Both parsing and checklist complete. Navigating...');
-                router.replace({
-                  pathname: '/recipe/summary',
-                  params: { recipeData: JSON.stringify(recipeData) },
-                });
-            } else if (error) {
-                // If there's an error, we should probably not proceed.
-                // The error UI is already shown.
-            }
+        if (isParsingFinished && !error && recipeData && !alreadyNavigated.current) {
+            alreadyNavigated.current = true;
+            console.log('[Router Push]', recipeData);
+            console.log('[LoadingExperienceScreen] Parsing complete. Navigating...');
+            router.replace({
+              pathname: '/recipe/summary',
+              params: { recipeData: JSON.stringify(recipeData) },
+            });
         }
-    }, [isParsingFinished, isChecklistComplete, recipeData, error, onComplete, router]);
-
-    const handleChecklistComplete = () => {
-        console.log('[LoadingExperienceScreen] handleChecklistComplete called');
-        setIsChecklistComplete(true);
-    };
+    }, [isParsingFinished, recipeData, error, router]);
 
     const handleRetry = () => {
         setError(null);
         setIsParsingFinished(false);
-        setIsChecklistComplete(false);
         setComponentKey(prevKey => prevKey + 1);
     };
 
@@ -115,16 +103,14 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({ recip
   if (loadingMode === 'checklist') {
     return (
         <SafeAreaView style={styles.container}>
-            <Animated.View 
-                entering={FadeIn.duration(500)}
-                style={[styles.logoContainer, { justifyContent: 'center', flex: 1 }]}
-            >
-                <Image source={require('@/assets/images/meez_logo.png')} style={{ width: 120, height: 120 }} />
-                <Text style={styles.loadingHint}>Working on our mise en place...</Text>
-            </Animated.View>
-            <View style={{ flex: 1 }}>
-                <ChecklistProgress onChecklistComplete={handleChecklistComplete} isFinished={isParsingFinished} />
+            <View style={{ paddingTop: 24, gap: 16 }}>
+                <View style={{ alignItems: 'center', marginBottom: 12 }}>
+              <Image source={require('@/assets/images/meez_logo.png')} style={{ width: 120, height: 120 }} />
+              <Text style={styles.loadingHint}>Working on our mise en place...</Text>
             </View>
+        
+            <ChecklistProgress isFinished={isParsingFinished} />
+          </View>
         </SafeAreaView>
     );
   }

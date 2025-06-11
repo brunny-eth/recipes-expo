@@ -11,11 +11,10 @@ const STEPS = [
 ];
 
 interface ChecklistProgressProps {
-  onChecklistComplete: () => void;
   isFinished?: boolean;
 }
 
-const ChecklistProgress: React.FC<ChecklistProgressProps> = ({ onChecklistComplete, isFinished }) => {
+const ChecklistProgress: React.FC<ChecklistProgressProps> = ({ isFinished }) => {
   const checklistId = useRef(Math.random().toFixed(5));
   console.log(`[ChecklistProgress] Mount ID ${checklistId.current}`);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -67,12 +66,11 @@ const ChecklistProgress: React.FC<ChecklistProgressProps> = ({ onChecklistComple
       if (isLastStep && isFinished && !hasCompleted.current) {
         console.log('[ChecklistProgress] maybeComplete: Firing onChecklistComplete...');
         hasCompleted.current = true;
-        setTimeout(onChecklistComplete, 0);
       }
     };
 
     maybeComplete();
-  }, [currentStepIndex, isFinished, onChecklistComplete]);
+  }, [currentStepIndex, isFinished]);
 
   const getStepState = (stepIndex: number) => {
     if (stepIndex < currentStepIndex) {
@@ -85,7 +83,7 @@ const ChecklistProgress: React.FC<ChecklistProgressProps> = ({ onChecklistComple
   };
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} pointerEvents="none">
       {STEPS.map((step, index) => (
         <StepItem
           key={index}
@@ -100,7 +98,6 @@ const ChecklistProgress: React.FC<ChecklistProgressProps> = ({ onChecklistComple
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'flex-start',
     paddingHorizontal: 20,
