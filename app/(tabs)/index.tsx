@@ -73,8 +73,7 @@ export default function HomeScreen() {
             style={styles.contentContainer}
           >
             <View style={styles.featuresContainer}>
-              <Text style={styles.mainFeatureText}>No essays. No ads.</Text>
-              <Text style={styles.mainFeatureText}>Just the recipe.</Text>
+              <Text style={styles.mainFeatureText}>{'No essays. No ads.\nJust the recipe.'}</Text>
               <Text style={styles.featureText}>Skip the scrolling and start cooking.</Text>
             </View>
           </Animated.View>
@@ -93,9 +92,8 @@ export default function HomeScreen() {
                 onBlur={() => setIsInputFocused(false)}
               />
               <TouchableOpacity 
-                style={[styles.submitButton, !recipeUrl ? styles.submitButtonDisabled : null]} 
+                style={styles.submitButton} 
                 onPress={handleSubmit}
-                disabled={!recipeUrl}
               >
                 <Text style={styles.submitButtonText}>Go</Text>
               </TouchableOpacity>
@@ -140,6 +138,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 12,
     lineHeight: 34,
+    letterSpacing: -0.5,
   },
   featureText: {
     fontFamily: 'Inter-Regular',
@@ -157,26 +156,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
-    position: 'relative',
+    height: 50,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+    backgroundColor: COLORS.white,
+    overflow: 'hidden',
   },
   input: {
     ...bodyText,
     flex: 1,
-    height: 50,
-    backgroundColor: COLORS.white,
-    borderRadius: 8,
+    height: '100%',
     paddingHorizontal: 15,
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
-    paddingRight: 60, // Make space for the button
+    color: COLORS.textDark,
   },
   submitButton: {
-    position: 'absolute',
-    right: 6,
-    height: 38,
-    width: 50,
+    height: '100%',
+    width: 60,
     backgroundColor: COLORS.primary,
-    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },

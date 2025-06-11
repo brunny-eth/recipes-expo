@@ -3,15 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sift and Serve</title>
+    <title>Meez</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <header>
         <nav>
-            <div class="logo">Sift and Serve</div>
+            <div class="logo">
+                <a href="#" id="link-to-home-logo"><img src="meez_logo_header.png" alt="Meez"></a>
+            </div>
             <ul>
-                <li><a href="#" id="tab-home" class="active">Home</a></li>
                 <li><a href="#" id="tab-whatisthis">What is this?</a></li>
             </ul>
         </nav>
@@ -20,14 +21,17 @@
     <main>
         <section id="content-home" class="tab-content active">
             <div class="input-container">
-                <img src="Chef.svg" alt="Sift and Serve Chef Icon" id="chef-icon">
+                <img id="meez-logo" src="meez_logo.png" alt="Meez Logo">
+                <div class="tagline-container">
+                    <p class="main-tagline">No essays. No ads.<br>Just the recipe.</p>
+                    <p class="sub-tagline">Skip the scrolling and start cooking.</p>
+                </div>
                 <form id="recipe-form">
-                    <input type="url" id="recipe-url" placeholder="Paste a recipe URL..." required>
-                    <button type="submit">Sift</button>
+                    <input type="url" id="recipe-url" placeholder="Drop a recipe link or text." required>
+                    <button type="submit">Go</button>
                 </form>
-                <p class="tagline">No essays. No ads. Just the recipe you came for.</p>
                 <div id="qr-code-container" style="display: none;">
-                    <p>Scan this QR code with the Sift and Serve app:</p>
+                    <p>Scan this QR code with the Meez app:</p>
                     <img id="qr-code-img" src="" alt="QR Code">
                     <p id="qr-data-mock" style="font-size: 0.8em; color: #555;"></p>
                 </div>
@@ -36,20 +40,20 @@
 
         <section id="content-whatisthis" class="tab-content">
             <div class="whatisthis-container">
-                <h2>What is Sift and Serve?</h2>
-                <p>Sift and Serve helps you cut through the clutter of online recipes and focus on the cooking.</p>
+                <h2>What is Meez?</h2>
+                <p>Meez helps you cut through the clutter of online recipes and focus on the cooking.</p>
                 <p>No more scrolling through lengthy introductions, personal anecdotes, or endless ads. Just paste a recipe URL, and we'll give you the ingredients and instructions, quickly and cleanly.</p> 
                 <p>We also give you useful tools, help you substitute ingredients, and scale up recipe amounts to your needs.</p>
                 
-                <h2>How it Works</h2>
+                <h3>How it Works</h3>
                 <ol>
                     <li>Find a recipe online that you want to use.</li>
                     <li>Copy the URL of the recipe page.</li>
-                    <li>Paste the URL into the input bar on our <a href="#" id="link-to-home">Home page</a> or directly into the Sift and Serve mobile app.</li>
+                    <li>Paste the URL into the input bar on our <a href="#" id="link-to-home">Home page</a> or directly into the Meez mobile app.</li>
                     <li>Get a clutter-free recipe and start cooking.</li>
                 </ol>
 
-                <h2>Testimonials</h2>
+                <h3>Testimonials</h3>
                 <p><em>"This app is a game changer for my weekly meal prep!" - A Happy User</em></p>
                 <p><em>"Finally, a way to get straight to the recipe!" - Another Satisfied Cook</em></p>
             </div>

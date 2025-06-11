@@ -1,10 +1,49 @@
+/* FONT-FACE DECLARATIONS */
+@font-face {
+    font-family: 'Recoleta-Medium';
+    src: url('Recoleta-Medium.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Inter-Regular';
+    src: url('Inter-Regular.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Inter-SemiBold';
+    src: url('Inter-SemiBold.ttf') format('truetype');
+    font-weight: 600;
+    font-style: normal;
+}
+
+
+/* THEME COLORS */
+:root {
+    --primary: #B05B3B;
+    --primary-light: #D7AD9D;
+    --secondary: #5C6B73;
+    --background: #F5F3EC;
+    --white: #FFFFFF;
+    --black: #000000;
+    --text-dark: #27241F;
+    --text-light: #FFFFFF;
+    --light-gray: #5C6B73;
+    --gray: #5C6B73;
+    --dark-gray: #5C6B73;
+    --error: #D32F2F;
+}
+
 /* General Reset & Base Styles */
 body, html {
     margin: 0;
     padding: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
-    background-color: #F0F7F4; /* COLORS.background (mintCream) */
-    color: #32292F; /* COLORS.textDark (raisinBlack) */
+    font-family: 'Inter-Regular', sans-serif;
+    background-color: var(--background);
+    color: var(--text-dark);
     line-height: 1.6;
     height: 100%;
     display: flex;
@@ -14,8 +53,8 @@ body, html {
 /* Header & Navigation */
 header {
     width: 100%;
-    background-color: #FFFFFF; /* COLORS.white */
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    background-color: transparent; /* Changed from white */
+    box-shadow: none; /* Remove shadow */
     padding: 0 20px;
     box-sizing: border-box;
     position: fixed;
@@ -30,13 +69,12 @@ nav {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    height: 60px;
+    height: 80px; /* Increased height */
 }
 
-.logo {
-    font-size: 1.5em;
-    font-weight: bold;
-    color: #FF6B6B; /* COLORS.primary */
+.logo img {
+    height: 24px; /* Adjust as needed */
+    width: auto;
 }
 
 nav ul {
@@ -48,16 +86,18 @@ nav ul {
 
 nav ul li a {
     text-decoration: none;
-    color: #32292F; /* COLORS.textDark (raisinBlack) */
+    color: var(--text-dark);
     padding: 10px 15px;
     display: block;
     border-bottom: 2px solid transparent;
+    font-family: 'Inter-SemiBold';
+    font-size: 16px;
 }
 
 nav ul li a.active,
 nav ul li a:hover {
-    color: #FF6B6B; /* COLORS.primary */
-    border-bottom: 2px solid #FF6B6B; /* COLORS.primary */
+    color: var(--primary);
+    border-bottom-color: var(--primary);
 }
 
 /* Main Content Area */
@@ -89,22 +129,23 @@ main {
     to { opacity: 1; transform: translateY(0); }
 }
 
-/* Chef Icon */
-#chef-icon {
+/* Meez Logo */
+#meez-logo {
     display: block;
-    margin: 0 auto 30px auto; /* Centered, with margin below */
-    width: 100px; /* Adjust as needed */
-    height: auto;
+    margin: 0 auto;
+    width: 250px; /* From index.tsx */
+    height: 250px; /* From index.tsx */
 }
 
 /* Home Section Specifics */
 .input-container {
     text-align: center;
-    padding: 60px 20px;
+    padding: 40px 20px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
+    padding-top: 10vh;
     min-height: calc(100vh - 80px - 40px); /* Full viewport height minus header and some padding */
 }
 
@@ -112,33 +153,42 @@ main {
     display: flex;
     width: 100%;
     max-width: 600px;
+    margin-top: 20px;
     margin-bottom: 20px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     border-radius: 8px;
-    overflow: hidden; /* Ensures child elements conform to border radius */
+    overflow: hidden;
 }
 
 #recipe-url {
     flex-grow: 1;
     padding: 15px 20px;
-    font-size: 1.1em;
-    border: 1px solid #EEEEEE; /* COLORS.lightGray */
+    font-size: 16px; /* from bodyText */
+    font-family: 'Inter-Regular', sans-serif;
+    border: 1px solid var(--light-gray);
     border-right: none;
     border-radius: 8px 0 0 8px;
     outline: none;
-    background-color: #FFFFFF; /* Ensure input is white */
+    background-color: var(--white);
+    color: var(--text-dark);
 }
 
+#recipe-url::placeholder {
+    color: var(--dark-gray);
+}
+
+
 #recipe-url:focus {
-    border-color: #FF6B6B; /* COLORS.primary */
-    box-shadow: 0 0 0 0.2rem rgba(255,107,107,.25); /* Adjusted shadow for COLORS.primary */
+    border-color: var(--primary);
+    box-shadow: 0 0 0 0.2rem rgba(176, 91, 59, 0.25);
 }
 
 #recipe-form button {
     padding: 15px 25px;
-    font-size: 1.1em;
-    background-color: #FF6B6B; /* COLORS.primary */
-    color: #FFFFFF; /* COLORS.white for button text */
+    font-size: 16px; /* from bodyStrongText */
+    font-family: 'Inter-SemiBold', sans-serif;
+    background-color: var(--primary);
+    color: var(--white);
     border: none;
     cursor: pointer;
     border-radius: 0 8px 8px 0;
@@ -146,21 +196,37 @@ main {
 }
 
 #recipe-form button:hover {
-    background-color: #e05252; /* Darker shade of COLORS.primary */
+    background-color: #964d32; /* Darker shade of primary */
 }
 
-.tagline {
-    font-size: 1.3em;
-    color: #705D56; /* COLORS.wenge */
-    margin-top: 0; /* Adjusted by form margin-bottom */
-    margin-bottom: 30px;
+.tagline-container {
+    text-align: center;
+    padding-bottom: 30px;
 }
 
-/* QR Code Container */
+.main-tagline {
+    font-family: 'Inter-SemiBold';
+    font-size: 30px;
+    color: var(--text-dark);
+    margin-bottom: 12px;
+    line-height: 34px;
+}
+
+.sub-tagline {
+    font-family: 'Inter-Regular';
+    font-size: 16px;
+    color: var(--text-dark);
+    opacity: 0.7;
+    max-width: 300px;
+    margin: 6px auto 0 auto;
+}
+
+
+/* QR Code Container - Assuming this is still needed */
 #qr-code-container {
     margin-top: 30px;
     padding: 20px;
-    background-color: #FFFFFF; /* COLORS.white */
+    background-color: var(--white);
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.05);
     text-align: center;
@@ -175,30 +241,34 @@ main {
 
 /* "What is this?" Section */
 .whatisthis-container {
-    padding: 20px;
-    background-color: #FFFFFF; /* COLORS.white */
+    padding: 40px;
+    background-color: var(--white);
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-}
-
-.whatisthis-container h1 {
-    color: #32292F; /* COLORS.textDark (raisinBlack) */
-    margin-top: 0;
-    font-size: 2em;
+    margin-top: 20px;
 }
 
 .whatisthis-container h2 {
-    font-size: 1.5em;
-    color: #32292F; /* COLORS.textDark (raisinBlack) */
+    font-family: 'Recoleta-Medium', serif;
+    font-size: 22px; /* titleText */
+    color: var(--text-dark);
+    margin-top: 0;
+}
+
+.whatisthis-container h3 {
+    font-family: 'Recoleta-Medium', serif;
+    font-size: 20px; /* sectionHeaderText */
+    color: var(--text-dark);
     margin-top: 30px;
-    border-bottom: 1px solid #EEEEEE; /* COLORS.lightGray */
+    border-bottom: 1px solid var(--light-gray);
     padding-bottom: 5px;
 }
 
 .whatisthis-container p,
 .whatisthis-container ol {
-    font-size: 1.1em;
-    color: #32292F; /* COLORS.textDark (raisinBlack) */
+    font-family: 'Inter-Regular', sans-serif;
+    font-size: 16px; /* bodyText */
+    color: var(--text-dark);
 }
 
 .whatisthis-container ol {
@@ -209,115 +279,76 @@ main {
     margin-bottom: 10px;
 }
 
+.whatisthis-container a {
+    color: var(--primary);
+    text-decoration: none;
+    font-family: 'Inter-SemiBold';
+}
+
+.whatisthis-container a:hover {
+    text-decoration: underline;
+}
+
+.whatisthis-container em {
+    font-family: 'Inter-Regular';
+    font-style: italic;
+}
+
+
 /* Responsive Adjustments */
 @media (max-width: 768px) {
     nav {
-        flex-direction: column;
-        height: auto;
-        padding: 10px 0;
-    }
-
-    .logo {
-        margin-bottom: 10px;
-    }
-
-    nav ul {
-        flex-direction: column;
-        align-items: center;
-        width: 100%;
-    }
-
-    nav ul li {
-        width: 100%;
-        text-align: center;
-    }
-
-    nav ul li a {
-        border-bottom: none;
-        padding: 12px 15px;
-    }
-
-    nav ul li a.active,
-    nav ul li a:hover {
-        background-color: #FFE2E2; /* COLORS.primaryLight */
-        color: #FF6B6B; /* COLORS.primary */
-        border-bottom: none;
+        flex-direction: row; /* Keep horizontal on tablets */
+        height: 60px;
+        padding: 10px 20px;
     }
 
     main {
-        padding-top: 120px; /* Adjust for taller mobile header */
+        padding-top: 80px; /* Adjust for header */
     }
 
-    #recipe-form {
-        flex-direction: column;
-        max-width: 90%;
-        box-shadow: none;
-        border-radius: 0;
-    }
-
-    #recipe-url {
-        border-radius: 8px 8px 0 0;
-        border-right: 1px solid #ced4da;
-        text-align: center;
-    }
-
-    #recipe-form button {
-        border-radius: 0 0 8px 8px;
-        width: 100%;
-    }
-
-    .tagline {
-        font-size: 1.1em;
-        padding: 0 10px;
-    }
-
-    .input-container {
-        padding: 30px 10px;
-        min-height: calc(100vh - 120px - 20px);
-    }
-
-    .whatisthis-container h1 {
-        font-size: 1.8em;
-    }
-
-    .whatisthis-container h2 {
-        font-size: 1.3em;
-    }
-
-    .whatisthis-container p,
-    .whatisthis-container ol {
-        font-size: 1em;
-    }
-
-    #qr-code-img {
-        max-width: 150px;
+    .whatisthis-container {
+        padding: 20px;
     }
 }
 
 @media (max-width: 480px) {
-    .logo {
-        font-size: 1.3em;
+    nav {
+        flex-direction: row;
+        justify-content: space-between;
+        padding: 10px 20px;
+        height: 60px;
+    }
+
+    nav ul {
+        display: none; /* Simple hamburger menu might be better, but for now just hide on mobile */
     }
 
     main {
-        padding-top: 110px; /* Further adjust for potentially wrapped logo/nav */
+        padding-top: 60px;
     }
 
     .input-container {
-         min-height: calc(100vh - 110px - 20px);
+        padding: 20px;
+        min-height: calc(100vh - 60px);
     }
 
-    .tagline {
-        font-size: 1em;
+    .main-tagline {
+        font-size: 24px;
+        line-height: 28px;
+    }
+
+    .sub-tagline {
+        font-size: 14px;
     }
 
     #recipe-url,
     #recipe-form button {
-        font-size: 1em;
-        padding: 12px 15px;
+        font-size: 14px;
     }
 
-    #qr-code-img {
-        max-width: 120px;
+    #meez-logo {
+        width: 120px;
+        height: 120px;
     }
 } 

@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const placeholderQrUrl = `https://placehold.co/200x200/007bff/FFF/png?text=QR+for&font=roboto`;
             qrCodeImg.src = placeholderQrUrl;
             qrCodeImg.alt = `QR Code for ${url}`;
-            qrDataMock.textContent = `(Mock QR: would link to Sift and Serve app with recipe: ${url})`;
+            qrDataMock.textContent = `(Mock QR: would link to Meez app with recipe: ${url})`;
             qrCodeContainer.style.display = 'block';
             
             // Optionally, scroll to the QR code
@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         } else {
             // Simple validation feedback
-            alert('Please paste a recipe URL.');
+            alert('Please paste a recipe URL or recipe text.');
             qrCodeContainer.style.display = 'none';
         }
     });

@@ -104,7 +104,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({ recip
     return (
         <SafeAreaView style={styles.container}>
             <View style={{ paddingTop: 24, gap: 16 }}>
-                <View style={{ alignItems: 'center', marginBottom: 22 }}>
+                <View style={{ alignItems: 'center', marginBottom: 60 }}>
               <Image source={require('@/assets/images/meez_logo.png')} style={{ width: 120, height: 120 }} />
               <Text style={[styles.loadingHint, { marginTop: -10 }]}>Working on our mise en place...</Text>
             </View>
