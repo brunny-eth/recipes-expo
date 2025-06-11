@@ -139,6 +139,7 @@ export default function RecipeSummaryScreen() {
   const [selectedScaleFactor, setSelectedScaleFactor] = useState<number>(1.0); // Default to 1x
 
   useEffect(() => {
+    console.log('[SummaryScreen] Mount');
     setIsLoading(true); // Start loading
     setRecipe(null); // Reset recipe on new data
 

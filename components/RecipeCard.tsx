@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
   nutritionLabel: {
     fontFamily: 'Poppins-Regular',
     fontSize: 12,
-    color: COLORS.textGray,
+    color: COLORS.darkGray,
   },
   divider: {
     width: 1,

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useFocusEffect, useNavigation } from 'expo-router';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Keyboard, ActivityIndicator, KeyboardAvoidingView, Platform, View as RNView, Image } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Keyboard, KeyboardAvoidingView, Platform, View as RNView, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { COLORS } from '@/constants/theme';
@@ -11,30 +11,11 @@ import { titleText, bodyText, bodyStrongText, captionText } from '@/constants/ty
 
 export default function HomeScreen() {
   const [recipeUrl, setRecipeUrl] = React.useState('');
-  const [isLoading, setIsLoading] = React.useState(false);
   const router = useRouter();
   const navigation = useNavigation();
   const [isInputFocused, setIsInputFocused] = React.useState(false);
-  const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   const { showError } = useErrorModal();
-  const handleError = useHandleError();
 
-  // Reset loading state when component mounts
-  React.useEffect(() => {
-    setIsLoading(false);
-  }, []);
-
-  useFocusEffect(
-    React.useCallback(() => {
-      setIsLoading(false);
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-    }, [])
-  );
-
-  // Update navigation options
   React.useEffect(() => {
     navigation.setOptions({
       headerLeft: () => null, // Remove back button
@@ -44,15 +25,11 @@ export default function HomeScreen() {
   React.useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
       'keyboardDidShow',
-      () => {
-        // No longer need to manage keyboardVisible state
-      }
+      () => {}
     );
     const keyboardDidHideListener = Keyboard.addListener(
       'keyboardDidHide',
-      () => {
-        // No longer need to manage keyboardVisible state
-      }
+      () => {}
     );
 
     return () => {
@@ -68,82 +45,13 @@ export default function HomeScreen() {
     }
     const recipeInput = recipeUrl.trim();
     Keyboard.dismiss();
-    setIsLoading(true);
     
-    const baseBackendUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
-    const endpoint = '/api/recipes/parse';
-    const backendUrl = `${baseBackendUrl}${endpoint}`;
-
-    try {
-      console.log(`Sending request to: ${backendUrl} with input: ${recipeInput}`);
-      const response = await fetch(backendUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json', // Added to signal we prefer JSON
-        },
-        body: JSON.stringify({ input: recipeInput }),
-      });
-
-      if (response.ok) {
-        try {
-          const result = await response.json();
-          if (result.recipe) {
-            router.push({
-              pathname: '/recipe/summary',
-              params: { recipeData: JSON.stringify(result.recipe) }
-            });
-          } else {
-            console.error("Parsed recipe data key ('recipe') is missing in the response object:", result);
-            showError({ title: "Data Error", message: "Received incomplete recipe data from the server. Please check the format." });
-          }
-        } catch (jsonError: any) {
-          console.error("[HomeScreen] JSON parsing error even though response.ok was true. Status:", response.status, "Error:", jsonError);
-          const rawText = await response.text(); // Try to get raw text
-          console.error("[HomeScreen] Raw response text for jsonError:", rawText);
-          handleError(`Failed to parse server response: ${jsonError.message}. Server sent: ${rawText.substring(0,100)}...`, "ResponseParsingError");
-        }
-      } else {
-        const responseText = await response.text(); // Get text for non-ok responses
-        console.error(`[HomeScreen] Backend responded with status: ${response.status}. Response text:`, responseText);
-        // Try to parse as JSON if it might contain an error object, otherwise use the text
-        let backendErrorMsg = `Failed to process recipe (status ${response.status}).`;
-        try {
-          const errorJson = JSON.parse(responseText);
-          if (errorJson && errorJson.error) {
-            backendErrorMsg = errorJson.error;
-          }
-        } catch (e) {
-          // Not JSON, or no .error field, use the raw text if it's not too long
-          backendErrorMsg = responseText.length < 200 ? responseText : backendErrorMsg;
-        }
-        handleError(backendErrorMsg, "RecipeParsingBackend");
-      }
-    } catch (error: any) { // Catching network errors or other unexpected client-side errors
-      console.error("[HomeScreen] Catch all handleSubmit error:", error);
-      handleError(error, "RecipeParsingClient"); 
-    } finally {
-      setIsLoading(false); 
-    }
+    router.push({
+      pathname: '/loading',
+      params: { recipeInput },
+    });
+    setRecipeUrl(''); // Clear input after submission
   };
-
-  if (isLoading) {
-    return (
-      <SafeAreaView style={[styles.container, { justifyContent: 'center' }]}>
-        <Animated.View 
-          entering={FadeIn.duration(500)}
-          style={styles.logoContainer}
-        >
-          <Image source={require('@/assets/images/meez_logo.png')} style={{ width: 250, height: 120 }} />
-          <Text style={styles.loadingText}>Loading....</Text>
-          <View style={styles.loadingIndicator} />
-          <Text style={styles.loadingHint}>
-            just a moment while we transform the recipe into something more useful...
-          </Text>
-        </Animated.View>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={styles.container}>
