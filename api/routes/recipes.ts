@@ -1,12 +1,13 @@
 import { Router, Request, Response } from 'express'
 import { supabase } from '../lib/supabase'
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold, GenerationConfig, Content } from "@google/generative-ai"; // Import Google AI SDK
+import { Content } from "@google/generative-ai"; // For type only, no initialization
 import scraperapiClient from 'scraperapi-sdk';
 import { parseAndCacheRecipe } from '../services/parseRecipe';
 import { createRecipeWithIngredients } from '../services/recipeService';
 import { rewriteForSubstitution } from '../services/substitutionRewriter';
 import { scaleInstructions } from '../services/instructionScaling';
 import logger from '../lib/logger'; // Added import
+import geminiModel from "../lib/gemini";
 
 const router = Router()
 
@@ -17,35 +18,9 @@ if (!scraperApiKey) {
 }
 const scraperClient = scraperapiClient(scraperApiKey || ''); 
 
-// --- Initialize Google AI Client ---
-const googleApiKey = process.env.GOOGLE_API_KEY;
-if (!googleApiKey) {
-  logger.error({ context: 'init', missingKey: 'GOOGLE_API_KEY', nodeEnv: process.env.NODE_ENV }, 'GOOGLE_API_KEY environment variable is not set!');
-}
-const genAI = new GoogleGenerativeAI(googleApiKey || '');
-const geminiConfig: GenerationConfig = {
-  responseMimeType: "application/json",
-  temperature: 0.1, 
-};
-const safetySettings = [
-  { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-  { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-  { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-  { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-];
-
-// Add try/catch for Gemini model initialization
-let geminiModel: any; // Use 'any' or a more specific type if available for GenerativeModel
-try {
-  geminiModel = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash-latest",
-      generationConfig: geminiConfig,
-      safetySettings: safetySettings,
-  });
-} catch (e) {
-  logger.error({ context: 'init', error: e, message: (e as Error).message, stack: (e as Error).stack }, '❌ Failed to initialize Gemini model');
-  // Depending on how critical this is, you might want to prevent the app from starting
-  // or allow it to run in a degraded state if other routes don't depend on geminiModel.
+// Ensure the Gemini model is initialized
+if (!geminiModel) {
+  logger.error({ context: 'init' }, 'Gemini model failed to initialize. API routes depending on Gemini will not function.');
 }
 
 // Get all recipes
@@ -137,7 +112,7 @@ router.post('/parse', async (req: Request, res: Response) => {
       return res.status(500).json({ error: 'Server configuration error: Missing ScraperAPI key.' });
     }
 
-    const { recipe, error: parseError, fromCache, inputType, cacheKey, timings, usage, fetchMethodUsed } = await parseAndCacheRecipe(input, geminiModel, scraperApiKey, scraperClient);
+    const { recipe, error: parseError, fromCache, inputType, cacheKey, timings, usage, fetchMethodUsed } = await parseAndCacheRecipe(input, geminiModel!, scraperApiKey, scraperClient);
 
     if (parseError) {
       logger.error({ requestId, route: req.originalUrl, method: req.method, input, errMessage: parseError }, `Failed to process input via parseAndCacheRecipe`);
@@ -186,16 +161,11 @@ router.post('/rewrite-instructions', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Missing original or substituted ingredient name' });
     }
 
-    if (!googleApiKey) {
-      logger.error({ requestId, route: req.originalUrl, method: req.method, nodeEnv: process.env.NODE_ENV }, 'Server configuration error: Missing Google API key.');
-      return res.status(500).json({ error: 'Server configuration error: Missing Google API key.' });
-    }
-
     const { rewrittenInstructions, error: rewriteError, usage, timeMs } = await rewriteForSubstitution(
       originalInstructions,
       originalIngredientName,
       substitutedIngredientName,
-      geminiModel
+      geminiModel!
     );
 
     if (rewriteError || !rewrittenInstructions) {
@@ -232,21 +202,15 @@ router.post('/scale-instructions', async (req: Request, res: Response) => {
       logger.warn({ requestId, route: req.originalUrl, method: req.method, originalLength: originalIngredients.length, scaledLength: scaledIngredients.length }, "Original and scaled ingredient lists have different lengths. Scaling might be inaccurate.");
     }
 
-    if (!googleApiKey) {
-      logger.error({ requestId, route: req.originalUrl, method: req.method, nodeEnv: process.env.NODE_ENV }, 'Server configuration error: Missing Google API key.');
-      return res.status(500).json({ error: 'Server configuration error: Missing Google API key.' });
-    }
-
     const { scaledInstructions, error: scaleError, usage, timeMs } = await scaleInstructions(
       instructionsToScale,
       originalIngredients,
       scaledIngredients,
-      geminiModel
+      geminiModel!
     );
 
     if (scaleError || !scaledInstructions) {
-      // scaleInstructions service already logs details
-      logger.error({ requestId, route: req.originalUrl, method: req.method, errMessage: scaleError || 'Result was null' }, `Failed to scale instructions with Gemini`);
+      logger.error({ requestId, route: req.originalUrl, method: req.method, errMessage: scaleError || 'Result was null' }, 'Failed to scale instructions with Gemini');
       return res.status(500).json({ error: `Failed to scale instructions: ${scaleError || 'Unknown error'}` });
     } else {
       logger.info({ requestId, route: req.originalUrl, method: req.method, usage, timeMs }, 'Successfully scaled instructions.');
@@ -260,4 +224,4 @@ router.post('/scale-instructions', async (req: Request, res: Response) => {
   }
 });
 
-export const recipeRouter = router
+export const recipeRouter = router;
