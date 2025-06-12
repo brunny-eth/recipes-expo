@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { COLORS } from '@/constants/theme';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { sendMessageToGemini } from '@/utils/geminiApi';
+import { sendMessageWithFallback } from '@/utils/aiChat';
 import { bodyText } from '@/constants/typography';
 
 interface Message {
@@ -69,7 +69,7 @@ export default function HelpTool({ recipeInstructions, recipeSubstitutions }: He
 
     const messageWithContext = `${context}\n\nUser Question: ${newUserMessage.text}`;
 
-    const botResponseText = await sendMessageToGemini(messageWithContext, historyForApi);
+    const botResponseText = await sendMessageWithFallback(messageWithContext, historyForApi);
     
     setIsLoading(false);
 
