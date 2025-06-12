@@ -16,7 +16,6 @@ interface ChecklistProgressProps {
 
 const ChecklistProgress: React.FC<ChecklistProgressProps> = ({ isFinished }) => {
   const checklistId = useRef(Math.random().toFixed(5));
-  console.log(`[ChecklistProgress] Mount ID ${checklistId.current}`);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const intervalRef = useRef<number | null>(null);
   const hasCompleted = useRef(false);

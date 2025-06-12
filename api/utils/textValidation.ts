@@ -17,7 +17,7 @@ export function validateRecipeText(
     // console.warn(`[${requestId}] Text validation failed: Input text is empty.`); // Optional: specific log here
     return {
       isValid: false,
-      error: "Input text is empty.",
+      error: "It looks like you haven't entered any text. Please paste a recipe link or just the text.",
     };
   }
 
@@ -30,7 +30,7 @@ export function validateRecipeText(
     // );
     return {
       isValid: false,
-      error: `Input does not appear to be a valid recipe (too short and missing keywords).`,
+      error: `This doesn't seem to be a recipe. It's quite short and is missing enough context to be a full recipe. Please try again with a complete recipe.`,
     };
   }
 
@@ -40,7 +40,7 @@ export function validateRecipeText(
     // );
     return {
       isValid: false,
-      error: `Input is too short (length ${text.length}) to likely be a recipe.`,
+      error: `The recipe seems too short for us to process. Please check if you've pasted the full text.`,
     };
   }
 
@@ -50,7 +50,7 @@ export function validateRecipeText(
     // );
     return {
       isValid: false,
-      error: "Input is missing common recipe keywords (e.g., ingredients, instructions).",
+      error: "This doesn't seem to be a recipe. It's quite short and is missing enough context to be a full recipe. Please try again with a complete recipe.",
     };
   }
 

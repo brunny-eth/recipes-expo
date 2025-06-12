@@ -5,6 +5,8 @@ import ChecklistProgress from './ChecklistProgress';
 import { COLORS } from '@/constants/theme';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useHandleError } from '@/hooks/useHandleError';
+import { normalizeError } from '@/utils/normalizeError';
+import GlobalErrorModal from '../GlobalErrorModal';
 
 interface LoadingExperienceScreenProps {
   recipeInput: string;
@@ -44,14 +46,14 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({ recip
             if (result.recipe) {
               setRecipeData(result.recipe);
             } else {
-              setError("Received incomplete recipe data from the server.");
+              setError(normalizeError("Received incomplete recipe data from the server."));
             }
           } else {
             const responseText = await response.text();
-            setError(responseText || `Failed to process recipe (status ${response.status}).`);
+            setError(normalizeError(responseText || `Failed to process recipe (status ${response.status}).`));
           }
         } catch (e: any) {
-            setError(e.message || "A network error occurred.");
+            setError(normalizeError(e));
         } finally {
             setIsParsingFinished(true);
         }
@@ -83,53 +85,48 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({ recip
         onFailure();
     };
 
-    if (error) {
+    if (loadingMode === 'checklist') {
         return (
             <SafeAreaView style={styles.container}>
-                <View style={styles.errorContainer}>
-                    <Text style={styles.errorTitle}>Oops!</Text>
-                    <Text style={styles.errorMessage}>{error}</Text>
-                    <TouchableOpacity style={styles.button} onPress={handleRetry}>
-                        <Text style={styles.buttonText}>Retry</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.button} onPress={handleBack}>
-                        <Text style={styles.buttonText}>Go Back</Text>
-                    </TouchableOpacity>
+                <GlobalErrorModal
+                    visible={!!error}
+                    message={normalizeError(error)}
+                    title="Oops!"
+                    onClose={handleBack}
+                />
+                <View style={{ paddingTop: 24, gap: 16 }}>
+                    <View style={{ alignItems: 'center', marginBottom: 60 }}>
+                  <Image source={require('@/assets/images/meez_logo.png')} style={{ width: 120, height: 120 }} />
+                  <Text style={[styles.loadingHint, { marginTop: -10 }]}>Working on our mise en place...</Text>
                 </View>
+            
+                <ChecklistProgress isFinished={isParsingFinished} />
+              </View>
             </SafeAreaView>
         );
-    }
+      }
     
-  if (loadingMode === 'checklist') {
-    return (
-        <SafeAreaView style={styles.container}>
-            <View style={{ paddingTop: 24, gap: 16 }}>
-                <View style={{ alignItems: 'center', marginBottom: 60 }}>
-              <Image source={require('@/assets/images/meez_logo.png')} style={{ width: 120, height: 120 }} />
-              <Text style={[styles.loadingHint, { marginTop: -10 }]}>Working on our mise en place...</Text>
-            </View>
-        
-            <ChecklistProgress isFinished={isParsingFinished} />
-          </View>
+      return (
+        <SafeAreaView style={[styles.container, { justifyContent: 'flex-start', paddingTop: 60 }]}>
+          <GlobalErrorModal
+                visible={!!error}
+                message={normalizeError(error)}
+                title="Oops!"
+                onClose={handleBack}
+            />
+          <Animated.View 
+            entering={FadeIn.duration(500)}
+            style={styles.logoContainer}
+          >
+            <Image source={require('@/assets/images/meez_logo.png')} style={{ width: 120, height: 120 }} />
+            <Text style={styles.loadingText}>Loading....</Text>
+            <View style={styles.loadingIndicator} />
+            <Text style={styles.loadingHint}>
+              just a moment while we transform the recipe into something more useful...
+            </Text>
+          </Animated.View>
         </SafeAreaView>
-    );
-  }
-
-  return (
-    <SafeAreaView style={[styles.container, { justifyContent: 'flex-start', paddingTop: 60 }]}>
-      <Animated.View 
-        entering={FadeIn.duration(500)}
-        style={styles.logoContainer}
-      >
-        <Image source={require('@/assets/images/meez_logo.png')} style={{ width: 120, height: 120 }} />
-        <Text style={styles.loadingText}>Loading....</Text>
-        <View style={styles.loadingIndicator} />
-        <Text style={styles.loadingHint}>
-          just a moment while we transform the recipe into something more useful...
-        </Text>
-      </Animated.View>
-    </SafeAreaView>
-  );
+      );
 };
 
 const styles = StyleSheet.create({

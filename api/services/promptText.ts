@@ -30,18 +30,6 @@ export async function parseRawTextWithGemini(
     };
   }
 
-  // Add heuristic filter
-  const isLikelyGarbage = preparedText.length < 100 || !preparedText.match(/ingredients|directions|instructions/i);
-  if (isLikelyGarbage) {
-    console.warn(`[${requestId}] Input flagged as likely garbage: length ${preparedText.length}`);
-    return {
-      recipe: null,
-      error: 'Input does not appear to be a valid recipe (too short or missing keywords).',
-      usage: { inputTokens: 0, outputTokens: 0 }, // Default usage as no API call was made
-      timings: { geminiCombinedParse: Date.now() - handlerStartTime } // Time spent up to this point
-    };
-  }
-
   // Step 1: Truncate oversized text if needed
   const maxLength = 75000;
   const safeText = preparedText.length > maxLength

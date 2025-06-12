@@ -42,10 +42,8 @@ const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
     };
   });
 
-  // Conditional rendering to avoid issues with reanimated on initial mount when not visible
-  // if (!visible && opacity.value === 0) { 
-  //   return null;
-  // }
+  // Ensure message is always a string
+  const messageText = message || '';
 
   return (
     <Modal
@@ -63,9 +61,11 @@ const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
           aria-modal={true} // Indicate it's a modal dialog
         >
           <Text style={styles.titleText}>{title === null ? '' : title}</Text> {/* Changed: Render empty string for null title */}
-          <Text style={styles.messageText} accessibilityLiveRegion="polite">
-            {message || ''} {/* Ensured message is always a string */}
-          </Text>
+          <View style={styles.messageContainer}>
+            <Text style={styles.messageText} accessibilityLiveRegion="polite">
+              {messageText}
+            </Text>
+          </View>
           <Pressable style={[styles.button, { backgroundColor: primaryColor }]} onPress={onClose}>
             <Text style={styles.buttonText}>OK</Text>
           </Pressable>
@@ -108,14 +108,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: COLORS.textDark, // Ensuring title text color is set
   },
+  messageContainer: {
+    width: '100%',
+    marginBottom: 20,
+  },
   messageText: {
     fontSize: 16,
     fontFamily: 'Poppins-Regular', // Added Poppins
-    marginBottom: 20,
     textAlign: 'center',
-    // For accessibilityLiveRegion, this text should update dynamically
-    // and be announced. React Native handles this reasonably well by default
-    // when modal content changes while visible.
     color: COLORS.textDark, // Ensuring message text color is set
   },
   button: {
