@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator, Platform, Alert, Modal, Pressable, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ActivityIndicator, Platform, Alert, Modal, Pressable, Image, InteractionManager } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import Animated, { FadeIn } from 'react-native-reanimated';
+// import Animated, { FadeIn } from 'react-native-reanimated'; // Removed for gesture debug
 import { COLORS } from '@/constants/theme';
 import IngredientSubstitutionModal from './IngredientSubstitutionModal';
 import { StructuredIngredient, SubstitutionSuggestion } from '@/api/types';
@@ -12,6 +12,7 @@ import { coerceToStructuredIngredients } from '@/utils/ingredientHelpers';
 import { getScaledYieldText, scaleIngredient, parseAmountString, formatAmountNumber } from '@/utils/recipeUtils';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import { titleText, bodyStrongText, bodyText, captionText } from '@/constants/typography';
+import { FlatList } from 'react-native';
 
 // --- Types ---
 // Added SubstitutionSuggestion type matching backend/modal
@@ -45,7 +46,91 @@ const SAMPLE_RECIPES: Record<string, Recipe> = { ... };
 */
 // --- End Comment Out ---
 
+// Memoized row component to avoid unnecessary re-renders
+const IngredientRow = React.memo(({
+  ingredient,
+  index,
+  isChecked,
+  isSubstituted,
+  toggleCheckIngredient,
+  openSubstitutionModal
+}: {
+  ingredient: StructuredIngredient;
+  index: number;
+  isChecked: boolean;
+  isSubstituted: boolean;
+  toggleCheckIngredient: (idx: number) => void;
+  openSubstitutionModal: (ing: StructuredIngredient) => void;
+}) => {
+  if (__DEV__) {
+    console.log('[Row] Render:', ingredient.name);
+  }
+  return (
+    <TouchableOpacity 
+      key={`ing-${index}`} 
+      style={[styles.ingredientItemContainer, isSubstituted && styles.ingredientItemSubstituted]}
+      onPress={() => toggleCheckIngredient(index)}
+      activeOpacity={0.7} 
+    >
+      {/* Checkbox Visual */}
+      <View 
+        style={[styles.checkboxBase, isChecked && styles.checkboxChecked]}
+        testID={`checkbox-${ingredient.name}`}
+      >
+        {isChecked && <View style={styles.checkboxInnerCheck} />}
+      </View>
+
+      {/* Ingredient Text Container */}
+      <View style={styles.ingredientNameContainer}> 
+        <Text style={[styles.ingredientName, isChecked && styles.ingredientTextChecked, isSubstituted && styles.ingredientNameSubstituted]} numberOfLines={0}> 
+          {String(ingredient.name)}
+          {ingredient.preparation && (
+            <Text style={styles.ingredientPreparation}>
+              {` ${ingredient.preparation}`}
+            </Text>
+          )}
+          {(ingredient.amount || ingredient.unit) && (
+            <Text style={styles.ingredientQuantityParenthetical}>
+              {` (${ingredient.amount || ''}${ingredient.unit ? ` ${abbreviateUnit(ingredient.unit)}` : ''})`}
+            </Text>
+          )}
+        </Text>
+
+        {/* Substitution Button */}
+        {!isSubstituted && 
+         ingredient.suggested_substitutions && 
+         ingredient.suggested_substitutions.length > 0 && 
+         ingredient.suggested_substitutions.some(sub => sub && sub.name != null) && (
+          <TouchableOpacity 
+            style={styles.infoButton}
+            onPress={() => {
+              if (__DEV__) {
+                console.log('🥪 Substitution button pressed:', ingredient.name);
+              }
+              requestAnimationFrame(() => {
+                openSubstitutionModal(ingredient);
+              });
+            }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            testID={`substitution-button-${ingredient.name}`}
+          >
+            <MaterialCommunityIcons name="swap-horizontal" size={18} color={COLORS.primary} />
+          </TouchableOpacity>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+});
+
+// Utility for consistent timing logs in dev
+const logTiming = (label: string) => {
+  if (__DEV__) {
+    console.log(`[TIMING] ${label} at ${Date.now()}ms`);
+  }
+};
+
 export default function IngredientsScreen() {
+  console.log("🚨 INGREDIENTS SCREEN MOUNTED 🚨");
   const params = useLocalSearchParams<{ recipeData?: string }>();
   const router = useRouter();
   const { showError } = useErrorModal();
@@ -65,6 +150,19 @@ export default function IngredientsScreen() {
   const [isHelpModalVisible, setIsHelpModalVisible] = useState(false);
   const [selectedIngredientOriginalData, setSelectedIngredientOriginalData] = useState<StructuredIngredient | null>(null);
   const [processedSubstitutionsForModal, setProcessedSubstitutionsForModal] = useState<SubstitutionSuggestion[] | null>(null);
+
+  // Debug logs for modal visibility state changes
+  useEffect(() => {
+    if (__DEV__) {
+      console.log('[DEBUG] substitutionModalVisible:', substitutionModalVisible);
+    }
+  }, [substitutionModalVisible]);
+
+  useEffect(() => {
+    if (__DEV__) {
+      console.log('[DEBUG] selectedIngredientOriginalData:', selectedIngredientOriginalData);
+    }
+  }, [selectedIngredientOriginalData]);
 
   // Use useMemo for displayIngredients calculation
   const displayIngredients = useMemo(() => {
@@ -121,9 +219,11 @@ export default function IngredientsScreen() {
           return;
         }
 
-        setNavData(parsedNavData);
-        setAppliedSubstitution(null); 
-        setCheckedIngredients({}); 
+        InteractionManager.runAfterInteractions(() => {
+          setNavData(parsedNavData);
+          setAppliedSubstitution(null);
+          setCheckedIngredients({});
+        });
       } catch (e: any) { 
         console.error(`[IngredientsScreen] Failed to parse recipeData. Error: ${e.message}. Raw data:`, params.recipeData);
         showError({
@@ -146,6 +246,8 @@ export default function IngredientsScreen() {
   }, [params.recipeData, showError, router]);
 
   const navigateToNextScreen = useCallback(async () => {
+    const navStart = Date.now();
+    logTiming("Entered navigateToNextScreen");
     if (!navData || !displayIngredients) { 
       console.error("Cannot navigate, essential data is missing.");
       return;
@@ -157,7 +259,7 @@ export default function IngredientsScreen() {
 
     // --- 1. Handle Substitution Rewriting (if applicable) --- 
     if (appliedSubstitution) {
-      console.log("Applied substitution detected. Rewriting instructions...");
+      logTiming("Started rewriting instructions (LLM call)");
       setIsRewriting(true);
       try {
         const backendUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
@@ -174,6 +276,7 @@ export default function IngredientsScreen() {
         if (!response.ok) throw new Error(result.error || `Rewrite failed (Status: ${response.status})`);
         if (result.rewrittenInstructions) finalInstructions = result.rewrittenInstructions;
         else throw new Error("Invalid format for rewritten instructions.");
+        logTiming("Finished rewriting instructions");
       } catch (rewriteError) {
         console.error("Error rewriting instructions:", rewriteError);
         showError({ 
@@ -187,7 +290,7 @@ export default function IngredientsScreen() {
 
     // --- 2. Handle Instruction Scaling (if applicable) --- 
     if (needsScaling && displayIngredients.length > 0) {
-        console.log(`Scaling instructions for ${navData.scaleFactor}x of "${navData.originalYieldDisplay || 'original recipe'}"...`);
+        logTiming("Started scaling instructions");
         setIsScalingInstructions(true);
         try {
             const backendUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
@@ -204,7 +307,7 @@ export default function IngredientsScreen() {
              if (!response.ok) throw new Error(result.error || `Scaling failed (Status: ${response.status})`);
              if (result.scaledInstructions) {
                  finalInstructions = result.scaledInstructions;
-                 console.log("Successfully scaled instructions.");
+                 logTiming("Finished scaling instructions");
              } else throw new Error("Invalid format for scaled instructions.");
         } catch (scalingError) {
             console.error("Error scaling instructions:", scalingError);
@@ -217,6 +320,7 @@ export default function IngredientsScreen() {
         }
     }
 
+    logTiming("Beginning navigation to Steps screen");
     // --- 3. Navigate to Steps Screen --- 
     router.push({
       pathname: '/recipe/steps',
@@ -234,6 +338,8 @@ export default function IngredientsScreen() {
         })
       }
     });
+
+    logTiming(`navigateToNextScreen completed (total ${Date.now() - navStart}ms)`);
   }, [navData, displayIngredients, appliedSubstitution, router, showError]);
 
   const toggleCheckIngredient = (index: number) => {
@@ -243,7 +349,10 @@ export default function IngredientsScreen() {
     }));
   };
 
-  const openSubstitutionModal = (ingredient: StructuredIngredient) => {
+  const openSubstitutionModal = useCallback((ingredient: StructuredIngredient) => {
+      if (__DEV__) {
+        console.log('[openSubstitutionModal] called for:', ingredient.name);
+      }
       console.log("Opening substitution modal for:", JSON.stringify(ingredient)); 
       
       // --- Scaling Logic --- 
@@ -296,7 +405,7 @@ export default function IngredientsScreen() {
       setSelectedIngredientOriginalData(ingredient); // Store the original data
       setProcessedSubstitutionsForModal(scaledSuggestions); // Store the scaled suggestions for the modal
       setSubstitutionModalVisible(true);
-  };
+  }, [navData, setSelectedIngredientOriginalData, setProcessedSubstitutionsForModal, setSubstitutionModalVisible]);
 
   const handleApplySubstitution = (substitution: SubstitutionSuggestion) => {
     if (!selectedIngredientOriginalData || !displayIngredients) { 
@@ -378,6 +487,7 @@ export default function IngredientsScreen() {
     setSubstitutionModalVisible(false);
     setSelectedIngredientOriginalData(null);
     setProcessedSubstitutionsForModal(null);
+    console.log("✅ Substitution applied");
   };
 
   // --- Conditional Rendering (SHOULD BE AFTER ALL HOOKS) ---
@@ -400,161 +510,126 @@ export default function IngredientsScreen() {
   }
 
   // --- RENDER LOGIC (assuming navData is available) --- 
-  console.log("[IngredientsScreen] displayIngredients state before render:", JSON.stringify(displayIngredients, null, 2));
+  if (__DEV__) {
+    console.log("[IngredientsScreen] displayIngredients state before render:", JSON.stringify(displayIngredients, null, 2));
+  }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Animated.View entering={FadeIn.duration(300)} style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textDark} />
-        </TouchableOpacity>
-        <Image source={require('@/assets/images/meez_logo.png')} style={styles.headerLogo} />
-        <View style={styles.placeholder} />
-      </Animated.View>
-      
-      {navData?.title && (
-        <Text style={styles.pageTitle}>{navData.title}</Text>
-      )}
-      
-      <ScrollView style={styles.ingredientsList} showsVerticalScrollIndicator={false}>
-        {navData && navData.scaleFactor !== 1 && (
-          <View style={styles.scaleInfoBanner}>
-            <Text style={styles.scaleInfoText}>
-              {`Showing ${navData.scaleFactor}x scaled up ingredients`}
-            </Text>
-          </View>
-        )}
-
-        {displayIngredients && displayIngredients.length > 0 ? (
-            displayIngredients.map((ingredient, index) => {
-              const isChecked = !!checkedIngredients[index];
-              // Check if this specific ingredient is the one that was substituted
-              const isSubstituted = appliedSubstitution?.originalIndex === index;
-              
-              console.log('Ingredient:', ingredient);
-
-              return (
-                <TouchableOpacity 
-                  key={`ing-${index}`} 
-                  style={[styles.ingredientItemContainer, isSubstituted && styles.ingredientItemSubstituted]}
-                  onPress={() => toggleCheckIngredient(index)}
-                  activeOpacity={0.7} 
-                >
-                  {/* Checkbox Visual */}
-                  <View 
-                    style={[styles.checkboxBase, isChecked && styles.checkboxChecked]}
-                    testID={`checkbox-${ingredient.name}`}
-                  >
-                    {isChecked && <View style={styles.checkboxInnerCheck} />}
-                  </View>
-                  
-                  {/* Ingredient Text Container - Using combined structure */}
-                  <View style={styles.ingredientNameContainer}> 
-                    {/* Combined Text Element */}
-                    <Text style={[styles.ingredientName, isChecked && styles.ingredientTextChecked, isSubstituted && styles.ingredientNameSubstituted]} numberOfLines={0}> 
-                      {/* Display Name (already includes substitution info if applied) */}
-                      {String(ingredient.name)}
-                      {ingredient.preparation && (
-                        <Text style={styles.ingredientPreparation}>
-                          {` ${ingredient.preparation}`}
-                        </Text>
-                      )}
-                      {/* Display Quantity/Unit */}
-                      {(ingredient.amount || ingredient.unit) && (
-                        <Text style={styles.ingredientQuantityParenthetical}>
-                          {` (${ingredient.amount || ''}${ingredient.unit ? ` ${abbreviateUnit(ingredient.unit)}` : ''})`}
-                        </Text>
-                      )}
-                    </Text>
-
-                    {/* Substitution Button - Show only if NOT already substituted */}
-                    {!isSubstituted && 
-                     ingredient.suggested_substitutions && 
-                     ingredient.suggested_substitutions.length > 0 && 
-                     ingredient.suggested_substitutions.some(sub => sub && sub.name != null) && (
-                      <TouchableOpacity 
-                        style={styles.infoButton}
-                        onPress={() => openSubstitutionModal(ingredient)}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                        testID={`substitution-button-${ingredient.name}`}
-                      >
-                        <MaterialCommunityIcons name="swap-horizontal" size={18} color={COLORS.primary} />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </TouchableOpacity>
-              );
-            })
-          ) : (
-            <Text style={styles.placeholderText}>No ingredients found.</Text>
-          )}
-      </ScrollView>
-
-      <View style={styles.footer}>
-        <Pressable 
-          style={[
-            styles.nextButton, 
-            (isRewriting || isScalingInstructions) && styles.nextButtonDisabled
-          ]}
-          onPress={navigateToNextScreen}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          disabled={isRewriting || isScalingInstructions}
-        >
-          {(isRewriting || isScalingInstructions) && (
-            <ActivityIndicator size="small" color={COLORS.white} style={{ marginRight: 8 }}/>
-          )}
-          <Text style={styles.nextButtonText}>
-            {isRewriting ? 'Customizing instructions...' : isScalingInstructions ? 'Making sure everything lines up...' : 'Go to Steps'}
-          </Text>
-          {!(isRewriting || isScalingInstructions) && <MaterialCommunityIcons name="chevron-right" size={20} color={COLORS.white} />}
-        </Pressable>
-      </View>
-
-      {/* Substitution Modal - Pass processed suggestions */}
+    <>
       {selectedIngredientOriginalData && (
         <IngredientSubstitutionModal
           visible={substitutionModalVisible}
           onClose={() => {
             setSubstitutionModalVisible(false);
-            setSelectedIngredientOriginalData(null); // Clear original data state
-            setProcessedSubstitutionsForModal(null); // Clear processed suggestions
+            setSelectedIngredientOriginalData(null);
+            setProcessedSubstitutionsForModal(null);
           }}
-          ingredientName={selectedIngredientOriginalData.name} // Use name from original data
-          substitutions={processedSubstitutionsForModal} // Pass the scaled suggestions
+          ingredientName={selectedIngredientOriginalData.name}
+          substitutions={processedSubstitutionsForModal}
           onApply={handleApplySubstitution}
         />
       )}
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textDark} />
+          </TouchableOpacity>
+          <Image source={require('@/assets/images/meez_logo.png')} style={styles.headerLogo} />
+          <View style={styles.placeholder} />
+        </View>
+        
+        {navData?.title && (
+          <Text style={styles.pageTitle}>{navData.title}</Text>
+        )}
+        
+        <FlatList
+          data={displayIngredients}
+          keyExtractor={(item: StructuredIngredient) => item.name}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[styles.ingredientsList, { paddingBottom: 100 }]}
+          ListHeaderComponent={navData && navData.scaleFactor !== 1 ? (
+            <View style={styles.scaleInfoBanner}>
+              <Text style={styles.scaleInfoText}>{`Showing ${navData.scaleFactor}x scaled up ingredients`}</Text>
+            </View>
+          ) : undefined}
+          ListEmptyComponent={<Text style={styles.placeholderText}>No ingredients found.</Text>}
+          extraData={[substitutionModalVisible, selectedIngredientOriginalData]}
+          renderItem={({ item, index }: { item: StructuredIngredient; index: number }) => {
+            if (__DEV__) {
+              console.log('[FlashList renderItem] Rendering:', item.name);
+            }
+            const isChecked = !!checkedIngredients[index];
+            const isSubstituted = appliedSubstitution?.originalIndex === index;
+            return (
+              <IngredientRow
+                ingredient={item}
+                index={index}
+                isChecked={isChecked}
+                isSubstituted={isSubstituted}
+                toggleCheckIngredient={toggleCheckIngredient}
+                openSubstitutionModal={openSubstitutionModal}
+              />
+            );
+          }}
+        />
 
-      {/* Help Modal */}
-      <Modal
-        visible={isHelpModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsHelpModalVisible(false)} // For Android back button
-      >
-        <Pressable 
-          style={styles.helpModalBackdrop} 
-          onPress={() => setIsHelpModalVisible(false)} // Dismiss on backdrop press
-        >
-          <Pressable style={styles.helpModalContent} onPress={() => {}}> 
-            {/* Prevent backdrop press from triggering through content */}
-            <Text style={styles.helpModalText}>
-              Tip: substitute out an ingredient in the recipe by clicking the S next to the ingredient name. The recipe will adjust accordingly!
+        <View style={styles.footer}>
+          <Pressable 
+            style={[
+              styles.nextButton, 
+              (isRewriting || isScalingInstructions) && styles.nextButtonDisabled
+            ]}
+            onPress={() => {
+              logTiming("Button press fired");
+              InteractionManager.runAfterInteractions(() => {
+                logTiming("UI settled, navigating");
+                navigateToNextScreen();
+              });
+            }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            disabled={isRewriting || isScalingInstructions}
+          >
+            {(isRewriting || isScalingInstructions) && (
+              <ActivityIndicator size="small" color={COLORS.white} style={{ marginRight: 8 }}/>
+            )}
+            <Text style={styles.nextButtonText}>
+              {isRewriting ? 'Customizing instructions...' : isScalingInstructions ? 'Making sure everything lines up...' : 'Go to Steps'}
             </Text>
-            <TouchableOpacity 
-              style={styles.helpModalCloseButton} 
-              onPress={() => setIsHelpModalVisible(false)}
-            >
-              <MaterialCommunityIcons name="close" size={20} color={COLORS.textDark} />
-            </TouchableOpacity>
+            {!(isRewriting || isScalingInstructions) && <MaterialCommunityIcons name="chevron-right" size={20} color={COLORS.white} />}
           </Pressable>
-        </Pressable>
-      </Modal>
+        </View>
 
-    </SafeAreaView>
+        {/* Help Modal */}
+        <Modal
+          visible={isHelpModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setIsHelpModalVisible(false)} // For Android back button
+        >
+          <Pressable 
+            style={styles.helpModalBackdrop} 
+            onPress={() => setIsHelpModalVisible(false)} // Dismiss on backdrop press
+          >
+            <Pressable style={styles.helpModalContent} onPress={() => {}}> 
+              {/* Prevent backdrop press from triggering through content */}
+              <Text style={styles.helpModalText}>
+                Tip: substitute out an ingredient in the recipe by clicking the S next to the ingredient name. The recipe will adjust accordingly!
+              </Text>
+              <TouchableOpacity 
+                style={styles.helpModalCloseButton} 
+                onPress={() => setIsHelpModalVisible(false)}
+              >
+                <MaterialCommunityIcons name="close" size={20} color={COLORS.textDark} />
+              </TouchableOpacity>
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+      </SafeAreaView>
+    </>
   );
 }
 
