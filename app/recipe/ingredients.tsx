@@ -445,10 +445,13 @@ export default function IngredientsScreen() {
         setSelectedIngredientOriginalData(null);
 
         InteractionManager.runAfterInteractions(() => {
-          Alert.alert(
-            'Limit Reached',
-            'You can only remove up to 2 ingredients per recipe.'
-          );
+          setTimeout(() => {
+            console.log('🔥 Triggering showError modal');
+            showError({
+              title: 'Limit Reached',
+              message: 'You can only remove up to 2 ingredients per recipe.',
+            });
+          }, 300); // ⏳ delay to let first modal cleanly disappear
         });
         console.trace('Blocked 3rd removal – trace');
         return; // 🔒 prevent any state update
@@ -580,7 +583,7 @@ export default function IngredientsScreen() {
 
   return (
     <>
-      {selectedIngredientOriginalData && (
+      {substitutionModalVisible && selectedIngredientOriginalData && (
         <IngredientSubstitutionModal
           visible={substitutionModalVisible}
           onClose={() => {
@@ -667,18 +670,6 @@ export default function IngredientsScreen() {
             {!(isRewriting || isScalingInstructions) && <MaterialCommunityIcons name="chevron-right" size={20} color={COLORS.white} />}
           </Pressable>
         </View>
-
-        <TouchableOpacity
-          style={{ padding: 10, backgroundColor: 'red', margin: 20 }}
-          onPress={() =>
-            showError({
-              title: 'Test',
-              message: 'This is a manual error popup.'
-            })
-          }
-        >
-          <Text style={{ color: 'white' }}>Trigger Test Error</Text>
-        </TouchableOpacity>
 
         {/* Help Modal */}
         <Modal

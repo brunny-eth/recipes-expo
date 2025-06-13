@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,19 +18,12 @@ import Animated, {
 import { COLORS } from '@/constants/theme';
 import { abbreviateUnit } from '@/utils/format';
 import { sectionHeaderText, bodyStrongText, captionText } from '@/constants/typography';
+import { SubstitutionSuggestion } from '@/api/types';
 
 interface SubstitutionOption {
   id: string;
   name: string;
   description: string;
-}
-
-// Define the type for a single substitution suggestion (matching backend and ingredients screen)
-interface SubstitutionSuggestion {
-  name: string;
-  description?: string | null;
-  amount?: string | number | null; // Added
-  unit?: string | null;       // Added
 }
 
 interface IngredientSubstitutionModalProps {
@@ -49,6 +42,18 @@ export default function IngredientSubstitutionModal({
   onApply,
 }: IngredientSubstitutionModalProps) {
   const [selectedOption, setSelectedOption] = useState<SubstitutionSuggestion | null>(null);
+
+  useEffect(() => {
+    console.log('[Modal] substitutionModalVisible changed to:', visible);
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible) {
+      console.log('[Modal] substitution modal unmount requested');
+    }
+  }, [visible]);
+
+  console.log('[Render] substitution modal is', visible ? 'visible' : 'hidden');
 
   /* ----------------------------------------------------
    * Ensure a "Remove ingredient" option is always present
@@ -89,6 +94,7 @@ export default function IngredientSubstitutionModal({
       visible={visible}
       transparent
       animationType="none"
+      presentationStyle="overFullScreen"
       onRequestClose={onClose}
     >
       <View style={styles.modalContainer}>

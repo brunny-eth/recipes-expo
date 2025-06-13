@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 import GlobalErrorModal from '@/components/GlobalErrorModal';
 
 interface ErrorModalState {
@@ -21,14 +21,15 @@ export const ErrorModalProvider: React.FC<{ children: ReactNode }> = ({ children
     title: null,
   });
 
-  const showError = ({ message, title }: { message: any; title?: string }) => {
+  const showError = useCallback(({ message, title }: { message: any; title?: string }) => {
+    console.log("[GlobalErrorModal] Showing with:", title, message);
     const safeMessage = typeof message === 'string' ? message : String(message);
     setErrorState({ visible: true, message: safeMessage, title: title === undefined ? null : title });
-  };
+  }, []);
 
-  const hideError = () => {
+  const hideError = useCallback(() => {
     setErrorState({ visible: false, message: '', title: null });
-  };
+  }, []);
 
   return (
     <ErrorModalContext.Provider value={{ showError, hideError }}>
