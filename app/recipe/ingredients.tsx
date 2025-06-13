@@ -614,7 +614,7 @@ export default function IngredientsScreen() {
         
         <FlatList
           data={displayIngredients}
-          keyExtractor={(item: StructuredIngredient) => item.name}
+          keyExtractor={(item: StructuredIngredient, index: number) => `${item.name}-${index}`}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[styles.ingredientsList, { paddingBottom: 100 }]}
           ListHeaderComponent={navData && navData.scaleFactor !== 1 ? (
