@@ -21,8 +21,9 @@ export const ErrorModalProvider: React.FC<{ children: ReactNode }> = ({ children
     title: null,
   });
 
-  const showError = ({ message, title }: { message: string; title?: string }) => {
-    setErrorState({ visible: true, message, title: title === undefined ? null : title });
+  const showError = ({ message, title }: { message: any; title?: string }) => {
+    const safeMessage = typeof message === 'string' ? message : String(message);
+    setErrorState({ visible: true, message: safeMessage, title: title === undefined ? null : title });
   };
 
   const hideError = () => {

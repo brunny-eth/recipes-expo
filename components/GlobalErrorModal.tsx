@@ -21,7 +21,10 @@ const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
   const scale = useSharedValue(visible ? 1 : 0.7); // Initial scale based on visibility
   const opacity = useSharedValue(visible ? 1 : 0);   // Initial opacity based on visibility
 
+  console.log('[GlobalErrorModal] visible:', visible, 'message:', message);
+
   useEffect(() => {
+    console.log(`[GlobalErrorModal useEffect] visible changed to: ${visible}`);
     if (visible) {
       scale.value = withSpring(1, { damping: 15, stiffness: 200 });
       opacity.value = withTiming(1, { duration: 200 });
@@ -42,8 +45,9 @@ const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
     };
   });
 
-  // Ensure message is always a string
-  const messageText = message || '';
+  // Coerce title/message to safe display strings
+  const safeTitle = title ?? 'Something went wrong';
+  const safeMessage = typeof message === 'string' ? message : String(message ?? '');
 
   return (
     <Modal
@@ -60,10 +64,10 @@ const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
           accessibilityLabel={title === null ? undefined : title} // Changed: Convert null to undefined
           aria-modal={true} // Indicate it's a modal dialog
         >
-          <Text style={styles.titleText}>{title === null ? '' : title}</Text> {/* Changed: Render empty string for null title */}
+          <Text style={styles.titleText}>{safeTitle}</Text>
           <View style={styles.messageContainer}>
             <Text style={styles.messageText} accessibilityLiveRegion="polite">
-              {messageText}
+              {safeMessage}
             </Text>
           </View>
           <Pressable style={[styles.button, { backgroundColor: primaryColor }]} onPress={onClose}>

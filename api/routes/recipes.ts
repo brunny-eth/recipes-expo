@@ -149,22 +149,23 @@ router.post('/parse', async (req: Request, res: Response) => {
 // --- Rewrite Instructions Endpoint ---
 router.post('/rewrite-instructions', async (req: Request, res: Response) => {
   try {
-    const { originalInstructions, originalIngredientName, substitutedIngredientName } = req.body;
+    const { originalInstructions, substitutions } = req.body;
     const requestId = (req as any).id;
+
+    logger.info({ requestId, body: req.body }, '[rewrite-instructions] Received body');
 
     if (!originalInstructions || !Array.isArray(originalInstructions) || originalInstructions.length === 0) {
       logger.warn({ requestId, route: req.originalUrl, method: req.method }, 'Missing or invalid original instructions');
       return res.status(400).json({ error: 'Missing or invalid original instructions' });
     }
-    if (!originalIngredientName || !substitutedIngredientName) {
-      logger.warn({ requestId, route: req.originalUrl, method: req.method }, 'Missing original or substituted ingredient name');
-      return res.status(400).json({ error: 'Missing original or substituted ingredient name' });
+    if (!substitutions || !Array.isArray(substitutions)) {
+      logger.warn({ requestId, route: req.originalUrl, method: req.method }, 'Missing or invalid substitutions array');
+      return res.status(400).json({ error: 'Missing or invalid substitutions array' });
     }
 
     const { rewrittenInstructions, error: rewriteError, usage, timeMs } = await rewriteForSubstitution(
       originalInstructions,
-      originalIngredientName,
-      substitutedIngredientName,
+      substitutions,
       geminiModel!
     );
 

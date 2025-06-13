@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ActivityIndicator, Platform, Alert, Modal, Pressable, Image, InteractionManager } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -16,6 +16,7 @@ import { FlatList } from 'react-native';
 
 // --- Types ---
 // Added SubstitutionSuggestion type matching backend/modal
+type IngredientChange = { from: string; to: string | null };
 
 // Type for data received via navigation params
 type IngredientsNavParams = {
@@ -62,13 +63,15 @@ const IngredientRow = React.memo(({
   toggleCheckIngredient: (idx: number) => void;
   openSubstitutionModal: (ing: StructuredIngredient) => void;
 }) => {
-  if (__DEV__) {
-    console.log('[Row] Render:', ingredient.name);
-  }
+  /* removed verbose row render log */
   return (
     <TouchableOpacity 
       key={`ing-${index}`} 
-      style={[styles.ingredientItemContainer, isSubstituted && styles.ingredientItemSubstituted]}
+      style={[
+        styles.ingredientItemContainer,
+        isSubstituted && styles.ingredientItemSubstituted,
+        ingredient.name.includes('(removed') && styles.ingredientItemRemoved,
+      ]}
       onPress={() => toggleCheckIngredient(index)}
       activeOpacity={0.7} 
     >
@@ -104,9 +107,7 @@ const IngredientRow = React.memo(({
           <TouchableOpacity 
             style={styles.infoButton}
             onPress={() => {
-              if (__DEV__) {
-                console.log('🥪 Substitution button pressed:', ingredient.name);
-              }
+              /* removed verbose button press log */
               requestAnimationFrame(() => {
                 openSubstitutionModal(ingredient);
               });
@@ -130,7 +131,7 @@ const logTiming = (label: string) => {
 };
 
 export default function IngredientsScreen() {
-  console.log("🚨 INGREDIENTS SCREEN MOUNTED 🚨");
+  if (__DEV__) console.log("🚨 INGREDIENTS SCREEN MOUNTED 🚨");
   const params = useLocalSearchParams<{ recipeData?: string }>();
   const router = useRouter();
   const { showError } = useErrorModal();
@@ -140,16 +141,13 @@ export default function IngredientsScreen() {
   const [checkedIngredients, setCheckedIngredients] = useState<{ [key: number]: boolean }>({});
   const [substitutionModalVisible, setSubstitutionModalVisible] = useState(false);
   const [selectedIngredient, setSelectedIngredient] = useState<StructuredIngredient | null>(null);
-  const [appliedSubstitution, setAppliedSubstitution] = useState<{
-     originalIndex: number; 
-     originalName: string; 
-     substitution: SubstitutionSuggestion
-  } | null>(null);
+  const [appliedChanges, setAppliedChanges] = useState<IngredientChange[]>([]);
   const [isRewriting, setIsRewriting] = useState(false);
   const [isScalingInstructions, setIsScalingInstructions] = useState(false);
   const [isHelpModalVisible, setIsHelpModalVisible] = useState(false);
   const [selectedIngredientOriginalData, setSelectedIngredientOriginalData] = useState<StructuredIngredient | null>(null);
   const [processedSubstitutionsForModal, setProcessedSubstitutionsForModal] = useState<SubstitutionSuggestion[] | null>(null);
+  const processedRecipeData = useRef<string | null>(null);
 
   // Debug logs for modal visibility state changes
   useEffect(() => {
@@ -178,7 +176,7 @@ export default function IngredientsScreen() {
     if (!source) return null;
 
     const structured = coerceToStructuredIngredients(source);
-    console.log("Structured ingredients with potential preparation fields:", JSON.stringify(structured, null, 2));
+    // removed verbose structured ingredients log
     // Only scale if using original
     return usingOriginal
       ? structured.map(i => scaleIngredient(i, scale))
@@ -200,55 +198,82 @@ export default function IngredientsScreen() {
   }, []);
 
   useEffect(() => {
-    setIsLoading(true);
-    setNavData(null); // Reset navData on new params
+    // 🚫 Prevent resets after a failed substitution
+    if (
+      params.recipeData &&
+      params.recipeData === processedRecipeData.current
+    ) {
+      console.warn("🔁 Duplicate recipeData received — skipping reprocessing");
+      return;
+    }
+    // Only re-process if the recipeData param has actually changed
+    if (params.recipeData && params.recipeData !== processedRecipeData.current) {
+      setIsLoading(true);
 
-    if (params.recipeData && typeof params.recipeData === 'string') { // Ensure it exists and is a string
-      try {
-        console.log("[IngredientsScreen] Attempting to parse recipeData param:", params.recipeData);
-        const parsedNavData = JSON.parse(params.recipeData) as IngredientsNavParams;
-        // console.log("[IngredientsScreen] Parsed Nav Data:", JSON.stringify(parsedNavData, null, 2)); 
+      if (typeof params.recipeData === 'string') {
+        try {
+          console.log("[IngredientsScreen] New recipeData detected, parsing:", params.recipeData);
+          const parsedNavData = JSON.parse(params.recipeData) as IngredientsNavParams;
 
-        if (!parsedNavData || typeof parsedNavData !== 'object' || Object.keys(parsedNavData).length === 0) {
-          console.error("[IngredientsScreen] Parsed nav data is empty or invalid. Original data:", params.recipeData);
+          if (!parsedNavData || typeof parsedNavData !== 'object' || Object.keys(parsedNavData).length === 0) {
+            console.error("[IngredientsScreen] Parsed nav data is empty or invalid. Original data:", params.recipeData);
+            showError({
+              title: "Error Loading Ingredients",
+              message: "Ingredient data is invalid. Please go back and try again."
+            });
+            setIsLoading(false);
+            return;
+          }
+
+          InteractionManager.runAfterInteractions(() => {
+            setNavData(parsedNavData);
+            setAppliedChanges([]); // Reset changes for the new recipe
+            setCheckedIngredients({});
+            processedRecipeData.current = params.recipeData ?? null; // Mark as processed
+            setIsLoading(false);
+          });
+        } catch (e: any) { 
+          console.error(`[IngredientsScreen] Failed to parse recipeData. Error: ${e.message}. Raw data:`, params.recipeData);
           showError({
-            title: "Error Loading Ingredients",
-            message: "Ingredient data is invalid. Please go back and try again."
+              title: "Error Loading Ingredients",
+              message: `Could not load ingredient data: ${e.message}. Please go back and try again.`
           });
           setIsLoading(false);
           return;
         }
-
-        InteractionManager.runAfterInteractions(() => {
-          setNavData(parsedNavData);
-          setAppliedSubstitution(null);
-          setCheckedIngredients({});
-        });
-      } catch (e: any) { 
-        console.error(`[IngredientsScreen] Failed to parse recipeData. Error: ${e.message}. Raw data:`, params.recipeData);
+      } else {
+        console.error("[IngredientsScreen] Recipe data not provided or not a string in params. Received:", params.recipeData);
         showError({
-            title: "Error Loading Ingredients",
-            message: `Could not load ingredient data: ${e.message}. Please go back and try again.`
+          title: "Error Loading Ingredients",
+          message: "Recipe data not provided. Please go back and try again."
         });
         setIsLoading(false);
         return;
       }
     } else {
-      console.error("[IngredientsScreen] Recipe data not provided or not a string in params. Received:", params.recipeData);
-      showError({
-        title: "Error Loading Ingredients",
-        message: "Recipe data not provided. Please go back and try again."
-      });
-      setIsLoading(false);
-      return;
+      // If recipeData is null/undefined and we haven't processed anything yet, it's a problem.
+      if (!processedRecipeData.current) {
+         setIsLoading(false);
+      }
     }
-    setIsLoading(false); 
-  }, [params.recipeData, showError, router]);
+  }, [params.recipeData]);
 
   const navigateToNextScreen = useCallback(async () => {
+    console.log('🚀 navigateToNextScreen CALLED');
     const navStart = Date.now();
     logTiming("Entered navigateToNextScreen");
-    if (!navData || !displayIngredients) { 
+
+    const removalCount = appliedChanges.filter(c => !c.to).length;
+    if (removalCount > 2) {
+      console.warn("[NAV BLOCKED] Too many removals, canceling navigation");
+      showError({
+        title: "Limit Reached",
+        message: "You can only remove up to 2 ingredients per recipe."
+      });
+      return;
+    }
+
+    if (!navData || !displayIngredients) {
       console.error("Cannot navigate, essential data is missing.");
       return;
     }
@@ -258,35 +283,37 @@ export default function IngredientsScreen() {
     const needsScaling = navData.scaleFactor !== 1;
 
     // --- 1. Handle Substitution Rewriting (if applicable) --- 
-    if (appliedSubstitution) {
-      logTiming("Started rewriting instructions (LLM call)");
-      setIsRewriting(true);
-      try {
-        const backendUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
-        const response = await fetch(`${backendUrl}/api/recipes/rewrite-instructions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            originalInstructions: navData.instructions || [],
-            originalIngredientName: appliedSubstitution.originalName,
-            substitutedIngredientName: appliedSubstitution.substitution.name,
-          }),
-        });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || `Rewrite failed (Status: ${response.status})`);
-        if (result.rewrittenInstructions) finalInstructions = result.rewrittenInstructions;
-        else throw new Error("Invalid format for rewritten instructions.");
-        logTiming("Finished rewriting instructions");
-      } catch (rewriteError) {
-        console.error("Error rewriting instructions:", rewriteError);
-        showError({ 
-          title: "Update Failed", 
-          message: "We couldn't update the recipe steps for the ingredient substitution. The original steps will be used."
-        });
-      } finally {
-        setIsRewriting(false);
-      }
-    }
+    if (appliedChanges.length > 0) {
+       console.log('[Navigate] Triggering rewrite with changes:', appliedChanges);
+       console.log("🧪 Sending to backend:", appliedChanges);
+       setIsRewriting(true);
+       try {
+         const backendUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+         const response = await fetch(`${backendUrl}/api/recipes/rewrite-instructions`, {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({
+             originalInstructions: navData.instructions || [],
+             substitutions: appliedChanges,
+           }),
+         });
+         const result = await response.json();
+         if (!response.ok) throw new Error(result.error || `Rewrite failed (Status: ${response.status})`);
+         if (result.rewrittenInstructions) finalInstructions = result.rewrittenInstructions;
+         else throw new Error("Invalid format for rewritten instructions.");
+         logTiming("Finished rewriting instructions");
+       } catch (rewriteError) {
+         console.error("Error rewriting instructions:", rewriteError);
+         showError({ 
+           title: "Update Failed", 
+           message: "We couldn't update the recipe steps for the ingredient substitution. The original steps will be used."
+         });
+       } finally {
+         setIsRewriting(false);
+       }
+     } else {
+       if (__DEV__) console.log('[Navigate] No substitutions provided – skipping rewrite');
+     }
 
     // --- 2. Handle Instruction Scaling (if applicable) --- 
     if (needsScaling && displayIngredients.length > 0) {
@@ -320,6 +347,9 @@ export default function IngredientsScreen() {
         }
     }
 
+    if (__DEV__) {
+      console.log('[Navigate] Pushing to /steps with instructions:', finalInstructions);
+    }
     logTiming("Beginning navigation to Steps screen");
     // --- 3. Navigate to Steps Screen --- 
     router.push({
@@ -340,7 +370,7 @@ export default function IngredientsScreen() {
     });
 
     logTiming(`navigateToNextScreen completed (total ${Date.now() - navStart}ms)`);
-  }, [navData, displayIngredients, appliedSubstitution, router, showError]);
+  }, [navData, displayIngredients, appliedChanges, router, showError]);
 
   const toggleCheckIngredient = (index: number) => {
     setCheckedIngredients(prev => ({
@@ -350,16 +380,14 @@ export default function IngredientsScreen() {
   };
 
   const openSubstitutionModal = useCallback((ingredient: StructuredIngredient) => {
-      if (__DEV__) {
-        console.log('[openSubstitutionModal] called for:', ingredient.name);
-      }
+      // log removed: opening substitution modal with full ingredient json
       console.log("Opening substitution modal for:", JSON.stringify(ingredient)); 
       
       // --- Scaling Logic --- 
       let scaledSuggestions: SubstitutionSuggestion[] | null = null;
       if (ingredient.suggested_substitutions && navData && navData.scaleFactor !== null && navData.scaleFactor !== 1) {
            const scalingFactor = navData.scaleFactor;
-           console.log(`Scaling substitutions by factor: ${scalingFactor} (Selected: ${navData.scaleFactor}, Original: 1)`);
+           // removed scaling factor verbose log
 
            scaledSuggestions = ingredient.suggested_substitutions.map(sub => {
                let finalAmount: string | number | null = sub.amount ?? null;
@@ -371,18 +399,18 @@ export default function IngredientsScreen() {
                        if (parsedAmount !== null) {
                            const calculatedAmount = parsedAmount * scalingFactor;
                            finalAmount = formatAmountNumber(calculatedAmount) || calculatedAmount.toFixed(2);
-                           console.log(`Scaled ${sub.name} amount from ${sub.amount} to ${finalAmount}`);
+                           // removed verbose scaling log
                        } else {
                            // Keep original non-numeric amount if parsing fails
                            finalAmount = sub.amount;
-                           console.log(`Kept original non-numeric amount: ${sub.amount} for ${sub.name}`);
+                           // removed verbose log
                        }
                    } catch (e) {
                        console.error("Error scaling substitution amount:", e);
                        finalAmount = sub.amount; // Fallback to original if scaling fails
                    }
                } else {
-                   console.log(`Amount was null or undefined for ${sub.name}, keeping as null.`);
+                   // removed verbose null amount log
                    finalAmount = null;
                }
 
@@ -394,11 +422,7 @@ export default function IngredientsScreen() {
       } else {
           // Use original suggestions if no scaling is needed/possible
           scaledSuggestions = ingredient.suggested_substitutions || null;
-          if (navData && navData.scaleFactor === null || navData && navData.scaleFactor === 1) {
-             console.log("Skipping substitution scaling: Invalid scale factor data.");
-          } else {
-             console.log("No substitutions found to scale.");
-          }
+          // removed verbose scaling/no substitutions logs
       }
       // --- End Scaling Logic --- 
 
@@ -413,15 +437,34 @@ export default function IngredientsScreen() {
       return;
     }
 
+    if (substitution.name === 'Remove ingredient') {
+      const currentRemovals = appliedChanges.filter(change => !change.to).length;
+      if (currentRemovals >= 2) {
+        console.warn('🚫 Blocked 3rd removal attempt:', selectedIngredientOriginalData?.name);
+        setSubstitutionModalVisible(false);
+        setSelectedIngredientOriginalData(null);
+
+        InteractionManager.runAfterInteractions(() => {
+          Alert.alert(
+            'Limit Reached',
+            'You can only remove up to 2 ingredients per recipe.'
+          );
+        });
+        console.trace('Blocked 3rd removal – trace');
+        return; // 🔒 prevent any state update
+      }
+    }
+
+    console.log("🧪 Current appliedChanges:", appliedChanges);
+
+    const isRemoval = substitution.name === 'Remove ingredient';
+
     const originalIngredientNameFromState = selectedIngredientOriginalData.name;
-    console.log(`Attempting to find index for: "${originalIngredientNameFromState}"`);
     
     const index = displayIngredients.findIndex(ing => 
       ing.name === originalIngredientNameFromState || 
       ing.name.includes(`(substituted for ${originalIngredientNameFromState})`)
     );
-
-    console.log(`Found index: ${index}`);
 
     if (index === -1) { 
       console.error(`Apply error: Cannot find ingredient matching "${originalIngredientNameFromState}" in display list.`);
@@ -440,10 +483,21 @@ export default function IngredientsScreen() {
 
     console.log(`Applying substitution: ${substitution.name} (Amount: ${substitution.amount}, Unit: ${substitution.unit}) for original ${originalNameForSub} at index ${index}`);
     
-    setAppliedSubstitution({ 
-      originalIndex: index, 
-      originalName: originalNameForSub,
-      substitution: substitution
+    const newChange: IngredientChange = {
+      from: originalNameForSub,
+      to: isRemoval ? null : substitution.name,
+    };
+
+    console.log('Applying change:', newChange);
+
+    setAppliedChanges(prev => {
+      const existingChangeIndex = prev.findIndex(c => c.from === originalNameForSub);
+      if (existingChangeIndex > -1) {
+        const updated = [...prev];
+        updated[existingChangeIndex] = newChange;
+        return updated;
+      }
+      return [...prev, newChange];
     });
 
     // Update navData with the substituted ingredient
@@ -453,7 +507,7 @@ export default function IngredientsScreen() {
       const newNavData = { ...prevNavData };
       const source = newNavData.scaleFactor === 1 ? newNavData.originalIngredients : newNavData.scaledIngredients;
       
-      if (Array.isArray(source)) {
+      if (Array.isArray(source) && index !== -1 && source[index]) {
         const newSource = source.map((item, i) => {
           if (i === index) {
             // Convert string to StructuredIngredient if needed
@@ -461,13 +515,23 @@ export default function IngredientsScreen() {
               ? { name: item, amount: null, unit: null, suggested_substitutions: null }
               : item;
             
-            return {
-              ...baseIngredient,
-              name: `${substitution.name} (substituted for ${originalNameForSub})`,
-              amount: substitution.amount != null ? String(substitution.amount) : null,
-              unit: substitution.unit || null,
-              suggested_substitutions: null
-            };
+            if (isRemoval) {
+              return {
+                ...baseIngredient,
+                name: `${originalNameForSub} (removed)` ,
+                amount: null,
+                unit: null,
+                suggested_substitutions: null,
+              };
+            } else {
+              return {
+                ...baseIngredient,
+                name: `${substitution.name} (substituted for ${originalNameForSub})`,
+                amount: substitution.amount != null ? String(substitution.amount) : null,
+                unit: substitution.unit || null,
+                suggested_substitutions: null
+              };
+            }
           }
           return item;
         });
@@ -510,8 +574,8 @@ export default function IngredientsScreen() {
   }
 
   // --- RENDER LOGIC (assuming navData is available) --- 
-  if (__DEV__) {
-    console.log("[IngredientsScreen] displayIngredients state before render:", JSON.stringify(displayIngredients, null, 2));
+  if (__DEV__ && displayIngredients) {
+    console.log('[IngredientsScreen] displayIngredients names:', displayIngredients.map(i=>i.name));
   }
 
   return (
@@ -558,11 +622,13 @@ export default function IngredientsScreen() {
           ListEmptyComponent={<Text style={styles.placeholderText}>No ingredients found.</Text>}
           extraData={[substitutionModalVisible, selectedIngredientOriginalData]}
           renderItem={({ item, index }: { item: StructuredIngredient; index: number }) => {
-            if (__DEV__) {
-              console.log('[FlashList renderItem] Rendering:', item.name);
-            }
+            /* removed flash list verbose render log */
             const isChecked = !!checkedIngredients[index];
-            const isSubstituted = appliedSubstitution?.originalIndex === index;
+            const change = appliedChanges.find(c => {
+              // A bit complex: check if the item is the result of this change
+              return item.name.includes(c.from) || (c.to && item.name.startsWith(c.to));
+            });
+            const isSubstituted = !!change;
             return (
               <IngredientRow
                 ingredient={item}
@@ -601,6 +667,18 @@ export default function IngredientsScreen() {
             {!(isRewriting || isScalingInstructions) && <MaterialCommunityIcons name="chevron-right" size={20} color={COLORS.white} />}
           </Pressable>
         </View>
+
+        <TouchableOpacity
+          style={{ padding: 10, backgroundColor: 'red', margin: 20 }}
+          onPress={() =>
+            showError({
+              title: 'Test',
+              message: 'This is a manual error popup.'
+            })
+          }
+        >
+          <Text style={{ color: 'white' }}>Trigger Test Error</Text>
+        </TouchableOpacity>
 
         {/* Help Modal */}
         <Modal
@@ -744,6 +822,9 @@ const styles = StyleSheet.create({
   },
   ingredientItemSubstituted: {
     backgroundColor: COLORS.primaryLight,
+  },
+  ingredientItemRemoved: {
+    backgroundColor: '#fce8e6',
   },
   checkboxBase: {
     width: 24,

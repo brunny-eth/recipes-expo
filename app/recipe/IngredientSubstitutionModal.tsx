@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -50,6 +50,24 @@ export default function IngredientSubstitutionModal({
 }: IngredientSubstitutionModalProps) {
   const [selectedOption, setSelectedOption] = useState<SubstitutionSuggestion | null>(null);
 
+  /* ----------------------------------------------------
+   * Ensure a "Remove ingredient" option is always present
+   * ---------------------------------------------------- */
+  const removalOption: SubstitutionSuggestion = {
+    name: 'Remove ingredient',
+    description: 'Omit this ingredient from the recipe.',
+    amount: null,
+    unit: null,
+  };
+
+  const options = useMemo<SubstitutionSuggestion[]>(() => {
+    if (!substitutions || substitutions.length === 0) {
+      return [removalOption];
+    }
+    const hasRemoval = substitutions.some(opt => opt.name === removalOption.name);
+    return hasRemoval ? substitutions : [...substitutions, removalOption];
+  }, [substitutions]);
+
   const handleApply = () => {
     if (selectedOption) {
       onApply(selectedOption);
@@ -95,26 +113,27 @@ export default function IngredientSubstitutionModal({
           </View>
 
           <ScrollView style={styles.optionsList}>
-            {substitutions && substitutions.length > 0 ? (
-              substitutions.map((option, index) => {
+            {options && options.length > 0 ? (
+              options.map((option, index) => {
                 const quantityText = formatQuantity(option.amount, option.unit); // Format quantity
                 return (
                   <TouchableOpacity
                     key={`${option.name}-${index}`}
                     style={[
                       styles.optionItem,
+                      option.name === 'Remove ingredient' && styles.optionItemRemove,
                       selectedOption?.name === option.name && styles.optionItemSelected,
                     ]}
                     onPress={() => setSelectedOption(option)}
                   >
-                    <View style={styles.radioButton}>
+                    <View style={[styles.radioButton, option.name === 'Remove ingredient' && styles.radioButtonRemove]}>
                       {selectedOption?.name === option.name && (
                         <View style={styles.radioButtonInner} />
                       )}
                     </View>
                     <View style={styles.optionContent}>
                       <View style={styles.optionNameContainer}>
-                        <Text style={styles.optionName}>{option.name}</Text>
+                        <Text style={[styles.optionName, option.name === 'Remove ingredient' && styles.optionNameRemove]}>{option.name}</Text>
                         {/* Display Formatted Quantity */}
                         {quantityText && (
                            <Text style={styles.optionQuantity}>{quantityText}</Text>
@@ -194,6 +213,10 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
     backgroundColor: COLORS.primaryLight,
   },
+  optionItemRemove: {
+    borderColor: COLORS.error || '#e53935',
+    backgroundColor: '#fdecea',
+  },
   radioButton: {
     width: 24,
     height: 24,
@@ -203,6 +226,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
+  },
+  radioButtonRemove: {
+    borderColor: COLORS.error || '#e53935',
   },
   radioButtonInner: {
     width: 12,
@@ -224,6 +250,9 @@ const styles = StyleSheet.create({
     color: COLORS.textDark,
     flexShrink: 1, // Allow name to wrap
     marginRight: 8, // Space between name and quantity
+  },
+  optionNameRemove: {
+    color: COLORS.error || '#e53935',
   },
   optionQuantity: { // Style for the quantity text
     ...captionText,
