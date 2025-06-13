@@ -263,13 +263,6 @@ export default function RecipeSummaryScreen() {
     { label: '4x', value: 4.0 },
   ];
 
-  // Use the new helper for scaled yield text display
-  const displayableYieldText = recipe.recipeYield || "its original quantity";
-  // For the text indicating what it makes *now* after scaling:
-  const originalYieldNum = parseServingsValue(recipe.recipeYield);
-  const scaledYieldNum = originalYieldNum ? originalYieldNum * selectedScaleFactor : null;
-  const scaledYieldText = scaledYieldNum ? `${formatAmountNumber(scaledYieldNum)}` : `its original quantity`;
-
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */} 
@@ -327,8 +320,10 @@ export default function RecipeSummaryScreen() {
         <Text style={styles.sectionTitle}>Adjust Recipe Size</Text>
         <Text style={styles.helperText}>
           {selectedScaleFactor === 1.0
-            ? `This recipe makes ${displayableYieldText}. We make it easy to scale it up or down.`
-            : `Now scaled to ${scaledYieldText} (from ${recipe.recipeYield} originally).`}
+            ? recipe.recipeYield
+              ? `This recipe makes ${recipe.recipeYield}. We make it easy to scale it up or down.`
+              : `This recipe doesn't specify servings amount, but we can still scale amounts up or down if you'd like.`
+            : `Now scaled ${selectedScaleFactor < 1 ? 'down' : 'up'} by ${selectedScaleFactor}x.`}
         </Text>
         <View style={styles.servingsContainer}>
           {scaleFactorOptions.map(option => (
