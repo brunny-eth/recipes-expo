@@ -319,11 +319,22 @@ export default function RecipeSummaryScreen() {
         {/* Servings Selector */} 
         <Text style={styles.sectionTitle}>Adjust Recipe Size</Text>
         <Text style={styles.helperText}>
-          {selectedScaleFactor === 1.0
-            ? recipe.recipeYield
-              ? `This recipe makes ${recipe.recipeYield}. We make it easy to scale it up or down.`
-              : `This recipe doesn't specify servings amount, but we can still scale amounts up or down if you'd like.`
-            : `Now scaled ${selectedScaleFactor < 1 ? 'down' : 'up'} by ${selectedScaleFactor}x.`}
+          {(() => {
+            if (selectedScaleFactor === 1.0) {
+              return recipe.recipeYield
+                ? `This recipe makes ${recipe.recipeYield}. We make it easy to scale it up or down.`
+                : `This recipe doesn't specify servings amount, but we can still scale amounts up or down if you'd like.`;
+            }
+
+            const direction = selectedScaleFactor < 1 ? 'down' : 'up';
+            
+            if (originalYieldValue && originalYieldValue > 0 && recipe.recipeYield) {
+              const scaledYieldString = getScaledYieldText(recipe.recipeYield, selectedScaleFactor);
+              return `Now scaled ${direction} by ${selectedScaleFactor}x (${scaledYieldString}).`;
+            }
+
+            return `Now scaled ${direction} by ${selectedScaleFactor}x.`;
+          })()}
         </Text>
         <View style={styles.servingsContainer}>
           {scaleFactorOptions.map(option => (

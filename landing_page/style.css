@@ -267,7 +267,7 @@ main {
 .whatisthis-container p,
 .whatisthis-container ol {
     font-family: 'Inter-Regular', sans-serif;
-    font-size: 16px; /* bodyText */
+    font-size: 20px; /* bodyText */
     color: var(--text-dark);
 }
 
@@ -294,6 +294,72 @@ main {
     font-style: italic;
 }
 
+/* Loading Steps Animation */
+#loading-steps {
+    margin: 30px auto 0; /* Center the block */
+    width: 420px; /* Fixed width for the container */
+    max-width: 100%; /* Responsive guard for small screens */
+    display: none; /* Controlled by JS */
+    padding-left: 42px; /* Nudge content to the right */
+    box-sizing: border-box; /* Keep width consistent */
+}
+
+.step-item {
+    display: flex; /* Use flex to align check and text */
+    align-items: center;
+    margin-bottom: 20px;
+    opacity: 0;
+    animation: fadeInStep 0.5s ease-out forwards;
+}
+
+@keyframes fadeInStep {
+    to {
+        opacity: 1;
+    }
+}
+
+.step-check {
+    width: 28px; /* Increased from 24px */
+    height: 28px; /* Increased from 24px */
+    border-radius: 50%;
+    border: 2px solid var(--primary-light);
+    margin-right: 15px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: var(--primary);
+    font-weight: bold;
+    flex-shrink: 0;
+    transition: all 0.3s ease-in-out;
+}
+
+.step-check.done {
+    background-color: var(--primary);
+    border-color: var(--primary);
+    color: var(--white);
+}
+
+.step-check.done::before {
+    content: '✓';
+}
+
+.step-text {
+    text-align: left; /* Keep text inside the item left-aligned */
+}
+
+.step-text .label {
+    font-family: 'Inter-SemiBold', sans-serif;
+    font-size: 18px; /* Increased from 16px */
+    color: var(--text-dark);
+    line-height: 1.2;
+}
+
+.step-text .subtext {
+    font-family: 'Inter-Regular', sans-serif;
+    font-size: 15px; /* Increased from 14px */
+    color: var(--gray);
+    padding-top: 4px;
+}
 
 /* Responsive Adjustments */
 @media (max-width: 768px) {

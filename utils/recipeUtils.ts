@@ -193,9 +193,15 @@ export function getScaledYieldText(yieldStr: string | null | undefined, factor: 
 
   if (baseServings && baseServings > 0) {
     const scaledNumericYield = Math.round(baseServings * factor * 10) / 10; // Round to 1 decimal for display
-    // Avoid saying "~0" for very small scaled amounts if original base was, for example, 1 and factor 0.1
-    const displayScaledNumeric = scaledNumericYield > 0 ? `~${scaledNumericYield}` : "a small amount";
-    return `${displayScaledNumeric} (now ${factor}x of ${originalDisplay})`;
+    if (scaledNumericYield <= 0) {
+      return "a small amount";
+    }
+    
+    // Try to find the original unit (e.g., "servings", "tacos")
+    const unitMatch = yieldStr?.match(/\b([a-zA-Z]+)\b$/);
+    const unit = unitMatch ? ` ${unitMatch[1]}` : '';
+
+    return `${scaledNumericYield}${unit}`;
   }
   
   // Fallback if original yield string couldn't be parsed into a number but there's a scale factor

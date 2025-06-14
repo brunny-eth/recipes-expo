@@ -54,7 +54,8 @@ const IngredientRow = React.memo(({
   isChecked,
   isSubstituted,
   toggleCheckIngredient,
-  openSubstitutionModal
+  openSubstitutionModal,
+  undoIngredientRemoval
 }: {
   ingredient: StructuredIngredient;
   index: number;
@@ -62,6 +63,7 @@ const IngredientRow = React.memo(({
   isSubstituted: boolean;
   toggleCheckIngredient: (idx: number) => void;
   openSubstitutionModal: (ing: StructuredIngredient) => void;
+  undoIngredientRemoval: (name: string) => void;
 }) => {
   /* removed verbose row render log */
   return (
@@ -98,6 +100,16 @@ const IngredientRow = React.memo(({
             </Text>
           )}
         </Text>
+
+        {ingredient.name.includes('(removed') && (
+          <TouchableOpacity
+            style={{ marginLeft: 6 }}
+            onPress={() => undoIngredientRemoval(ingredient.name)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <MaterialCommunityIcons name="undo" size={18} color={COLORS.primary} />
+          </TouchableOpacity>
+        )}
 
         {/* Substitution Button */}
         {!isSubstituted && 
@@ -148,6 +160,7 @@ export default function IngredientsScreen() {
   const [selectedIngredientOriginalData, setSelectedIngredientOriginalData] = useState<StructuredIngredient | null>(null);
   const [processedSubstitutionsForModal, setProcessedSubstitutionsForModal] = useState<SubstitutionSuggestion[] | null>(null);
   const processedRecipeData = useRef<string | null>(null);
+  const [lastRemoved, setLastRemoved] = useState<IngredientChange | null>(null);
 
   // Debug logs for modal visibility state changes
   useEffect(() => {
@@ -491,6 +504,10 @@ export default function IngredientsScreen() {
       to: isRemoval ? null : substitution.name,
     };
 
+    if (isRemoval) {
+      setLastRemoved(newChange);
+    }
+
     console.log('Applying change:', newChange);
 
     setAppliedChanges(prev => {
@@ -555,6 +572,63 @@ export default function IngredientsScreen() {
     setSelectedIngredientOriginalData(null);
     setProcessedSubstitutionsForModal(null);
     console.log("✅ Substitution applied");
+  };
+
+  const undoIngredientRemoval = (fullName: string) => {
+    const match = fullName.match(/^(.*?) \(removed\)$/);
+    const originalName = match ? match[1] : fullName;
+
+    // Remove the removal from appliedChanges
+    setAppliedChanges(prev => prev.filter(change => change.from !== originalName));
+
+    // Restore ingredient name in navData
+    setNavData(prev => {
+      if (!prev) return prev;
+      const updated = { ...prev };
+      const targetList = prev.scaleFactor === 1 ? prev.originalIngredients : prev.scaledIngredients;
+      if (!Array.isArray(targetList)) return prev;
+
+      const restoredList = targetList.map(ing => {
+        if (typeof ing === 'string') { // This logic branch might need review if original ingredients are always structured
+            if (ing === fullName) {
+                return originalName;
+            }
+            return ing;
+        }
+        if (ing.name === fullName) {
+          const structuredOriginals = navData?.originalIngredients?.filter(
+            (originalIng): originalIng is StructuredIngredient => typeof originalIng !== 'string'
+          );
+          const originalIngredient = structuredOriginals?.find(
+            (originalIng) => originalIng.name === originalName
+          );
+
+          return {
+            ...ing,
+            name: originalName,
+            // Restore original amount/unit. This is a simplification.
+            // A more robust solution might store the original pre-scaled/pre-substitution state.
+            amount: originalIngredient?.amount ?? null,
+            unit: originalIngredient?.unit ?? null,
+            suggested_substitutions: originalIngredient?.suggested_substitutions ?? null,
+          };
+        }
+        return ing;
+      });
+
+      if (prev.scaleFactor === 1) {
+        updated.originalIngredients = restoredList as typeof prev.originalIngredients;
+      } else {
+        updated.scaledIngredients = restoredList as StructuredIngredient[];
+      }
+
+      return updated;
+    });
+
+    // Clear lastRemoved if it matches
+    if (lastRemoved?.from === originalName) {
+      setLastRemoved(null);
+    }
   };
 
   // --- Conditional Rendering (SHOULD BE AFTER ALL HOOKS) ---
@@ -640,6 +714,7 @@ export default function IngredientsScreen() {
                 isSubstituted={isSubstituted}
                 toggleCheckIngredient={toggleCheckIngredient}
                 openSubstitutionModal={openSubstitutionModal}
+                undoIngredientRemoval={undoIngredientRemoval}
               />
             );
           }}
