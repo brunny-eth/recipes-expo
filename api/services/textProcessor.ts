@@ -1,3 +1,5 @@
+import logger from '../lib/logger';
+
 /**
  * Prepares raw recipe text for further processing.
  * Currently, this just trims the input.
@@ -10,9 +12,9 @@ export function extractFromRawText(
   requestId: string
 ): { preparedText: string; error: null; timings: { prepareText: number } } {
   const startTime = Date.now();
-  console.log(`[${requestId}] Preparing raw text input.`);
+  logger.info({ requestId }, 'Preparing raw text input.');
   const preparedText = text.trim();
   const timings = { prepareText: Date.now() - startTime };
-  console.log(`[${requestId}] Raw text preparation complete. Timing: ${timings.prepareText}ms`);
+  logger.info({ requestId, duration: timings.prepareText }, 'Raw text preparation complete.');
   return { preparedText, error: null, timings };
 } 

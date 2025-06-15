@@ -12,6 +12,7 @@ import { StandardizedUsage } from '../utils/usageUtils';
 import logger from '../lib/logger';
 import openai from '../lib/openai';
 import { normalizeUsageMetadata } from '../utils/usageUtils';
+import { finalValidateRecipe } from './finalValidateRecipe';
 
 function normalizeServings(servingRaw: string | null): string | null {
     if (!servingRaw) return null;
@@ -70,6 +71,7 @@ export async function parseAndCacheRecipe(
     let handlerUsage: StandardizedUsage = { inputTokens: 0, outputTokens: 0 };
     let fetchMethodUsed: string | undefined = 'N/A';
     let isFallback = false; // Ensure isFallback is always a boolean
+    let fallbackType: string | null = null;
 
     // Wrap the core logic in a try/catch block
     try {
@@ -155,6 +157,7 @@ export async function parseAndCacheRecipe(
                 logger.error({ requestId, error: processingError }, `URL processing failed during fetch/extract`);
             } else {
                 isFallback = !!extractedContent.isFallback; // Ensure isFallback is a boolean
+                fallbackType = extractedContent.fallbackType || null;
                 const totalLength = (extractedContent?.ingredientsText?.length ?? 0) + (extractedContent?.instructionsText?.length ?? 0);
                 logger.info({ requestId, fetchExtractMs: (overallTimings.fetchHtml ?? 0) + (overallTimings.extractContent ?? 0), method: fetchMethodUsed, combinedTextLength: totalLength }, `URL content prepared.`);
                 
@@ -319,6 +322,18 @@ export async function parseAndCacheRecipe(
             throw new Error("This page doesn't appear to contain a recipe.");
         }
 
+        // Perform final validation on the structured data
+        finalValidateRecipe(finalRecipeData, requestId);
+        if (!finalRecipeData) {
+          logger.error({
+            requestId,
+            inputType,
+            error: 'Final recipe validation failed – no valid data produced',
+            action: 'structured_parse_failure',
+            event: 'structured_parse_failure'
+          }, 'No final recipe object returned after validation.');
+        }
+
         if (finalRecipeData) {
             // Normalize servings field before caching or returning
             if (finalRecipeData.recipeYield) {
@@ -351,6 +366,11 @@ export async function parseAndCacheRecipe(
                 overallTimings.dbInsert = Date.now() - dbInsertStartTime;
                 logger.error({ requestId, cacheKey, err: cacheInsertError }, `Exception during cache insertion.`);
             }
+
+            if (finalRecipeData) {
+              const finalSizeKb = Buffer.byteLength(JSON.stringify(finalRecipeData), 'utf8') / 1024;
+              logger.info({ requestId, sizeKb: finalSizeKb.toFixed(2), event: 'final_recipe_size' }, 'Size of final structured recipe JSON');
+            }
         } else {
             logger.warn({ requestId, inputType }, `Processing finished without error, but no final recipe data was produced.`);
             overallTimings.dbInsert = 0;
@@ -363,11 +383,12 @@ export async function parseAndCacheRecipe(
             inputType, 
             fromCache: false, 
             fetchMethod: fetchMethodUsed, 
-            usedFallback, 
+            usedFallback: isFallback,
+            fallbackType: fallbackType,
             timings: overallTimings, 
-            action: 'parse_request_complete' 
+            event: 'parse_request_complete' 
         }, `Request complete.`);
-        logger.info({ requestId, usage: handlerUsage, action: 'final_token_usage' }, `Final Token Usage.`);
+        logger.info({ requestId, usage: handlerUsage, event: 'token_usage_summary' }, `Final Token Usage.`);
 
         logger.debug({
           requestId,

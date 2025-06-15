@@ -12,7 +12,7 @@ export async function parseRawTextWithGemini(
   geminiModel: GeminiModel
 ): Promise<GeminiHandlerResponse> {
   const handlerStartTime = Date.now();
-  console.log(`[${requestId}] Starting Gemini parsing for raw text input.`);
+  logger.info({ requestId }, 'Starting Gemini parsing for raw text input.');
 
   let usage: StandardizedUsage = { inputTokens: 0, outputTokens: 0 };
   let recipe: CombinedParsedRecipe | null = null;
@@ -21,7 +21,7 @@ export async function parseRawTextWithGemini(
   // Validate prepared text
   const validationResult = validateRecipeText(preparedText, requestId);
   if (!validationResult.isValid) {
-    console.warn(`[${requestId}] Input validation failed: ${validationResult.error}`);
+    logger.warn({ requestId, error: validationResult.error }, 'Input validation failed');
     return {
       recipe: null,
       error: validationResult.error || 'Input validation failed.',
@@ -37,7 +37,7 @@ export async function parseRawTextWithGemini(
     : preparedText;
 
   if (preparedText.length > maxLength) {
-    console.warn(`[${requestId}] Raw text was truncated from ${preparedText.length} to ${safeText.length} characters.`);
+    logger.warn({ requestId, originalLength: preparedText.length, truncatedLength: safeText.length }, 'Raw text was truncated');
   }
 
   // Step 2: Gemini Prompt
@@ -92,7 +92,7 @@ Raw Recipe Text:
 ${safeText}
 `;
 
-  console.log(`[${requestId}] Sending Gemini request (prompt length: ${rawTextPrompt.length}).`);
+  logger.info({ requestId, promptLength: rawTextPrompt.length }, 'Sending Gemini request.');
   const geminiStart = Date.now();
 
   logger.debug({ 
@@ -120,7 +120,7 @@ ${safeText}
     usage = normalizeUsageMetadata(response.usageMetadata, 'gemini');
 
     const preview = text ? text.slice(0, 300) + (text.length > 300 ? '...' : '') : 'EMPTY';
-    console.log(`[${requestId}] Gemini response preview:\n${preview}`);
+    logger.debug({ requestId, preview }, 'Gemini response preview.');
 
     if (text) {
       try {
@@ -134,34 +134,34 @@ ${safeText}
 
         // Basic structure checks
         if (recipe.ingredients && !Array.isArray(recipe.ingredients)) {
-          console.warn(`[${requestId}] ingredients not an array — nulling`);
+          logger.warn({ requestId }, 'Parsed ingredients field is not an array, nullifying.');
           recipe.ingredients = null;
         }
 
         if (recipe.instructions && !Array.isArray(recipe.instructions)) {
-          console.warn(`[${requestId}] instructions not an array — nulling`);
+          logger.warn({ requestId }, 'Parsed instructions field is not an array, nullifying.');
           recipe.instructions = null;
         }
 
-        console.log(`[${requestId}] Successfully parsed Gemini output.`);
+        logger.info({ requestId }, 'Successfully parsed Gemini output.');
       } catch (parseErr: any) {
-        console.error(`[${requestId}] JSON parse failed:`, parseErr);
-        console.error(`[${requestId}] Raw response:\n${text}`);
+        logger.error({ requestId, err: parseErr }, 'JSON parse failed');
+        logger.error({ requestId, rawResponse: text }, 'Raw Gemini response that failed to parse');
         error = `Failed to parse Gemini response: ${parseErr.message}`;
       }
     } else {
       error = 'Empty response from Gemini.';
-      console.warn(`[${requestId}] No text in Gemini response.`);
+      logger.warn({ requestId }, 'No text in Gemini response.');
     }
   } catch (err: any) {
-    console.error(`[${requestId}] Gemini call error:`, err);
+    logger.error({ requestId, err }, 'Gemini call error');
     error = err instanceof Error ? err.message : 'Unknown Gemini error';
 
     if (err?.response?.promptFeedback?.blockReason) {
       error = `Gemini blocked response: ${err.response.promptFeedback.blockReason}`;
-      console.error(`[${requestId}] Block reason: ${err.response.promptFeedback.blockReason}`);
+      logger.error({ requestId, reason: err.response.promptFeedback.blockReason }, 'Gemini blocked response');
       if (err.response.promptFeedback.safetyRatings) {
-        console.error(`[${requestId}] Safety Ratings:`, JSON.stringify(err.response.promptFeedback.safetyRatings, null, 2));
+        logger.error({ requestId, ratings: err.response.promptFeedback.safetyRatings }, 'Gemini safety ratings');
       }
     }
 
@@ -174,12 +174,12 @@ ${safeText}
   const totalTime = Date.now() - handlerStartTime;
 
   if (!recipe && !error) {
-    console.warn(`[${requestId}] No result and no error — defaulting to unknown failure.`);
+    logger.warn({ requestId }, 'No result and no error — defaulting to unknown failure.');
     error = 'AI returned no usable result.';
   }
 
-  console.log(`[${requestId}] Gemini parsing complete. Time=${geminiParseTime}ms, Total=${totalTime}ms`);
-  console.log(`[${requestId}] Token Usage: prompt=${usage.inputTokens}, output=${usage.outputTokens}`);
+  logger.info({ requestId, geminiParseTime, totalTime }, 'Gemini parsing complete.');
+  logger.debug({ requestId, inputTokens: usage.inputTokens, outputTokens: usage.outputTokens }, 'Token usage');
 
   return {
     recipe,

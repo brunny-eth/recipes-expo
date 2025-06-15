@@ -23,6 +23,7 @@ export type ExtractedContent = {
   prepTime?: string | null;
   cookTime?: string | null;
   totalTime?: string | null;
+  fallbackType?: string | null;
 };
 
 // Helper function to validate instruction text
@@ -92,6 +93,7 @@ export function extractRecipeContent(html: string, requestId: string, sourceUrl?
   let prepTime: string | null = null;
   let cookTime: string | null = null;
   let totalTime: string | null = null;
+  let fallbackType: string | null = null;
 
   // Tier 1: Try JSON-LD
   let recipeJson: any = null;
@@ -110,7 +112,7 @@ export function extractRecipeContent(html: string, requestId: string, sourceUrl?
       // Sanitize control characters that can break JSON.parse, then log for debugging
       const scriptContent = scriptContentRaw.replace(/[\u0000-\u001F]/g, '');
 
-      logger.debug({ requestId, preview: scriptContent.slice(0, 2000) }, 'Found potential JSON-LD script content.');
+      logger.debug({ requestId, preview: scriptContent.slice(0, 300) }, 'Found potential JSON-LD script content.');
 
       const jsonData = JSON.parse(scriptContent);
       let candidate = null;
@@ -215,9 +217,16 @@ export function extractRecipeContent(html: string, requestId: string, sourceUrl?
     }, 'Extracted from JSON-LD');
     // If JSON-LD provides the essentials (ingredients AND instructions), return it (including times)
     if (ingredientsText && instructionsText) {
-        return { title, description, image, thumbnailUrl, sourceUrl: sourceUrl ?? null, ingredientsText, instructionsText, recipeYieldText, isFallback, prepTime, cookTime, totalTime };
+        const payloadSizeKb = Buffer.byteLength(JSON.stringify({
+          title, description, image, thumbnailUrl, sourceUrl, ingredientsText, instructionsText, recipeYieldText, prepTime, cookTime, totalTime
+        }), 'utf8') / 1024;
+        logger.info({ requestId, sizeKb: payloadSizeKb.toFixed(2), isFallback }, '[extractRecipeContent] Final recipe JSON size');
+        return { title, description, image, thumbnailUrl, sourceUrl: sourceUrl ?? null, ingredientsText, instructionsText, recipeYieldText, isFallback, prepTime, cookTime, totalTime, fallbackType };
     }
     // Continue to selector fallback if JSON-LD was incomplete for essentials
+    fallbackType = 'incomplete_jsonld';
+  } else {
+    fallbackType = 'missing_jsonld';
   }
 
   // Tier 1.5: Fallback to meta tags if JSON-LD parsing failed or was incomplete for metadata
@@ -548,12 +557,30 @@ export function extractRecipeContent(html: string, requestId: string, sourceUrl?
     const stillMissingInstructions = !instructionsText || instructionsText.length < minLengthThreshold;
 
     if (stillMissingIngredients || stillMissingInstructions) {
-      logger.warn({ requestId }, `Fallback: using raw body text as last resort.`);
+      let cause = 'low_quality_content';
+      let reason = 'low-quality/missing extracted content';
+      if(stillMissingIngredients) {
+        cause = 'no_ingredients_found';
+        reason = 'missing ingredients';
+      }
+      if(stillMissingInstructions) {
+        cause = cause === 'no_ingredients_found' ? 'no_ingredients_or_instructions_found' : 'no_instructions_found';
+        reason = reason === 'missing ingredients' ? 'missing ingredients and instructions' : 'missing instructions';
+      }
+      fallbackType = cause;
+
+      isFallback = true;
+      logger.warn({
+        requestId,
+        fallbackType,
+        reason: `Entered raw text fallback path due to ${reason}`,
+        event: 'fallback_used'
+      }, '[extractContent] Using raw text fallback');
+
       const rawBodyText = $('body').text()
         .replace(/ +/g, ' ')
         .replace(/\n\s*\n/g, '\n')
         .trim();
-      isFallback = true;
 
       if (stillMissingIngredients) {
         ingredientsText = rawBodyText;
@@ -578,6 +605,9 @@ export function extractRecipeContent(html: string, requestId: string, sourceUrl?
         }
       }
     }
+  } else if (fallbackType) {
+    // If we are here, it means we used selectors after JSON-LD failed, and it was sufficient.
+    fallbackType = 'selector_fallback';
   }
 
   // --- Content Quality Filter for Fallback ---
@@ -615,7 +645,8 @@ export function extractRecipeContent(html: string, requestId: string, sourceUrl?
           requestId,
           reason: 'fallback extraction: instructionsText contains insufficient valid instructions',
           validCount: validInstructions.length,
-          sample: validInstructions.slice(0, 2)
+          sample: validInstructions.slice(0, 2),
+          fallbackType
         }, '[extractRecipeContent] Fallback extraction rejected: insufficient valid instructions found');
         return null;
       }
@@ -640,10 +671,17 @@ export function extractRecipeContent(html: string, requestId: string, sourceUrl?
     cook: !!cookTime,
     total: !!totalTime,
     isFallback: isFallback,
+    fallbackType: fallbackType
   }, 'Final extracted content stats');
 
   // Add logging for instructionsText
-  logger.debug({ requestId, instructionsPreview: instructionsText?.slice(0, 500) }, "[extractRecipeContent] Final instructionsText preview");
+  logger.debug({ requestId, instructionsPreview: instructionsText?.slice(0, 200) }, "[extractRecipeContent] Final instructionsText preview");
+
+  const payloadSizeKb = Buffer.byteLength(JSON.stringify({
+    title, description, image, thumbnailUrl, sourceUrl, ingredientsText, instructionsText, recipeYieldText, prepTime, cookTime, totalTime
+  }), 'utf8') / 1024;
+  
+  logger.info({ requestId, sizeKb: payloadSizeKb.toFixed(2), isFallback, fallbackType, event: 'extraction_complete' }, '[extractRecipeContent] Final recipe JSON size');
   // Return structure includes the fallback flag again
-  return { title, description, image, thumbnailUrl, sourceUrl: sourceUrl ?? null, ingredientsText, instructionsText, recipeYieldText, isFallback, prepTime, cookTime, totalTime };
+  return { title, description, image, thumbnailUrl, sourceUrl: sourceUrl ?? null, ingredientsText, instructionsText, recipeYieldText, isFallback, prepTime, cookTime, totalTime, fallbackType };
 }
