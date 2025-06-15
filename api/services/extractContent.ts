@@ -73,9 +73,11 @@ const isValidInstruction = (text: string): boolean => {
  * Extracts recipe content (title, ingredients, instructions) from HTML.
  * Tries JSON-LD first, then falls back to common CSS selectors.
  * @param html The HTML content string.
+ * @param requestId A unique identifier for tracing the request.
+ * @param sourceUrl The source URL of the HTML content.
  * @returns An object containing extracted title, ingredients text, and instructions text.
  */
-export function extractRecipeContent(html: string, sourceUrl?: string): ExtractedContent | null {
+export function extractRecipeContent(html: string, requestId: string, sourceUrl?: string): ExtractedContent | null {
   let $ = cheerio.load(html); // Load initial HTML
 
   // Initialize extracted fields
@@ -108,7 +110,7 @@ export function extractRecipeContent(html: string, sourceUrl?: string): Extracte
       // Sanitize control characters that can break JSON.parse, then log for debugging
       const scriptContent = scriptContentRaw.replace(/[\u0000-\u001F]/g, '');
 
-      console.log(`Found potential JSON-LD script content (first 2000 chars):\n${scriptContent.slice(0, 2000)}`);
+      logger.debug({ requestId, preview: scriptContent.slice(0, 2000) }, 'Found potential JSON-LD script content.');
 
       const jsonData = JSON.parse(scriptContent);
       let candidate = null;
@@ -129,14 +131,14 @@ export function extractRecipeContent(html: string, sourceUrl?: string): Extracte
       }
 
     } catch (e) {
-      console.warn("Ignoring JSON-LD parsing error:", e);
+      logger.warn({ requestId, err: e }, "Ignoring JSON-LD parsing error");
     }
   });
 
-  console.log(`[JSON-LD Scan] Scanned ${ldJsonBlocksScanned} ld+json blocks. Recipe type found and used: ${recipeFoundInLdJson}.`); // Logging
+  logger.debug({ requestId, scanned: ldJsonBlocksScanned, found: recipeFoundInLdJson }, '[JSON-LD Scan] Scan completed.');
 
   if (recipeJson) { // This condition now means a valid Recipe object was found and assigned
-    console.log("Found and using recipe data from JSON-LD."); // Updated log message
+    logger.info({ requestId }, "Found and using recipe data from JSON-LD.");
     title = recipeJson.name || null;
     description = recipeJson.description || null;
     
@@ -199,7 +201,18 @@ export function extractRecipeContent(html: string, sourceUrl?: string): Extracte
     // Fallback title extraction if needed, only if JSON-LD didn't yield one
     // if (!title) title = $('title').first().text() || $('h1').first().text() || null; // REMOVED FOR CONSOLIDATION
 
-    console.log(`Extracted from JSON-LD - Title: ${!!title}, Description: ${!!description}, Image: ${!!image}, Ingredients: ${!!ingredientsText}, Instructions: ${!!instructionsText}, Yield: ${!!recipeYieldText}, Prep: ${!!prepTime}, Cook: ${!!cookTime}, Total: ${!!totalTime}`);
+    logger.debug({
+      requestId,
+      title: !!title,
+      description: !!description,
+      image: !!image,
+      ingredients: !!ingredientsText,
+      instructions: !!instructionsText,
+      yield: !!recipeYieldText,
+      prep: !!prepTime,
+      cook: !!cookTime,
+      total: !!totalTime
+    }, 'Extracted from JSON-LD');
     // If JSON-LD provides the essentials (ingredients AND instructions), return it (including times)
     if (ingredientsText && instructionsText) {
         return { title, description, image, thumbnailUrl, sourceUrl: sourceUrl ?? null, ingredientsText, instructionsText, recipeYieldText, isFallback, prepTime, cookTime, totalTime };
@@ -225,7 +238,7 @@ export function extractRecipeContent(html: string, sourceUrl?: string): Extracte
 
   // --- Pre-stripping & Content Isolation (MOVED HERE) ---
   // This runs if JSON-LD was not found or was incomplete for essentials.
-  console.log("JSON-LD not found or incomplete for essentials. Applying pre-stripping and attempting main content isolation before selector fallback.");
+  logger.info({ requestId }, "JSON-LD not found or incomplete for essentials. Applying pre-stripping and attempting main content isolation before selector fallback.");
   
   // Create a new Cheerio instance from the original HTML for pre-stripping,
   // as the original '$' might have been modified if mainContentHtml was previously loaded.
@@ -259,7 +272,7 @@ export function extractRecipeContent(html: string, sourceUrl?: string): Extracte
       if (mainElement.length > 0) {
           const potentialHtml = mainElement.html();
           if (potentialHtml && potentialHtml.length > 500) {
-              console.log(`Found potential main content container using selector: ${selector}.`);
+              logger.debug({ requestId, selector }, `Found potential main content container.`);
               mainContentHtml = potentialHtml;
               selectedMainSelector = selector; // Store the selector used
               break;
@@ -268,10 +281,10 @@ export function extractRecipeContent(html: string, sourceUrl?: string): Extracte
   }
 
   if (mainContentHtml) {
-      console.log(`Found potential main content container using selector: ${selectedMainSelector}, but skipping cheerio reload to preserve full DOM access.`);
+      logger.debug({ requestId, selector: selectedMainSelector }, `Found potential main content container, but skipping cheerio reload to preserve full DOM access.`);
       // Skipping cheerio reload to maintain full DOM access
   } else {
-      console.log("Could not isolate a specific main content container after JSON-LD attempt, proceeding with pre-stripped body for selectors.");
+      logger.info({ requestId }, "Could not isolate a specific main content container after JSON-LD attempt, proceeding with pre-stripped body for selectors.");
   }
   // --- End Pre-stripping & Isolation ---
 
@@ -359,7 +372,7 @@ export function extractRecipeContent(html: string, sourceUrl?: string): Extracte
                       const text = $(item).text().trim();
                       if (text && isValidInstruction(text)) {
                           tempInstructionsSet.add(text);
-                          console.log(`Found valid instruction in list: ${text.substring(0, 50)}...`);
+                          logger.debug({ requestId, instruction: text.substring(0, 50) }, `Found valid instruction in list.`);
                       }
                   });
               });
@@ -370,7 +383,7 @@ export function extractRecipeContent(html: string, sourceUrl?: string): Extracte
                   const text = $(p).text().trim();
                   if (text && isValidInstruction(text)) {
                       tempInstructionsSet.add(text);
-                      console.log(`Found valid instruction in paragraph: ${text.substring(0, 50)}...`);
+                      logger.debug({ requestId, instruction: text.substring(0, 50) }, `Found valid instruction in paragraph.`);
                   }
               });
           }
@@ -464,7 +477,7 @@ export function extractRecipeContent(html: string, sourceUrl?: string): Extracte
       }
     }
     if (recipeYieldText) {
-      console.log(`Extracted recipeYieldText using selectors: ${recipeYieldText}`);
+      logger.debug({ requestId, yield: recipeYieldText }, `Extracted recipeYieldText using selectors.`);
     }
   }
 
@@ -475,7 +488,7 @@ export function extractRecipeContent(html: string, sourceUrl?: string): Extracte
   const instructionsMissingOrShort = !instructionsText || instructionsText.length < minLengthThreshold;
 
   if (ingredientsMissingOrShort || instructionsMissingOrShort) {
-    console.warn(`[extractContent] Attempting additional extraction before raw fallback due to missing or short (${minLengthThreshold} chars) content.`);
+    logger.warn({ requestId, ingredientsMissingOrShort, instructionsMissingOrShort }, `Attempting additional extraction before raw fallback due to missing or short content.`);
     
     // Additional attempt to find instructions in broader context
     if (instructionsMissingOrShort) {
@@ -493,11 +506,11 @@ export function extractRecipeContent(html: string, sourceUrl?: string): Extracte
               tempInstructionsSet.add(text);
               validInstructions++;
               debugInstructionsFound++;
-              console.log(`Found valid instruction: ${text.substring(0, 50)}...`);
+              logger.debug({ requestId, instruction: text.substring(0, 50) }, `Found valid instruction`);
             }
           });
           if (validInstructions >= 2) {
-            console.log(`Found ${validInstructions} valid instructions in a list element`);
+            logger.debug({ requestId, count: validInstructions }, `Found valid instructions in a list element`);
           }
         }
       });
@@ -508,7 +521,7 @@ export function extractRecipeContent(html: string, sourceUrl?: string): Extracte
         if (text && isValidInstruction(text) && text.length > 20) {
           tempInstructionsSet.add(text);
           debugInstructionsFound++;
-          console.log(`Found valid instruction in paragraph: ${text.substring(0, 50)}...`);
+          logger.debug({ requestId, instruction: text.substring(0, 50) }, `Found valid instruction in paragraph`);
         }
       });
 
@@ -518,15 +531,15 @@ export function extractRecipeContent(html: string, sourceUrl?: string): Extracte
         if (text && text.length > 20 && text.length < 500 && isValidInstruction(text)) {
           tempInstructionsSet.add(text);
           debugInstructionsFound++;
-          console.log(`Found valid instruction in div: ${text.substring(0, 50)}...`);
+          logger.debug({ requestId, instruction: text.substring(0, 50) }, `Found valid instruction in div`);
         }
       });
 
-      console.log(`[Debug] Total valid instructions found: ${debugInstructionsFound}`);
+      logger.debug({ requestId, count: debugInstructionsFound }, `Total valid instructions found in broader search`);
 
       if (tempInstructionsSet.size > 0) {
         instructionsText = Array.from(tempInstructionsSet).join('\n');
-        console.log(`Found ${tempInstructionsSet.size} valid instructions in broader context`);
+        logger.info({ requestId, count: tempInstructionsSet.size }, `Found instructions in broader context`);
       }
     }
 
@@ -535,7 +548,7 @@ export function extractRecipeContent(html: string, sourceUrl?: string): Extracte
     const stillMissingInstructions = !instructionsText || instructionsText.length < minLengthThreshold;
 
     if (stillMissingIngredients || stillMissingInstructions) {
-      console.warn(`[extractContent] Fallback: using raw body text as last resort.`);
+      logger.warn({ requestId }, `Fallback: using raw body text as last resort.`);
       const rawBodyText = $('body').text()
         .replace(/ +/g, ' ')
         .replace(/\n\s*\n/g, '\n')
@@ -552,14 +565,14 @@ export function extractRecipeContent(html: string, sourceUrl?: string): Extracte
           .filter(line => {
             const isValid = line && isValidInstruction(line);
             if (isValid) {
-              console.log(`Found valid instruction in raw text: ${line.substring(0, 50)}...`);
+              logger.debug({ requestId, instruction: line.substring(0, 50) }, `Found valid instruction in raw text`);
             }
             return isValid;
           });
 
         if (potentialInstructions.length >= 2) { // More lenient: only require 2 valid instructions
           instructionsText = potentialInstructions.join('\n');
-          console.log(`Found ${potentialInstructions.length} valid instructions in raw text`);
+          logger.info({ requestId, count: potentialInstructions.length }, `Found valid instructions in raw text`);
         } else {
           instructionsText = rawBodyText;
         }
@@ -572,13 +585,21 @@ export function extractRecipeContent(html: string, sourceUrl?: string): Extracte
     const ingLen = ingredientsText ? ingredientsText.length : 0;
     const instLen = instructionsText ? instructionsText.length : 0;
     
+    const firstThreeInstructions = instructionsText?.split('\n').filter(Boolean).slice(0, 3) || [];
+    const ingredientsHaveNumerics = ingredientsText ? /[\d¼½¾⅓⅔⅛⅜⅝⅞]/.test(ingredientsText) : false;
+    logger.debug({ 
+        requestId, 
+        first3Instructions: firstThreeInstructions, 
+        hasNumericIngredients: ingredientsHaveNumerics 
+    }, 'Fallback quality check data');
+
     if (ingLen < 50 && instLen < 50) {
-      logger.warn({ reason: 'fallback extraction contained no usable data (both ingredients and instructions missing or too short)' }, '[extractRecipeContent] Fallback extraction rejected: both ingredients and instructions missing or too short');
+      logger.warn({ requestId, reason: 'fallback extraction contained no usable data (both ingredients and instructions missing or too short)' }, '[extractRecipeContent] Fallback extraction rejected: both ingredients and instructions missing or too short');
       return null;
     }
     
     if (ingredientsText && !ingredientsText.match(/[\d¼½¾⅓⅔⅛⅜⅝⅞]/)) {
-      logger.warn({ reason: 'fallback extraction: ingredientsText contains no numeric characters' }, '[extractRecipeContent] Fallback extraction rejected: ingredientsText contains no numeric characters');
+      logger.warn({ requestId, reason: 'fallback extraction: ingredientsText contains no numeric characters' }, '[extractRecipeContent] Fallback extraction rejected: ingredientsText contains no numeric characters');
       return null;
     }
 
@@ -587,10 +608,11 @@ export function extractRecipeContent(html: string, sourceUrl?: string): Extracte
         .split(/\n/)
         .filter(line => line.trim() && isValidInstruction(line.trim()));
       
-      console.log(`[Debug] Found ${validInstructions.length} valid instructions in final content`);
+      logger.debug({ requestId, count: validInstructions.length }, `Found valid instructions in final fallback content`);
       
       if (validInstructions.length < 2) { // More lenient: only require 2 valid instructions
         logger.warn({ 
+          requestId,
           reason: 'fallback extraction: instructionsText contains insufficient valid instructions',
           validCount: validInstructions.length,
           sample: validInstructions.slice(0, 2)
@@ -602,13 +624,26 @@ export function extractRecipeContent(html: string, sourceUrl?: string): Extracte
 
   // Add a stronger fallback rejection check post-Gemini
   if (!title && !ingredientsText?.length && !instructionsText?.length) {
-    logger.warn("[extractRecipeContent] Gemini returned empty recipe. Likely not a recipe page.");
+    logger.warn({ requestId }, "[extractRecipeContent] Gemini returned empty recipe. Likely not a recipe page.");
     return null;
   }
 
-  console.log(`Final Extracted Content - Title: ${!!title}, Ingredients: ${!!ingredientsText}, Instructions: ${!!instructionsText}, Yield: ${!!recipeYieldText}, Prep: ${!!prepTime}, Cook: ${!!cookTime}, Total: ${!!totalTime}, Fallback Used: ${isFallback}`);
+  const finalIngredientCount = ingredientsText?.split('\n').filter(line => line.trim().length > 0).length ?? 0;
+  const finalInstructionCount = instructionsText?.split('\n').filter(line => line.trim().length > 0).length ?? 0;
+  logger.info({
+    requestId,
+    title: !!title,
+    ingredientCount: finalIngredientCount,
+    instructionCount: finalInstructionCount,
+    yield: !!recipeYieldText,
+    prep: !!prepTime,
+    cook: !!cookTime,
+    total: !!totalTime,
+    isFallback: isFallback,
+  }, 'Final extracted content stats');
+
   // Add logging for instructionsText
-  console.log("[extractRecipeContent] Final instructionsText preview:\n", instructionsText?.slice(0, 500));
+  logger.debug({ requestId, instructionsPreview: instructionsText?.slice(0, 500) }, "[extractRecipeContent] Final instructionsText preview");
   // Return structure includes the fallback flag again
   return { title, description, image, thumbnailUrl, sourceUrl: sourceUrl ?? null, ingredientsText, instructionsText, recipeYieldText, isFallback, prepTime, cookTime, totalTime };
 }

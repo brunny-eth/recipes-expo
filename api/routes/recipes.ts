@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express'
 import { supabase } from '../lib/supabase'
 import { Content } from "@google/generative-ai"; // For type only, no initialization
-import scraperapiClient from 'scraperapi-sdk';
+import { scraperClient, scraperApiKey } from '../lib/scraper';
 import { parseAndCacheRecipe } from '../services/parseRecipe';
 import { createRecipeWithIngredients } from '../services/recipeService';
 import { rewriteForSubstitution } from '../services/substitutionRewriter';
@@ -11,13 +11,6 @@ import geminiModel from "../lib/gemini";
 
 const router = Router()
 
-// --- Initialize ScraperAPI Client ---
-const scraperApiKey = process.env.SCRAPERAPI_KEY;
-if (!scraperApiKey) {
-  logger.error({ context: 'init', missingKey: 'SCRAPERAPI_KEY', nodeEnv: process.env.NODE_ENV }, 'SCRAPERAPI_KEY environment variable is not set!');
-}
-const scraperClient = scraperapiClient(scraperApiKey || ''); 
-
 // Ensure the Gemini model is initialized
 if (!geminiModel) {
   logger.error({ context: 'init' }, 'Gemini model failed to initialize. API routes depending on Gemini will not function.');
@@ -26,12 +19,7 @@ if (!geminiModel) {
 // Get all recipes
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { data, error } = await supabase
-      .from('recipes')
-      .select(`
-        *,
-        ingredients (*)
-      `)
+    const { data, error } = await getAllRecipes();
     
     if (error) throw error
     res.json(data)
@@ -46,17 +34,7 @@ router.get('/', async (req: Request, res: Response) => {
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const { data, error } = await supabase
-      .from('recipes')
-      .select(`
-        *,
-        ingredients (
-          *,
-          substitutions (*)
-        )
-      `)
-      .eq('id', id)
-      .single()
+    const { data, error } = await getRecipeById(id);
     
     if (error) throw error
     res.json(data)
@@ -93,12 +71,6 @@ router.post('/parse', async (req: Request, res: Response) => {
   // Add logging for incoming request body
   logger.info({ body: req.body, requestId: (req as any).id, route: req.originalUrl, method: req.method }, '[parse] Incoming request');
   try {
-    // ---- TEMPORARY TEST CODE: Force backend error ----
-    // logger.info({ requestId: (req as any).id, message: "FORCED BACKEND ERROR FOR TESTING /parse" });
-    // return res.status(500).json({ error: "Intentional backend test error" });
-    // ---- END TEMPORARY TEST CODE ----
-
-    // Original code restored
     const { input } = req.body;
     const requestId = (req as any).id;
 
@@ -112,7 +84,7 @@ router.post('/parse', async (req: Request, res: Response) => {
       return res.status(500).json({ error: 'Server configuration error: Missing ScraperAPI key.' });
     }
 
-    const { recipe, error: parseError, fromCache, inputType, cacheKey, timings, usage, fetchMethodUsed } = await parseAndCacheRecipe(input, geminiModel!, scraperApiKey, scraperClient);
+    const { recipe, error: parseError, fromCache, inputType, cacheKey, timings, usage, fetchMethodUsed } = await parseAndCacheRecipe(input, geminiModel!);
 
     if (parseError) {
       logger.error({ requestId, route: req.originalUrl, method: req.method, input, errMessage: parseError }, `Failed to process input via parseAndCacheRecipe`);
@@ -226,3 +198,28 @@ router.post('/scale-instructions', async (req: Request, res: Response) => {
 });
 
 export const recipeRouter = router;
+
+// --- Supabase Helper Functions ---
+
+async function getAllRecipes() {
+  return supabase
+    .from('recipes')
+    .select(`
+      *,
+      ingredients (*)
+    `);
+}
+
+async function getRecipeById(id: string) {
+  return supabase
+    .from('recipes')
+    .select(`
+      *,
+      ingredients (
+        *,
+        substitutions (*)
+      )
+    `)
+    .eq('id', id)
+    .single();
+}

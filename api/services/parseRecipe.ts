@@ -7,7 +7,7 @@ import { fetchAndExtractFromUrl } from './urlProcessor';
 import { extractFromRawText } from './textProcessor';
 import { parseUrlContentWithGemini } from './promptUrl';
 import { parseRawTextWithGemini } from './promptText';
-import scraperapiClient from 'scraperapi-sdk';
+import { scraperClient, scraperApiKey } from '../lib/scraper';
 import { StandardizedUsage } from '../utils/usageUtils';
 import logger from '../lib/logger';
 import openai from '../lib/openai';
@@ -57,9 +57,7 @@ export type ParseResult = {
 
 export async function parseAndCacheRecipe(
     input: string,
-    geminiModel: GeminiModel,
-    scraperApiKey: string,
-    scraperClient: any
+    geminiModel: GeminiModel
 ): Promise<ParseResult> {
     const requestId = createHash('sha256').update(Date.now().toString() + Math.random().toString()).digest('hex').substring(0, 12);
     const requestStartTime = Date.now();
@@ -166,7 +164,7 @@ export async function parseAndCacheRecipe(
                         if (geminiResponse.error) {
                             // Gemini failed, try OpenAI fallback
                             logger.warn({ requestId, error: geminiResponse.error }, `Gemini parsing failed for URL. Falling back to OpenAI.`);
-                            geminiResponse = await parseWithOpenAI(trimmedInput, requestId, scraperApiKey, scraperClient);
+                            geminiResponse = await parseWithOpenAI(trimmedInput, requestId);
                             usedFallback = true;
                         }
                         
@@ -196,7 +194,7 @@ export async function parseAndCacheRecipe(
                     if (err?.status === 503 || err?.message?.includes('503') || err?.message?.includes('unavailable')) {
                         logger.warn({ requestId, error: err }, `Gemini service unavailable for URL. Falling back to OpenAI.`);
                         try {
-                            geminiResponse = await parseWithOpenAI(trimmedInput, requestId, scraperApiKey, scraperClient);
+                            geminiResponse = await parseWithOpenAI(trimmedInput, requestId);
                             usedFallback = true;
                             
                             if (geminiResponse.error) {
@@ -245,7 +243,7 @@ export async function parseAndCacheRecipe(
                         if (geminiResponse.error) {
                             // Gemini failed, try OpenAI fallback
                             logger.warn({ requestId, error: geminiResponse.error }, `Gemini parsing failed for raw text. Falling back to OpenAI.`);
-                            geminiResponse = await parseWithOpenAI(trimmedInput, requestId, scraperApiKey, scraperClient);
+                            geminiResponse = await parseWithOpenAI(trimmedInput, requestId);
                             usedFallback = true;
                         }
                         
@@ -269,7 +267,7 @@ export async function parseAndCacheRecipe(
                     if (err?.status === 503 || err?.message?.includes('503') || err?.message?.includes('unavailable')) {
                         logger.warn({ requestId, error: err }, `Gemini service unavailable for raw text. Falling back to OpenAI.`);
                         try {
-                            geminiResponse = await parseWithOpenAI(trimmedInput, requestId, scraperApiKey, scraperClient);
+                            geminiResponse = await parseWithOpenAI(trimmedInput, requestId);
                             usedFallback = true;
                             
                             if (geminiResponse.error) {
@@ -410,8 +408,6 @@ export async function parseAndCacheRecipe(
 async function parseWithOpenAI(
   input: string,
   requestId: string,
-  scraperApiKey: string,
-  scraperClient: any
 ): Promise<GeminiHandlerResponse> {
   const handlerStartTime = Date.now();
   logger.info({ requestId }, "Falling back to OpenAI for parsing");

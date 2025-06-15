@@ -37,7 +37,7 @@ export async function fetchAndExtractFromUrl(
 
   // Step 1: Fetch HTML
   const fetchStartTime = Date.now();
-  const fetchResult = await fetchHtmlWithFallback(url, scraperApiKey, scraperClient);
+  const fetchResult = await fetchHtmlWithFallback(url, scraperApiKey, scraperClient, requestId);
   let htmlContent = fetchResult.htmlContent;
   let fetchError = fetchResult.error;
   fetchMethodUsed = fetchResult.fetchMethodUsed;
@@ -63,7 +63,7 @@ export async function fetchAndExtractFromUrl(
   console.log(`[${requestId}] Pre-processing HTML with cheerio for URL: ${url}...`);
   const extractStartTime = Date.now();
   try {
-      extractedContent = extractRecipeContent(htmlContent, url);
+      extractedContent = extractRecipeContent(htmlContent, requestId, url);
       timings.extractContent = Date.now() - extractStartTime;
 
       // --- ADDED DEBUG LOG ---
