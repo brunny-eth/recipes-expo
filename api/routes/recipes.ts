@@ -45,27 +45,6 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 })
 
-// Create new custom user-created recipe, NOT in full parsing flow; not currently being used 
-router.post('/', async (req: Request, res: Response) => {
-  try {
-    const { title, servings, ingredients } = req.body;
-
-    const { result, error: serviceError } = await createRecipeWithIngredients({ title, servings, ingredients });
-
-    if (serviceError) {
-      // Log the service error before sending response
-      logger.error({ requestId: (req as any).id, err: new Error(serviceError), route: req.originalUrl, method: req.method, body: req.body }, 'Error creating custom recipe via service');
-      return res.status(500).json({ error: serviceError });
-    }
-
-    res.json(result);
-  } catch (err) {
-    const error = err as Error;
-    logger.error({ requestId: (req as any).id, err: error, route: req.originalUrl, method: req.method, body: req.body }, 'Unhandled exception in custom recipe creation');
-    res.status(500).json({ error: error.message || 'An unknown error occurred creating custom recipe' });
-  }
-});
-
 // --- Main Parsing Route --- 
 router.post('/parse', async (req: Request, res: Response) => {
   // Add logging for incoming request body
