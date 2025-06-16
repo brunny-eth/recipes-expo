@@ -3,11 +3,11 @@ import { supabase } from '../lib/supabase'
 import { Content } from "@google/generative-ai"; // For type only, no initialization
 import { scraperClient, scraperApiKey } from '../lib/scraper';
 import { parseAndCacheRecipe } from '../services/parseRecipe';
-import { createRecipeWithIngredients } from '../services/recipeService';
 import { rewriteForSubstitution } from '../services/substitutionRewriter';
 import { scaleInstructions } from '../services/instructionScaling';
 import logger from '../lib/logger'; // Added import
 import geminiModel from "../lib/gemini";
+import { ParseErrorCode } from '../types/errors';
 
 const router = Router()
 
@@ -66,8 +66,15 @@ router.post('/parse', async (req: Request, res: Response) => {
     const { recipe, error: parseError, fromCache, inputType, cacheKey, timings, usage, fetchMethodUsed } = await parseAndCacheRecipe(input, geminiModel!);
 
     if (parseError) {
-      logger.error({ requestId, route: req.originalUrl, method: req.method, input, errMessage: parseError }, `Failed to process input via parseAndCacheRecipe`);
-      return res.status(500).json({ error: parseError });
+      switch (parseError.code) {
+        case ParseErrorCode.INVALID_INPUT:
+          return res.status(400).json({ error: parseError });
+        case ParseErrorCode.FINAL_VALIDATION_FAILED:
+        case ParseErrorCode.GENERATION_EMPTY:
+          return res.status(422).json({ error: parseError });
+        default:
+          return res.status(500).json({ error: parseError });
+      }
     }
 
     res.json({

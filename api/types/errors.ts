@@ -1,0 +1,12 @@
+export enum ParseErrorCode {
+  INVALID_INPUT = 'INVALID_INPUT',
+  GENERATION_FAILED = 'GENERATION_FAILED',
+  GENERATION_EMPTY = 'GENERATION_EMPTY',
+  FINAL_VALIDATION_FAILED = 'FINAL_VALIDATION_FAILED',
+  UNSUPPORTED_INPUT_TYPE = 'UNSUPPORTED_INPUT_TYPE'
+}
+
+export type StructuredError = {
+  code: ParseErrorCode;
+  message: string;
+}; 
