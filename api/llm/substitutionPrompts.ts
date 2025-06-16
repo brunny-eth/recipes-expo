@@ -1,11 +1,12 @@
 import { formatMeasurement } from '../../utils/format';
+import { PromptPayload } from './adapters';
 
 export type IngredientChange = { from: string; to: string | null };
 
 export function buildSubstitutionPrompt(
     originalInstructions: string[],
     substitutions: IngredientChange[],
-): string {
+): PromptPayload {
 
     const substitutionLines = substitutions.map(sub => {
         if (!sub.to || sub.to.trim() === '') {
@@ -21,7 +22,7 @@ export function buildSubstitutionPrompt(
         return `REPLACE: "${sub.from}" → "${formatMeasurement(Number(sub.to)) || sub.to}"`;
     }).join('\n');
 
-    const rewritePrompt = `
+    const systemPrompt = `
     You are an expert recipe editor. Rewrite the cooking instructions to reflect the following ingredient changes.
 
     ${substitutionLines}
@@ -34,10 +35,16 @@ export function buildSubstitutionPrompt(
 
     Respond ONLY in valid JSON:
     { "rewrittenInstructions": [ ... ] }
+    `;
 
+    const userPrompt = `
     ORIGINAL_INSTRUCTIONS:
     ${originalInstructions.map(s => `- ${s}`).join('\n')}
-`;
+    `;
 
-    return rewritePrompt;
+    return {
+        system: systemPrompt,
+        text: userPrompt,
+        isJson: true,
+    };
 } 

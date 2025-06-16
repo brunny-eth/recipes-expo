@@ -7,11 +7,10 @@ import { fetchAndExtractFromUrl } from './urlProcessor';
 import { scraperClient, scraperApiKey } from '../lib/scraper';
 import { StandardizedUsage } from '../utils/usageUtils';
 import logger from '../lib/logger';
-import openai from '../lib/openai';
 import { normalizeUsageMetadata } from '../utils/usageUtils';
 import { finalValidateRecipe } from './finalValidateRecipe';
 import { ParseResult } from './parseRecipe';
-import { geminiAdapter, openaiAdapter, PromptPayload } from '../llm/adapters';
+import { geminiAdapter, openaiAdapter, PromptPayload, runDefaultLLM } from '../llm/adapters';
 import { buildUrlParsePrompt } from '../llm/parsingPrompts';
 import { ParseErrorCode, StructuredError } from '../types/errors';
 
@@ -36,7 +35,6 @@ function normalizeServings(servingRaw: string | null): string | null {
 
 export async function parseUrlRecipe(
     input: string,
-    geminiModel: GeminiModel
 ): Promise<ParseResult> {
     const requestId = createHash('sha256').update(Date.now().toString() + Math.random().toString()).digest('hex').substring(0, 12);
     const requestStartTime = Date.now();
@@ -105,22 +103,17 @@ export async function parseUrlRecipe(
               extractedContent.ingredientsText || '',
               extractedContent.instructionsText || ''
             );
+            prompt.metadata = { requestId };
 
             const geminiStartTime = Date.now();
-            let modelResponse = await geminiAdapter(prompt, requestId, geminiModel);
-            
-            if (modelResponse.error || !modelResponse.output) {
-                logger.warn({ requestId, error: modelResponse.error }, `Gemini adapter failed for URL. Falling back to OpenAI.`);
-                modelResponse = await openaiAdapter(prompt, requestId);
-                usedFallback = true;
-            }
+            const modelResponse = await runDefaultLLM(prompt);
             
             overallTimings.geminiParse = Date.now() - geminiStartTime;
             handlerUsage = modelResponse.usage;
 
             if (modelResponse.error || !modelResponse.output) {
                 processingError = modelResponse.error || "Model returned no output.";
-                logger.error({ requestId, error: processingError }, `URL processing failed during ${usedFallback ? 'OpenAI' : 'Gemini'} parse`);
+                logger.error({ requestId, error: processingError }, `URL processing failed during model parse`);
             } else {
                 try {
                     finalRecipeData = JSON.parse(modelResponse.output);
@@ -130,7 +123,7 @@ export async function parseUrlRecipe(
                         finalRecipeData.thumbnailUrl = extractedContent.thumbnailUrl ?? null;
                         finalRecipeData.sourceUrl = extractedContent.sourceUrl ?? null;
                     }
-                    logger.info({ requestId, timeMs: overallTimings.geminiParse, usage: handlerUsage, action: `${usedFallback ? 'openai' : 'gemini'}_parse_url` }, `${usedFallback ? 'OpenAI' : 'Gemini'} parse completed for URL.`);
+                    logger.info({ requestId, timeMs: overallTimings.geminiParse, usage: handlerUsage, action: `llm_parse_url` }, `LLM parse completed for URL.`);
                 } catch (parseErr: any) {
                     processingError = `Failed to parse model response: ${parseErr.message}`;
                     logger.error({ requestId, error: processingError, responseText: modelResponse.output }, 'JSON parse failed for model response');

@@ -6,15 +6,9 @@ import { parseAndCacheRecipe } from '../services/parseRecipe';
 import { rewriteForSubstitution } from '../services/substitutionRewriter';
 import { scaleInstructions } from '../services/instructionScaling';
 import logger from '../lib/logger'; // Added import
-import geminiModel from "../lib/gemini";
 import { ParseErrorCode } from '../types/errors';
 
 const router = Router()
-
-// Ensure the Gemini model is initialized
-if (!geminiModel) {
-  logger.error({ context: 'init' }, 'Gemini model failed to initialize. API routes depending on Gemini will not function.');
-}
 
 // Get all recipes
 router.get('/', async (req: Request, res: Response) => {
@@ -63,7 +57,7 @@ router.post('/parse', async (req: Request, res: Response) => {
       return res.status(500).json({ error: 'Server configuration error: Missing ScraperAPI key.' });
     }
 
-    const { recipe, error: parseError, fromCache, inputType, cacheKey, timings, usage, fetchMethodUsed } = await parseAndCacheRecipe(input, geminiModel!);
+    const { recipe, error: parseError, fromCache, inputType, cacheKey, timings, usage, fetchMethodUsed } = await parseAndCacheRecipe(input);
 
     if (parseError) {
       switch (parseError.code) {
@@ -124,7 +118,7 @@ router.post('/rewrite-instructions', async (req: Request, res: Response) => {
     const { rewrittenInstructions, error: rewriteError, usage, timeMs } = await rewriteForSubstitution(
       originalInstructions,
       substitutions,
-      geminiModel!
+      requestId
     );
 
     if (rewriteError || !rewrittenInstructions) {
@@ -165,7 +159,7 @@ router.post('/scale-instructions', async (req: Request, res: Response) => {
       instructionsToScale,
       originalIngredients,
       scaledIngredients,
-      geminiModel!
+      requestId
     );
 
     if (scaleError || !scaledInstructions) {

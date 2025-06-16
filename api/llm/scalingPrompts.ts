@@ -1,12 +1,14 @@
+import { PromptPayload } from './adapters';
+
 export function buildScalingPrompt(
     instructionsToScale: string[],
     originalIngredients: any[],
     scaledIngredients: any[],
-): string {
+): PromptPayload {
     const originalIngredientsDesc = originalIngredients.map((ing: any) => `${ing.amount || ''} ${ing.unit || ''} ${ing.name}`.trim()).join(', ');
     const scaledIngredientsDesc = scaledIngredients.map((ing: any) => `${ing.amount || ''} ${ing.unit || ''} ${ing.name}`.trim()).join(', ');
 
-    const scalePrompt = `
+    const systemPrompt = `
 You are an expert recipe editor. Your task is to rewrite recipe instructions to reflect changes in ingredient quantities.
 
 Original ingredients: [${originalIngredientsDesc}]
@@ -23,10 +25,15 @@ Respond with ONLY a valid JSON object:
 {
   "scaledInstructions": [ ... ] // same number of steps, rewritten for new quantities
 }
+`;
 
+    const userPrompt = `
 Original Instructions:
 ${instructionsToScale.map(s => `- ${s}`).join('\n')}
 `;
-
-    return scalePrompt;
+    return {
+        system: systemPrompt,
+        text: userPrompt,
+        isJson: true,
+    };
 } 

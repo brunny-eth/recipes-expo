@@ -6,11 +6,10 @@ import { generateCacheKeyHash } from '../utils/hash';
 import { extractFromRawText } from './textProcessor';
 import { StandardizedUsage } from '../utils/usageUtils';
 import logger from '../lib/logger';
-import openai from '../lib/openai';
 import { normalizeUsageMetadata } from '../utils/usageUtils';
 import { finalValidateRecipe } from './finalValidateRecipe';
 import { ParseResult } from './parseRecipe';
-import { geminiAdapter, openaiAdapter, PromptPayload } from '../llm/adapters';
+import { geminiAdapter, runDefaultLLM } from '../llm/adapters';
 import { buildTextParsePrompt } from '../llm/parsingPrompts';
 import { ParseErrorCode, StructuredError } from '../types/errors';
 
@@ -35,7 +34,6 @@ function normalizeServings(servingRaw: string | null): string | null {
 
 export async function parseTextRecipe(
     input: string,
-    geminiModel: GeminiModel
 ): Promise<ParseResult> {
     const requestId = createHash('sha256').update(Date.now().toString() + Math.random().toString()).digest('hex').substring(0, 12);
     const requestStartTime = Date.now();
@@ -111,26 +109,21 @@ export async function parseTextRecipe(
             logger.info({ requestId, prepareMs: overallTimings.prepareText, textLength: preparedText?.length ?? 0 }, `Raw text prepared.`);
             
             const prompt = buildTextParsePrompt(preparedText!);
+            prompt.metadata = { requestId };
 
             const modelStartTime = Date.now();
-            let modelResponse = await geminiAdapter(prompt, requestId, geminiModel);
+            const modelResponse = await runDefaultLLM(prompt);
             
-            if (modelResponse.error || !modelResponse.output) {
-                logger.warn({ requestId, error: modelResponse.error }, `Gemini adapter failed for text. Falling back to OpenAI.`);
-                modelResponse = await openaiAdapter(prompt, requestId);
-                usedFallback = true;
-            }
-
             overallTimings.geminiParse = Date.now() - modelStartTime;
             handlerUsage = modelResponse.usage;
 
             if (modelResponse.error || !modelResponse.output) {
                 processingError = modelResponse.error || "Model returned no output.";
-                logger.error({ requestId, error: processingError }, `Raw text processing failed during ${usedFallback ? 'OpenAI' : 'Gemini'} parse`);
+                logger.error({ requestId, error: processingError }, `Raw text processing failed during model parse`);
             } else {
                 try {
                     finalRecipeData = JSON.parse(modelResponse.output);
-                     logger.info({ requestId, timeMs: overallTimings.geminiParse, usage: handlerUsage, action: `${usedFallback ? 'openai' : 'gemini'}_parse_raw_text` }, `${usedFallback ? 'OpenAI' : 'Gemini'} parse completed for Raw Text.`);
+                     logger.info({ requestId, timeMs: overallTimings.geminiParse, usage: handlerUsage, action: `llm_parse_raw_text` }, `LLM parse completed for Raw Text.`);
                 } catch (parseErr: any) {
                     processingError = `Failed to parse model response: ${parseErr.message}`;
                     logger.error({ requestId, error: processingError, responseText: modelResponse.output }, 'JSON parse failed for model response');
