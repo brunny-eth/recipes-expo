@@ -50,4 +50,26 @@ export const coerceToStructuredIngredients = (
   }
 
   return processedIngredients;
-}; 
+};
+
+export function parseIngredientDisplayName(name: string): {
+  baseName: string;
+  isRemoved: boolean;
+  substitutedFor?: string;
+} {
+  const removedMatch = name.match(/^(.*?) \(removed\)$/);
+  if (removedMatch) {
+    return { baseName: removedMatch[1], isRemoved: true };
+  }
+
+  const substitutedMatch = name.match(/^(.*?) \(substituted for (.+?)\)$/);
+  if (substitutedMatch) {
+    return {
+      baseName: substitutedMatch[1],
+      isRemoved: false,
+      substitutedFor: substitutedMatch[2],
+    };
+  }
+
+  return { baseName: name, isRemoved: false };
+}

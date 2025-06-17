@@ -8,7 +8,7 @@ import IngredientSubstitutionModal from './IngredientSubstitutionModal';
 import { StructuredIngredient, SubstitutionSuggestion } from '@/api/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { formatMeasurement, abbreviateUnit } from '@/utils/format';
-import { coerceToStructuredIngredients } from '@/utils/ingredientHelpers';
+import { coerceToStructuredIngredients, parseIngredientDisplayName } from '@/utils/ingredientHelpers';
 import { getScaledYieldText, scaleIngredient, parseAmountString, formatAmountNumber } from '@/utils/recipeUtils';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import { titleText, bodyStrongText, bodyText, captionText } from '@/constants/typography';
@@ -35,84 +35,107 @@ type IngredientsNavParams = {
 };
 // --- End Types ---
 
-// --- Helper function for unit abbreviation (kept for display) ---
-/* This function has been moved to utils/format.ts */
-// --- End Helper function ---
+/**
+ * Resolves the original ingredient name from appliedChanges instead of relying on parsed display names.
+ */
+function getOriginalIngredientNameFromAppliedChanges(
+  appliedChanges: IngredientChange[],
+  displayName: string
+): string {
+  const { substitutedFor, baseName } = parseIngredientDisplayName(displayName);
+  const fallback = substitutedFor || baseName;
+  const match = appliedChanges.find(change => change.to === fallback);
+  return match?.from || fallback;
+}
 
-// --- Comment out old types/data ---
-/*
-type Recipe = { ... };
-interface Ingredient { ... };
-const SAMPLE_RECIPES: Record<string, Recipe> = { ... };
-*/
-// --- End Comment Out ---
-
-// Memoized row component to avoid unnecessary re-renders
-const IngredientRow = React.memo(({
+const renderIngredientRow = ({
   ingredient,
   index,
   isChecked,
-  isSubstituted,
+  appliedChanges,
   toggleCheckIngredient,
   openSubstitutionModal,
-  undoIngredientRemoval
+  undoIngredientRemoval,
+  undoSubstitution,
 }: {
   ingredient: StructuredIngredient;
   index: number;
   isChecked: boolean;
-  isSubstituted: boolean;
+  appliedChanges: IngredientChange[];
   toggleCheckIngredient: (idx: number) => void;
   openSubstitutionModal: (ing: StructuredIngredient) => void;
   undoIngredientRemoval: (name: string) => void;
+  undoSubstitution: (originalName: string) => void;
 }) => {
-  /* removed verbose row render log */
+  const { baseName, isRemoved, substitutedFor } = parseIngredientDisplayName(ingredient.name);
+  const originalNameForSub = getOriginalIngredientNameFromAppliedChanges(appliedChanges, ingredient.name);
+
   return (
     <TouchableOpacity 
-      key={`ing-${index}`} 
       style={[
         styles.ingredientItemContainer,
-        isSubstituted && styles.ingredientItemSubstituted,
-        ingredient.name.includes('(removed') && styles.ingredientItemRemoved,
       ]}
-      onPress={() => toggleCheckIngredient(index)}
+      onPress={() => !isRemoved && toggleCheckIngredient(index)}
       activeOpacity={0.7} 
     >
       {/* Checkbox Visual */}
-      <View 
-        style={[styles.checkboxBase, isChecked && styles.checkboxChecked]}
-        testID={`checkbox-${ingredient.name}`}
-      >
-        {isChecked && <View style={styles.checkboxInnerCheck} />}
-      </View>
+      {isRemoved ? (
+        <View style={styles.checkboxPlaceholder} />
+      ) : (
+        <View 
+          style={[styles.checkboxBase, isChecked && styles.checkboxChecked]}
+          testID={`checkbox-${ingredient.name}`}
+        >
+          {isChecked && <View style={styles.checkboxInnerCheck} />}
+        </View>
+      )}
 
       {/* Ingredient Text Container */}
       <View style={styles.ingredientNameContainer}> 
-        <Text style={[styles.ingredientName, isChecked && styles.ingredientTextChecked, isSubstituted && styles.ingredientNameSubstituted]} numberOfLines={0}> 
-          {String(ingredient.name)}
-          {ingredient.preparation && (
-            <Text style={styles.ingredientPreparation}>
-              {` ${ingredient.preparation}`}
-            </Text>
-          )}
-          {(ingredient.amount || ingredient.unit) && (
-            <Text style={styles.ingredientQuantityParenthetical}>
-              {` (${ingredient.amount || ''}${ingredient.unit ? ` ${abbreviateUnit(ingredient.unit)}` : ''})`}
-            </Text>
-          )}
-        </Text>
+        {isRemoved ? (
+          <Text style={styles.ingredientName} numberOfLines={0}>
+            <Text style={styles.ingredientTextRemoved}>{baseName}</Text>
+            <Text style={styles.ingredientRemovedTag}> (removed)</Text>
+          </Text>
+        ) : (
+          <Text style={[styles.ingredientName, isChecked && styles.ingredientTextChecked]} numberOfLines={0}> 
+            {baseName}
+            {ingredient.preparation && (
+              <Text style={styles.ingredientPreparation}>
+                {` ${ingredient.preparation}`}
+              </Text>
+            )}
+            {(ingredient.amount || ingredient.unit) && (
+              <Text style={styles.ingredientQuantityParenthetical}>
+                {` (${ingredient.amount || ''}${ingredient.unit ? ` ${abbreviateUnit(ingredient.unit)}` : ''})`}
+              </Text>
+            )}
+          </Text>
+        )}
 
-        {ingredient.name.includes('(removed') && (
+        {isRemoved && (
           <TouchableOpacity
-            style={{ marginLeft: 6 }}
+            style={styles.revertButton}
             onPress={() => undoIngredientRemoval(ingredient.name)}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <MaterialCommunityIcons name="undo" size={18} color={COLORS.primary} />
+            <MaterialCommunityIcons name="arrow-u-left-top" size={18} color={COLORS.primary} />
+          </TouchableOpacity>
+        )}
+        
+        {substitutedFor && !isRemoved && (
+           <TouchableOpacity
+            style={styles.revertButton}
+            onPress={() => undoSubstitution(originalNameForSub)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <MaterialCommunityIcons name="arrow-u-left-top" size={18} color={COLORS.primary} />
           </TouchableOpacity>
         )}
 
         {/* Substitution Button */}
-        {!isSubstituted && 
+        {!substitutedFor && 
+         !isRemoved &&
          ingredient.suggested_substitutions && 
          ingredient.suggested_substitutions.length > 0 && 
          ingredient.suggested_substitutions.some(sub => sub && sub.name != null) && (
@@ -133,7 +156,7 @@ const IngredientRow = React.memo(({
       </View>
     </TouchableOpacity>
   );
-});
+};
 
 // Utility for consistent timing logs in dev
 const logTiming = (label: string) => {
@@ -177,23 +200,9 @@ export default function IngredientsScreen() {
 
   // Use useMemo for displayIngredients calculation
   const displayIngredients = useMemo(() => {
-    if (!navData) return null;
-
-    const scale = navData.scaleFactor || 1;
-    const usingOriginal = navData.scaleFactor === 1 || !navData.scaledIngredients;
-
-    const source = usingOriginal
-      ? navData.originalIngredients
-      : navData.scaledIngredients;
-
-    if (!source) return null;
-
-    const structured = coerceToStructuredIngredients(source);
-    // removed verbose structured ingredients log
-    // Only scale if using original
-    return usingOriginal
-      ? structured.map(i => scaleIngredient(i, scale))
-      : structured;
+    // 🧠 Simplified to always use scaledIngredients as the source of truth for display
+    if (!navData || !navData.scaledIngredients) return null;
+    return coerceToStructuredIngredients(navData.scaledIngredients);
   }, [navData]);
 
   useEffect(() => {
@@ -227,6 +236,13 @@ export default function IngredientsScreen() {
         try {
           console.log("[IngredientsScreen] New recipeData detected, parsing:", params.recipeData);
           const parsedNavData = JSON.parse(params.recipeData) as IngredientsNavParams;
+
+          // 🧠 If scaled ingredients aren't provided (e.g., scale=1x), create them from originals
+          if (!parsedNavData.scaledIngredients && parsedNavData.originalIngredients) {
+              const structured = coerceToStructuredIngredients(parsedNavData.originalIngredients);
+              const scale = parsedNavData.scaleFactor || 1;
+              parsedNavData.scaledIngredients = structured.map(i => scaleIngredient(i, scale));
+          }
 
           if (!parsedNavData || typeof parsedNavData !== 'object' || Object.keys(parsedNavData).length === 0) {
             console.error("[IngredientsScreen] Parsed nav data is empty or invalid. Original data:", params.recipeData);
@@ -477,10 +493,10 @@ export default function IngredientsScreen() {
 
     const originalIngredientNameFromState = selectedIngredientOriginalData.name;
     
-    const index = displayIngredients.findIndex(ing => 
-      ing.name === originalIngredientNameFromState || 
-      ing.name.includes(`(substituted for ${originalIngredientNameFromState})`)
-    );
+    const index = displayIngredients.findIndex(ing => {
+      const { substitutedFor } = parseIngredientDisplayName(ing.name);
+      return ing.name === originalIngredientNameFromState || substitutedFor === originalIngredientNameFromState;
+    });
 
     if (index === -1) { 
       console.error(`Apply error: Cannot find ingredient matching "${originalIngredientNameFromState}" in display list.`);
@@ -490,11 +506,9 @@ export default function IngredientsScreen() {
     
     const currentDisplayName = displayIngredients[index].name;
     let originalNameForSub = selectedIngredientOriginalData.name;
-    if (currentDisplayName.includes('(substituted for')) {
-      const match = currentDisplayName.match(/\(substituted for (.*?)\)/);
-      if (match && match[1]) {
-        originalNameForSub = match[1];
-      }
+    const { substitutedFor } = parseIngredientDisplayName(currentDisplayName);
+    if (substitutedFor) {
+      originalNameForSub = substitutedFor;
     }
 
     console.log(`Applying substitution: ${substitution.name} (Amount: ${substitution.amount}, Unit: ${substitution.unit}) for original ${originalNameForSub} at index ${index}`);
@@ -525,7 +539,8 @@ export default function IngredientsScreen() {
       if (!prevNavData) return prevNavData;
       
       const newNavData = { ...prevNavData };
-      const source = newNavData.scaleFactor === 1 ? newNavData.originalIngredients : newNavData.scaledIngredients;
+      // 🧠 Always modify the scaledIngredients list, keep originalIngredients pristine
+      const source = newNavData.scaledIngredients;
       
       if (Array.isArray(source) && index !== -1 && source[index]) {
         const newSource = source.map((item, i) => {
@@ -556,13 +571,8 @@ export default function IngredientsScreen() {
           return item;
         });
         
-        if (newNavData.scaleFactor === 1) {
-          // For originalIngredients, we need to maintain the same type as input
-          newNavData.originalIngredients = newSource as typeof newNavData.originalIngredients;
-        } else {
-          // For scaledIngredients, we know it's always StructuredIngredient[]
-          newNavData.scaledIngredients = newSource as StructuredIngredient[];
-        }
+        // 🧠 Only update scaledIngredients
+        newNavData.scaledIngredients = newSource as StructuredIngredient[];
       }
       
       return newNavData;
@@ -575,8 +585,7 @@ export default function IngredientsScreen() {
   };
 
   const undoIngredientRemoval = (fullName: string) => {
-    const match = fullName.match(/^(.*?) \(removed\)$/);
-    const originalName = match ? match[1] : fullName;
+    const { baseName: originalName } = parseIngredientDisplayName(fullName);
 
     // Remove the removal from appliedChanges
     setAppliedChanges(prev => prev.filter(change => change.from !== originalName));
@@ -585,7 +594,8 @@ export default function IngredientsScreen() {
     setNavData(prev => {
       if (!prev) return prev;
       const updated = { ...prev };
-      const targetList = prev.scaleFactor === 1 ? prev.originalIngredients : prev.scaledIngredients;
+      // 🧠 Always target scaledIngredients for mutation
+      const targetList = prev.scaledIngredients;
       if (!Array.isArray(targetList)) return prev;
 
       const restoredList = targetList.map(ing => {
@@ -616,11 +626,8 @@ export default function IngredientsScreen() {
         return ing;
       });
 
-      if (prev.scaleFactor === 1) {
-        updated.originalIngredients = restoredList as typeof prev.originalIngredients;
-      } else {
-        updated.scaledIngredients = restoredList as StructuredIngredient[];
-      }
+      // 🧠 Only update scaledIngredients
+      updated.scaledIngredients = restoredList as StructuredIngredient[];
 
       return updated;
     });
@@ -629,6 +636,49 @@ export default function IngredientsScreen() {
     if (lastRemoved?.from === originalName) {
       setLastRemoved(null);
     }
+  };
+
+  const undoSubstitution = (originalName: string) => {
+    // Remove the substitution from appliedChanges
+    setAppliedChanges(prev => prev.filter(change => change.from !== originalName));
+
+    // Restore ingredient name in navData
+    setNavData(prev => {
+      if (!prev) return prev;
+      const updated = { ...prev };
+      // 🧠 Always target scaledIngredients for mutation
+      const targetList = prev.scaledIngredients;
+      if (!Array.isArray(targetList)) return prev;
+
+      const restoredList = targetList.map(ing => {
+        const currentName = typeof ing === 'string' ? ing : ing.name;
+        const { substitutedFor } = parseIngredientDisplayName(currentName);
+        if (substitutedFor === originalName) {
+          const structuredOriginals = navData?.originalIngredients?.filter(
+            (originalIng): originalIng is StructuredIngredient => typeof originalIng !== 'string'
+          );
+          const originalIngredient = structuredOriginals?.find(
+            (originalIng) => originalIng.name === originalName
+          );
+
+          if (typeof ing === 'string') return originalName;
+
+          return {
+            ...ing,
+            name: originalName,
+            amount: originalIngredient?.amount ?? null,
+            unit: originalIngredient?.unit ?? null,
+            suggested_substitutions: originalIngredient?.suggested_substitutions ?? null,
+          };
+        }
+        return ing;
+      });
+
+      // 🧠 Only update scaledIngredients
+      updated.scaledIngredients = restoredList as StructuredIngredient[];
+
+      return updated;
+    });
   };
 
   // --- Conditional Rendering (SHOULD BE AFTER ALL HOOKS) ---
@@ -697,25 +747,21 @@ export default function IngredientsScreen() {
             </View>
           ) : undefined}
           ListEmptyComponent={<Text style={styles.placeholderText}>No ingredients found.</Text>}
-          extraData={[substitutionModalVisible, selectedIngredientOriginalData]}
+          extraData={[checkedIngredients, appliedChanges]}
           renderItem={({ item, index }: { item: StructuredIngredient; index: number }) => {
-            /* removed flash list verbose render log */
-            const isChecked = !!checkedIngredients[index];
-            const change = appliedChanges.find(c => {
-              // A bit complex: check if the item is the result of this change
-              return item.name.includes(c.from) || (c.to && item.name.startsWith(c.to));
-            });
-            const isSubstituted = !!change;
             return (
-              <IngredientRow
-                ingredient={item}
-                index={index}
-                isChecked={isChecked}
-                isSubstituted={isSubstituted}
-                toggleCheckIngredient={toggleCheckIngredient}
-                openSubstitutionModal={openSubstitutionModal}
-                undoIngredientRemoval={undoIngredientRemoval}
-              />
+              <View key={`${item.name}-${index}`}>
+                {renderIngredientRow({
+                  ingredient: item,
+                  index,
+                  isChecked: !!checkedIngredients[index],
+                  appliedChanges,
+                  toggleCheckIngredient,
+                  openSubstitutionModal,
+                  undoIngredientRemoval,
+                  undoSubstitution,
+                })}
+              </View>
             );
           }}
         />
@@ -889,8 +935,11 @@ const styles = StyleSheet.create({
   ingredientItemSubstituted: {
     backgroundColor: COLORS.primaryLight,
   },
-  ingredientItemRemoved: {
-    backgroundColor: '#fce8e6',
+
+  checkboxPlaceholder: {
+    width: 24,
+    height: 24,
+    marginRight: 15,
   },
   checkboxBase: {
     width: 24,
@@ -920,21 +969,18 @@ const styles = StyleSheet.create({
       color: COLORS.darkGray,
       textDecorationLine: 'line-through',
   },
+  ingredientTextRemoved: {
+    color: COLORS.darkGray,
+    textDecorationLine: 'line-through',
+  },
+  ingredientRemovedTag: {
+    color: COLORS.darkGray,
+    fontStyle: 'italic',
+  },
   ingredientItemStructured: {
     flexDirection: 'row',
     marginBottom: 12,
     alignItems: 'flex-start',
-  },
-  ingredientAmountUnit: {
-    // This style is no longer needed as quantity/unit are combined
-    /*
-    fontFamily: 'Poppins-Regular',
-    fontSize: 16,
-    color: COLORS.darkGray,
-    lineHeight: 24,
-    textAlign: 'right',
-    marginRight: 10,
-    */
   },
   ingredientNameContainer: {
       flex: 1, // Takes remaining space
@@ -972,6 +1018,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  revertButton: {
+    paddingHorizontal: 8,
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 8,
