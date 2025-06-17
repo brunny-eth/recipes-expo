@@ -364,7 +364,7 @@ export default function RecipeSummaryScreen() {
                         {index < detectedAllergens.length - 1 && ', '}
                       </React.Fragment>
                     ))}
-                    . You can substitute them out on the Ingredients page.
+                    . If you are allergic or insensitive to any of these, you can substitute them out on the following page.
                 </Text>
             </>
         )}

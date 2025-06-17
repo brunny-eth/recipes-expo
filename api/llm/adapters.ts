@@ -2,6 +2,7 @@ import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold, GenerationConfig 
 import OpenAI from 'openai';
 import { GeminiModel } from '../types';
 import { normalizeUsageMetadata, StandardizedUsage } from '../utils/usageUtils';
+import { estimateCostUSD } from '../utils/costUtils';
 import logger from '../lib/logger';
 import { geminiModel, openai } from '../lib/clients';
 
@@ -15,6 +16,7 @@ export type PromptPayload = {
     temperature?: number;
     metadata?: {
         requestId: string;
+        route?: string;
     };
 };
 
@@ -54,6 +56,7 @@ export const geminiAdapter: ModelAdapter = async (
 ): Promise<AdapterResponse> => {
     const fullPrompt = withPromptDefaults(prompt);
     const requestId = fullPrompt.metadata?.requestId ?? 'no-id';
+    const start = Date.now();
     logger.info({ requestId, adapter: 'gemini', promptLength: fullPrompt.text.length }, 'Calling Gemini Adapter');
     
     try {
@@ -67,12 +70,23 @@ export const geminiAdapter: ModelAdapter = async (
         const response = result.response;
         const output = response.text();
         
-        // Gemini doesn't provide detailed token usage in the same way,
-        // so we'll have to estimate or use what's available if anything.
-        // For now, returning zeroed usage until a better method is found.
-        const usage: StandardizedUsage = { inputTokens: 0, outputTokens: 0 }; 
 
-        logger.info({ requestId, adapter: 'gemini', usage }, 'Gemini Adapter call successful');
+        const usage = normalizeUsageMetadata({
+            promptTokenCount: response.usageMetadata?.promptTokenCount || 0,
+            candidatesTokenCount: response.usageMetadata?.candidatesTokenCount || 0
+          }, 'gemini');
+
+        const totalCostUSD = estimateCostUSD(usage, 'gemini');
+        logger.info({
+          requestId,
+          provider: 'gemini',
+          route: fullPrompt.metadata?.route || 'unknown',
+          inputTokenCount: usage.inputTokens,
+          outputTokenCount: usage.outputTokens,
+          totalCostUSD,
+          timeMs: Date.now() - start
+        }, 'LLM call successful');
+        
         return {
             output: output,
             usage: usage,
@@ -97,6 +111,7 @@ export const openaiAdapter: ModelAdapter = async (
 ): Promise<AdapterResponse> => {
     const fullPrompt = withPromptDefaults(prompt);
     const requestId = fullPrompt.metadata?.requestId ?? 'no-id';
+    const start = Date.now();
     logger.info({ requestId, adapter: 'openai', promptLength: fullPrompt.text.length }, 'Calling OpenAI Adapter');
     if (!openaiClient) {
         return {
@@ -122,14 +137,25 @@ export const openaiAdapter: ModelAdapter = async (
             promptTokenCount: completion.usage?.prompt_tokens || 0,
             candidatesTokenCount: completion.usage?.completion_tokens || 0
         }, 'openai');
-
-        logger.info({ requestId, adapter: 'openai', usage }, 'OpenAI Adapter call successful');
+        
+        const totalCostUSD = estimateCostUSD(usage, 'openai');
+        logger.info({
+            requestId,
+            provider: 'openai',
+            route: fullPrompt.metadata?.route || 'unknown',
+            inputTokenCount: usage.inputTokens,
+            outputTokenCount: usage.outputTokens,
+            totalCostUSD,
+            timeMs: Date.now() - start
+        }, 'LLM call successful');
 
         return {
             output,
             usage,
             error: null
         };
+
+        
 
     } catch (err: any) {
         logger.error({ requestId, adapter: 'openai', error: err }, 'OpenAI Adapter call failed');

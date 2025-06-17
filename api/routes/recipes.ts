@@ -1,11 +1,11 @@
 import { Router, Request, Response } from 'express'
-import { supabase } from '../lib/supabase'
 import { Content } from "@google/generative-ai"; // For type only, no initialization
 import { scraperClient, scraperApiKey } from '../lib/scraper';
 import { parseAndCacheRecipe } from '../services/parseRecipe';
 import { rewriteForSubstitution } from '../services/substitutionRewriter';
 import { scaleInstructions } from '../services/instructionScaling';
-import logger from '../lib/logger'; // Added import
+import { getAllRecipes, getRecipeById } from '../services/recipeDB';
+import logger from '../lib/logger'; 
 import { ParseErrorCode } from '../types/errors';
 
 const router = Router()
@@ -178,28 +178,3 @@ router.post('/scale-instructions', async (req: Request, res: Response) => {
 });
 
 export const recipeRouter = router;
-
-// --- Supabase Helper Functions ---
-
-async function getAllRecipes() {
-  return supabase
-    .from('recipes')
-    .select(`
-      *,
-      ingredients (*)
-    `);
-}
-
-async function getRecipeById(id: string) {
-  return supabase
-    .from('recipes')
-    .select(`
-      *,
-      ingredients (
-        *,
-        substitutions (*)
-      )
-    `)
-    .eq('id', id)
-    .single();
-}

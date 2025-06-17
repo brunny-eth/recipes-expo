@@ -2,7 +2,6 @@ import express from 'express'
 import pinoHttp from 'pino-http'
 import logger from './lib/logger'
 import { recipeRouter } from './routes/recipes'
-import { ingredientRouter } from './routes/ingredients'
 
 const app = express()
 
@@ -16,6 +15,5 @@ app.get('/api/health', (_req, res) => {
 })
 
 app.use('/api/recipes', recipeRouter)
-app.use('/api/ingredients', ingredientRouter)
 
 export default app
