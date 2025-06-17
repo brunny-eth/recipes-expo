@@ -1,5 +1,6 @@
 import { formatMeasurement } from '../../utils/format';
 import { PromptPayload } from './adapters';
+import logger from '../lib/logger';
 
 export type IngredientChange = { from: string; to: string | null };
 
@@ -9,18 +10,24 @@ export function buildSubstitutionPrompt(
 ): PromptPayload {
 
     const substitutionLines = substitutions.map(sub => {
+        const from = sub.from?.trim();
+        if (!from) {
+            logger.warn({ sub }, 'Skipping substitution with empty `from` value.');
+            return null;
+        }
+
         if (!sub.to || sub.to.trim() === '') {
             // derive simple alternative names (last word and grated form)
-            const words = sub.from.split(' ');
+            const words = from.split(' ');
             const base = words[words.length - 1];
             const altPhrases: string[] = [];
-            if (base.toLowerCase() !== sub.from.toLowerCase()) altPhrases.push(base);
+            if (base.toLowerCase() !== from.toLowerCase()) altPhrases.push(base);
             altPhrases.push(`grated ${base}`);
             const altLine = altPhrases.length ? `\nALSO REMOVE if referred to as: ${altPhrases.map(a => `"${a}"`).join(', ')}` : '';
-            return `REMOVE: "${sub.from}"${altLine}`;
+            return `REMOVE: "${from}"${altLine}`;
         }
-        return `REPLACE: "${sub.from}" → "${formatMeasurement(Number(sub.to)) || sub.to}"`;
-    }).join('\n');
+        return `REPLACE: "${from}" → "${formatMeasurement(Number(sub.to)) || sub.to}"`;
+    }).filter(Boolean).join('\n');
 
     const systemPrompt = `
     You are an expert recipe editor. Rewrite the cooking instructions to reflect the following ingredient changes.

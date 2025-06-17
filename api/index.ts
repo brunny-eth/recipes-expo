@@ -6,7 +6,6 @@ import { ingredientRouter } from './routes/ingredients'
 
 const app = express()
 
-// Add pino-http middleware before other middleware and routes
 app.use(pinoHttp({ logger }))
 
 app.use(express.json())
