@@ -299,13 +299,7 @@ export function extractRecipeContent(html: string, requestId: string, sourceUrl?
 
   // Tier 2: Fallback to Selectors (or run if JSON-LD was incomplete)
   // Note: The console log for this was moved up to the start of the pre-stripping block.
-  /* MOVED
-  if (!title) { // Title might have been parsed by JSON-LD even if other fields were missing
-    const titleFromSelectors = $('title').first().text() || $('h1').first().text() || null;
-    if (titleFromSelectors) title = titleFromSelectors;
-  }
-  */
-
+ 
   // Ingredient Selectors
   if (!ingredientsText) {
       const ingredientSelectors = [
@@ -315,7 +309,9 @@ export function extractRecipeContent(html: string, requestId: string, sourceUrl?
         '.easyrecipe-ingredient',
         '.recipe-ingredients li',
         '.ingredients li',
-        '.ingredient-list li'
+        '.ingredient-list li',
+        // Create by Mediavine
+        '.mv-create-ingredients li'
       ];
       const collectedIngredients = new Set<string>();
       for (const selector of ingredientSelectors) {
@@ -345,7 +341,9 @@ export function extractRecipeContent(html: string, requestId: string, sourceUrl?
           '[itemprop="recipeInstructions"] li', '[itemprop="recipeInstructions"] p',
           '[itemprop="recipeInstructions"]',
           '.wprm-recipe-instruction',
-          '.wprm-recipe-instruction-text'
+          '.wprm-recipe-instruction-text',
+          '.mv-create-instructions li',
+          '.mv-create-instructions p'
       ];
       const blockLevelSelectors = [
           '.wprm-recipe-instructions',
@@ -361,7 +359,9 @@ export function extractRecipeContent(html: string, requestId: string, sourceUrl?
           'div[class*="directions" i]',
           'div[class*="steps" i]',
           'div[class*="method" i]',
-          'div[class*="preparation" i]'
+          'div[class*="preparation" i]',
+          // Create by Mediavine
+          '.mv-create-instructions'
       ];
 
       // First try to find ordered lists within recipe containers
@@ -448,6 +448,9 @@ export function extractRecipeContent(html: string, requestId: string, sourceUrl?
       '.tasty-recipes-yield', '.tasty-recipes-details .recipe-yield',
       '.easyrecipe-servings', '.mf-recipe-servings',
       '[itemprop="recipeYield"]', '[data-mv-recipe-meta="servings"] .mv-value',
+      // Create by Mediavine
+      '.mv-create-yield',
+      '.mv-create-meta-serving',
       // Generic selectors looking for keywords if specific classes fail
       'div:contains("Servings:")', 'span:contains("Servings:")', 'p:contains("Servings:")',
       'div:contains("Yield:")', 'span:contains("Yield:")', 'p:contains("Yield:")',
