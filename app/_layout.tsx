@@ -2,10 +2,22 @@ import React from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, LogBox } from 'react-native';
 import { COLORS } from '@/constants/theme';
 import { ErrorModalProvider } from '@/context/ErrorModalContext';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
+
+if (__DEV__) {
+  // @ts-expect-error - ErrorUtils is a global internal to react-native
+  const originalHandler = global.ErrorUtils.getGlobalHandler();
+  // @ts-expect-error - ErrorUtils is a global internal to react-native
+  global.ErrorUtils.setGlobalHandler((error, isFatal) => {
+    console.log('[GLOBAL ERROR CAUGHT]', error.message);
+  
+    // 🛑 Don't re-call the originalHandler
+    // originalHandler(error, isFatal);
+  });
+}
 
 export default function RootLayout() {
   useFrameworkReady();

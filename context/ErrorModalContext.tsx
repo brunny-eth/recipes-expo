@@ -1,43 +1,74 @@
-import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback, useRef, useEffect } from 'react';
 import GlobalErrorModal from '@/components/GlobalErrorModal';
 
-interface ErrorModalState {
-  visible: boolean;
+interface ModalData {
   message: string;
   title: string | null;
 }
 
 interface ErrorModalContextType {
-  showError: (details: { message: string; title?: string }) => void;
+  showError: (title: string, message: string) => void;
   hideError: () => void;
 }
 
 const ErrorModalContext = createContext<ErrorModalContextType | undefined>(undefined);
 
 export const ErrorModalProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [errorState, setErrorState] = useState<ErrorModalState>({
-    visible: false,
-    message: '',
-    title: null,
-  });
+  const [modalData, setModalData] = useState<ModalData | null>(null);
+  const [visible, setVisible] = useState(false);
+  const isMountedRef = useRef(true);
 
-  const showError = useCallback(({ message, title }: { message: any; title?: string }) => {
-    console.log("[GlobalErrorModal] Showing with:", title, message);
-    const safeMessage = typeof message === 'string' ? message : String(message);
-    setErrorState({ visible: true, message: safeMessage, title: title === undefined ? null : title });
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
+  useEffect(() => {
+    if (modalData) {
+      const timeout = setTimeout(() => {
+        setVisible(true);
+      }, 50); // small debounce delay helps avoid flash
+      return () => clearTimeout(timeout);
+    } else {
+      setVisible(false);
+    }
+  }, [modalData]);
+  
+  const showError = useCallback((title: string, message: string) => {
+    // prevent duplicate flashes if the same error is already showing
+    if (visible && modalData?.title === title && modalData?.message === message) {
+      console.warn('[GlobalErrorModal] Duplicate error suppressed:', title);
+      return;
+    }
+    
+    if (!isMountedRef.current) {
+      console.warn('[GlobalErrorModal] Tried to show after unmount – skipping');
+      return;
+    }
+    
+    console.log(`[GlobalErrorModal] Showing with: ${title} ${message}`);
+    setModalData({ title, message });
+  }, [visible, modalData]);
+
   const hideError = useCallback(() => {
-    setErrorState({ visible: false, message: '', title: null });
+    requestAnimationFrame(() => {
+      setVisible(false);
+      // Safely clear data after the hide animation is complete
+      setTimeout(() => {
+        setModalData(null); 
+      }, 500); 
+    });
   }, []);
 
   return (
     <ErrorModalContext.Provider value={{ showError, hideError }}>
       {children}
       <GlobalErrorModal
-        visible={errorState.visible}
-        title={errorState.title}
-        message={errorState.message}
+        visible={visible}
+        title={modalData?.title ?? null}
+        message={modalData?.message ?? ''}
         onClose={hideError} 
       />
     </ErrorModalContext.Provider>

@@ -43,6 +43,11 @@ export default function IngredientSubstitutionModal({
 }: IngredientSubstitutionModalProps) {
   const [selectedOption, setSelectedOption] = useState<SubstitutionSuggestion | null>(null);
 
+  const handleCloseWithLog = () => {
+    console.log('[DEBUG] triggering onClose from modal');
+    onClose();
+  };
+
   useEffect(() => {
     console.log('[Modal] substitutionModalVisible changed to:', visible);
   }, [visible]);
@@ -95,10 +100,10 @@ export default function IngredientSubstitutionModal({
       transparent
       animationType="none"
       presentationStyle="overFullScreen"
-      onRequestClose={onClose}
+      onRequestClose={handleCloseWithLog}
     >
       <View style={styles.modalContainer}>
-        <Pressable style={styles.backdrop} onPress={onClose}>
+        <Pressable style={styles.backdrop} onPress={handleCloseWithLog}>
           <Animated.View
             entering={FadeIn.duration(200)}
             exiting={FadeOut.duration(150)}
@@ -107,13 +112,13 @@ export default function IngredientSubstitutionModal({
         </Pressable>
 
         <Animated.View
-          entering={SlideInDown.springify()}
+          entering={SlideInDown.springify().damping(20).stiffness(150)}
           exiting={SlideOutDown.duration(150)}
           style={styles.modalContent}
         >
           <View style={styles.header}>
             <Text style={styles.title}>Substitute {ingredientName}</Text>
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <TouchableOpacity style={styles.closeButton} onPress={handleCloseWithLog}>
               <MaterialCommunityIcons name="close" size={24} color={COLORS.textDark} />
             </TouchableOpacity>
           </View>

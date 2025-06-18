@@ -221,10 +221,10 @@ export default function IngredientsScreen() {
 
           if (!parsedNavData || typeof parsedNavData !== 'object' || Object.keys(parsedNavData).length === 0) {
             console.error("[IngredientsScreen] Parsed nav data is empty or invalid. Original data:", params.recipeData);
-            showError({
-              title: "Error Loading Ingredients",
-              message: "Ingredient data is invalid. Please go back and try again."
-            });
+            showError(
+              "Error Loading Ingredients",
+              "Ingredient data is invalid. Please go back and try again."
+            );
             setIsLoading(false);
             return;
           }
@@ -238,19 +238,19 @@ export default function IngredientsScreen() {
           });
         } catch (e: any) { 
           console.error(`[IngredientsScreen] Failed to parse recipeData. Error: ${e.message}. Raw data:`, params.recipeData);
-          showError({
-              title: "Error Loading Ingredients",
-              message: `Could not load ingredient data: ${e.message}. Please go back and try again.`
-          });
+          showError(
+              "Error Loading Ingredients",
+              `Could not load ingredient data: ${e.message}. Please go back and try again.`
+          );
           setIsLoading(false);
           return;
         }
       } else {
         console.error("[IngredientsScreen] Recipe data not provided or not a string in params. Received:", params.recipeData);
-        showError({
-          title: "Error Loading Ingredients",
-          message: "Recipe data not provided. Please go back and try again."
-        });
+        showError(
+          "Error Loading Ingredients",
+          "Recipe data not provided. Please go back and try again."
+        );
         setIsLoading(false);
         return;
       }
@@ -362,10 +362,10 @@ export default function IngredientsScreen() {
     const removalCount = appliedChanges.filter(c => !c.to).length;
     if (removalCount > 2) {
       console.warn("[NAV BLOCKED] Too many removals, canceling navigation");
-      showError({
-        title: "Limit Reached",
-        message: "You can only remove up to 2 ingredients per recipe."
-      });
+      showError(
+        "Limit Reached",
+        "You can only remove up to 2 ingredients per recipe."
+      );
       return;
     }
 
@@ -398,16 +398,23 @@ export default function IngredientsScreen() {
            }),
          });
          const result = await response.json();
-         if (!response.ok) throw new Error(result.error || `Rewrite failed (Status: ${response.status})`);
-         if (result.rewrittenInstructions) finalInstructions = result.rewrittenInstructions;
-         else throw new Error("Invalid format for rewritten instructions.");
+         if (!response.ok) {
+           console.error("💥 Rewrite fetch failed", result);
+           throw new Error(result.error || `Rewrite failed (Status: ${response.status})`);
+         }
+         if (!result.rewrittenInstructions) {
+            console.error("💥 Rewrite response invalid format", result);
+            throw new Error("Invalid format for rewritten instructions.");
+         }
+         finalInstructions = result.rewrittenInstructions;
          logTiming("Finished rewriting instructions");
        } catch (rewriteError) {
          console.error("Error rewriting instructions:", rewriteError);
-         showError({ 
-           title: "Update Failed", 
-           message: "We couldn't update the recipe steps for the ingredient substitution. The original steps will be used."
-         });
+         showError(
+           "Update Failed", 
+           "We couldn't update the recipe steps for the ingredient substitution. The original steps will be used."
+         );
+         return;
        } finally {
          setIsRewriting(false);
        }
@@ -431,17 +438,23 @@ export default function IngredientsScreen() {
                 }),
             });
             const result = await response.json();
-             if (!response.ok) throw new Error(result.error || `Scaling failed (Status: ${response.status})`);
-             if (result.scaledInstructions) {
-                 finalInstructions = result.scaledInstructions;
-                 logTiming("Finished scaling instructions");
-             } else throw new Error("Invalid format for scaled instructions.");
+             if (!response.ok) {
+                console.error("💥 Scale fetch failed", result);
+                throw new Error(result.error || `Scaling failed (Status: ${response.status})`);
+             }
+             if (!result.scaledInstructions) {
+                console.error("💥 Scale response invalid format", result);
+                throw new Error("Invalid format for scaled instructions.");
+             }
+             finalInstructions = result.scaledInstructions;
+             logTiming("Finished scaling instructions");
         } catch (scalingError) {
-            console.error("Error scaling instructions:", scalingError);
-            showError({
-              title: "Update Failed",
-              message: "We couldn't automatically adjust ingredient quantities in the recipe steps. The original quantities will be shown."
-            });
+             console.error("Error scaling instructions:", scalingError);
+             showError(
+               "Update Failed",
+               "We couldn't automatically adjust ingredient quantities in the recipe steps. The original quantities will be shown."
+             );
+             return;
         } finally {
             setIsScalingInstructions(false);
         }
@@ -476,96 +489,101 @@ export default function IngredientsScreen() {
   }, [navData, scaledIngredients, appliedChanges, router, showError]);
 
   const handleApplySubstitution = (substitution: SubstitutionSuggestion) => {
-    if (!selectedIngredientOriginalData) {
-      console.error("Apply error: Missing original ingredient data or display list.");
-      return;
-    }
-
-    const ingredientToSubstitute = selectedIngredientOriginalData;
-    console.log(`[TIMING] Modal close trigger at ${Date.now()}ms`);
-    setSubstitutionModalVisible(false);
-    setSelectedIngredientOriginalData(null);
-    setProcessedSubstitutionsForModal(null);
-
-    requestAnimationFrame(() => {
-      InteractionManager.runAfterInteractions(() => {
-        console.log(`[TIMING] Running deferred state updates at ${Date.now()}ms`);
-        performance.mark('applySubstitution-start');
-
-        if (substitution.name === 'Remove ingredient') {
-          const currentRemovals = appliedChanges.filter(change => !change.to).length;
-          if (currentRemovals >= 2) {
-            console.warn('🚫 Blocked 3rd removal attempt:', ingredientToSubstitute?.name);
-            InteractionManager.runAfterInteractions(() => {
-              setTimeout(() => {
-                console.log('🔥 Triggering showError modal');
-                showError({
-                  title: 'Limit Reached',
-                  message: 'You can only remove up to 2 ingredients per recipe.',
-                });
-              }, 300);
-            });
-            console.trace('Blocked 3rd removal – trace');
+    try {
+      if (!selectedIngredientOriginalData) {
+        console.error("Apply error: Missing original ingredient data or display list.");
+        return;
+      }
+  
+      const ingredientToSubstitute = selectedIngredientOriginalData;
+      console.log(`[TIMING] Modal close trigger at ${Date.now()}ms`);
+      setSubstitutionModalVisible(false);
+      setSelectedIngredientOriginalData(null);
+      setProcessedSubstitutionsForModal(null);
+  
+      requestAnimationFrame(() => {
+        InteractionManager.runAfterInteractions(() => {
+          console.log(`[TIMING] Running deferred state updates at ${Date.now()}ms`);
+          performance.mark('applySubstitution-start');
+  
+          if (substitution.name === 'Remove ingredient') {
+            const currentRemovals = appliedChanges.filter(change => !change.to).length;
+            if (currentRemovals >= 2) {
+              console.warn('🚫 Blocked 3rd removal attempt:', ingredientToSubstitute?.name);
+              InteractionManager.runAfterInteractions(() => {
+                setTimeout(() => {
+                  console.log('🔥 Triggering showError modal');
+                  showError(
+                    'Limit Reached',
+                    'You can only remove up to 2 ingredients per recipe.'
+                  );
+                }, 300);
+              });
+              console.trace('Blocked 3rd removal – trace');
+              return;
+            }
+          }
+  
+          console.log("🧪 Current appliedChanges:", appliedChanges);
+  
+          const isRemoval = substitution.name === 'Remove ingredient';
+          const originalIngredientNameFromState = ingredientToSubstitute.name;
+          const index = scaledIngredients.findIndex(ing => {
+            const { substitutedFor } = parseIngredientDisplayName(ing.name);
+            return ing.name === originalIngredientNameFromState || substitutedFor === originalIngredientNameFromState;
+          });
+  
+          if (index === -1) {
+            console.error(`Apply error: Cannot find ingredient matching "${originalIngredientNameFromState}" in display list.`);
+            console.log("Current scaledIngredients names:", scaledIngredients.map(i => i.name));
             return;
           }
-        }
-
-        console.log("🧪 Current appliedChanges:", appliedChanges);
-
-        const isRemoval = substitution.name === 'Remove ingredient';
-        const originalIngredientNameFromState = ingredientToSubstitute.name;
-        const index = scaledIngredients.findIndex(ing => {
-          const { substitutedFor } = parseIngredientDisplayName(ing.name);
-          return ing.name === originalIngredientNameFromState || substitutedFor === originalIngredientNameFromState;
-        });
-
-        if (index === -1) {
-          console.error(`Apply error: Cannot find ingredient matching "${originalIngredientNameFromState}" in display list.`);
-          console.log("Current scaledIngredients names:", scaledIngredients.map(i => i.name));
-          return;
-        }
-
-        const currentDisplayName = scaledIngredients[index].name;
-        let originalNameForSub = ingredientToSubstitute.name;
-        const { substitutedFor } = parseIngredientDisplayName(currentDisplayName);
-        if (substitutedFor) {
-          originalNameForSub = substitutedFor;
-        }
-
-        console.log(`Applying substitution: ${substitution.name} (Amount: ${substitution.amount}, Unit: ${substitution.unit}) for original ${originalNameForSub} at index ${index}`);
-
-        const newChange: AppliedChange = {
-          from: originalNameForSub,
-          to: isRemoval ? null : {
-            name: substitution.name,
-            amount: substitution.amount != null ? String(substitution.amount) : null,
-            unit: substitution.unit ?? null,
-            preparation: substitution.description ?? null,
-            suggested_substitutions: null,
+  
+          const currentDisplayName = scaledIngredients[index].name;
+          let originalNameForSub = ingredientToSubstitute.name;
+          const { substitutedFor } = parseIngredientDisplayName(currentDisplayName);
+          if (substitutedFor) {
+            originalNameForSub = substitutedFor;
           }
-        };
-
-        if (isRemoval) {
-          setLastRemoved({ from: newChange.from, to: null });
-        }
-
-        console.log('Applying change:', newChange);
-        console.log(`[TIMING] setAppliedChanges will run at ${Date.now()}ms`);
-        setAppliedChanges(prev => {
-          const existingChangeIndex = prev.findIndex(c => c.from === originalNameForSub);
-          if (existingChangeIndex > -1) {
-            const updated = [...prev];
-            updated[existingChangeIndex] = newChange;
-            return updated;
+  
+          console.log(`Applying substitution: ${substitution.name} (Amount: ${substitution.amount}, Unit: ${substitution.unit}) for original ${originalNameForSub} at index ${index}`);
+  
+          const newChange: AppliedChange = {
+            from: originalNameForSub,
+            to: isRemoval ? null : {
+              name: substitution.name,
+              amount: substitution.amount != null ? String(substitution.amount) : null,
+              unit: substitution.unit ?? null,
+              preparation: substitution.description ?? null,
+              suggested_substitutions: null,
+            }
+          };
+  
+          if (isRemoval) {
+            setLastRemoved({ from: newChange.from, to: null });
           }
-          return [...prev, newChange];
+  
+          console.log('Applying change:', newChange);
+          console.log(`[TIMING] setAppliedChanges will run at ${Date.now()}ms`);
+          setAppliedChanges(prev => {
+            const existingChangeIndex = prev.findIndex(c => c.from === originalNameForSub);
+            if (existingChangeIndex > -1) {
+              const updated = [...prev];
+              updated[existingChangeIndex] = newChange;
+              return updated;
+            }
+            return [...prev, newChange];
+          });
+  
+          performance.mark('applySubstitution-end');
+          performance.measure('applySubstitution', 'applySubstitution-start', 'applySubstitution-end');
+          console.log("✅ Substitution applied (deferred)");
         });
-
-        performance.mark('applySubstitution-end');
-        performance.measure('applySubstitution', 'applySubstitution-start', 'applySubstitution-end');
-        console.log("✅ Substitution applied (deferred)");
       });
-    });
+    } catch (err) {
+      console.error("💥 Unexpected applySubstitution failure", err);
+      showError("Substitution Error", "Something went wrong.");
+    }
   };
 
   // --- Conditional Rendering (SHOULD BE AFTER ALL HOOKS) ---

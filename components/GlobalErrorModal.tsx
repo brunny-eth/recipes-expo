@@ -22,19 +22,23 @@ const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
   const opacity = useSharedValue(0);
 
   useEffect(() => {
-    console.log('[GlobalErrorModal] useEffect triggered. visible:', visible);
-    if (visible) {
-      setIsRendered(true);
-      scale.value = withSpring(1, { damping: 15, stiffness: 200 });
-      opacity.value = withTiming(1, { duration: 200 });
-    } else {
-      scale.value = withSpring(0.7, { damping: 15, stiffness: 200 });
-      opacity.value = withTiming(0, { duration: 200 }, (isFinished) => {
-        'worklet';
-        if (isFinished) {
-          runOnJS(setIsRendered)(false);
-        }
-      });
+    try {
+      console.log('[GlobalErrorModal] useEffect triggered. visible:', visible);
+      if (visible) {
+        setIsRendered(true);
+        scale.value = withSpring(1, { damping: 15, stiffness: 200 });
+        opacity.value = withTiming(1, { duration: 200 });
+      } else {
+        scale.value = withSpring(0.7, { damping: 15, stiffness: 200 });
+        opacity.value = withTiming(0, { duration: 200 }, (isFinished) => {
+          'worklet';
+          if (isFinished) {
+            runOnJS(setIsRendered)(false);
+          }
+        });
+      }
+    } catch (err) {
+      console.error('[GlobalErrorModal] ERROR during effect:', err);
     }
   }, [visible]);
 
