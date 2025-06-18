@@ -16,6 +16,7 @@ import { embedText } from '../../utils/embedText';
 import { findSimilarRecipe } from '../../utils/findSimilarRecipe';
 
 const MAX_PREVIEW_LENGTH = 100;
+const SIMILARITY_THRESHOLD = 0.55;
 
 function normalizeServings(servingRaw: string | null): string | null {
     if (!servingRaw) return null;
@@ -64,7 +65,7 @@ export async function parseTextRecipe(
             const match = await findSimilarRecipe(embedding);
             const searchTime = Date.now() - searchStartTime;
 
-            if (match && match.recipe && match.similarity > 0.55) {
+            if (match && match.recipe && match.similarity > SIMILARITY_THRESHOLD) {
                 logger.info({
                     requestId,
                     similarity: match.similarity,
@@ -90,6 +91,7 @@ export async function parseTextRecipe(
                     {
                         requestId,
                         similarity: match?.similarity ?? 'N/A',
+                        matchedRecipeId: match?.recipe?.id ?? null,
                         llm_skipped: false
                     }, 
                     "No suitable fuzzy match found or threshold not met. Proceeding with LLM."

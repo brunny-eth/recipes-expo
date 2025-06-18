@@ -13,6 +13,7 @@ import { ParseResult } from './parseRecipe';
 import { geminiAdapter, openaiAdapter, PromptPayload, runDefaultLLM } from '../llm/adapters';
 import { buildUrlParsePrompt } from '../llm/parsingPrompts';
 import { ParseErrorCode, StructuredError } from '../types/errors';
+import { generateAndSaveEmbedding } from '../../utils/recipeEmbeddings';
 
 const MAX_PREVIEW_LENGTH = 100;
 
@@ -187,13 +188,15 @@ export async function parseUrlRecipe(
 
             const dbInsertStartTime = Date.now();
             try {
-                const { error: insertError } = await supabase
+                const { data: insertData, error: insertError } = await supabase
                     .from('processed_recipes_cache')
                     .insert({
                         url: cacheKey,
                         recipe_data: finalRecipeData,
                         source_type: inputType
-                    });
+                    })
+                    .select('id')
+                    .single();
 
                 overallTimings.dbInsert = Date.now() - dbInsertStartTime;
 
@@ -201,6 +204,15 @@ export async function parseUrlRecipe(
                     logger.error({ requestId, cacheKey, err: insertError }, `Error saving recipe to cache.`);
                 } else {
                     logger.info({ requestId, cacheKey, dbInsertMs: overallTimings.dbInsert }, `Successfully cached new recipe.`);
+                    if (process.env.ENABLE_EMBEDDING === 'true' && insertData) {
+                        const recipeId = insertData.id;
+                        logger.info({ recipeId }, 'Embedding queued after successful URL parse');
+                        await generateAndSaveEmbedding(recipeId, {
+                            title: finalRecipeData.title,
+                            ingredientsText: finalRecipeData.ingredients?.join('\n'),
+                            instructionsText: finalRecipeData.instructions?.join('\n'),
+                         });
+                    }
                 }
             } catch (cacheInsertError) {
                 overallTimings.dbInsert = Date.now() - dbInsertStartTime;
