@@ -167,6 +167,7 @@ const logTiming = (label: string) => {
 
 export default function IngredientsScreen() {
   if (__DEV__) console.log("🚨 INGREDIENTS SCREEN MOUNTED 🚨");
+  const renderCount = useRef(0);
   const params = useLocalSearchParams<{ recipeData?: string }>();
   const router = useRouter();
   const { showError } = useErrorModal();
@@ -184,6 +185,11 @@ export default function IngredientsScreen() {
   const [processedSubstitutionsForModal, setProcessedSubstitutionsForModal] = useState<SubstitutionSuggestion[] | null>(null);
   const processedRecipeData = useRef<string | null>(null);
   const [lastRemoved, setLastRemoved] = useState<IngredientChange | null>(null);
+
+  useEffect(() => {
+    renderCount.current += 1;
+    console.log(`[Render Count] IngredientsScreen: ${renderCount.current}`);
+  });
 
   // Debug logs for modal visibility state changes
   useEffect(() => {
@@ -585,6 +591,7 @@ export default function IngredientsScreen() {
   };
 
   const undoIngredientRemoval = (fullName: string) => {
+    if (__DEV__) console.log(`[Handler] Undo removal: ${fullName}`);
     const { baseName: originalName } = parseIngredientDisplayName(fullName);
 
     // Remove the removal from appliedChanges
@@ -639,6 +646,7 @@ export default function IngredientsScreen() {
   };
 
   const undoSubstitution = (originalName: string) => {
+    if (__DEV__) console.log(`[Handler] Undo substitution: ${originalName}`);
     // Remove the substitution from appliedChanges
     setAppliedChanges(prev => prev.filter(change => change.from !== originalName));
 
@@ -749,6 +757,7 @@ export default function IngredientsScreen() {
           ListEmptyComponent={<Text style={styles.placeholderText}>No ingredients found.</Text>}
           extraData={[checkedIngredients, appliedChanges]}
           renderItem={({ item, index }: { item: StructuredIngredient; index: number }) => {
+            if (__DEV__) console.log(`[Render] Ingredient Row: ${item.name}`);
             return (
               <View key={`${item.name}-${index}`}>
                 {renderIngredientRow({
