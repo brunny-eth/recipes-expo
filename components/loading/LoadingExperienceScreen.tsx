@@ -10,13 +10,14 @@ import GlobalErrorModal from '../GlobalErrorModal';
 
 interface LoadingExperienceScreenProps {
   recipeInput: string;
+  intent: 'fuzzy_match' | 'literal';
   onComplete: () => void;
   onFailure: () => void;
   loadingMode: 'checklist' | 'default';
 }
 
-const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({ recipeInput, onComplete, onFailure, loadingMode }) => {
-    console.log('[LoadingExperienceScreen] mount with input:', recipeInput);
+const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({ recipeInput, intent, onComplete, onFailure, loadingMode }) => {
+    console.log(`[LoadingExperienceScreen] mount with input: ${recipeInput}, intent: ${intent}`);
     const router = useRouter();
     const alreadyNavigated = useRef(false);
     const [isParsingFinished, setIsParsingFinished] = useState(false);
@@ -31,14 +32,14 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({ recip
         const backendUrl = `${baseBackendUrl}${endpoint}`;
     
         try {
-          console.log(`Sending request to: ${backendUrl} with input: ${recipeInput}`);
+          console.log(`Sending request to: ${backendUrl} with input: ${recipeInput} and intent: ${intent}`);
           const response = await fetch(backendUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
             },
-            body: JSON.stringify({ input: recipeInput }),
+            body: JSON.stringify({ input: recipeInput, intent: intent }),
           });
     
           if (response.ok) {

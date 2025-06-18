@@ -29,6 +29,7 @@ export type ParseResult = {
 
 export async function parseAndCacheRecipe(
     input: string,
+    intent: 'fuzzy_match' | 'literal' = 'literal'
 ): Promise<ParseResult> {
     const requestId = createHash('sha256').update(Date.now().toString() + Math.random().toString()).digest('hex').substring(0, 12);
     const requestStartTime = Date.now();
@@ -62,7 +63,7 @@ export async function parseAndCacheRecipe(
                 recipe: null,
                 error: {
                   code: ParseErrorCode.UNSUPPORTED_INPUT_TYPE,
-                  message: "We don’t support that kind of input yet. Please paste text or a link to a recipe."
+                  message: "We don't support that kind of input yet. Please paste text or a link to a recipe."
                 },
                 fromCache: false,
                 inputType: inputType,
@@ -76,7 +77,7 @@ export async function parseAndCacheRecipe(
         if (inputType === 'url') {
             return await parseUrlRecipe(trimmedInput);
         } else { // 'raw_text'
-            return await parseTextRecipe(trimmedInput);
+            return await parseTextRecipe(trimmedInput, intent, requestId);
         }
 
     } catch (err) {

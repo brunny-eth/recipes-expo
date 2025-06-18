@@ -1,6 +1,6 @@
 import React from 'react';
 import { useFocusEffect, useNavigation } from 'expo-router';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Keyboard, KeyboardAvoidingView, Platform, View as RNView, Image } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Keyboard, KeyboardAvoidingView, Platform, View as RNView, Image, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { COLORS } from '@/constants/theme';
@@ -15,6 +15,8 @@ export default function HomeScreen() {
   const navigation = useNavigation();
   const [isInputFocused, setIsInputFocused] = React.useState(false);
   const { showError } = useErrorModal();
+  const [modalVisible, setModalVisible] = React.useState(false);
+  const [currentInput, setCurrentInput] = React.useState('');
 
   React.useEffect(() => {
     navigation.setOptions({
@@ -38,19 +40,33 @@ export default function HomeScreen() {
     };
   }, []);
 
+  const handleNavigation = (recipeInput: string, intent: 'fuzzy_match' | 'literal') => {
+    Keyboard.dismiss();
+    console.log(`Navigating with intent: ${intent}`);
+    router.push({
+      pathname: '/loading',
+      params: { recipeInput, intent },
+    });
+    setRecipeUrl(''); // Clear input after submission
+    setModalVisible(false);
+  };
+
   const handleSubmit = async () => {
     if (!recipeUrl || recipeUrl.trim() === '') {
         showError({ title: "Input Required", message: "Please paste a recipe URL or recipe text." });
         return;
     }
     const recipeInput = recipeUrl.trim();
-    Keyboard.dismiss();
-    
-    router.push({
-      pathname: '/loading',
-      params: { recipeInput },
-    });
-    setRecipeUrl(''); // Clear input after submission
+    // A simple URL check.
+    const isUrl = recipeInput.startsWith('http') || recipeInput.includes('.com') || recipeInput.includes('.co');
+    const wordCount = recipeInput.split(/\s+/).length;
+
+    if (!isUrl && wordCount < 35) {
+      setCurrentInput(recipeInput);
+      setModalVisible(true);
+    } else {
+      handleNavigation(recipeInput, 'literal');
+    }
   };
 
   return (
@@ -101,6 +117,34 @@ export default function HomeScreen() {
           </View>
         </RNView>
       </KeyboardAvoidingView>
+
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => {
+          setModalVisible(!modalVisible);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>How should we proceed?</Text>
+            <Text style={styles.modalMessage}>Your recipe seems short. We can either find a similar, complete recipe for you, or try to convert exactly what you typed.</Text>
+            
+            <TouchableOpacity style={styles.modalButton} onPress={() => handleNavigation(currentInput, 'fuzzy_match')}>
+              <Text style={styles.modalButtonText}>Find a similar recipe</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={[styles.modalButton, styles.modalButtonSecondary]} onPress={() => handleNavigation(currentInput, 'literal')}>
+              <Text style={[styles.modalButtonText, styles.modalButtonTextSecondary]}>Convert this exactly</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.modalCancelButton} onPress={() => setModalVisible(false)}>
+              <Text style={styles.modalCancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -201,5 +245,69 @@ const styles = StyleSheet.create({
     color: COLORS.darkGray,
     textAlign: 'center',
     paddingHorizontal: 40,
+  },
+  // --- Modal Styles ---
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  modalContainer: {
+    width: '85%',
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalTitle: {
+    ...titleText,
+    fontSize: 20,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  modalMessage: {
+    ...bodyText,
+    marginBottom: 24,
+    textAlign: 'center',
+    color: COLORS.darkGray,
+    lineHeight: 22,
+  },
+  modalButton: {
+    width: '100%',
+    backgroundColor: COLORS.primary,
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  modalButtonSecondary: {
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  modalButtonText: {
+    ...bodyStrongText,
+    color: COLORS.white,
+    fontSize: 16,
+  },
+  modalButtonTextSecondary: {
+    color: COLORS.primary,
+  },
+  modalCancelButton: {
+    marginTop: 8,
+  },
+  modalCancelButtonText: {
+    ...bodyText,
+    color: COLORS.darkGray,
+    fontSize: 14,
   },
 });

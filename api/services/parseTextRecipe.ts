@@ -12,6 +12,8 @@ import { ParseResult } from './parseRecipe';
 import { geminiAdapter, runDefaultLLM } from '../llm/adapters';
 import { buildTextParsePrompt } from '../llm/parsingPrompts';
 import { ParseErrorCode, StructuredError } from '../types/errors';
+import { embedText } from '../../utils/embedText';
+import { findSimilarRecipe } from '../../utils/findSimilarRecipe';
 
 const MAX_PREVIEW_LENGTH = 100;
 
@@ -34,8 +36,9 @@ function normalizeServings(servingRaw: string | null): string | null {
 
 export async function parseTextRecipe(
     input: string,
+    intent: 'fuzzy_match' | 'literal' = 'literal',
+    requestId: string
 ): Promise<ParseResult> {
-    const requestId = createHash('sha256').update(Date.now().toString() + Math.random().toString()).digest('hex').substring(0, 12);
     const requestStartTime = Date.now();
     let overallTimings: ParseResult['timings'] = {
         dbCheck: -1,
@@ -49,11 +52,61 @@ export async function parseTextRecipe(
     const cacheKey = generateCacheKeyHash(trimmedInput);
     let isFallback = false;
 
+    // --- Start Fuzzy Match Logic ---
+    if (intent === 'fuzzy_match' && process.env.ENABLE_FUZZY_MATCH === 'true') {
+        logger.info({ requestId, intent }, "Attempting fuzzy match.");
+        try {
+            const embeddingStartTime = Date.now();
+            const embedding = await embedText(trimmedInput);
+            const embeddingTime = Date.now() - embeddingStartTime;
+
+            const searchStartTime = Date.now();
+            const match = await findSimilarRecipe(embedding);
+            const searchTime = Date.now() - searchStartTime;
+
+            if (match && match.recipe && match.similarity > 0.55) {
+                logger.info({
+                    requestId,
+                    similarity: match.similarity,
+                    matchedRecipeId: match.recipe.id,
+                    llm_skipped: true,
+                    timings: { embeddingTime, searchTime }
+                }, "Fuzzy match found, returning matched recipe directly.");
+
+                // The matched recipe data is already in the correct format.
+                // We can short-circuit and return immediately.
+                return {
+                    recipe: match.recipe,
+                    error: null,
+                    fromCache: true, // Treat it as a cache hit for analytics
+                    inputType,
+                    cacheKey: match.recipe.url, // Use the matched recipe's key
+                    timings: { ...overallTimings, total: Date.now() - requestStartTime, dbCheck: searchTime },
+                    usage: { inputTokens: 0, outputTokens: 0 },
+                    fetchMethodUsed: 'fuzzy_match'
+                };
+            } else {
+                 logger.info(
+                    {
+                        requestId,
+                        similarity: match?.similarity ?? 'N/A',
+                        llm_skipped: false
+                    }, 
+                    "No suitable fuzzy match found or threshold not met. Proceeding with LLM."
+                );
+            }
+
+        } catch (fuzzyError: any) {
+            logger.error({ requestId, error: fuzzyError.message }, "Error during fuzzy match process. Falling back to LLM.");
+        }
+    }
+    // --- End Fuzzy Match Logic ---
+
     try {
         if (trimmedInput.length < 20 && !trimmedInput.includes(' ')) {
              const errorPayload: StructuredError = {
                 code: ParseErrorCode.INVALID_INPUT,
-                message: 'That didn’t look like a real recipe. Try describing a dish or pasting a full recipe.'
+                message: "That didn't look like a real recipe. Try describing a dish or pasting a full recipe."
             };
             logger.warn({ requestId, input: trimmedInput }, "Rejected input as invalid (too short, no spaces).");
             return {
@@ -149,7 +202,7 @@ export async function parseTextRecipe(
             recipe: null,
             error: {
               code: ParseErrorCode.GENERATION_EMPTY,
-              message: "We couldn’t create a recipe from that. Try adding a few more details or ingredients."
+              message: "We couldn't create a recipe from that. Try adding a few more details or ingredients."
             },
             fromCache: false,
             inputType,
@@ -224,6 +277,7 @@ export async function parseTextRecipe(
             requestId, 
             success: !!finalRecipeData, 
             inputType, 
+            intent,
             fromCache: false, 
             fetchMethod: 'N/A', 
             usedFallback: isFallback,
