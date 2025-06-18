@@ -101,14 +101,14 @@ export default function IngredientSubstitutionModal({
         <Pressable style={styles.backdrop} onPress={onClose}>
           <Animated.View
             entering={FadeIn.duration(200)}
-            exiting={FadeOut.duration(200)}
+            exiting={FadeOut.duration(150)}
             style={styles.backdrop}
           />
         </Pressable>
 
         <Animated.View
           entering={SlideInDown.springify()}
-          exiting={SlideOutDown.springify()}
+          exiting={SlideOutDown.duration(150)}
           style={styles.modalContent}
         >
           <View style={styles.header}>

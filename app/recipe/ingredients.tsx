@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ActivityIndicator, Platform, Alert, Modal, Pressable, Image, InteractionManager } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { PerformanceObserver } from 'react-native-performance';
 // import Animated, { FadeIn } from 'react-native-reanimated'; // Removed for gesture debug
 import { COLORS } from '@/constants/theme';
 import IngredientSubstitutionModal from './IngredientSubstitutionModal';
@@ -13,10 +14,14 @@ import { getScaledYieldText, scaleIngredient, parseAmountString, formatAmountNum
 import { useErrorModal } from '@/context/ErrorModalContext';
 import { titleText, bodyStrongText, bodyText, captionText } from '@/constants/typography';
 import { FlatList } from 'react-native';
+import IngredientRow from './IngredientRow';
 
 // --- Types ---
-// Added SubstitutionSuggestion type matching backend/modal
-type IngredientChange = { from: string; to: string | null };
+// The new, richer state definition for a change. `null` for `to` indicates a removal.
+type AppliedChange = {
+  from: string;
+  to: StructuredIngredient | null;
+};
 
 // Type for data received via navigation params
 type IngredientsNavParams = {
@@ -39,124 +44,14 @@ type IngredientsNavParams = {
  * Resolves the original ingredient name from appliedChanges instead of relying on parsed display names.
  */
 function getOriginalIngredientNameFromAppliedChanges(
-  appliedChanges: IngredientChange[],
+  appliedChanges: AppliedChange[],
   displayName: string
 ): string {
   const { substitutedFor, baseName } = parseIngredientDisplayName(displayName);
   const fallback = substitutedFor || baseName;
-  const match = appliedChanges.find(change => change.to === fallback);
+  const match = appliedChanges.find(change => change.to?.name === fallback);
   return match?.from || fallback;
 }
-
-const renderIngredientRow = ({
-  ingredient,
-  index,
-  isChecked,
-  appliedChanges,
-  toggleCheckIngredient,
-  openSubstitutionModal,
-  undoIngredientRemoval,
-  undoSubstitution,
-}: {
-  ingredient: StructuredIngredient;
-  index: number;
-  isChecked: boolean;
-  appliedChanges: IngredientChange[];
-  toggleCheckIngredient: (idx: number) => void;
-  openSubstitutionModal: (ing: StructuredIngredient) => void;
-  undoIngredientRemoval: (name: string) => void;
-  undoSubstitution: (originalName: string) => void;
-}) => {
-  const { baseName, isRemoved, substitutedFor } = parseIngredientDisplayName(ingredient.name);
-  const originalNameForSub = getOriginalIngredientNameFromAppliedChanges(appliedChanges, ingredient.name);
-
-  return (
-    <TouchableOpacity 
-      style={[
-        styles.ingredientItemContainer,
-      ]}
-      onPress={() => !isRemoved && toggleCheckIngredient(index)}
-      activeOpacity={0.7} 
-    >
-      {/* Checkbox Visual */}
-      {isRemoved ? (
-        <View style={styles.checkboxPlaceholder} />
-      ) : (
-        <View 
-          style={[styles.checkboxBase, isChecked && styles.checkboxChecked]}
-          testID={`checkbox-${ingredient.name}`}
-        >
-          {isChecked && <View style={styles.checkboxInnerCheck} />}
-        </View>
-      )}
-
-      {/* Ingredient Text Container */}
-      <View style={styles.ingredientNameContainer}> 
-        {isRemoved ? (
-          <Text style={styles.ingredientName} numberOfLines={0}>
-            <Text style={styles.ingredientTextRemoved}>{baseName}</Text>
-            <Text style={styles.ingredientRemovedTag}> (removed)</Text>
-          </Text>
-        ) : (
-          <Text style={[styles.ingredientName, isChecked && styles.ingredientTextChecked]} numberOfLines={0}> 
-            {baseName}
-            {ingredient.preparation && (
-              <Text style={styles.ingredientPreparation}>
-                {` ${ingredient.preparation}`}
-              </Text>
-            )}
-            {(ingredient.amount || ingredient.unit) && (
-              <Text style={styles.ingredientQuantityParenthetical}>
-                {` (${ingredient.amount || ''}${ingredient.unit ? ` ${abbreviateUnit(ingredient.unit)}` : ''})`}
-              </Text>
-            )}
-          </Text>
-        )}
-
-        {isRemoved && (
-          <TouchableOpacity
-            style={styles.revertButton}
-            onPress={() => undoIngredientRemoval(ingredient.name)}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <MaterialCommunityIcons name="arrow-u-left-top" size={18} color={COLORS.primary} />
-          </TouchableOpacity>
-        )}
-        
-        {substitutedFor && !isRemoved && (
-           <TouchableOpacity
-            style={styles.revertButton}
-            onPress={() => undoSubstitution(originalNameForSub)}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <MaterialCommunityIcons name="arrow-u-left-top" size={18} color={COLORS.primary} />
-          </TouchableOpacity>
-        )}
-
-        {/* Substitution Button */}
-        {!substitutedFor && 
-         !isRemoved &&
-         ingredient.suggested_substitutions && 
-         ingredient.suggested_substitutions.length > 0 && 
-         ingredient.suggested_substitutions.some(sub => sub && sub.name != null) && (
-          <TouchableOpacity 
-            style={styles.infoButton}
-            onPress={() => {
-              /* removed verbose button press log */
-              requestAnimationFrame(() => {
-                openSubstitutionModal(ingredient);
-              });
-            }}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            testID={`substitution-button-${ingredient.name}`}
-          >
-            <MaterialCommunityIcons name="swap-horizontal" size={18} color={COLORS.primary} />
-          </TouchableOpacity>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
-};
 
 // Utility for consistent timing logs in dev
 const logTiming = (label: string) => {
@@ -177,14 +72,64 @@ export default function IngredientsScreen() {
   const [checkedIngredients, setCheckedIngredients] = useState<{ [key: number]: boolean }>({});
   const [substitutionModalVisible, setSubstitutionModalVisible] = useState(false);
   const [selectedIngredient, setSelectedIngredient] = useState<StructuredIngredient | null>(null);
-  const [appliedChanges, setAppliedChanges] = useState<IngredientChange[]>([]);
+  const [appliedChanges, setAppliedChanges] = useState<AppliedChange[]>([]);
   const [isRewriting, setIsRewriting] = useState(false);
   const [isScalingInstructions, setIsScalingInstructions] = useState(false);
   const [isHelpModalVisible, setIsHelpModalVisible] = useState(false);
   const [selectedIngredientOriginalData, setSelectedIngredientOriginalData] = useState<StructuredIngredient | null>(null);
   const [processedSubstitutionsForModal, setProcessedSubstitutionsForModal] = useState<SubstitutionSuggestion[] | null>(null);
   const processedRecipeData = useRef<string | null>(null);
-  const [lastRemoved, setLastRemoved] = useState<IngredientChange | null>(null);
+  const [lastRemoved, setLastRemoved] = useState<{ from: string; to: string | null } | null>(null);
+
+  const scaledIngredients = useMemo(() => {
+    console.log('[Memo] scaledIngredients recalculated');
+    if (!navData?.scaledIngredients) {
+      return [];
+    }
+
+    const baseIngredients = coerceToStructuredIngredients(navData.scaledIngredients);
+    if (appliedChanges.length === 0) {
+      return baseIngredients;
+    }
+
+    const finalIngredients = baseIngredients.map(baseIngredient => {
+      const change = appliedChanges.find(c => c.from === baseIngredient.name);
+
+      if (change) {
+        if (change.to === null) { // Removal
+          return {
+            ...baseIngredient,
+            name: `${baseIngredient.name} (removed)`,
+            amount: null,
+            unit: null,
+            suggested_substitutions: null,
+          };
+        } else { // Substitution
+          return {
+            ...change.to,
+            name: `${change.to.name} (substituted for ${change.from})`,
+          };
+        }
+      }
+      return baseIngredient;
+    });
+
+    return finalIngredients;
+  }, [navData?.scaledIngredients, appliedChanges]);
+
+  useEffect(() => {
+    const observer = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        if (entry.duration > 16) {
+          console.warn(`[⚠️ FRAME BLOCKED] ${entry.name} took ${entry.duration.toFixed(2)}ms`);
+        }
+      }
+    });
+
+    observer.observe({ type: 'measure', buffered: true });
+
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     renderCount.current += 1;
@@ -199,17 +144,41 @@ export default function IngredientsScreen() {
   }, [substitutionModalVisible]);
 
   useEffect(() => {
+    if (!substitutionModalVisible) {
+      console.log('[DEBUG] Substitution modal fully closed');
+      setTimeout(() => {
+        console.log('[DEBUG] 250ms after modal close');
+      }, 250);
+    }
+  }, [substitutionModalVisible]);
+
+  useEffect(() => {
     if (__DEV__) {
       console.log('[DEBUG] selectedIngredientOriginalData:', selectedIngredientOriginalData);
     }
   }, [selectedIngredientOriginalData]);
 
-  // Use useMemo for displayIngredients calculation
-  const displayIngredients = useMemo(() => {
-    // 🧠 Simplified to always use scaledIngredients as the source of truth for display
-    if (!navData || !navData.scaledIngredients) return null;
-    return coerceToStructuredIngredients(navData.scaledIngredients);
+  useEffect(() => {
+    console.log('[PERF] appliedChanges updated:', appliedChanges);
+  }, [appliedChanges]);
+
+  useEffect(() => {
+    console.log('[PERF] scaledIngredients updated, FlatList will re-render.');
+  }, [scaledIngredients]);
+
+  useEffect(() => {
+    console.log('[PERF] checkedIngredients updated');
+  }, [checkedIngredients]);
+
+  useEffect(() => {
+    console.log('[Re-render Trigger] navData changed');
   }, [navData]);
+
+  useEffect(() => {
+    return () => {
+      console.log('[UNMOUNT] IngredientsScreen has been unmounted ✅');
+    };
+  }, []);
 
   useEffect(() => {
     const showTip = async () => {
@@ -293,6 +262,98 @@ export default function IngredientsScreen() {
     }
   }, [params.recipeData]);
 
+  const toggleCheckIngredient = useCallback((index: number) => {
+    setCheckedIngredients(prev => ({
+      ...prev,
+      [index]: !prev[index]
+    }));
+  }, []);
+
+  const openSubstitutionModal = useCallback((ingredient: StructuredIngredient) => {
+    console.log("Opening substitution modal for:", JSON.stringify(ingredient));
+    let scaledSuggestions: SubstitutionSuggestion[] | null = null;
+    if (ingredient.suggested_substitutions && navData && navData.scaleFactor !== null && navData.scaleFactor !== 1) {
+      const scalingFactor = navData.scaleFactor;
+      scaledSuggestions = ingredient.suggested_substitutions.map(sub => {
+        let finalAmount: string | number | null = sub.amount ?? null;
+        if (sub.amount != null) {
+          try {
+            const parsedAmount = parseAmountString(String(sub.amount));
+            if (parsedAmount !== null) {
+              const calculatedAmount = parsedAmount * scalingFactor;
+              finalAmount = formatAmountNumber(calculatedAmount) || calculatedAmount.toFixed(2);
+            } else {
+              finalAmount = sub.amount;
+            }
+          } catch (e) {
+            console.error("Error scaling substitution amount:", e);
+            finalAmount = sub.amount;
+          }
+        } else {
+          finalAmount = null;
+        }
+        return {
+          ...sub,
+          amount: finalAmount
+        };
+      });
+    } else {
+      scaledSuggestions = ingredient.suggested_substitutions || null;
+    }
+    setSelectedIngredientOriginalData(ingredient);
+    setProcessedSubstitutionsForModal(scaledSuggestions);
+    setTimeout(() => {
+      setSubstitutionModalVisible(true);
+    }, 0);
+  }, [navData]);
+
+  const undoIngredientRemoval = useCallback((fullName: string) => {
+    if (__DEV__) console.log(`[Handler] Undo removal: ${fullName}`);
+    const { baseName: originalName } = parseIngredientDisplayName(fullName);
+
+    setAppliedChanges(prev => prev.filter(change => change.from !== originalName));
+
+    if (lastRemoved?.from === originalName) {
+      setLastRemoved(null);
+    }
+  }, [lastRemoved]);
+
+  const undoSubstitution = useCallback((originalName: string) => {
+    if (__DEV__) console.log(`[Handler] Undo substitution: ${originalName}`);
+    setAppliedChanges(prev => prev.filter(change => change.from !== originalName));
+  }, []);
+
+  const handleGoToSteps = () => {
+    InteractionManager.runAfterInteractions(() => {
+      navigateToNextScreen();
+    });
+  };
+
+  const memoizedRenderIngredientRow = useCallback(
+    ({ item, index }: { item: StructuredIngredient; index: number }) => {
+      return (
+        <IngredientRow
+          ingredient={item}
+          index={index}
+          isChecked={!!checkedIngredients[index]}
+          appliedChanges={appliedChanges}
+          toggleCheckIngredient={toggleCheckIngredient}
+          openSubstitutionModal={openSubstitutionModal}
+          undoIngredientRemoval={undoIngredientRemoval}
+          undoSubstitution={undoSubstitution}
+        />
+      );
+    },
+    [
+      checkedIngredients,
+      appliedChanges,
+      toggleCheckIngredient,
+      openSubstitutionModal,
+      undoIngredientRemoval,
+      undoSubstitution,
+    ]
+  );
+
   const navigateToNextScreen = useCallback(async () => {
     console.log('🚀 navigateToNextScreen CALLED');
     const navStart = Date.now();
@@ -308,7 +369,7 @@ export default function IngredientsScreen() {
       return;
     }
 
-    if (!navData || !displayIngredients) {
+    if (!navData || !scaledIngredients) {
       console.error("Cannot navigate, essential data is missing.");
       return;
     }
@@ -317,6 +378,7 @@ export default function IngredientsScreen() {
     let finalSubstitutionsText = navData.substitutions_text || '';
     const needsScaling = navData.scaleFactor !== 1;
 
+    performance.mark('navigateToNextScreen-start');
     // --- 1. Handle Substitution Rewriting (if applicable) --- 
     if (appliedChanges.length > 0) {
        console.log('[Navigate] Triggering rewrite with changes:', appliedChanges);
@@ -329,7 +391,10 @@ export default function IngredientsScreen() {
            headers: { 'Content-Type': 'application/json' },
            body: JSON.stringify({
              originalInstructions: navData.instructions || [],
-             substitutions: appliedChanges,
+             substitutions: appliedChanges.map(change => ({
+                from: change.from,
+                to: change.to ? change.to.name : null
+             })),
            }),
          });
          const result = await response.json();
@@ -351,7 +416,7 @@ export default function IngredientsScreen() {
      }
 
     // --- 2. Handle Instruction Scaling (if applicable) --- 
-    if (needsScaling && displayIngredients.length > 0) {
+    if (needsScaling && scaledIngredients.length > 0) {
         logTiming("Started scaling instructions");
         setIsScalingInstructions(true);
         try {
@@ -362,7 +427,7 @@ export default function IngredientsScreen() {
                 body: JSON.stringify({
                     instructionsToScale: finalInstructions,
                     originalIngredients: navData.originalIngredients,
-                    scaledIngredients: displayIngredients,
+                    scaledIngredients: scaledIngredients,
                 }),
             });
             const result = await response.json();
@@ -387,14 +452,14 @@ export default function IngredientsScreen() {
     }
     logTiming("Beginning navigation to Steps screen");
     // --- 3. Navigate to Steps Screen --- 
-    router.push({
+    router.replace({
       pathname: '/recipe/steps',
       params: {
         recipeData: JSON.stringify({
           title: navData.title,
           instructions: finalInstructions,
           substitutions_text: finalSubstitutionsText,
-          ingredients: displayIngredients,
+          ingredients: scaledIngredients,
           recipeYield: getScaledYieldText(navData.originalYieldDisplay, navData.scaleFactor),
           prepTime: navData.prepTime,
           cookTime: navData.cookTime,
@@ -404,288 +469,102 @@ export default function IngredientsScreen() {
       }
     });
 
+    performance.mark('navigateToNextScreen-end');
+    performance.measure('navigateToNextScreen', 'navigateToNextScreen-start', 'navigateToNextScreen-end');
+
     logTiming(`navigateToNextScreen completed (total ${Date.now() - navStart}ms)`);
-  }, [navData, displayIngredients, appliedChanges, router, showError]);
-
-  const toggleCheckIngredient = (index: number) => {
-    setCheckedIngredients(prev => ({
-      ...prev,
-      [index]: !prev[index] // Toggle the boolean value for the given index
-    }));
-  };
-
-  const openSubstitutionModal = useCallback((ingredient: StructuredIngredient) => {
-      // log removed: opening substitution modal with full ingredient json
-      console.log("Opening substitution modal for:", JSON.stringify(ingredient)); 
-      
-      // --- Scaling Logic --- 
-      let scaledSuggestions: SubstitutionSuggestion[] | null = null;
-      if (ingredient.suggested_substitutions && navData && navData.scaleFactor !== null && navData.scaleFactor !== 1) {
-           const scalingFactor = navData.scaleFactor;
-           // removed scaling factor verbose log
-
-           scaledSuggestions = ingredient.suggested_substitutions.map(sub => {
-               let finalAmount: string | number | null = sub.amount ?? null;
-
-               // Use parseAmountString for consistent handling of amounts
-               if (sub.amount != null) {
-                   try {
-                       const parsedAmount = parseAmountString(String(sub.amount));
-                       if (parsedAmount !== null) {
-                           const calculatedAmount = parsedAmount * scalingFactor;
-                           finalAmount = formatAmountNumber(calculatedAmount) || calculatedAmount.toFixed(2);
-                           // removed verbose scaling log
-                       } else {
-                           // Keep original non-numeric amount if parsing fails
-                           finalAmount = sub.amount;
-                           // removed verbose log
-                       }
-                   } catch (e) {
-                       console.error("Error scaling substitution amount:", e);
-                       finalAmount = sub.amount; // Fallback to original if scaling fails
-                   }
-               } else {
-                   // removed verbose null amount log
-                   finalAmount = null;
-               }
-
-               return {
-                   ...sub,
-                   amount: finalAmount
-               };
-           });
-      } else {
-          // Use original suggestions if no scaling is needed/possible
-          scaledSuggestions = ingredient.suggested_substitutions || null;
-          // removed verbose scaling/no substitutions logs
-      }
-      // --- End Scaling Logic --- 
-
-      setSelectedIngredientOriginalData(ingredient); // Store the original data
-      setProcessedSubstitutionsForModal(scaledSuggestions); // Store the scaled suggestions for the modal
-      setSubstitutionModalVisible(true);
-  }, [navData, setSelectedIngredientOriginalData, setProcessedSubstitutionsForModal, setSubstitutionModalVisible]);
+  }, [navData, scaledIngredients, appliedChanges, router, showError]);
 
   const handleApplySubstitution = (substitution: SubstitutionSuggestion) => {
-    if (!selectedIngredientOriginalData || !displayIngredients) { 
+    if (!selectedIngredientOriginalData) {
       console.error("Apply error: Missing original ingredient data or display list.");
       return;
     }
 
-    if (substitution.name === 'Remove ingredient') {
-      const currentRemovals = appliedChanges.filter(change => !change.to).length;
-      if (currentRemovals >= 2) {
-        console.warn('🚫 Blocked 3rd removal attempt:', selectedIngredientOriginalData?.name);
-        setSubstitutionModalVisible(false);
-        setSelectedIngredientOriginalData(null);
-
-        InteractionManager.runAfterInteractions(() => {
-          setTimeout(() => {
-            console.log('🔥 Triggering showError modal');
-            showError({
-              title: 'Limit Reached',
-              message: 'You can only remove up to 2 ingredients per recipe.',
-            });
-          }, 300); // ⏳ delay to let first modal cleanly disappear
-        });
-        console.trace('Blocked 3rd removal – trace');
-        return; // 🔒 prevent any state update
-      }
-    }
-
-    console.log("🧪 Current appliedChanges:", appliedChanges);
-
-    const isRemoval = substitution.name === 'Remove ingredient';
-
-    const originalIngredientNameFromState = selectedIngredientOriginalData.name;
-    
-    const index = displayIngredients.findIndex(ing => {
-      const { substitutedFor } = parseIngredientDisplayName(ing.name);
-      return ing.name === originalIngredientNameFromState || substitutedFor === originalIngredientNameFromState;
-    });
-
-    if (index === -1) { 
-      console.error(`Apply error: Cannot find ingredient matching "${originalIngredientNameFromState}" in display list.`);
-      console.log("Current displayIngredients names:", displayIngredients.map(i => i.name));
-      return;
-    }
-    
-    const currentDisplayName = displayIngredients[index].name;
-    let originalNameForSub = selectedIngredientOriginalData.name;
-    const { substitutedFor } = parseIngredientDisplayName(currentDisplayName);
-    if (substitutedFor) {
-      originalNameForSub = substitutedFor;
-    }
-
-    console.log(`Applying substitution: ${substitution.name} (Amount: ${substitution.amount}, Unit: ${substitution.unit}) for original ${originalNameForSub} at index ${index}`);
-    
-    const newChange: IngredientChange = {
-      from: originalNameForSub,
-      to: isRemoval ? null : substitution.name,
-    };
-
-    if (isRemoval) {
-      setLastRemoved(newChange);
-    }
-
-    console.log('Applying change:', newChange);
-
-    setAppliedChanges(prev => {
-      const existingChangeIndex = prev.findIndex(c => c.from === originalNameForSub);
-      if (existingChangeIndex > -1) {
-        const updated = [...prev];
-        updated[existingChangeIndex] = newChange;
-        return updated;
-      }
-      return [...prev, newChange];
-    });
-
-    // Update navData with the substituted ingredient
-    setNavData(prevNavData => {
-      if (!prevNavData) return prevNavData;
-      
-      const newNavData = { ...prevNavData };
-      // 🧠 Always modify the scaledIngredients list, keep originalIngredients pristine
-      const source = newNavData.scaledIngredients;
-      
-      if (Array.isArray(source) && index !== -1 && source[index]) {
-        const newSource = source.map((item, i) => {
-          if (i === index) {
-            // Convert string to StructuredIngredient if needed
-            const baseIngredient = typeof item === 'string' 
-              ? { name: item, amount: null, unit: null, suggested_substitutions: null }
-              : item;
-            
-            if (isRemoval) {
-              return {
-                ...baseIngredient,
-                name: `${originalNameForSub} (removed)` ,
-                amount: null,
-                unit: null,
-                suggested_substitutions: null,
-              };
-            } else {
-              return {
-                ...baseIngredient,
-                name: `${substitution.name} (substituted for ${originalNameForSub})`,
-                amount: substitution.amount != null ? String(substitution.amount) : null,
-                unit: substitution.unit || null,
-                suggested_substitutions: null
-              };
-            }
-          }
-          return item;
-        });
-        
-        // 🧠 Only update scaledIngredients
-        newNavData.scaledIngredients = newSource as StructuredIngredient[];
-      }
-      
-      return newNavData;
-    });
-
+    const ingredientToSubstitute = selectedIngredientOriginalData;
+    console.log(`[TIMING] Modal close trigger at ${Date.now()}ms`);
     setSubstitutionModalVisible(false);
     setSelectedIngredientOriginalData(null);
     setProcessedSubstitutionsForModal(null);
-    console.log("✅ Substitution applied");
-  };
 
-  const undoIngredientRemoval = (fullName: string) => {
-    if (__DEV__) console.log(`[Handler] Undo removal: ${fullName}`);
-    const { baseName: originalName } = parseIngredientDisplayName(fullName);
+    requestAnimationFrame(() => {
+      InteractionManager.runAfterInteractions(() => {
+        console.log(`[TIMING] Running deferred state updates at ${Date.now()}ms`);
+        performance.mark('applySubstitution-start');
 
-    // Remove the removal from appliedChanges
-    setAppliedChanges(prev => prev.filter(change => change.from !== originalName));
-
-    // Restore ingredient name in navData
-    setNavData(prev => {
-      if (!prev) return prev;
-      const updated = { ...prev };
-      // 🧠 Always target scaledIngredients for mutation
-      const targetList = prev.scaledIngredients;
-      if (!Array.isArray(targetList)) return prev;
-
-      const restoredList = targetList.map(ing => {
-        if (typeof ing === 'string') { // This logic branch might need review if original ingredients are always structured
-            if (ing === fullName) {
-                return originalName;
-            }
-            return ing;
+        if (substitution.name === 'Remove ingredient') {
+          const currentRemovals = appliedChanges.filter(change => !change.to).length;
+          if (currentRemovals >= 2) {
+            console.warn('🚫 Blocked 3rd removal attempt:', ingredientToSubstitute?.name);
+            InteractionManager.runAfterInteractions(() => {
+              setTimeout(() => {
+                console.log('🔥 Triggering showError modal');
+                showError({
+                  title: 'Limit Reached',
+                  message: 'You can only remove up to 2 ingredients per recipe.',
+                });
+              }, 300);
+            });
+            console.trace('Blocked 3rd removal – trace');
+            return;
+          }
         }
-        if (ing.name === fullName) {
-          const structuredOriginals = navData?.originalIngredients?.filter(
-            (originalIng): originalIng is StructuredIngredient => typeof originalIng !== 'string'
-          );
-          const originalIngredient = structuredOriginals?.find(
-            (originalIng) => originalIng.name === originalName
-          );
 
-          return {
-            ...ing,
-            name: originalName,
-            // Restore original amount/unit. This is a simplification.
-            // A more robust solution might store the original pre-scaled/pre-substitution state.
-            amount: originalIngredient?.amount ?? null,
-            unit: originalIngredient?.unit ?? null,
-            suggested_substitutions: originalIngredient?.suggested_substitutions ?? null,
-          };
+        console.log("🧪 Current appliedChanges:", appliedChanges);
+
+        const isRemoval = substitution.name === 'Remove ingredient';
+        const originalIngredientNameFromState = ingredientToSubstitute.name;
+        const index = scaledIngredients.findIndex(ing => {
+          const { substitutedFor } = parseIngredientDisplayName(ing.name);
+          return ing.name === originalIngredientNameFromState || substitutedFor === originalIngredientNameFromState;
+        });
+
+        if (index === -1) {
+          console.error(`Apply error: Cannot find ingredient matching "${originalIngredientNameFromState}" in display list.`);
+          console.log("Current scaledIngredients names:", scaledIngredients.map(i => i.name));
+          return;
         }
-        return ing;
+
+        const currentDisplayName = scaledIngredients[index].name;
+        let originalNameForSub = ingredientToSubstitute.name;
+        const { substitutedFor } = parseIngredientDisplayName(currentDisplayName);
+        if (substitutedFor) {
+          originalNameForSub = substitutedFor;
+        }
+
+        console.log(`Applying substitution: ${substitution.name} (Amount: ${substitution.amount}, Unit: ${substitution.unit}) for original ${originalNameForSub} at index ${index}`);
+
+        const newChange: AppliedChange = {
+          from: originalNameForSub,
+          to: isRemoval ? null : {
+            name: substitution.name,
+            amount: substitution.amount != null ? String(substitution.amount) : null,
+            unit: substitution.unit ?? null,
+            preparation: substitution.description ?? null,
+            suggested_substitutions: null,
+          }
+        };
+
+        if (isRemoval) {
+          setLastRemoved({ from: newChange.from, to: null });
+        }
+
+        console.log('Applying change:', newChange);
+        console.log(`[TIMING] setAppliedChanges will run at ${Date.now()}ms`);
+        setAppliedChanges(prev => {
+          const existingChangeIndex = prev.findIndex(c => c.from === originalNameForSub);
+          if (existingChangeIndex > -1) {
+            const updated = [...prev];
+            updated[existingChangeIndex] = newChange;
+            return updated;
+          }
+          return [...prev, newChange];
+        });
+
+        performance.mark('applySubstitution-end');
+        performance.measure('applySubstitution', 'applySubstitution-start', 'applySubstitution-end');
+        console.log("✅ Substitution applied (deferred)");
       });
-
-      // 🧠 Only update scaledIngredients
-      updated.scaledIngredients = restoredList as StructuredIngredient[];
-
-      return updated;
-    });
-
-    // Clear lastRemoved if it matches
-    if (lastRemoved?.from === originalName) {
-      setLastRemoved(null);
-    }
-  };
-
-  const undoSubstitution = (originalName: string) => {
-    if (__DEV__) console.log(`[Handler] Undo substitution: ${originalName}`);
-    // Remove the substitution from appliedChanges
-    setAppliedChanges(prev => prev.filter(change => change.from !== originalName));
-
-    // Restore ingredient name in navData
-    setNavData(prev => {
-      if (!prev) return prev;
-      const updated = { ...prev };
-      // 🧠 Always target scaledIngredients for mutation
-      const targetList = prev.scaledIngredients;
-      if (!Array.isArray(targetList)) return prev;
-
-      const restoredList = targetList.map(ing => {
-        const currentName = typeof ing === 'string' ? ing : ing.name;
-        const { substitutedFor } = parseIngredientDisplayName(currentName);
-        if (substitutedFor === originalName) {
-          const structuredOriginals = navData?.originalIngredients?.filter(
-            (originalIng): originalIng is StructuredIngredient => typeof originalIng !== 'string'
-          );
-          const originalIngredient = structuredOriginals?.find(
-            (originalIng) => originalIng.name === originalName
-          );
-
-          if (typeof ing === 'string') return originalName;
-
-          return {
-            ...ing,
-            name: originalName,
-            amount: originalIngredient?.amount ?? null,
-            unit: originalIngredient?.unit ?? null,
-            suggested_substitutions: originalIngredient?.suggested_substitutions ?? null,
-          };
-        }
-        return ing;
-      });
-
-      // 🧠 Only update scaledIngredients
-      updated.scaledIngredients = restoredList as StructuredIngredient[];
-
-      return updated;
     });
   };
 
@@ -709,8 +588,8 @@ export default function IngredientsScreen() {
   }
 
   // --- RENDER LOGIC (assuming navData is available) --- 
-  if (__DEV__ && displayIngredients) {
-    console.log('[IngredientsScreen] displayIngredients names:', displayIngredients.map(i=>i.name));
+  if (__DEV__ && scaledIngredients) {
+    console.log('[IngredientsScreen] scaledIngredients names:', scaledIngredients.map(i=>i.name));
   }
 
   return (
@@ -745,7 +624,7 @@ export default function IngredientsScreen() {
         )}
         
         <FlatList
-          data={displayIngredients}
+          data={scaledIngredients}
           keyExtractor={(item: StructuredIngredient, index: number) => `${item.name}-${index}`}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[styles.ingredientsList, { paddingBottom: 100 }]}
@@ -755,39 +634,22 @@ export default function IngredientsScreen() {
             </View>
           ) : undefined}
           ListEmptyComponent={<Text style={styles.placeholderText}>No ingredients found.</Text>}
-          extraData={[checkedIngredients, appliedChanges]}
-          renderItem={({ item, index }: { item: StructuredIngredient; index: number }) => {
-            if (__DEV__) console.log(`[Render] Ingredient Row: ${item.name}`);
-            return (
-              <View key={`${item.name}-${index}`}>
-                {renderIngredientRow({
-                  ingredient: item,
-                  index,
-                  isChecked: !!checkedIngredients[index],
-                  appliedChanges,
-                  toggleCheckIngredient,
-                  openSubstitutionModal,
-                  undoIngredientRemoval,
-                  undoSubstitution,
-                })}
-              </View>
-            );
-          }}
+          extraData={appliedChanges.length + Object.keys(checkedIngredients).length}
+          renderItem={memoizedRenderIngredientRow}
         />
 
         <View style={styles.footer}>
-          <Pressable 
+          <TouchableOpacity
+            onPressIn={() => console.log('[BUTTON] onPressIn')}
+            onPress={() => {
+              console.log('[BUTTON] onPress');
+              handleGoToSteps();
+            }}
+            onLayout={(e) => console.log('[BUTTON] Layout:', e.nativeEvent.layout)}
             style={[
-              styles.nextButton, 
+              styles.nextButton,
               (isRewriting || isScalingInstructions) && styles.nextButtonDisabled
             ]}
-            onPress={() => {
-              logTiming("Button press fired");
-              InteractionManager.runAfterInteractions(() => {
-                logTiming("UI settled, navigating");
-                navigateToNextScreen();
-              });
-            }}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             disabled={isRewriting || isScalingInstructions}
           >
@@ -798,7 +660,7 @@ export default function IngredientsScreen() {
               {isRewriting ? 'Customizing instructions...' : isScalingInstructions ? 'Making sure everything lines up...' : 'Go to Steps'}
             </Text>
             {!(isRewriting || isScalingInstructions) && <MaterialCommunityIcons name="chevron-right" size={20} color={COLORS.white} />}
-          </Pressable>
+          </TouchableOpacity>
         </View>
 
         {/* Help Modal */}
