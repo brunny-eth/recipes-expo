@@ -37,7 +37,6 @@ function normalizeServings(servingRaw: string | null): string | null {
 
 export async function parseTextRecipe(
     input: string,
-    intent: 'fuzzy_match' | 'literal' = 'literal',
     requestId: string
 ): Promise<ParseResult> {
     const requestStartTime = Date.now();
@@ -54,8 +53,8 @@ export async function parseTextRecipe(
     let isFallback = false;
 
     // --- Start Fuzzy Match Logic ---
-    if (intent === 'fuzzy_match' && process.env.ENABLE_FUZZY_MATCH === 'true') {
-        logger.info({ requestId, intent }, "Attempting fuzzy match.");
+    if (process.env.ENABLE_FUZZY_MATCH === 'true') {
+        logger.info({ requestId }, "Attempting fuzzy match.");
         try {
             const embeddingStartTime = Date.now();
             const embedding = await embedText(trimmedInput);
@@ -279,7 +278,6 @@ export async function parseTextRecipe(
             requestId, 
             success: !!finalRecipeData, 
             inputType, 
-            intent,
             fromCache: false, 
             fetchMethod: 'N/A', 
             usedFallback: isFallback,

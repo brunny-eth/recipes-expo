@@ -15,8 +15,6 @@ export default function HomeScreen() {
   const navigation = useNavigation();
   const [isInputFocused, setIsInputFocused] = React.useState(false);
   const { showError } = useErrorModal();
-  const [modalVisible, setModalVisible] = React.useState(false);
-  const [currentInput, setCurrentInput] = React.useState('');
 
   React.useEffect(() => {
     navigation.setOptions({
@@ -40,15 +38,13 @@ export default function HomeScreen() {
     };
   }, []);
 
-  const handleNavigation = (recipeInput: string, intent: 'fuzzy_match' | 'literal') => {
+  const handleNavigation = (recipeInput: string) => {
     Keyboard.dismiss();
-    console.log(`Navigating with intent: ${intent}`);
     router.push({
       pathname: '/loading',
-      params: { recipeInput, intent },
+      params: { recipeInput },
     });
     setRecipeUrl(''); // Clear input after submission
-    setModalVisible(false);
   };
 
   const handleSubmit = async () => {
@@ -57,16 +53,7 @@ export default function HomeScreen() {
         return;
     }
     const recipeInput = recipeUrl.trim();
-    // A simple URL check.
-    const isUrl = recipeInput.startsWith('http') || recipeInput.includes('.com') || recipeInput.includes('.co');
-    const wordCount = recipeInput.split(/\s+/).length;
-
-    if (!isUrl && wordCount < 35) {
-      setCurrentInput(recipeInput);
-      setModalVisible(true);
-    } else {
-      handleNavigation(recipeInput, 'literal');
-    }
+    handleNavigation(recipeInput);
   };
 
   return (
@@ -117,34 +104,6 @@ export default function HomeScreen() {
           </View>
         </RNView>
       </KeyboardAvoidingView>
-
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => {
-          setModalVisible(!modalVisible);
-        }}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>How should we proceed?</Text>
-            <Text style={styles.modalMessage}>Your recipe seems short. We can either find a similar, complete recipe for you, or try to convert exactly what you typed.</Text>
-            
-            <TouchableOpacity style={styles.modalButton} onPress={() => handleNavigation(currentInput, 'fuzzy_match')}>
-              <Text style={styles.modalButtonText}>Find a similar recipe</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={[styles.modalButton, styles.modalButtonSecondary]} onPress={() => handleNavigation(currentInput, 'literal')}>
-              <Text style={[styles.modalButtonText, styles.modalButtonTextSecondary]}>Convert this exactly</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.modalCancelButton} onPress={() => setModalVisible(false)}>
-              <Text style={styles.modalCancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }

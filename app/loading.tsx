@@ -6,7 +6,7 @@ import { COLORS } from '@/constants/theme';
 
 export default function LoadingRoute() {
   const router = useRouter();
-  const { recipeInput, intent } = useLocalSearchParams<{ recipeInput?: string, intent?: 'fuzzy_match' | 'literal' }>();
+  const { recipeInput } = useLocalSearchParams<{ recipeInput?: string }>();
 
   if (!recipeInput) {
     // This should ideally not happen if navigation is always correct
@@ -19,7 +19,6 @@ export default function LoadingRoute() {
     <SafeAreaView style={styles.container}>
       <LoadingExperienceScreen
         recipeInput={recipeInput}
-        intent={intent || 'literal'}
         loadingMode="checklist"
         onComplete={() => {
           // Navigation is handled internally by LoadingExperienceScreen

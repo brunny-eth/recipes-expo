@@ -1,7 +1,7 @@
 import 'dotenv/config'
 import { createClient } from '@supabase/supabase-js'
-import { embedText } from '../utils/embedText'
-import { cosineSimilarity } from '../utils/cosineSimilarity'
+import { embedText } from '../embedText'
+import { cosineSimilarity } from '../cosineSimilarity'
 
 const supabase = createClient(
     process.env.SUPABASE_URL!,

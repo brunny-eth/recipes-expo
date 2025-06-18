@@ -1,7 +1,7 @@
 import 'dotenv/config'
 import { createClient } from '@supabase/supabase-js'
-import { embedText } from '../utils/embedText'
-import { buildEmbeddingInput } from '../utils/embedInputBuilder'
+import { embedText } from '../embedText'
+import { buildEmbeddingInput } from './embedInputBuilder'
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,

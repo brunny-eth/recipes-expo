@@ -1,6 +1,6 @@
 import 'dotenv/config'
-import { embedText } from '../utils/embedText'
-import { findSimilarRecipe } from '../utils/findSimilarRecipe'
+import { embedText } from '../embedText'
+import { findSimilarRecipe } from '../findSimilarRecipe'
 
 async function run() {
   const query = "chicken chili"
