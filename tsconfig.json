@@ -2,8 +2,17 @@
   "extends": "./node_modules/expo/tsconfig.base.json",
   "compilerOptions": {
     "strict": true,
+    "jsx": "react-native",
+    "baseUrl": ".", // ✅ Required for paths to work
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@types": ["common/types"],
+      "@types/*": ["common/types/*"],
+      "@components/*": ["components/*"],
+      "@utils/*": ["utils/*"],
+      "@hooks/*": ["hooks/*"],
+      "@context/*": ["context/*"],
+      "@server/*": ["server/*"]
     },
     "typeRoots": ["./types", "./node_modules/@types"],
     "moduleResolution": "node16",
@@ -15,6 +24,7 @@
     ".expo/types/**/*.ts",
     "expo-env.d.ts",
     "nativewind-env.d.ts",
-    "types/scraperapi-sdk.d.ts"
-  ]
+    "types/scraperapi-sdk/index.d.ts" 
+  ],
+  "exclude": ["server"]
 }

@@ -6,11 +6,13 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { decode } from 'he';
 import { COLORS } from '@/constants/theme';
 import { scaleIngredient, parseServingsValue, getScaledYieldText, parseAmountString, formatAmountNumber } from '@/utils/recipeUtils'; // Correct import path assuming utils is under root/src or similar alias
-import { StructuredIngredient } from '@/api/types';
-import { coerceToStructuredIngredients } from '@/utils/ingredientHelpers'; // Import the new helper
-import { useErrorModal } from '@/context/ErrorModalContext'; // Added import
-import InlineErrorBanner from '@/components/InlineErrorBanner'; // Import the new component
+import { StructuredIngredient } from '../../common/types';
+import { coerceToStructuredIngredients } from '@/utils/ingredientHelpers'; 
+import { useErrorModal } from '@/context/ErrorModalContext'; 
+import InlineErrorBanner from '@/components/InlineErrorBanner'; 
 import { titleText, sectionHeaderText, bodyText, captionStrongText, bodyStrongText, captionText } from '@/constants/typography';
+import { useAuth } from '@/context/AuthContext';
+import { setHasUsedFreeRecipe } from '@/server/lib/freeUsageTracker';
 
 const ALLERGENS = [
   {
@@ -130,6 +132,7 @@ export default function RecipeSummaryScreen() {
   const params = useLocalSearchParams<{ recipeData?: string }>();
   const router = useRouter();
   const { showError } = useErrorModal(); // Added hook usage
+  const { session } = useAuth();
   
   const [recipe, setRecipe] = useState<ParsedRecipe | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -149,10 +152,10 @@ export default function RecipeSummaryScreen() {
         const parsed = JSON.parse(params.recipeData) as ParsedRecipe;
         if (!parsed || typeof parsed !== 'object' || Object.keys(parsed).length === 0) { // Added check for empty/invalid parsed object
           console.error("Parsed recipe data is empty or invalid on summary screen.");
-          showError({
-            title: "Error Loading Summary",
-            message: "Recipe data is invalid. Please go back and try again."
-          });
+          showError(
+            "Error Loading Summary",
+            "Recipe data is invalid. Please go back and try again."
+          );
           setIsLoading(false);
           return;
         }
@@ -165,18 +168,18 @@ export default function RecipeSummaryScreen() {
 
       } catch (e: any) {
         console.error("Failed to parse recipe data on summary screen:", e);
-        showError({
-          title: "Error Loading Summary",
-          message: `Could not load recipe details: ${e.message}. Please go back and try again.`
-        });
+        showError(
+          "Error Loading Summary",
+          `Could not load recipe details: ${e.message}. Please go back and try again.`
+        );
         setIsLoading(false); // Ensure loading is false on error
         return; // Prevent further processing
       }
     } else {
-      showError({
-        title: "Error Loading Summary",
-        message: "Recipe data not provided. Please go back and try again."
-      });
+      showError(
+        "Error Loading Summary",
+        "Recipe data not provided. Please go back and try again."
+      );
       setIsLoading(false); // Ensure loading is false on error
       return; // Prevent further processing
     }
@@ -200,6 +203,13 @@ export default function RecipeSummaryScreen() {
 
   const navigateToIngredients = () => {
     if (!recipe || !recipe.ingredients) return;
+
+    if (!session) {
+      if (__DEV__) {
+        console.log('[FreeUsage] User is not logged in. Setting hasUsedFreeRecipe flag.');
+      }
+      setHasUsedFreeRecipe();
+    }
 
     // Use the helper to coerce ingredients
     const structuredOriginals: StructuredIngredient[] = coerceToStructuredIngredients(recipe.ingredients);

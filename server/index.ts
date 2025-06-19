@@ -6,14 +6,21 @@ import { recipeRouter } from './routes/recipes'
 const app = express()
 
 app.use(pinoHttp({ logger }))
-
 app.use(express.json())
 
-// Health check endpoint
+// Health check
 app.get('/api/health', (_req, res) => {
   res.send('🟢 Backend is running')
 })
 
 app.use('/api/recipes', recipeRouter)
+
+// 👇 Only run this if executed directly (e.g., via `ts-node server/index.ts`)
+if (require.main === module) {
+  const PORT = process.env.PORT || 3000
+  app.listen(PORT, () => {
+    console.log(`🟢 Server running at http://localhost:${PORT}`)
+  })
+}
 
 export default app

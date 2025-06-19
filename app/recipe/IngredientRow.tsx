@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
-import { StructuredIngredient } from '@/api/types';
+import { StructuredIngredient } from '../../common/types';
 import { bodyStrongText, bodyText, captionText } from '@/constants/typography';
 import { abbreviateUnit } from '@/utils/format';
 import { parseIngredientDisplayName } from '@/utils/ingredientHelpers';

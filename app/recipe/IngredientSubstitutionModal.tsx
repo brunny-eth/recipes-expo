@@ -18,7 +18,7 @@ import Animated, {
 import { COLORS } from '@/constants/theme';
 import { abbreviateUnit } from '@/utils/format';
 import { sectionHeaderText, bodyStrongText, captionText } from '@/constants/typography';
-import { SubstitutionSuggestion } from '@/api/types';
+import { SubstitutionSuggestion } from '../../common/types';
 
 interface SubstitutionOption {
   id: string;

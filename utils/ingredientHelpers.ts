@@ -1,4 +1,4 @@
-import { StructuredIngredient } from '@/api/types';
+import { StructuredIngredient } from '@types/index';
 
 /**
  * Coerces an array of mixed ingredient types (string or StructuredIngredient objects)

@@ -6,8 +6,17 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { COLORS } from '@/constants/theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useErrorModal } from '@/context/ErrorModalContext';
-import { useHandleError } from '@/hooks/useHandleError';
 import { titleText, bodyText, bodyStrongText, captionText } from '@/constants/typography';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useEffect } from 'react';
+import { useAuth } from '@/context/AuthContext';
+import { getHasUsedFreeRecipe } from '@/server/lib/freeUsageTracker';
+
+useEffect(() => {
+  AsyncStorage.clear().then(() => {
+    console.log('[DEBUG] AsyncStorage cleared');
+  });
+}, []);
 
 export default function HomeScreen() {
   const [recipeUrl, setRecipeUrl] = React.useState('');
@@ -15,6 +24,7 @@ export default function HomeScreen() {
   const navigation = useNavigation();
   const [isInputFocused, setIsInputFocused] = React.useState(false);
   const { showError } = useErrorModal();
+  const { session } = useAuth();
 
   React.useEffect(() => {
     navigation.setOptions({
@@ -52,6 +62,18 @@ export default function HomeScreen() {
         showError({ title: "Input Required", message: "Please paste a recipe URL or recipe text." });
         return;
     }
+
+    if (!session) {
+      const hasUsedFree = await getHasUsedFreeRecipe();
+      if (hasUsedFree) {
+        if (__DEV__) {
+          console.log('[UsageLimit] Free recipe used, redirecting to login.');
+        }
+        router.replace('/login');
+        return;
+      }
+    }
+
     const recipeInput = recipeUrl.trim();
     handleNavigation(recipeInput);
   };

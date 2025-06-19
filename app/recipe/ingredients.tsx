@@ -6,7 +6,7 @@ import { PerformanceObserver } from 'react-native-performance';
 // import Animated, { FadeIn } from 'react-native-reanimated'; // Removed for gesture debug
 import { COLORS } from '@/constants/theme';
 import IngredientSubstitutionModal from './IngredientSubstitutionModal';
-import { StructuredIngredient, SubstitutionSuggestion } from '@/api/types';
+import { StructuredIngredient, SubstitutionSuggestion } from '../../common/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { formatMeasurement, abbreviateUnit } from '@/utils/format';
 import { coerceToStructuredIngredients, parseIngredientDisplayName } from '@/utils/ingredientHelpers';
@@ -695,7 +695,7 @@ export default function IngredientsScreen() {
             <Pressable style={styles.helpModalContent} onPress={() => {}}> 
               {/* Prevent backdrop press from triggering through content */}
               <Text style={styles.helpModalText}>
-                Tip: substitute out an ingredient in the recipe by clicking the S next to the ingredient name. The recipe will adjust accordingly!
+                Tip: substitute out an ingredient in the recipe by clicking the button next to the ingredient name. The recipe will adjust accordingly!
               </Text>
               <TouchableOpacity 
                 style={styles.helpModalCloseButton} 

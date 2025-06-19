@@ -1,4 +1,4 @@
-import { GeminiModel, CombinedParsedRecipe } from '../types';
+import { GeminiModel, CombinedParsedRecipe } from '../../common/types';
 import { createHash } from 'crypto';
 import { detectInputType, InputType } from '../utils/detectInputType';
 import { generateCacheKeyHash } from '../utils/hash';
@@ -6,7 +6,7 @@ import { StandardizedUsage } from '../utils/usageUtils';
 import logger from '../lib/logger';
 import { parseUrlRecipe } from './parseUrlRecipe';
 import { parseTextRecipe } from './parseTextRecipe';
-import { StructuredError, ParseErrorCode } from '../types/errors';
+import { StructuredError, ParseErrorCode } from '../../common/types/errors';
 
 export type ParseResult = {
     recipe: CombinedParsedRecipe | null;

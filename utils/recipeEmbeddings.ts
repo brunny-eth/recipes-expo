@@ -1,6 +1,6 @@
 import { embedText } from './embedText';
-import { supabase } from '../api/lib/supabase'; // or wherever your client lives
-import logger from '../api/lib/logger';
+import { supabase } from '../server/lib/supabase'; 
+import logger from '../server/lib/logger';
 
 /**
  * Embeds a recipe and stores it in processed_recipes_cache.

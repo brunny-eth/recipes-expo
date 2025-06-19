@@ -1,4 +1,4 @@
-import { CombinedParsedRecipe } from '../types';
+import { CombinedParsedRecipe } from '../../common/types';
 import logger from '../lib/logger';
 
 /**

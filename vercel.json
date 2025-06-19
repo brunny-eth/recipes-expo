@@ -2,14 +2,15 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/**/*.ts",
+      "src": "server/index.ts",
       "use": "@vercel/node"
     }
   ],
+  "devCommand": "npx ts-node --project server/tsconfig.json server/index.ts",
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/api/index.ts"
+      "dest": "server/index.ts"
     }
   ]
 }

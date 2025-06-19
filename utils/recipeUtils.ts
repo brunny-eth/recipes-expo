@@ -1,5 +1,5 @@
 // Import the StructuredIngredient type from the shared types file
-import { StructuredIngredient } from '@/api/types';
+import { StructuredIngredient } from '../common/types';
 
 // --- Fraction Handling ---
 // Helper to convert fraction string ("1/2", "3/4") to number

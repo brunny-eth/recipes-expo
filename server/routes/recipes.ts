@@ -6,7 +6,7 @@ import { rewriteForSubstitution } from '../services/substitutionRewriter';
 import { scaleInstructions } from '../services/instructionScaling';
 import { getAllRecipes, getRecipeById } from '../services/recipeDB';
 import logger from '../lib/logger'; 
-import { ParseErrorCode } from '../types/errors';
+import { ParseErrorCode } from '../../common/types/errors';
 
 const router = Router()
 

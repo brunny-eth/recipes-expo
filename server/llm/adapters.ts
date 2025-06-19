@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold, GenerationConfig } from "@google/generative-ai";
 import OpenAI from 'openai';
-import { GeminiModel } from '../types';
+import { GeminiModel } from '../../common/types';
 import { normalizeUsageMetadata, StandardizedUsage } from '../utils/usageUtils';
 import { estimateCostUSD } from '../utils/costUtils';
 import logger from '../lib/logger';

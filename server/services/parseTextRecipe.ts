@@ -1,21 +1,22 @@
-import { GeminiModel, CombinedParsedRecipe, GeminiHandlerResponse } from '../types';
+import { GeminiModel, CombinedParsedRecipe, GeminiHandlerResponse } from '../../common/types';
 import { supabase } from '../lib/supabase';
 import { createHash } from 'crypto';
 import { detectInputType } from '../utils/detectInputType';
 import { generateCacheKeyHash } from '../utils/hash';
-import { fetchAndExtractFromUrl } from './urlProcessor';
-import { scraperClient, scraperApiKey } from '../lib/scraper';
+import { extractFromRawText } from './textProcessor';
 import { StandardizedUsage } from '../utils/usageUtils';
 import logger from '../lib/logger';
 import { normalizeUsageMetadata } from '../utils/usageUtils';
 import { finalValidateRecipe } from './finalValidateRecipe';
 import { ParseResult } from './parseRecipe';
-import { geminiAdapter, openaiAdapter, PromptPayload, runDefaultLLM } from '../llm/adapters';
-import { buildUrlParsePrompt } from '../llm/parsingPrompts';
-import { ParseErrorCode, StructuredError } from '../types/errors';
-import { generateAndSaveEmbedding } from '../../utils/recipeEmbeddings';
+import { geminiAdapter, runDefaultLLM } from '../llm/adapters';
+import { buildTextParsePrompt } from '../llm/parsingPrompts';
+import { ParseErrorCode, StructuredError } from '../../common/types/errors';
+import { embedText } from '../../utils/embedText';
+import { findSimilarRecipe } from '../../utils/findSimilarRecipe';
 
 const MAX_PREVIEW_LENGTH = 100;
+const SIMILARITY_THRESHOLD = 0.55;
 
 function normalizeServings(servingRaw: string | null): string | null {
     if (!servingRaw) return null;
@@ -34,10 +35,10 @@ function normalizeServings(servingRaw: string | null): string | null {
     return unique[0];
 }
 
-export async function parseUrlRecipe(
+export async function parseTextRecipe(
     input: string,
+    requestId: string
 ): Promise<ParseResult> {
-    const requestId = createHash('sha256').update(Date.now().toString() + Math.random().toString()).digest('hex').substring(0, 12);
     const requestStartTime = Date.now();
     let overallTimings: ParseResult['timings'] = {
         dbCheck: -1,
@@ -46,14 +47,81 @@ export async function parseUrlRecipe(
         total: -1
     };
     let handlerUsage: StandardizedUsage = { inputTokens: 0, outputTokens: 0 };
-    let fetchMethodUsed: string | undefined = 'N/A';
-    let isFallback = false;
-    let fallbackType: string | null = null;
-    const inputType = 'url';
+    const inputType = 'raw_text';
     const trimmedInput = input.trim();
-    const cacheKey = trimmedInput;
+    const cacheKey = generateCacheKeyHash(trimmedInput);
+    let isFallback = false;
+
+    // --- Start Fuzzy Match Logic ---
+    if (process.env.ENABLE_FUZZY_MATCH === 'true') {
+        logger.info({ requestId }, "Attempting fuzzy match.");
+        try {
+            const embeddingStartTime = Date.now();
+            const embedding = await embedText(trimmedInput);
+            const embeddingTime = Date.now() - embeddingStartTime;
+
+            const searchStartTime = Date.now();
+            const match = await findSimilarRecipe(embedding);
+            const searchTime = Date.now() - searchStartTime;
+
+            if (match && match.recipe && match.similarity > SIMILARITY_THRESHOLD) {
+                logger.info({
+                    requestId,
+                    similarity: match.similarity,
+                    matchedRecipeId: match.recipe.id,
+                    llm_skipped: true,
+                    timings: { embeddingTime, searchTime }
+                }, "Fuzzy match found, returning matched recipe directly.");
+
+                // The matched recipe data is already in the correct format.
+                // We can short-circuit and return immediately.
+                return {
+                    recipe: match.recipe,
+                    error: null,
+                    fromCache: true, // Treat it as a cache hit for analytics
+                    inputType,
+                    cacheKey: match.recipe.url, // Use the matched recipe's key
+                    timings: { ...overallTimings, total: Date.now() - requestStartTime, dbCheck: searchTime },
+                    usage: { inputTokens: 0, outputTokens: 0 },
+                    fetchMethodUsed: 'fuzzy_match'
+                };
+            } else {
+                 logger.info(
+                    {
+                        requestId,
+                        similarity: match?.similarity ?? 'N/A',
+                        matchedRecipeId: match?.recipe?.id ?? null,
+                        llm_skipped: false
+                    }, 
+                    "No suitable fuzzy match found or threshold not met. Proceeding with LLM."
+                );
+            }
+
+        } catch (fuzzyError: any) {
+            logger.error({ requestId, error: fuzzyError.message }, "Error during fuzzy match process. Falling back to LLM.");
+        }
+    }
+    // --- End Fuzzy Match Logic ---
 
     try {
+        if (trimmedInput.length < 20 && !trimmedInput.includes(' ')) {
+             const errorPayload: StructuredError = {
+                code: ParseErrorCode.INVALID_INPUT,
+                message: "That didn't look like a real recipe. Try describing a dish or pasting a full recipe."
+            };
+            logger.warn({ requestId, input: trimmedInput }, "Rejected input as invalid (too short, no spaces).");
+            return {
+                recipe: null,
+                error: errorPayload,
+                fromCache: false,
+                inputType,
+                cacheKey,
+                timings: { dbCheck: -1, geminiParse: -1, dbInsert: -1, total: Date.now() - requestStartTime },
+                usage: { inputTokens: 0, outputTokens: 0 },
+                fetchMethodUsed: 'N/A'
+            };
+        }
+
         logger.info({ requestId, inputType, inputLength: trimmedInput.length, cacheKey }, `Received parse request.`);
 
         const dbCheckStartTime = Date.now();
@@ -85,46 +153,31 @@ export async function parseUrlRecipe(
         let finalRecipeData: CombinedParsedRecipe | null = null;
         let usedFallback = false;
 
-        const { extractedContent, error: fetchExtractError, fetchMethodUsed: fmUsed, timings: feTimings } = await fetchAndExtractFromUrl(trimmedInput, requestId, scraperApiKey, scraperClient);
-        fetchMethodUsed = fmUsed;
-        overallTimings.fetchHtml = feTimings.fetchHtml;
-        overallTimings.extractContent = feTimings.extractContent;
+        const { preparedText, error: prepareError, timings: prepTimings } = extractFromRawText(trimmedInput, requestId);
+        overallTimings.prepareText = prepTimings.prepareText;
 
-        if (fetchExtractError || !extractedContent) {
-            processingError = fetchExtractError || 'Failed to fetch or extract content from URL.';
-            logger.error({ requestId, error: processingError }, `URL processing failed during fetch/extract`);
+        if (prepareError) {
+            processingError = prepareError;
+            logger.error({ requestId, error: processingError }, `Raw text processing failed during preparation`);
         } else {
-            isFallback = !!extractedContent.isFallback;
-            fallbackType = extractedContent.fallbackType || null;
-            const totalLength = (extractedContent?.ingredientsText?.length ?? 0) + (extractedContent?.instructionsText?.length ?? 0);
-            logger.info({ requestId, fetchExtractMs: (overallTimings.fetchHtml ?? 0) + (overallTimings.extractContent ?? 0), method: fetchMethodUsed, combinedTextLength: totalLength }, `URL content prepared.`);
+            logger.info({ requestId, prepareMs: overallTimings.prepareText, textLength: preparedText?.length ?? 0 }, `Raw text prepared.`);
             
-            const prompt = buildUrlParsePrompt(
-              extractedContent.title || '',
-              extractedContent.ingredientsText || '',
-              extractedContent.instructionsText || ''
-            );
+            const prompt = buildTextParsePrompt(preparedText!);
             prompt.metadata = { requestId };
 
-            const geminiStartTime = Date.now();
+            const modelStartTime = Date.now();
             const modelResponse = await runDefaultLLM(prompt);
             
-            overallTimings.geminiParse = Date.now() - geminiStartTime;
+            overallTimings.geminiParse = Date.now() - modelStartTime;
             handlerUsage = modelResponse.usage;
 
             if (modelResponse.error || !modelResponse.output) {
                 processingError = modelResponse.error || "Model returned no output.";
-                logger.error({ requestId, error: processingError }, `URL processing failed during model parse`);
+                logger.error({ requestId, error: processingError }, `Raw text processing failed during model parse`);
             } else {
                 try {
                     finalRecipeData = JSON.parse(modelResponse.output);
-                    if (finalRecipeData && extractedContent) {
-                        finalRecipeData.description = extractedContent.description ?? null;
-                        finalRecipeData.image = extractedContent.image ?? null;
-                        finalRecipeData.thumbnailUrl = extractedContent.thumbnailUrl ?? null;
-                        finalRecipeData.sourceUrl = extractedContent.sourceUrl ?? null;
-                    }
-                    logger.info({ requestId, timeMs: overallTimings.geminiParse, usage: handlerUsage, action: `llm_parse_url` }, `LLM parse completed for URL.`);
+                     logger.info({ requestId, timeMs: overallTimings.geminiParse, usage: handlerUsage, action: `llm_parse_raw_text` }, `LLM parse completed for Raw Text.`);
                 } catch (parseErr: any) {
                     processingError = `Failed to parse model response: ${parseErr.message}`;
                     logger.error({ requestId, error: processingError, responseText: modelResponse.output }, 'JSON parse failed for model response');
@@ -135,44 +188,47 @@ export async function parseUrlRecipe(
         if (processingError) {
             overallTimings.total = Date.now() - requestStartTime;
             logger.error({ requestId, error: processingError, inputType, timings: overallTimings }, `Processing ultimately failed for input.`);
-            return { recipe: null, error: { code: ParseErrorCode.GENERATION_FAILED, message: processingError }, fromCache: false, inputType, cacheKey, timings: overallTimings, usage: handlerUsage, fetchMethodUsed };
+            return { recipe: null, error: { code: ParseErrorCode.GENERATION_FAILED, message: processingError }, fromCache: false, inputType, cacheKey, timings: overallTimings, usage: handlerUsage, fetchMethodUsed: 'N/A' };
+        }
+
+        const isEmptyRecipe = (
+            !finalRecipeData?.title &&
+            (!finalRecipeData?.ingredients || finalRecipeData.ingredients.length === 0) &&
+            (!finalRecipeData?.instructions || finalRecipeData.instructions.length === 0)
+        );
+
+        if (isEmptyRecipe) {
+          logger.warn({ requestId }, "[parse] Model returned an empty recipe. Rejecting.");
+          return {
+            recipe: null,
+            error: {
+              code: ParseErrorCode.GENERATION_EMPTY,
+              message: "We couldn't create a recipe from that. Try adding a few more details or ingredients."
+            },
+            fromCache: false,
+            inputType,
+            cacheKey,
+            timings: { ...overallTimings, total: Date.now() - requestStartTime },
+            usage: handlerUsage,
+            fetchMethodUsed: 'N/A'
+          };
         }
 
         const validationResult = finalValidateRecipe(finalRecipeData, requestId);
         if (!validationResult.ok) {
-            logger.warn({ requestId, reasons: validationResult.reasons }, "Final validation failed for URL recipe, rejecting.");
-            const isThinRecipe = (
-                !finalRecipeData?.title &&
-                (!finalRecipeData?.ingredients || finalRecipeData.ingredients.length === 0) &&
-                (!finalRecipeData?.instructions || finalRecipeData.instructions.length === 0)
-            );
-            if (isFallback && isThinRecipe) {
-                return {
-                    recipe: null,
-                    error: {
-                        code: ParseErrorCode.GENERATION_EMPTY,
-                        message: "This page doesn't appear to contain a recipe."
-                    },
-                    fromCache: false,
-                    inputType,
-                    cacheKey,
-                    timings: { ...overallTimings, total: Date.now() - requestStartTime },
-                    usage: handlerUsage,
-                    fetchMethodUsed
-                };
-            }
-             return {
+            logger.warn({ requestId, reasons: validationResult.reasons }, "Final validation failed, rejecting recipe.");
+            return {
                 recipe: null,
                 error: {
                     code: ParseErrorCode.FINAL_VALIDATION_FAILED,
-                    message: "The recipe generated from the URL was incomplete."
+                    message: "Can you be a bit more descriptive about the meal you want?"
                 },
                 fromCache: false,
                 inputType,
                 cacheKey,
                 timings: { ...overallTimings, total: Date.now() - requestStartTime },
                 usage: handlerUsage,
-                fetchMethodUsed
+                fetchMethodUsed: 'N/A'
             };
         }
 
@@ -188,15 +244,13 @@ export async function parseUrlRecipe(
 
             const dbInsertStartTime = Date.now();
             try {
-                const { data: insertData, error: insertError } = await supabase
+                const { error: insertError } = await supabase
                     .from('processed_recipes_cache')
                     .insert({
                         url: cacheKey,
                         recipe_data: finalRecipeData,
                         source_type: inputType
-                    })
-                    .select('id')
-                    .single();
+                    });
 
                 overallTimings.dbInsert = Date.now() - dbInsertStartTime;
 
@@ -204,15 +258,6 @@ export async function parseUrlRecipe(
                     logger.error({ requestId, cacheKey, err: insertError }, `Error saving recipe to cache.`);
                 } else {
                     logger.info({ requestId, cacheKey, dbInsertMs: overallTimings.dbInsert }, `Successfully cached new recipe.`);
-                    if (process.env.ENABLE_EMBEDDING === 'true' && insertData) {
-                        const recipeId = insertData.id;
-                        logger.info({ recipeId }, 'Embedding queued after successful URL parse');
-                        await generateAndSaveEmbedding(recipeId, {
-                            title: finalRecipeData.title,
-                            ingredientsText: finalRecipeData.ingredients?.join('\n'),
-                            instructionsText: finalRecipeData.instructions?.join('\n'),
-                         });
-                    }
                 }
             } catch (cacheInsertError) {
                 overallTimings.dbInsert = Date.now() - dbInsertStartTime;
@@ -234,9 +279,9 @@ export async function parseUrlRecipe(
             success: !!finalRecipeData, 
             inputType, 
             fromCache: false, 
-            fetchMethod: fetchMethodUsed, 
+            fetchMethod: 'N/A', 
             usedFallback: isFallback,
-            fallbackType: fallbackType,
+            fallbackType: null,
             timings: overallTimings, 
             event: 'parse_request_complete' 
         }, `Request complete.`);
@@ -257,25 +302,25 @@ export async function parseUrlRecipe(
             cacheKey,
             timings: overallTimings,
             usage: handlerUsage,
-            fetchMethodUsed
+            fetchMethodUsed: 'N/A'
         };
 
     } catch (err) {
         const error = err as Error;
         overallTimings.total = Date.now() - requestStartTime;
-        logger.error({ requestId, error: error.message, stack: error.stack }, `Unhandled exception in parseUrlRecipe.`);
+        logger.error({ requestId, error: error.message, stack: error.stack }, `Unhandled exception in parseTextRecipe.`);
         return {
             recipe: null,
             error: {
               code: ParseErrorCode.GENERATION_FAILED,
-              message: error.message || 'Unknown error in parseUrlRecipe'
+              message: error.message || 'Unknown error in parseTextRecipe'
             },
             fromCache: false,
             inputType,
-            cacheKey,
+            cacheKey: generateCacheKeyHash(input),
             timings: overallTimings,
             usage: handlerUsage,
-            fetchMethodUsed
+            fetchMethodUsed: 'N/A'
         };
     }
 }

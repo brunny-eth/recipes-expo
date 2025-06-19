@@ -1,6 +1,6 @@
 import React from 'react';
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, SafeAreaView, Platform, Modal, Pressable, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, SafeAreaView, Platform, Modal, Pressable, Image, Dimensions } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
@@ -10,9 +10,12 @@ import MiniTimerDisplay from '@/components/MiniTimerDisplay';
 import { ActiveTool } from '@/components/ToolsModal';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import InlineErrorBanner from '@/components/InlineErrorBanner';
-import { StructuredIngredient } from '@/api/types';
+import { StructuredIngredient } from '../../common/types';
 import { abbreviateUnit } from '@/utils/format';
 import { titleText, sectionHeaderText, bodyText, bodyStrongText, captionText } from '@/constants/typography';
+import { parseAmountString } from '@/utils/recipeUtils';
+
+const screenWidth = Dimensions.get('window').width;
 
 export default function StepsScreen() {
   const params = useLocalSearchParams<{ recipeData?: string }>();
@@ -36,7 +39,7 @@ export default function StepsScreen() {
   // --- Lifted Timer State --- 
   const [timerTimeRemaining, setTimerTimeRemaining] = useState(0); // Time in seconds
   const [isTimerActive, setIsTimerActive] = useState(false);
-  const timerIntervalRef = useRef<number | null>(null);
+  const timerIntervalRef = useRef<any>(null);
   // --- End Lifted Timer State ---
   
   useEffect(() => {
@@ -63,20 +66,20 @@ export default function StepsScreen() {
         }
 
       } else {
-        showError({
-          title: "Error Loading Steps",
-          message: "Recipe data was not provided. Please go back and try again."
-        });
+        showError(
+          "Error Loading Steps",
+          "Recipe data was not provided. Please go back and try again."
+        );
         setInstructions([]);
         setIsLoading(false);
         return;
       }
     } catch (e: any) {
         console.error("Failed to parse recipe data on steps screen:", e);
-        showError({
-          title: "Error Loading Steps",
-          message: `Could not load recipe data: ${e.message}. Please go back and try again.`
-        });
+        showError(
+          "Error Loading Steps",
+          `Could not load recipe data: ${e.message}. Please go back and try again.`
+        );
         setInstructions([]);
         setIsLoading(false);
         return;
@@ -106,7 +109,7 @@ export default function StepsScreen() {
       setIsTimerActive(false);
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
       // Optional: Add sound/vibration feedback here
-      showError({ title: "Timer", message: "Time's up!" });
+      showError("Timer", "Time's up!");
     }
 
     // Cleanup interval
