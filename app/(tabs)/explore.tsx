@@ -1,9 +1,12 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '@/constants/theme';
 import RecipeCard from '@/components/RecipeCard';
-import { useFreeUsage } from '@/context/FreeUsageContext'; // Import the FreeUsageContext
+import { useFreeUsage } from '@/context/FreeUsageContext';
+import { router } from 'expo-router';
+import { supabase } from '@/server/lib/supabase';
+import { bodyText, screenTitleText } from '@/constants/typography';
 
 const DUMMY_RECIPES = [
   {
@@ -36,14 +39,41 @@ const DUMMY_RECIPES = [
   },
 ];
 
+const DevTools = () => {
+  if (!__DEV__) {
+    return null;
+  }
+
+  const { resetFreeRecipeUsage, hasUsedFreeRecipe } = useFreeUsage();
+
+  const handleFullReset = async () => {
+    await supabase.auth.signOut();
+    await resetFreeRecipeUsage();
+    router.replace('/login');
+  };
+
+  return (
+    <View style={styles.devToolsContainer}>
+      <Text style={styles.devToolsTitle}>Dev Tools</Text>
+      <Text>Has Used Free Recipe: {String(hasUsedFreeRecipe)}</Text>
+      <TouchableOpacity style={styles.devButton} onPress={resetFreeRecipeUsage}>
+        <Text style={styles.devButtonText}>Reset Free Usage</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.devButton} onPress={handleFullReset}>
+        <Text style={styles.devButtonText}>Start Fresh (Sign Out & Reset)</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+
 const ExploreScreen = () => {
-  const { hasUsedFreeRecipe, isLoadingFreeUsage, resetFreeRecipeUsage } = useFreeUsage(); // Destructure the function and state
+  const { hasUsedFreeRecipe, isLoadingFreeUsage, resetFreeRecipeUsage } = useFreeUsage();
 
   const handleResetFreeUsage = async () => {
     console.log('[Dev Tools] Attempting to reset free recipe usage...');
     await resetFreeRecipeUsage();
     console.log('[Dev Tools] Free recipe usage has been reset.');
-    alert('Free recipe usage has been reset!'); // Provide a visual confirmation
+    alert('Free recipe usage has been reset!');
   };
 
   return (
@@ -52,20 +82,7 @@ const ExploreScreen = () => {
         <Text style={styles.title}>Explore Recipes</Text>
       </View>
 
-      {/* Dev-only button for resetting free usage */}
-      <View style={styles.devToolsContainer}>
-        <Text style={styles.devToolsText}>
-          Free Recipe Used: {isLoadingFreeUsage ? 'Loading...' : hasUsedFreeRecipe ? 'Yes' : 'No'}
-        </Text>
-        <TouchableOpacity
-          onPress={handleResetFreeUsage}
-          style={styles.resetButton}
-          disabled={isLoadingFreeUsage}
-        >
-          <Text style={styles.resetButtonText}>Reset Free Usage (DEV)</Text>
-        </TouchableOpacity>
-      </View>
-      {/* End Dev-only button */}
+      <DevTools />
 
       <FlatList
         data={DUMMY_RECIPES}
@@ -93,8 +110,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   title: {
-    fontFamily: 'Recoleta-Medium', // Ensure you have this font loaded
-    fontSize: 28,
+    ...screenTitleText,
     color: COLORS.textDark,
   },
   listContentContainer: {
@@ -102,29 +118,29 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   devToolsContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
-    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
     padding: 10,
-    backgroundColor: '#fff',
+    marginVertical: 10,
+    borderRadius: 5,
     alignItems: 'center',
   },
-  devToolsText: {
-    fontSize: 14,
-    color: COLORS.darkGray,
-    marginBottom: 10,
-  },
-  resetButton: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 5,
-  },
-  resetButtonText: {
-    color: COLORS.white,
+  devToolsTitle: {
     fontWeight: 'bold',
+    fontSize: 16,
+    marginBottom: 5,
+  },
+  devButton: {
+    backgroundColor: '#ffc107',
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 5,
+  },
+  devButtonText: {
+    color: '#000',
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
   },
 });
 

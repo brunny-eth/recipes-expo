@@ -1,27 +1,37 @@
-import { View, Text, StyleSheet, Switch, TouchableOpacity, ScrollView } from 'react-native';
-import { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { router } from 'expo-router';
 import { COLORS } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { bodyText, bodyStrongText, titleText, sectionHeaderText } from '@/constants/typography';
+import { bodyText, bodyStrongText, screenTitleText, sectionHeaderText } from '@/constants/typography';
 
 function AuthStatus() {
-  const { session } = useAuth();
-  const isAuthenticated = !!session;
+  const { session, isAuthenticated } = useAuth();
+
+  if (!isAuthenticated) {
+    return (
+        <View style={[styles.authStatusContainer, { backgroundColor: COLORS.lightGray, flexDirection: 'column', alignItems: 'flex-start', padding: 15, borderRadius: 10}]}>
+            <Text style={[bodyStrongText, { color: COLORS.darkGray, marginBottom: 15}]}>
+                You are not logged in.
+            </Text>
+            <TouchableOpacity onPress={() => router.push('/login')} style={styles.loginButton}>
+                <Text style={styles.loginButtonText}>Log In or Sign Up</Text>
+            </TouchableOpacity>
+        </View>
+    );
+  }
 
   return (
-    <View style={[styles.authStatusContainer, { backgroundColor: isAuthenticated ? COLORS.primaryLight : COLORS.lightGray }]}>
-      <Text style={[bodyStrongText, { color: isAuthenticated ? COLORS.primary : COLORS.darkGray, marginLeft: 8 }]}>
-        {isAuthenticated ? `Logged in as ${session?.user?.email}` : 'Not Logged In'}
+    <View style={[styles.authStatusContainer, { backgroundColor: COLORS.primaryLight }]}>
+      <Text style={[bodyStrongText, { color: COLORS.primary, marginLeft: 8 }]}>
+        {`Logged in as ${session?.user?.email}`}
       </Text>
     </View>
   );
 }
 
 export default function SettingsScreen() {
-  const [darkMode, setDarkMode] = useState(false);
-  const [saveHistory, setSaveHistory] = useState(true);
-  const [autoScale, setAutoScale] = useState(true);
+  const { signOut, isAuthenticated } = useAuth();
   
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -31,45 +41,6 @@ export default function SettingsScreen() {
       <AuthStatus />
       
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40}}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Appearance</Text>
-          
-          <View style={styles.settingRow}>
-            <Text style={styles.settingText}>Dark Mode</Text>
-            <Switch
-              value={darkMode}
-              onValueChange={setDarkMode}
-              trackColor={{ false: COLORS.lightGray, true: COLORS.primaryLight }}
-              thumbColor={darkMode ? COLORS.primary : COLORS.white}
-              disabled={true} // Disabled until implemented
-            />
-          </View>
-        </View>
-        
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recipe Preferences</Text>
-          
-          <View style={styles.settingRow}>
-            <Text style={styles.settingText}>Save Recipe History</Text>
-            <Switch
-              value={saveHistory}
-              onValueChange={setSaveHistory}
-              trackColor={{ false: COLORS.lightGray, true: COLORS.primaryLight }}
-              thumbColor={saveHistory ? COLORS.primary : COLORS.white}
-            />
-          </View>
-          
-          <View style={styles.settingRow}>
-            <Text style={styles.settingText}>Auto-scale Ingredients</Text>
-            <Switch
-              value={autoScale}
-              onValueChange={setAutoScale}
-              trackColor={{ false: COLORS.lightGray, true: COLORS.primaryLight }}
-              thumbColor={autoScale ? COLORS.primary : COLORS.white}
-            />
-          </View>
-        </View>
-        
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>About</Text>
           
@@ -89,6 +60,12 @@ export default function SettingsScreen() {
             <Text style={styles.linkText}>Support Development</Text>
           </TouchableOpacity>
         </View>
+
+        {isAuthenticated && (
+            <TouchableOpacity style={styles.signOutButton} onPress={signOut}>
+                <Text style={styles.signOutButtonText}>Sign Out</Text>
+            </TouchableOpacity>
+        )}
         
         <Text style={styles.versionText}>Version 1.0.0</Text>
       </ScrollView>
@@ -107,8 +84,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   title: {
-    fontFamily: 'Recoleta-Medium',
-    fontSize: 28,
+    ...screenTitleText,
     color: COLORS.textDark,
   },
   authStatusContainer: {
@@ -124,18 +100,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     ...sectionHeaderText,
     marginBottom: 8,
-  },
-  settingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.lightGray,
-  },
-  settingText: {
-    ...bodyText,
-    fontSize: 16,
   },
   linkRow: {
     flexDirection: 'row',
@@ -154,5 +118,29 @@ const styles = StyleSheet.create({
     color: COLORS.darkGray,
     textAlign: 'center',
     marginTop: 20,
+  },
+  signOutButton: {
+    marginTop: 20,
+    backgroundColor: COLORS.primary,
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  signOutButtonText: {
+    ...bodyStrongText,
+    color: COLORS.white,
+    fontSize: 16,
+  },
+  loginButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 25,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  loginButtonText: {
+      ...bodyStrongText,
+      color: COLORS.white,
+      fontSize: 16,
   },
 }); 

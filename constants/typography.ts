@@ -1,8 +1,13 @@
 import { TextStyle } from 'react-native';
 
-const recoleta = 'Recoleta-Medium, serif';
-const inter = 'Inter-Regular, sans-serif';
-const interSemiBold = 'Inter-SemiBold, sans-serif';
+const recoleta = 'Recoleta-Medium';
+const inter = 'Inter-Regular';
+const interSemiBold = 'Inter-SemiBold';
+
+export const screenTitleText: TextStyle = {
+  fontFamily: recoleta,
+  fontSize: 28,
+};
 
 export const titleText: TextStyle = {
   fontFamily: recoleta,

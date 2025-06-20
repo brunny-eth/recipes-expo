@@ -47,7 +47,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { showError } = useErrorModal();
-  const { hasUsedFreeRecipe: localHasUsedFreeRecipe, refetchFreeUsage } = useFreeUsage();
+  const { hasUsedFreeRecipe: localHasUsedFreeRecipe, refetchFreeUsage, resetFreeRecipeUsage } = useFreeUsage();
 
   // Effect to fetch initial session only once on mount
   useEffect(() => {
@@ -204,8 +204,8 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           console.warn(`[OAuth] Web browser session not successful or URL missing. Type: ${result.type}`);
           if (result.type === 'cancel') {
              showError('Sign In Cancelled', 'You cancelled the sign-in process.');
-          } else if (result.error) {
-             showError('Sign In Error', `Browser error: ${result.error}`);
+          } else {
+             showError('Sign In Error', `The sign-in process was not completed (reason: ${result.type}).`);
           }
         }
         console.log('[OAuth] Web browser session processing complete.');

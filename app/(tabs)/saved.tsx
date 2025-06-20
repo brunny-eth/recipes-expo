@@ -1,13 +1,16 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { COLORS } from '@/constants/theme';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-// import { Bookmark } from 'lucide-react-native'; // Removed import
+import { screenTitleText } from '@/constants/typography';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function SavedScreen() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Favorites</Text>
-      
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Favorites</Text>
+      </View>
+
       <View style={styles.emptyContainer}>
         <MaterialCommunityIcons name="heart-outline" size={48} color={COLORS.lightGray} />
         <Text style={styles.emptyText}>No saved recipes yet</Text>
@@ -15,7 +18,7 @@ export default function SavedScreen() {
           When you save a recipe, it will appear here for quick access
         </Text>
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -23,14 +26,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingTop: 60,
+  },
+  header: {
+    paddingTop: 20,
     paddingHorizontal: 20,
+    marginBottom: 10,
   },
   title: {
-    fontFamily: 'Poppins-Bold',
-    fontSize: 28,
+    ...screenTitleText,
     color: COLORS.textDark,
-    marginBottom: 20,
   },
   emptyContainer: {
     flex: 1,
