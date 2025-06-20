@@ -4,11 +4,9 @@ import { StyleSheet, Platform } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons'; // Added import
 import { COLORS } from '@/constants/theme';
 import { captionText } from '@/constants/typography';
-import { AuthProvider } from '@/context/AuthContext';
 
 export default function TabLayout() {
   return (
-    <AuthProvider>
       <Tabs
         screenOptions={{
           tabBarActiveTintColor: COLORS.primary,
@@ -47,7 +45,6 @@ export default function TabLayout() {
           }}
         />
       </Tabs>
-    </AuthProvider>
   );
 }
 

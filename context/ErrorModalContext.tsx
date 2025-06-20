@@ -49,6 +49,8 @@ export const ErrorModalProvider: React.FC<{ children: ReactNode }> = ({ children
     }
     
     console.log(`[GlobalErrorModal] Showing with: ${title} ${message}`);
+    console.log('[DEBUG] ErrorModalContext: showError called with:', { title, message });
+    console.trace('[DEBUG] Trace for showError');
     setModalData({ title, message });
   }, [visible, modalData]);
 

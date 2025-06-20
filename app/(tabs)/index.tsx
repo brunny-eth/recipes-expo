@@ -7,16 +7,9 @@ import { COLORS } from '@/constants/theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import { titleText, bodyText, bodyStrongText, captionText } from '@/constants/typography';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { getHasUsedFreeRecipe } from '@/server/lib/freeUsageTracker';
-
-useEffect(() => {
-  AsyncStorage.clear().then(() => {
-    console.log('[DEBUG] AsyncStorage cleared');
-  });
-}, []);
+import { useFreeUsage } from '@/context/FreeUsageContext';
 
 export default function HomeScreen() {
   const [recipeUrl, setRecipeUrl] = React.useState('');
@@ -24,7 +17,8 @@ export default function HomeScreen() {
   const navigation = useNavigation();
   const [isInputFocused, setIsInputFocused] = React.useState(false);
   const { showError } = useErrorModal();
-  const { session, isLoading, isAuthenticated } = useAuth();
+  const { session, isLoading: isAuthLoading } = useAuth();
+  const { hasUsedFreeRecipe, isLoadingFreeUsage, markFreeRecipeUsed } = useFreeUsage();
 
   React.useEffect(() => {
     navigation.setOptions({
@@ -48,32 +42,6 @@ export default function HomeScreen() {
     };
   }, []);
 
-  // This effect handles the redirection logic based on auth state and free usage.
-  useEffect(() => {
-    // Wait until auth status is known before doing anything.
-    if (isLoading) return;
-
-    // If the user is authenticated, we don't need to check for free usage.
-    if (isAuthenticated) return;
-
-    // If not loading and not authenticated, check free usage.
-    const checkUsage = async () => {
-      try {
-        const hasUsedFree = await getHasUsedFreeRecipe();
-        if (hasUsedFree) {
-          if (__DEV__) {
-            console.log('[UsageLimit] Free recipe used, redirecting to login from home screen.');
-          }
-          router.replace('/login');
-        }
-      } catch (error) {
-        showError('Error', 'Could not check usage status.');
-      }
-    };
-
-    checkUsage();
-  }, [isLoading, isAuthenticated, router]);
-
   const handleNavigation = (recipeInput: string) => {
     Keyboard.dismiss();
     router.push({
@@ -85,13 +53,27 @@ export default function HomeScreen() {
 
   const handleSubmit = async () => {
     if (!recipeUrl || recipeUrl.trim() === '') {
-        showError("Input Required", "Please paste a recipe URL or recipe text.");
-        return;
+      showError("Input Required", "Please paste a recipe URL or recipe text.");
+      return;
     }
 
-    // The useEffect above handles the redirection logic.
-    // By the time the user can submit, they are cleared to proceed.
     const recipeInput = recipeUrl.trim();
+
+    // If the user is not authenticated, we need to check their free usage
+    // and mark it as used if they are submitting a recipe.
+    if (!session) {
+      if (hasUsedFreeRecipe) {
+        // This case should theoretically be handled by the layout redirect,
+        // but as a safeguard, we prevent submission and show an error.
+        showError("Login Required", "You've already used your free recipe. Please log in to continue.");
+        return;
+      }
+      
+      // Mark the free recipe as used
+      await markFreeRecipeUsed();
+    }
+
+    // Proceed with navigation
     handleNavigation(recipeInput);
   };
 
