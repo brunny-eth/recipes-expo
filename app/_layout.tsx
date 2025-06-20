@@ -50,7 +50,7 @@ function RootLayoutNav() {
     }
 
     // 2. Determine target path based on authentication and free usage
-    let targetPath: string | null = null;
+    let targetPath: '/login' | '/(tabs)/explore' | null = null;
     let shouldReplace = false;
 
     if (!session) { // User is NOT authenticated
@@ -77,7 +77,7 @@ function RootLayoutNav() {
       }
     } else { // User IS authenticated
       console.log('[RootLayoutNav] Session present.');
-      if (inAuthGroup || segments[0] === 'login') { // Authenticated, but on login/auth page
+      if (inAuthGroup) { // Authenticated, but on login/auth page
         targetPath = '/(tabs)/explore'; // Redirect to main app
         shouldReplace = true;
         console.log('[RootLayoutNav] Authenticated and on login/auth page, redirecting to main app.');
@@ -128,8 +128,8 @@ function RootLayoutNav() {
       <Stack.Screen name="+not-found" />
       <Stack.Screen name="login" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="recipe/ingredients" options={{ presentation: 'card' }} />
-      <Stack.Screen name="recipe/steps" options={{ presentation: 'card' }} />
+      <Stack.Screen name="recipe/ingredients" options={{ presentation: 'card', headerShown: false }} />
+      <Stack.Screen name="recipe/steps" options={{ presentation: 'card', headerShown: false }} />
     </Stack>
   );
 }

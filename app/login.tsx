@@ -45,7 +45,7 @@ const LoginScreen = () => {
       <View style={styles.content}>
         <Text style={styles.title}>Welcome to Meez</Text>
         <Text style={styles.subtitle}>
-          Continue with your favorite provider to save and discover new recipes.
+          Login with Google or Apple to save, use, and discover new recipes.
         </Text>
 
         <TouchableOpacity
