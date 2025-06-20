@@ -28,6 +28,15 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
+          name="explore"
+          options={{
+            title: 'Explore',
+            tabBarIcon: ({ color, size }: { color: string; size: number }) => (
+              <MaterialCommunityIcons name="compass-outline" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="saved"
           options={{
             title: 'Favorites',

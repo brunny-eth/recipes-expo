@@ -66,7 +66,6 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({ recip
     useEffect(() => {
         if (isParsingFinished && !error && recipeData && !alreadyNavigated.current) {
             alreadyNavigated.current = true;
-            console.log('[Router Push]', recipeData);
             console.log('[LoadingExperienceScreen] Parsing complete. Navigating...');
             router.replace({
               pathname: '/recipe/summary',

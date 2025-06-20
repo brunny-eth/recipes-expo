@@ -82,7 +82,6 @@ export default function IngredientsScreen() {
   const [lastRemoved, setLastRemoved] = useState<{ from: string; to: string | null } | null>(null);
 
   const scaledIngredients = useMemo(() => {
-    console.log('[Memo] scaledIngredients recalculated');
     if (!navData?.scaledIngredients) {
       return [];
     }
@@ -209,7 +208,6 @@ export default function IngredientsScreen() {
 
       if (typeof params.recipeData === 'string') {
         try {
-          console.log("[IngredientsScreen] New recipeData detected, parsing:", params.recipeData);
           const parsedNavData = JSON.parse(params.recipeData) as IngredientsNavParams;
 
           // 🧠 If scaled ingredients aren't provided (e.g., scale=1x), create them from originals
