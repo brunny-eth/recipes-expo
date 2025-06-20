@@ -8,6 +8,7 @@ import React, {
 import { Session, User } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import { Platform } from 'react-native';
 import { supabase } from '@/server/lib/supabase';
 import { useErrorModal } from './ErrorModalContext';
 import { getHasUsedFreeRecipe } from '@/server/lib/freeUsageTracker';
@@ -44,6 +45,34 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   const { showError } = useErrorModal();
 
   useEffect(() => {
+    const handleUrl = (url: string | null) => {
+      if (!url) return;
+      console.log('[Auth] Handling deep link:', url);
+      const [, fragment] = url.split('#');
+      if (!fragment) return;
+      
+      const params = new URLSearchParams(fragment);
+      const accessToken = params.get('access_token');
+      const refreshToken = params.get('refresh_token');
+
+      if (accessToken && refreshToken) {
+        console.log('[Auth] Found tokens in URL, setting session.');
+        supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+        console.log('[Auth] Login complete 🚀');
+      } else {
+        console.warn('[Auth] No tokens found in deep link URL.');
+      }
+    };
+
+    Linking.getInitialURL().then(handleUrl);
+    const deepLinkSubscription = Linking.addEventListener('url', (event) => handleUrl(event.url));
+    
+    //
+    // 2. Standard session hydration & auth state changes
+    //
     let isMounted = true;
     const initSession = async () => {
       const { data } = await supabase.auth.getSession();
@@ -56,7 +85,9 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, currentSession) => {
+    } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+      console.log('[Auth] onAuthStateChange event:', event);
+
       if (currentSession && isFirstLogin(currentSession)) {
         try {
           const usedFreeRecipe = await getHasUsedFreeRecipe();
@@ -85,6 +116,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       }
 
       if (isMounted) {
+        console.log('[Auth] Session updated via onAuthStateChange:', currentSession);
         setSession(currentSession);
       }
     });
@@ -92,23 +124,26 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     return () => {
       isMounted = false;
       subscription.unsubscribe();
+      deepLinkSubscription.remove();
     };
   }, []);
 
   const signIn = async (provider: AuthProvider) => {
-    const redirectTo = Linking.createURL('login-callback');
+    const redirectTo = 'meez://auth/callback';
+
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo,
-          skipBrowserRedirect: true, // Required for mobile OAuth
+          skipBrowserRedirect: true,
         },
       });
-
+  
       if (error) throw error;
-
+  
       if (data.url) {
+        console.log('[OAuth] Received redirect URL:', data.url);
         await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
       }
     } catch (err: any) {

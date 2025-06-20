@@ -27,77 +27,32 @@ if (__DEV__) {
 
 function RootLayoutNav() {
   const { session, isLoading: isAuthLoading } = useAuth();
-  const [hasUsedFreeRecipe, setHasUsedFreeRecipe] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
+    if (isAuthLoading) {
+      return; // Wait until auth status is known
+    }
+
     const checkUsageAndRedirect = async () => {
-      if (__DEV__) console.log('[Debug] Running checkUsageAndRedirect...');
-      const freeUsage = await getHasUsedFreeRecipe();
-      if (__DEV__) console.log(`[Debug] getHasUsedFreeRecipe returned: ${freeUsage}`);
-      setHasUsedFreeRecipe(freeUsage);
-      setIsLoading(false);
-      if (__DEV__) console.log('[Debug] checkUsageAndRedirect finished. isLoading set to false.');
+      // Only check for free usage if we are NOT authenticated.
+      if (!session) {
+        console.log('[UsageLimit] No session, checking free recipe usage.');
+        const hasUsedFreeRecipe = await getHasUsedFreeRecipe();
+        if (hasUsedFreeRecipe) {
+          console.log('[UsageLimit] Free recipe used, redirecting to login.');
+          router.replace('/login');
+        }
+      }
     };
+
     checkUsageAndRedirect();
-  }, []);
+  }, [session, isAuthLoading, router]);
 
-  // Detailed state change logging
-  if (__DEV__) {
-    useEffect(() => {
-      console.log(`[Debug] isLoading state changed: ${isLoading}`);
-    }, [isLoading]);
-  
-    useEffect(() => {
-      console.log(`[Debug] isAuthLoading state changed: ${isAuthLoading}`);
-    }, [isAuthLoading]);
-  
-    useEffect(() => {
-      console.log(`[Debug] session state changed: ${!!session}`);
-    }, [session]);
-  }
-
-  useEffect(() => {
-    if (__DEV__) {
-      console.log('[Debug] Redirection useEffect triggered. State:', {
-        isLoading,
-        isAuthLoading,
-        hasUsedFreeRecipe,
-        session: !!session,
-      });
-    }
-
-    // Wait for both auth state and free usage state to be loaded
-    if (isLoading || isAuthLoading) {
-      if (__DEV__) console.log('[Debug] Bailing out of redirection logic: still loading.');
-      return;
-    }
-
-    if (__DEV__) {
-      console.log(`[Routing] session: ${!!session}, usedFree: ${hasUsedFreeRecipe}`);
-    }
-
-    if (!session && hasUsedFreeRecipe) {
-      if (__DEV__) console.log("[Debug] Condition met! Redirecting to /login...");
-      router.replace('/login');
-    }
-  }, [session, hasUsedFreeRecipe, isAuthLoading, isLoading, router]);
-
-
-  // Render a loading indicator while we check auth and storage
-  if (isLoading || isAuthLoading) {
-    if (__DEV__) {
-      console.log('[Debug] Rendering loading indicator. State:', {
-        isLoading,
-        isAuthLoading,
-      });
-    }
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
-    );
+  // Render a loading indicator while we check auth.
+  // The splash screen is still visible at this point.
+  if (isAuthLoading) {
+    return null;
   }
   
   return (

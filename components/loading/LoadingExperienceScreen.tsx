@@ -50,7 +50,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({ recip
             }
           } else {
             const responseText = await response.text();
-            setError(normalizeError(responseText || `Failed to process recipe (status ${response.status}).`));
+            setError(normalizeError(responseText));
           }
         } catch (e: any) {
             setError(normalizeError(e));
@@ -72,6 +72,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({ recip
               pathname: '/recipe/summary',
               params: { recipeData: JSON.stringify(recipeData) },
             });
+            onComplete();
         }
     }, [isParsingFinished, recipeData, error, router]);
 
@@ -90,7 +91,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({ recip
             <SafeAreaView style={styles.container}>
                 <GlobalErrorModal
                     visible={!!error}
-                    message={normalizeError(error)}
+                    message={error ?? ''}
                     title="Oops!"
                     onClose={handleBack}
                 />
@@ -110,7 +111,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({ recip
         <SafeAreaView style={[styles.container, { justifyContent: 'flex-start', paddingTop: 60 }]}>
           <GlobalErrorModal
                 visible={!!error}
-                message={normalizeError(error)}
+                message={error ?? ''}
                 title="Oops!"
                 onClose={handleBack}
             />

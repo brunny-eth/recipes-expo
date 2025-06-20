@@ -8,6 +8,7 @@
     "scheme": "meez",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "entryPoint": "./node_modules/expo-router/entry",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.meez.app"
@@ -29,12 +30,12 @@
         "projectId": "f14248c8-b5d7-42a2-b029-29fbed6bcd9f"
       }
     },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/f14248c8-b5d7-42a2-b029-29fbed6bcd9f"
     },
-    "android": {}
+    "android": {
+      "package": "com.meez.app"
+    }
   }
 }

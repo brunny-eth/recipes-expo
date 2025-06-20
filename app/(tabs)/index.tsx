@@ -24,7 +24,7 @@ export default function HomeScreen() {
   const navigation = useNavigation();
   const [isInputFocused, setIsInputFocused] = React.useState(false);
   const { showError } = useErrorModal();
-  const { session } = useAuth();
+  const { session, isLoading, isAuthenticated } = useAuth();
 
   React.useEffect(() => {
     navigation.setOptions({
@@ -48,6 +48,32 @@ export default function HomeScreen() {
     };
   }, []);
 
+  // This effect handles the redirection logic based on auth state and free usage.
+  useEffect(() => {
+    // Wait until auth status is known before doing anything.
+    if (isLoading) return;
+
+    // If the user is authenticated, we don't need to check for free usage.
+    if (isAuthenticated) return;
+
+    // If not loading and not authenticated, check free usage.
+    const checkUsage = async () => {
+      try {
+        const hasUsedFree = await getHasUsedFreeRecipe();
+        if (hasUsedFree) {
+          if (__DEV__) {
+            console.log('[UsageLimit] Free recipe used, redirecting to login from home screen.');
+          }
+          router.replace('/login');
+        }
+      } catch (error) {
+        showError('Error', 'Could not check usage status.');
+      }
+    };
+
+    checkUsage();
+  }, [isLoading, isAuthenticated, router]);
+
   const handleNavigation = (recipeInput: string) => {
     Keyboard.dismiss();
     router.push({
@@ -59,21 +85,12 @@ export default function HomeScreen() {
 
   const handleSubmit = async () => {
     if (!recipeUrl || recipeUrl.trim() === '') {
-        showError({ title: "Input Required", message: "Please paste a recipe URL or recipe text." });
+        showError("Input Required", "Please paste a recipe URL or recipe text.");
         return;
     }
 
-    if (!session) {
-      const hasUsedFree = await getHasUsedFreeRecipe();
-      if (hasUsedFree) {
-        if (__DEV__) {
-          console.log('[UsageLimit] Free recipe used, redirecting to login.');
-        }
-        router.replace('/login');
-        return;
-      }
-    }
-
+    // The useEffect above handles the redirection logic.
+    // By the time the user can submit, they are cleared to proceed.
     const recipeInput = recipeUrl.trim();
     handleNavigation(recipeInput);
   };
