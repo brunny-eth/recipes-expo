@@ -27,69 +27,71 @@ function RootLayoutNav() {
   const router = useRouter();
   const segments = useSegments();
 
-  // Helper to check if a segment is part of the auth flow
-  const inAuthGroup = segments[0] === 'auth' || segments[0] === 'login';
-
-  // Helper to check if a segment is part of the main tabs or the recipe flow allowed for free users
-  const inAppGroup = segments[0] === '(tabs)';
-  const inRecipeFlow = segments[0] === 'recipe' || segments[0] === 'loading';
+  // Define routes that are always accessible to unauthenticated users,
+  // even if they have used their free recipe.
+  const PUBLIC_ALLOWED_ROUTES_PREFIXES = [
+    '(tabs)', // Covers / (index), /explore, /settings, /saved
+    'login',
+    'auth', // Covers auth/callback
+    '+not-found', // For the 404 page
+  ];
 
   useEffect(() => {
-    // Log current state for debugging
-    const currentSegmentPath = segments.join('/');
-    console.log(`[RootLayoutNav] useEffect triggered.\n      Session present: ${!!session},\n      isAuthLoading: ${isAuthLoading},\n      hasUsedFreeRecipe: ${hasUsedFreeRecipe},\n      isLoadingFreeUsage: ${isLoadingFreeUsage},\n      Current Segment: ${currentSegmentPath}`);
-
-
-    // 1. Wait for loading states to resolve
-    if (isAuthLoading || isLoadingFreeUsage || hasUsedFreeRecipe === null) {
-      console.log('[RootLayoutNav] Still loading auth or free usage status, returning early.');
+    // Wait for authentication and free usage contexts to finish loading
+    if (isAuthLoading || isLoadingFreeUsage) {
+      console.log(`[RootLayoutNav] Waiting for contexts to load. isAuthLoading: ${isAuthLoading}, isLoadingFreeUsage: ${isLoadingFreeUsage}`);
       return;
     }
 
-    // 2. Determine target path based on authentication and free usage
-    let targetPath: '/login' | '/(tabs)/explore' | null = null;
-    let shouldReplace = true; // Default to replace for primary navigation redirects
+    const currentPathSegments = segments.join('/'); // e.g., "login", "(tabs)/explore", "recipe/summary"
+    const inAuthFlow = segments[0] === 'login' || segments[0] === 'auth';
+    const inRecipeContentFlow = segments[0] === 'loading' || segments[0] === 'recipe';
+
+    // Check if the current route is one of the explicitly allowed public routes
+    const isCurrentlyOnAllowedPublicRoute = PUBLIC_ALLOWED_ROUTES_PREFIXES.some(prefix => {
+      // For '(tabs)', we check if the first segment is '(tabs)' to cover all tab routes
+      if (prefix === '(tabs)') {
+        return segments[0] === '(tabs)';
+      }
+      // For other specific routes like 'login' or '+not-found', we check for exact match or startWith
+      return currentPathSegments === prefix || currentPathSegments.startsWith(prefix + '/');
+    });
 
     if (!session) { // User is NOT authenticated
-      console.log('[RootLayoutNav] No session present.');
-      if (hasUsedFreeRecipe) { // Free recipe HAS been used, user MUST authenticate
-        if (!inAuthGroup) {
-          targetPath = '/login';
-          console.log('[RootLayoutNav] Free recipe used, redirecting to login.');
+      if (hasUsedFreeRecipe) { // And has used their free recipe
+        if (inAuthFlow || isCurrentlyOnAllowedPublicRoute) {
+          // Allow navigation if already in the authentication flow,
+          // or if on a route explicitly allowed for unauthenticated users
+          // (e.g., home, explore, settings, or returning from a recipe page via 'X' button).
+          console.log(`[RootLayoutNav] Unauthenticated, free recipe used, but on allowed route: ${currentPathSegments}. No redirect.`);
+        } else if (inRecipeContentFlow) {
+          // If unauthenticated and free recipe used, and trying to access
+          // recipe content (loading, summary, steps), redirect to login.
+          console.log(`[RootLayoutNav] Unauthenticated, free recipe used, trying to access restricted recipe content: ${currentPathSegments}. Redirecting to login.`);
+          router.replace('/login');
         } else {
-          // Already in auth group (login or callback), no redirect needed
-          console.log('[RootLayoutNav] Free recipe used, but already in auth flow. No redirect.');
+          // Fallback for any other unexpected restricted routes that aren't explicit public or auth routes.
+          console.warn(`[RootLayoutNav] Unauthenticated, free recipe used, accessing unexpected restricted route: ${currentPathSegments}. Redirecting to login.`);
+          router.replace('/login');
         }
-      } else { // Free recipe HAS NOT been used, allow free recipe flow
-        console.log('[RootLayoutNav] Free recipe not used, allowing access.');
-        if (!inAppGroup && !inRecipeFlow) { // Not in main app or recipe flow, redirect to explore
-          targetPath = '/(tabs)/explore';
-          console.log('[RootLayoutNav] Not in app or recipe flow, redirecting to explore for free usage.');
-        } else {
-          // Already in app group or recipe flow (e.g., home, loading, summary), no redirect needed
-          console.log('[RootLayoutNav] Already in allowed free usage path. No redirect.');
+      } else { // User is NOT authenticated AND has NOT used their free recipe
+        // They are allowed to browse most of the app freely, including starting a recipe,
+        // but prevent direct bypass of login if they somehow land there.
+        if (inAuthFlow) {
+          console.log(`[RootLayoutNav] Unauthenticated, free recipe NOT used, attempting auth flow: ${currentPathSegments}. No redirect.`);
+          return; // Stay on login/auth page if they are already there
         }
+        // Implicitly allows navigation to (tabs) and initial recipe flow if not in auth group
+        console.log(`[RootLayoutNav] Unauthenticated, free recipe NOT used, allowing access to: ${currentPathSegments}.`);
       }
     } else { // User IS authenticated
-      console.log('[RootLayoutNav] Session present.');
-      if (inAuthGroup) { // Authenticated, but on login/auth page
-        targetPath = '/(tabs)/explore'; // Redirect to main app
-        console.log('[RootLayoutNav] Authenticated and on login/auth page, redirecting to main app.');
-      } else {
-        // Authenticated and already in main app, no redirect needed
-        console.log('[RootLayoutNav] Authenticated and already in main app. No redirect.');
+      // If authenticated, prevent them from accessing login/auth pages directly
+      if (inAuthFlow) {
+        console.log(`[RootLayoutNav] Authenticated user on auth page: ${currentPathSegments}. Redirecting to main app.`);
+        router.replace('/(tabs)');
       }
     }
-
-    // 3. Perform redirect if necessary and not already at the target path
-    if (targetPath && currentSegmentPath !== targetPath) {
-        console.log(`[RootLayoutNav] Executing redirect to: ${targetPath} (replace: ${shouldReplace})`);
-        router.replace(targetPath); // Use replace consistently for auth flow
-    } else {
-        console.log(`[RootLayoutNav] No redirect needed or already at target path: ${currentSegmentPath}`);
-    }
-
-  }, [session, isAuthLoading, hasUsedFreeRecipe, isLoadingFreeUsage, segments, router]);
+  }, [session, hasUsedFreeRecipe, isAuthLoading, isLoadingFreeUsage, segments, router]);
 
   return (
     <Stack screenOptions={{ animation: 'fade' }}>

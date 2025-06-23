@@ -1,5 +1,5 @@
 import React from 'react';
-import { useFocusEffect, useNavigation } from 'expo-router';
+import { useState, useEffect, useRef } from 'react'; // Added useRef for consistency, though not strictly needed for this change
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Keyboard, KeyboardAvoidingView, Platform, View as RNView, Image, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
@@ -7,24 +7,16 @@ import { COLORS } from '@/constants/theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import { titleText, bodyText, bodyStrongText, captionText } from '@/constants/typography';
-import { useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useFreeUsage } from '@/context/FreeUsageContext';
 
 export default function HomeScreen() {
   const [recipeUrl, setRecipeUrl] = React.useState('');
   const router = useRouter();
-  const navigation = useNavigation();
   const [isInputFocused, setIsInputFocused] = React.useState(false);
   const { showError } = useErrorModal();
-  const { session, isLoading: isAuthLoading } = useAuth();
-  const { hasUsedFreeRecipe, isLoadingFreeUsage, markFreeRecipeUsed } = useFreeUsage();
-
-  React.useEffect(() => {
-    navigation.setOptions({
-      headerLeft: () => null, // Remove back button
-    });
-  }, [navigation]);
+  const { session } = useAuth(); 
+  const { hasUsedFreeRecipe } = useFreeUsage(); 
 
   React.useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
@@ -65,12 +57,14 @@ export default function HomeScreen() {
       if (hasUsedFreeRecipe) {
         // This case should theoretically be handled by the layout redirect,
         // but as a safeguard, we prevent submission and show an error.
-        showError("Login Required", "You've already used your free recipe. Please log in to continue.");
+        showError(
+          "Login Required",
+          "You've already used your free recipe. Please log in to continue.",
+          () => router.replace('/login')
+        );
         return;
       }
       
-      // Mark the free recipe as used
-      await markFreeRecipeUsed();
     }
 
     // Proceed with navigation

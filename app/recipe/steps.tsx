@@ -14,6 +14,8 @@ import { StructuredIngredient } from '../../common/types';
 import { abbreviateUnit } from '@/utils/format';
 import { titleText, sectionHeaderText, bodyText, bodyStrongText, captionText } from '@/constants/typography';
 import { parseAmountString } from '@/utils/recipeUtils';
+import { useAuth } from '@/context/AuthContext'; 
+import { useFreeUsage } from '@/context/FreeUsageContext'; 
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -21,7 +23,9 @@ export default function StepsScreen() {
   const params = useLocalSearchParams<{ recipeData?: string }>();
   const router = useRouter();
   const { showError } = useErrorModal();
-  
+  const { isAuthenticated } = useAuth(); 
+  const { markFreeRecipeUsed } = useFreeUsage(); 
+
   const [recipeTitle, setRecipeTitle] = useState<string | null>(null);
   const [instructions, setInstructions] = useState<string[]>([]);
   const [ingredients, setIngredients] = useState<StructuredIngredient[]>([]);
@@ -43,6 +47,7 @@ export default function StepsScreen() {
   // --- End Lifted Timer State ---
   
   useEffect(() => {
+    // Existing logic for loading recipe data
     setIsLoading(true);
     try {
       if (params.recipeData) {
@@ -56,10 +61,10 @@ export default function StepsScreen() {
             setInstructions(parsedData.instructions);
         } else {
             console.warn("[StepsScreen] Instructions missing or not an array in recipeData.");
-            setInstructions([]); 
+            setInstructions([]);
         }
-        
-        setRecipeTitle(parsedData.title || 'Instructions'); 
+
+        setRecipeTitle(parsedData.title || 'Instructions');
 
         if (parsedData.ingredients && Array.isArray(parsedData.ingredients)) {
           setIngredients(parsedData.ingredients);
@@ -86,6 +91,17 @@ export default function StepsScreen() {
     }
     setIsLoading(false);
   }, [params.recipeData, showError, router]);
+
+  useEffect(() => {
+    return () => {
+      // This cleanup function runs when the component unmounts
+      if (!isAuthenticated) {
+        console.log('[StepsScreen] User is NOT authenticated. Marking free recipe used via FreeUsageContext on unmount.');
+        markFreeRecipeUsed();
+      }
+    };
+  }, [isAuthenticated, markFreeRecipeUsed]); // Dependencies to ensure it reacts to auth state changes and function stability
+
 
   // --- Lifted Timer Logic --- 
   const formatTime = (seconds: number) => {
@@ -265,9 +281,14 @@ export default function StepsScreen() {
           <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textDark} />
         </TouchableOpacity>
         <Image source={require('@/assets/images/meez_logo.png')} style={styles.headerLogo} />
-        <TouchableOpacity style={styles.toolsButton} onPress={() => setIsHeaderToolsVisible(true)}>
-            <MaterialCommunityIcons name="tools" size={24} color={COLORS.textDark} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity style={styles.toolsButton} onPress={() => setIsHeaderToolsVisible(true)}>
+              <MaterialCommunityIcons name="tools" size={24} color={COLORS.textDark} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.exitButton} onPress={() => router.replace('/(tabs)')}>
+            <MaterialCommunityIcons name="close" size={24} color={COLORS.textDark} />
+          </TouchableOpacity>
+        </View>
       </Animated.View>
       
       <Modal
@@ -592,6 +613,9 @@ const styles = StyleSheet.create({
     color: COLORS.darkGray,
     marginTop: 20,
     textAlign: 'center',
+  },
+  exitButton: {
+    padding: 8,
   },
   toolsButton: {
     padding: 8,

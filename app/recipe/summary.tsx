@@ -281,7 +281,9 @@ export default function RecipeSummaryScreen() {
            <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textDark} />
          </TouchableOpacity>
          <Image source={require('@/assets/images/meez_logo.png')} style={styles.headerLogo} />
-         <View style={{ width: 40 }} /> 
+         <TouchableOpacity style={styles.exitButton} onPress={() => router.replace('/(tabs)')}>
+           <MaterialCommunityIcons name="close" size={24} color={COLORS.textDark} />
+         </TouchableOpacity>
       </View>
       
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -423,6 +425,10 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
     marginLeft: -8, // Offset padding for visual alignment
+  },
+  exitButton: {
+    padding: 8,
+    marginRight: -8, // Offset padding for visual alignment
   },
   headerLogo: {
     width: 70,

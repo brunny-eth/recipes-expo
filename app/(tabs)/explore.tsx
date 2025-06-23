@@ -7,6 +7,8 @@ import { useFreeUsage } from '@/context/FreeUsageContext';
 import { router } from 'expo-router';
 import { supabase } from '@/server/lib/supabase';
 import { bodyText, screenTitleText } from '@/constants/typography';
+import { useAuth } from '@/context/AuthContext';
+import { useErrorModal } from '@/context/ErrorModalContext';
 
 const DUMMY_RECIPES = [
   {
@@ -68,6 +70,8 @@ const DevTools = () => {
 
 const ExploreScreen = () => {
   const { hasUsedFreeRecipe, isLoadingFreeUsage, resetFreeRecipeUsage } = useFreeUsage();
+  const { session, isAuthenticated } = useAuth();
+  const { showError } = useErrorModal();
 
   const handleResetFreeUsage = async () => {
     console.log('[Dev Tools] Attempting to reset free recipe usage...');
@@ -90,7 +94,16 @@ const ExploreScreen = () => {
         renderItem={({ item }) => (
           <RecipeCard
             recipe={item}
-            onPress={() => console.log('Tapped recipe:', item.title)}
+            onPress={() => {
+              if (!isAuthenticated && hasUsedFreeRecipe) {
+                showError("Login Required", "You've already used your free recipe. Please log in to continue.");
+              } else {
+                router.push({
+                  pathname: '/loading',
+                  params: { recipeInput: item.title },
+                });
+              }
+            }}
           />
         )}
         contentContainerStyle={styles.listContentContainer}

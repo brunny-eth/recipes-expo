@@ -632,7 +632,9 @@ export default function IngredientsScreen() {
             <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textDark} />
           </TouchableOpacity>
           <Image source={require('@/assets/images/meez_logo.png')} style={styles.headerLogo} />
-          <View style={styles.placeholder} />
+          <TouchableOpacity style={styles.exitButton} onPress={() => router.replace('/')}>
+            <MaterialCommunityIcons name="close" size={24} color={COLORS.textDark} />
+          </TouchableOpacity>
         </View>
         
         {navData?.title && (
@@ -742,6 +744,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
     lineHeight: 34,
+  },
+  exitButton: {
+    padding: 8,
   },
   placeholder: {
     width: 24 + 16,

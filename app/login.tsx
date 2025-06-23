@@ -10,7 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
 import { COLORS } from '@/constants/theme';
-import { FontAwesome } from '@expo/vector-icons';
+import { FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
 type AuthProvider = 'google' | 'apple';
@@ -42,6 +42,9 @@ const LoginScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <TouchableOpacity style={styles.exitButton} onPress={() => router.replace('/(tabs)')}>
+        <MaterialCommunityIcons name="close" size={24} color={COLORS.textDark} />
+      </TouchableOpacity>
       <View style={styles.content}>
         <Text style={styles.title}>Welcome to Meez</Text>
         <Text style={styles.subtitle}>
@@ -142,6 +145,13 @@ const styles = StyleSheet.create({
   },
   icon: {
     marginRight: 12,
+  },
+  exitButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    padding: 8,
+    zIndex: 1,
   },
 });
 
