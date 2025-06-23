@@ -1,4 +1,4 @@
-import { StructuredIngredient } from '@types/index';
+import { StructuredIngredient } from '../common/types/recipes';
 
 /**
  * Coerces an array of mixed ingredient types (string or StructuredIngredient objects)

@@ -10,10 +10,10 @@ import React, {
 import { Session, User } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
-import { Platform } from 'react-native';
 import { supabase } from '@/server/lib/supabase';
 import { useErrorModal } from './ErrorModalContext';
 import { useFreeUsage } from './FreeUsageContext';
+import { router } from 'expo-router';
 
 interface UserMetadata {
   role?: 'beta_user' | 'control' | 'variant';
@@ -47,7 +47,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { showError } = useErrorModal();
-  const { hasUsedFreeRecipe: localHasUsedFreeRecipe, refetchFreeUsage, resetFreeRecipeUsage } = useFreeUsage();
+  const { hasUsedFreeRecipe: localHasUsedFreeRecipe, refetchFreeUsage, resetFreeRecipeUsage, isLoadingFreeUsage } = useFreeUsage();
 
   // Effect to fetch initial session only once on mount
   useEffect(() => {
@@ -75,7 +75,6 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   }, []); // Run only once on mount
 
 
-  // Moved the handleUrl function outside to be a stable callback
   const handleUrl = useCallback(async (url: string | null) => {
     console.log('[Auth] handleUrl called with URL:', url);
     if (!url) {
@@ -83,16 +82,15 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       return;
     }
     
-    // Supabase OAuth often returns tokens in the hash fragment
+    // Extract tokens from URL fragment and set session explicitly using setSession()
     const urlParts = url.split('#');
     let fragment = null;
     if (urlParts.length > 1) {
         fragment = urlParts[1];
     }
-    console.log('[Auth] URL Fragment:', fragment);
 
     if (!fragment) {
-      console.log('[Auth] No fragment found in deep link URL.');
+      console.warn('[Auth] handleUrl: No fragment found in deep link URL after OAuth.');
       return;
     }
     
@@ -100,26 +98,34 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     const accessToken = params.get('access_token');
     const refreshToken = params.get('refresh_token');
 
-    console.log('[Auth] Parsed Access Token:', accessToken ? 'present' : 'null');
-    console.log('[Auth] Parsed Refresh Token:', refreshToken ? 'present' : 'null');
+    console.log('[Auth] handleUrl: Parsed Access Token:', accessToken ? 'present' : 'null');
+    console.log('[Auth] handleUrl: Parsed Refresh Token:', refreshToken ? 'present' : 'null');
 
     if (accessToken && refreshToken) {
-      console.log('[Auth] Found tokens in URL, attempting to set session.');
-      const { error } = await supabase.auth.setSession({ // Added await here
-        access_token: accessToken,
-        refresh_token: refreshToken,
-      });
+      console.log('[Auth] handleUrl: Found tokens, attempting to set session via supabase.auth.setSession().');
+      try {
+        const { data: { session: newSession }, error: sessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
 
-      if (error) {
-        console.error('[Auth] Error setting session from deep link:', error.message);
-        showError('Authentication Error', 'Failed to set session from deep link.');
-      } else {
-        console.log('[Auth] Session successfully set from deep link. Login complete 🚀');
+        if (sessionError) {
+          console.error('[Auth] handleUrl: Error setting session:', sessionError.message);
+          showError('Authentication Error', `Failed to set session: ${sessionError.message}`);
+        } else if (newSession) {
+          console.log('[Auth] handleUrl: Session successfully set via supabase.auth.setSession(). onAuthStateChange will now fire. 🚀');
+        } else {
+          console.warn('[Auth] handleUrl: setSession returned no session despite no error. This may indicate an issue with token validity or Supabase setup.');
+        }
+      } catch (e: any) {
+        console.error('[Auth] handleUrl: Exception while setting session:', e.message);
+        showError('Authentication Error', `Unexpected error setting session: ${e.message}`);
       }
     } else {
-      console.warn('[Auth] No access_token or refresh_token found in deep link URL fragment.');
+      console.warn('[Auth] handleUrl: No valid access_token or refresh_token found in deep link URL fragment.');
     }
-  }, [showError]); // Add showError to dependencies since it's from another context
+
+  }, [showError]); 
 
   // Effect to set up auth state change listener and deep link listener
   useEffect(() => {
@@ -129,40 +135,56 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
 
     // Add event listener for deep links while the app is running
     const linkingSubscription = Linking.addEventListener('url', (event) => {
-      handleUrl(event.url);
+      // This listener is important for general deep links that open the app (e.g., from email magic links).
+      // For WebBrowser.openAuthSessionAsync, we explicitly call handleUrl in signIn().
+      handleUrl(event.url); // Keeping this for other deep link types
     });
 
     // Correctly get the auth listener object
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
+      (event, currentSession) => { // Removed 'async' from the direct callback to prevent immediate deadlocks
         console.log(`[Auth] onAuthStateChange event: ${event} Current Session: ${currentSession ? 'present' : 'null'}`);
-        // Always update session state
+        // Always update session state synchronously
         setSession(currentSession);
         setIsLoading(false); // Ensure loading is false after any state change
 
-        if (currentSession && event === 'SIGNED_IN') {
-          console.log('[Auth] Session updated via onAuthStateChange, setting state.');
-          // Only perform first login logic if hasUsedFreeRecipe is available and not null
-          if (isFirstLogin(currentSession)) {
-            console.log(`[Auth] This is a first login for user: ${currentSession.user.id}`);
-            // Only sync free usage if its value is known (not null)
-            if (localHasUsedFreeRecipe !== null) {
-              console.log(`[Auth] Syncing local free recipe usage to Supabase metadata. Local hasUsedFreeRecipe: ${localHasUsedFreeRecipe}`);
-              const { error: updateError } = await supabase.auth.updateUser({
-                data: { has_used_free_recipe: localHasUsedFreeRecipe, first_login_at: new Date().toISOString() }, // Ensure first_login_at is set here
-              });
-              if (updateError) {
-                console.error('[Auth] Error updating user metadata on first login:', updateError);
+        // Defer any async operations that call Supabase functions to avoid deadlocks
+        setTimeout(async () => {
+          if (currentSession && event === 'SIGNED_IN') {
+            console.log('[Auth] onAuthStateChange: User signed in (deferred logic).');
+
+            // Only perform first login logic if free usage context has finished loading
+            if (!isLoadingFreeUsage) {
+              if (isFirstLogin(currentSession)) {
+                console.log(`[Auth] This is a first login for user: ${currentSession.user.id}`);
+                // This check now ensures localHasUsedFreeRecipe is reliable
+                if (localHasUsedFreeRecipe !== null) {
+                  console.log(`[Auth] Syncing local free recipe usage to Supabase metadata. Local hasUsedFreeRecipe: ${localHasUsedFreeRecipe}`);
+                  const { error: updateError } = await supabase.auth.updateUser({ // This await is now safely inside setTimeout
+                    data: { has_used_free_recipe: localHasUsedFreeRecipe, first_login_at: new Date().toISOString() },
+                  });
+                  if (updateError) {
+                    console.error('[Auth] Error updating user metadata on first login (deferred):', updateError);
+                  } else {
+                    console.log('[Auth] User metadata (has_used_free_recipe, first_login_at) successfully updated on Supabase (deferred).');
+                  }
+                } else {
+                    console.warn('[Auth] localHasUsedFreeRecipe is null during first login metadata sync (deferred), even after FreeUsageContext loaded. This should not happen if isLoadingFreeUsage is false.');
+                }
+              } else {
+                  console.log('[Auth] Not a first login or first_login_at already set (deferred).');
               }
             } else {
-                console.warn('[Auth] localHasUsedFreeRecipe is null during first login metadata sync. Skipping.');
+              console.log('[Auth] FreeUsageContext is still loading, skipping first login metadata sync for now (deferred).');
             }
+          } else if (!currentSession && event === 'SIGNED_OUT') {
+              console.log('[Auth] onAuthStateChange: User signed out (deferred logic). Resetting local free recipe usage as they are now anonymous again.');
+              // Assuming resetFreeRecipeUsage() doesn't have an internal await to Supabase
+              // if it does, and you need it to hit Supabase, ensure it's handled here or
+              // within its own setTimeout if it causes issues.
+              resetFreeRecipeUsage();
           }
-        } else if (!currentSession && event === 'SIGNED_OUT') {
-            console.log('[Auth] User signed out. Optionally reset free recipe usage.');
-            // Optionally, reset free usage flag locally on sign out if desired
-            // resetFreeRecipeUsage();
-        }
+        }, 0); // Dispatch to the next event loop tick
       }
     );
 
@@ -173,7 +195,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       }
       linkingSubscription.remove();
     };
-  }, [localHasUsedFreeRecipe, refetchFreeUsage, handleUrl, showError]); // Dependencies for useEffect
+  }, [localHasUsedFreeRecipe, refetchFreeUsage, handleUrl, showError, resetFreeRecipeUsage, isLoadingFreeUsage]); // Dependencies for useEffect
 
 
   const signIn = async (provider: AuthProvider) => {
@@ -196,10 +218,10 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
         console.log('[OAuth] Web browser session result:', result);
 
-        // Directly process the URL from WebBrowser.openAuthSessionAsync
+        // --- THIS IS THE CRITICAL AND CORRECTED LOGIC FOR signIn ---
         if (result.type === 'success' && result.url) {
-          console.log('[OAuth] Processing URL from WebBrowser session result.');
-          await handleUrl(result.url); // Call handleUrl directly
+          console.log('[OAuth] Web browser session successful. Explicitly processing result.url via handleUrl.');
+          await handleUrl(result.url); // <--- THIS IS THE LINE TO ENSURE IT'S PROCESSED
         } else {
           console.warn(`[OAuth] Web browser session not successful or URL missing. Type: ${result.type}`);
           if (result.type === 'cancel') {
@@ -211,25 +233,57 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         console.log('[OAuth] Web browser session processing complete.');
       } else {
         console.warn('[OAuth] No URL received from signInWithOAuth. This might indicate an issue.');
+        showError('Sign In Error', 'No redirect URL received from sign-in process. Please try again.');
       }
     } catch (err: any) {
       console.error('[Auth] Sign In Error:', err.message);
       showError('Sign In Error', err.message || 'An unknown error occurred during sign-in.');
-      throw err;
     }
   };
 
   const signOut = async () => {
     console.log('[Auth] Attempting to sign out.');
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      console.log('[Auth] User signed out successfully.');
+        console.log('[Auth] Initiating supabase.auth.signOut() promise.');
+        const signOutPromise = supabase.auth.signOut();
+        console.log('[Auth] supabase.auth.signOut() promise initiated.');
+
+        const timeoutPromise = new Promise<{ error: Error | null }>(resolve => {
+            const id = setTimeout(() => {
+                clearTimeout(id);
+                console.warn('[Auth] Sign out operation timed out (Timeout Promise resolved).');
+                resolve({ error: new Error('Sign out timed out after 10 seconds. Forcing local logout.') });
+            }, 10000); // 10 seconds timeout
+        });
+
+        const result = await Promise.race([
+            signOutPromise.then(() => {
+                console.log('[Auth] supabase.auth.signOut() promise resolved successfully.');
+                return { error: null };
+            }).catch((e) => { // Catch potential immediate rejections from signOutPromise
+                console.error('[Auth] supabase.auth.signOut() promise rejected immediately:', e.message);
+                return { error: e };
+            }),
+            timeoutPromise
+        ]);
+
+        if (result.error) {
+            throw result.error;
+        }
+
+        console.log('[Auth] User signed out successfully via Supabase call.');
+
     } catch (err: any) {
-      console.error('[Auth] Sign Out Error:', err.message);
-      showError('Sign Out Error', err.message || 'An unknown error occurred during sign-out.');
+        console.error('[Auth] Sign Out Error: Caught an error or timeout:', err.message);
+        showError('Sign Out Error', err.message || 'An unknown error occurred during sign-out.');
+
+        console.log('[Auth] Forcing local session clear due to sign out error/timeout.');
+        setSession(null);
+        setIsLoading(false);
+        resetFreeRecipeUsage();
+        router.replace('/login');
     }
-  };
+};
 
   const value = {
     session,

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
@@ -27,9 +27,6 @@ function RootLayoutNav() {
   const router = useRouter();
   const segments = useSegments();
 
-  // New state to track the path we last redirected to
-  const [lastRedirectedPath, setLastRedirectedPath] = useState<string | null>(null);
-
   // Helper to check if a segment is part of the auth flow
   const inAuthGroup = segments[0] === 'auth' || segments[0] === 'login';
 
@@ -40,7 +37,7 @@ function RootLayoutNav() {
   useEffect(() => {
     // Log current state for debugging
     const currentSegmentPath = segments.join('/');
-    console.log(`[RootLayoutNav] useEffect triggered.\n      Session present: ${!!session},\n      isAuthLoading: ${isAuthLoading},\n      hasUsedFreeRecipe: ${hasUsedFreeRecipe},\n      isLoadingFreeUsage: ${isLoadingFreeUsage},\n      Current Segment: ${currentSegmentPath},\n      Last Redirected Path: ${lastRedirectedPath}`);
+    console.log(`[RootLayoutNav] useEffect triggered.\n      Session present: ${!!session},\n      isAuthLoading: ${isAuthLoading},\n      hasUsedFreeRecipe: ${hasUsedFreeRecipe},\n      isLoadingFreeUsage: ${isLoadingFreeUsage},\n      Current Segment: ${currentSegmentPath}`);
 
 
     // 1. Wait for loading states to resolve
@@ -51,14 +48,13 @@ function RootLayoutNav() {
 
     // 2. Determine target path based on authentication and free usage
     let targetPath: '/login' | '/(tabs)/explore' | null = null;
-    let shouldReplace = false;
+    let shouldReplace = true; // Default to replace for primary navigation redirects
 
     if (!session) { // User is NOT authenticated
       console.log('[RootLayoutNav] No session present.');
       if (hasUsedFreeRecipe) { // Free recipe HAS been used, user MUST authenticate
         if (!inAuthGroup) {
           targetPath = '/login';
-          shouldReplace = true;
           console.log('[RootLayoutNav] Free recipe used, redirecting to login.');
         } else {
           // Already in auth group (login or callback), no redirect needed
@@ -68,7 +64,6 @@ function RootLayoutNav() {
         console.log('[RootLayoutNav] Free recipe not used, allowing access.');
         if (!inAppGroup && !inRecipeFlow) { // Not in main app or recipe flow, redirect to explore
           targetPath = '/(tabs)/explore';
-          shouldReplace = true;
           console.log('[RootLayoutNav] Not in app or recipe flow, redirecting to explore for free usage.');
         } else {
           // Already in app group or recipe flow (e.g., home, loading, summary), no redirect needed
@@ -79,7 +74,6 @@ function RootLayoutNav() {
       console.log('[RootLayoutNav] Session present.');
       if (inAuthGroup) { // Authenticated, but on login/auth page
         targetPath = '/(tabs)/explore'; // Redirect to main app
-        shouldReplace = true;
         console.log('[RootLayoutNav] Authenticated and on login/auth page, redirecting to main app.');
       } else {
         // Authenticated and already in main app, no redirect needed
@@ -89,42 +83,19 @@ function RootLayoutNav() {
 
     // 3. Perform redirect if necessary and not already at the target path
     if (targetPath && currentSegmentPath !== targetPath) {
-        if (lastRedirectedPath === targetPath) {
-            // Avoid redundant redirects if we've just redirected to this path
-            console.log(`[RootLayoutNav] Already redirected to ${targetPath}, skipping current redirect attempt.`);
-            // This is crucial: if a state change *later* would cause another redirect to the same path, prevent it
-            // but if a *different* path is needed, allow it.
-            return;
-        }
-        setLastRedirectedPath(targetPath); // Record the target of this redirect
         console.log(`[RootLayoutNav] Executing redirect to: ${targetPath} (replace: ${shouldReplace})`);
-        if (shouldReplace) {
-            router.replace(targetPath);
-        } else {
-            router.push(targetPath);
-        }
-    } else if (targetPath && currentSegmentPath === targetPath) {
-        // If we determined a targetPath but are already there, clear the lastRedirectedPath
-        // This allows future state changes to trigger a new redirect if needed
-        if (lastRedirectedPath !== null) {
-            console.log('[RootLayoutNav] Already at target path, resetting lastRedirectedPath.');
-            setLastRedirectedPath(null);
-        }
+        router.replace(targetPath); // Use replace consistently for auth flow
     } else {
-        // No redirect needed, clear any previous redirect flag
-        if (lastRedirectedPath !== null) {
-            console.log('[RootLayoutNav] No redirect needed, resetting lastRedirectedPath.');
-            setLastRedirectedPath(null);
-        }
+        console.log(`[RootLayoutNav] No redirect needed or already at target path: ${currentSegmentPath}`);
     }
 
-  }, [session, isAuthLoading, hasUsedFreeRecipe, isLoadingFreeUsage, segments, router, lastRedirectedPath]);
+  }, [session, isAuthLoading, hasUsedFreeRecipe, isLoadingFreeUsage, segments, router]);
 
   return (
     <Stack screenOptions={{ animation: 'fade' }}>
       <Stack.Screen name="loading" options={{ headerShown: false }} />
       <Stack.Screen name="recipe/summary" options={{ headerShown: false }} />
-      <Stack.Screen name="auth/callback" options={{ headerShown: false, presentation: 'modal' }} />
+      <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
       <Stack.Screen name="+not-found" />
       <Stack.Screen name="login" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
