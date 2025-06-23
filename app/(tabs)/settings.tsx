@@ -6,20 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { bodyText, bodyStrongText, screenTitleText, sectionHeaderText } from '@/constants/typography';
 
 function AuthStatus() {
-  const { session, isAuthenticated } = useAuth();
-
-  if (!isAuthenticated) {
-    return (
-        <View style={[styles.authStatusContainer, { backgroundColor: COLORS.lightGray, flexDirection: 'column', alignItems: 'flex-start', padding: 15, borderRadius: 10}]}>
-            <Text style={[bodyStrongText, { color: COLORS.darkGray, marginBottom: 15}]}>
-                You are not logged in.
-            </Text>
-            <TouchableOpacity onPress={() => router.push('/login')} style={styles.loginButton}>
-                <Text style={styles.loginButtonText}>Log In or Sign Up</Text>
-            </TouchableOpacity>
-        </View>
-    );
-  }
+  const { session } = useAuth();
 
   return (
     <View style={[styles.authStatusContainer, { backgroundColor: COLORS.primaryLight }]}>
@@ -38,11 +25,18 @@ export default function SettingsScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Settings</Text>
       </View>
-      <AuthStatus />
+      <View style={styles.authStatusContainer}></View>
+      
+      {isAuthenticated ? (
+        <AuthStatus />
+      ) : (
+        <TouchableOpacity onPress={() => router.push('/login')} style={[styles.loginButton, {marginBottom: 20}]}>
+            <Text style={styles.loginButtonText}>Log In or Sign Up</Text>
+        </TouchableOpacity>
+      )}
       
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40}}>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About</Text>
           
           <TouchableOpacity style={styles.linkRow}>
             <Text style={styles.linkText}>Privacy Policy</Text>
@@ -54,10 +48,6 @@ export default function SettingsScreen() {
           
           <TouchableOpacity style={styles.linkRow}>
             <Text style={styles.linkText}>Contact Us</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.linkRow}>
-            <Text style={styles.linkText}>Support Development</Text>
           </TouchableOpacity>
         </View>
 
@@ -136,7 +126,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 25,
     borderRadius: 8,
-    alignSelf: 'flex-start',
+    alignItems: 'center',
   },
   loginButtonText: {
       ...bodyStrongText,

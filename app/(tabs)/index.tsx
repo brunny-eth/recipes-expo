@@ -1,5 +1,5 @@
 import React from 'react';
-import { useState, useEffect, useRef } from 'react'; // Added useRef for consistency, though not strictly needed for this change
+import { useState, useEffect, useRef } from 'react'; 
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Keyboard, KeyboardAvoidingView, Platform, View as RNView, Image, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
