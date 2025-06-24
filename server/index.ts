@@ -2,6 +2,7 @@ import express from 'express'
 import pinoHttp from 'pino-http'
 import logger from './lib/logger'
 import { recipeRouter } from './routes/recipes'
+import { aiRouter } from './routes/ai'
 
 const app = express()
 
@@ -14,6 +15,7 @@ app.get('/api/health', (_req, res) => {
 })
 
 app.use('/api/recipes', recipeRouter)
+app.use('/api/ai', aiRouter)
 
 // 👇 Only run this if executed directly (e.g., via `ts-node server/index.ts`)
 if (require.main === module) {

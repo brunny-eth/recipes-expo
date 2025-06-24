@@ -1,63 +1,67 @@
 import { sendMessageToGemini } from './geminiApi';
-import OpenAI from 'openai';
 
 // This function should only be used in a client-side context.
 // Always use the EXPO_PUBLIC_ prefixed variable.
-const openaiApiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
+const backendUrl = process.env.EXPO_PUBLIC_API_URL!;
 
-if (!openaiApiKey) {
-  console.warn("EXPO_PUBLIC_OPENAI_API_KEY is not set. AI Chat features will be disabled.");
+if (!backendUrl) {
+  console.warn("EXPO_PUBLIC_API_URL is not set. AI Chat features will be disabled.");
 }
 
-const openai = new OpenAI({
-  apiKey: openaiApiKey,
-  dangerouslyAllowBrowser: true // Necessary for client-side usage
-});
+async function callOpenAIChat(messages: any[]): Promise<string | null> {
+  if (!backendUrl) {
+    console.error("[aiChat] EXPO_PUBLIC_API_URL is not set.");
+    return "Error: API URL not configured.";
+  }
+
+  try {
+    const response = await fetch(`${backendUrl}/api/ai/openai-chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || `Request failed with status ${response.status}`);
+    }
+    return data.response;
+  } catch (error) {
+    console.error("[aiChat] Error calling backend OpenAI chat endpoint:", error);
+    if (error instanceof Error) {
+      return `OpenAI Error: ${error.message}`;
+    }
+    return "An unknown error occurred while communicating with the OpenAI service.";
+  }
+}
 
 export async function sendMessageWithFallback(
   userMessage: string,
   history: any[],
   recipeContext?: { instructions: string[]; substitutions?: string | null }
 ): Promise<string | null> {
-  if (!openaiApiKey) {
-    throw new Error("OpenAI API key is not configured.");
+  if (!backendUrl) {
+    throw new Error("API URL is not configured.");
   }
 
   // First try Gemini
   try {
-    const response = await sendMessageToGemini(userMessage, history, recipeContext);
+    const geminiResponse = await sendMessageToGemini(userMessage, history, recipeContext);
 
     // If we got a valid, non-error response from Gemini, just return it.
-    if (response && !/^error[:\s]/i.test(response.trim())) {
-      return response;
+    if (geminiResponse && !geminiResponse.toLowerCase().includes('error')) {
+      return geminiResponse;
     }
 
     // Otherwise, log and continue to fallback.
-    console.warn('Gemini chat responded with error, attempting OpenAI fallback:', response);
-  } catch (err) {
-    console.warn('Gemini chat threw exception, attempting OpenAI fallback:', err);
+    console.warn('Gemini chat responded with error, attempting OpenAI fallback:', geminiResponse);
+  } catch (geminiError) {
+    console.error("Gemini call failed, falling back to OpenAI:", geminiError);
   }
 
-  // Fallback to OpenAI if available
-  if (!openai) {
-    console.error('OpenAI API key missing; cannot fallback.');
-    return null;
-  }
-
-  try {
-    // Build OpenAI chat history preserving prior turns if provided
-    const openAiMessages = [
-      ...history.map((h) => ({ role: h.role, content: h.parts?.[0]?.text || '' })),
-      { role: 'user', content: userMessage },
-    ];
-
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: openAiMessages,
-    });
-    return completion.choices?.[0]?.message?.content || null;
-  } catch (err) {
-    console.error('OpenAI chat error:', err);
-    return null;
-  }
+  // Fallback to OpenAI
+  console.log("Falling back to OpenAI chat...");
+  const openAIHistory = history.map(h => ({ role: h.role, content: h.parts[0].text }));
+  const messages = [...openAIHistory, { role: 'user', content: userMessage }];
+  return callOpenAIChat(messages);
 } 
