@@ -24,22 +24,9 @@ router.get('/', async (req: Request, res: Response) => {
   }
 })
 
-// Get single recipe with ingredients and substitutions
-router.get('/:id', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params
-    const { data, error } = await getRecipeById(id);
-    
-    if (error) throw error
-    res.json(data)
-  } catch (err) {
-    const error = err as Error;
-    logger.error({ requestId: (req as any).id, err: error, route: req.originalUrl, method: req.method, params: req.params }, 'Error fetching single recipe');
-    res.status(500).json({ error: error.message || 'An unknown error occurred' });
-  }
-})
-
-// --- Main Parsing Route --- 
+// --- Main Parsing Route ---
+// This static route is defined before the dynamic /:id route to ensure
+// requests to /parse are not captured by the /:id handler.
 router.post('/parse', async (req: Request, res: Response) => {
   // Add logging for incoming request body
   logger.info({ body: req.body, requestId: (req as any).id, route: req.originalUrl, method: req.method }, '[parse] Incoming request');
@@ -99,6 +86,21 @@ router.post('/parse', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 });
+
+// Get single recipe with ingredients and substitutions
+router.get('/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const { data, error } = await getRecipeById(id);
+    
+    if (error) throw error
+    res.json(data)
+  } catch (err) {
+    const error = err as Error;
+    logger.error({ requestId: (req as any).id, err: error, route: req.originalUrl, method: req.method, params: req.params }, 'Error fetching single recipe');
+    res.status(500).json({ error: error.message || 'An unknown error occurred' });
+  }
+})
 
 // --- Rewrite Instructions Endpoint ---
 router.post('/rewrite-instructions', async (req: Request, res: Response) => {
