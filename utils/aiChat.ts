@@ -1,20 +1,28 @@
 import { sendMessageToGemini } from './geminiApi';
 import OpenAI from 'openai';
 
-// Allow OpenAI usage in React Native / Browser via fetch
-const openaiApiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+// This function should only be used in a client-side context.
+// Always use the EXPO_PUBLIC_ prefixed variable.
+const openaiApiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
 
-let openai: OpenAI | null = null;
-if (openaiApiKey) {
-  // @ts-ignore - browser flag
-  openai = new OpenAI({ apiKey: openaiApiKey, dangerouslyAllowBrowser: true });
+if (!openaiApiKey) {
+  console.warn("EXPO_PUBLIC_OPENAI_API_KEY is not set. AI Chat features will be disabled.");
 }
+
+const openai = new OpenAI({
+  apiKey: openaiApiKey,
+  dangerouslyAllowBrowser: true // Necessary for client-side usage
+});
 
 export async function sendMessageWithFallback(
   userMessage: string,
   history: any[],
   recipeContext?: { instructions: string[]; substitutions?: string | null }
 ): Promise<string | null> {
+  if (!openaiApiKey) {
+    throw new Error("OpenAI API key is not configured.");
+  }
+
   // First try Gemini
   try {
     const response = await sendMessageToGemini(userMessage, history, recipeContext);

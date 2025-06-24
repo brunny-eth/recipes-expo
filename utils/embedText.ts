@@ -1,7 +1,24 @@
 import OpenAI from 'openai'
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
 
-export async function embedText(text: string): Promise<number[]> {
+// This function should only be used in a client-side context.
+// Always use the EXPO_PUBLIC_ prefixed variable.
+const openaiApiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
+
+if (!openaiApiKey) {
+  // We don't throw an error here, as this file might be imported in contexts
+  // where the key isn't immediately needed. The calling function should handle the error.
+  console.warn("EXPO_PUBLIC_OPENAI_API_KEY is not set. Text embedding will fail.");
+}
+
+const openai = new OpenAI({ 
+  apiKey: openaiApiKey,
+  dangerouslyAllowBrowser: true // Necessary for client-side usage
+});
+
+export const embedText = async (text: string): Promise<number[]> => {
+  if (!openaiApiKey) {
+    throw new Error("OpenAI API key is not configured. Cannot embed text.");
+  }
   const input = text.slice(0, 8192) // just in case
 
   console.log('[DEBUG] Embedding input length:', input.length)

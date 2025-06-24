@@ -1,4 +1,4 @@
-import { supabase } from '../server/lib/supabase';
+import { supabaseAdmin } from '../server/lib/supabase';
 import logger from '../server/lib/logger';
 
 export async function findSimilarRecipe(
@@ -6,19 +6,22 @@ export async function findSimilarRecipe(
   threshold = 0.55
 ): Promise<{ recipe: any | null; similarity: number } | null> {
   try {
-    logger.debug({
-      function: 'findSimilarRecipe',
-      embeddingLength: embedding?.length,
-      threshold,
-    }, "Executing RPC 'match_recipes_by_embedding'");
-
     if (!embedding || embedding.length === 0) {
       logger.warn({ function: 'findSimilarRecipe' }, "findSimilarRecipe called with an empty or null embedding.");
       return null;
     }
 
-    const { data, error } = await supabase.rpc('match_recipes_by_embedding', {
-      query_embedding: embedding,
+    // The pgvector type requires a string representation of the array, e.g., "[0.1,0.2,...]"
+    const vectorString = `[${embedding.join(',')}]`;
+
+    logger.debug({
+      function: 'findSimilarRecipe',
+      embeddingLength: embedding.length, // Your DB vector column should match this dimension (e.g., vector(1536))
+      threshold,
+    }, "Executing RPC 'match_recipes_by_embedding'");
+
+    const { data, error } = await supabaseAdmin.rpc('match_recipes_by_embedding', {
+      query_embedding: vectorString,
       match_threshold: threshold,
       match_count: 1,
     });
@@ -29,7 +32,6 @@ export async function findSimilarRecipe(
         error: error.message,
         details: error.details,
       }, "Supabase RPC 'match_recipes_by_embedding' failed.");
-      // We don't re-throw, we just return null to let the caller decide how to proceed.
       return null; 
     }
 
