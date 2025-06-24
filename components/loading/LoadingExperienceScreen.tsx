@@ -31,18 +31,23 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({ recip
         const backendUrl = `${baseBackendUrl}${endpoint}`;
     
         try {
-          console.log(`Sending request to: ${backendUrl} with input: ${recipeInput}`);
+          console.log(`[parseRecipe] Preparing to send request to: ${backendUrl}`);
+          const requestBody = { input: recipeInput };
+          console.log('[parseRecipe] Request Body:', JSON.stringify(requestBody, null, 2));
+
           const response = await fetch(backendUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Accept': 'application/json',
             },
-            body: JSON.stringify({ input: recipeInput }),
+            body: JSON.stringify(requestBody),
           });
+
+          console.log(`[parseRecipe] Response Status: ${response.status}`);
     
           if (response.ok) {
             const result = await response.json();
+            console.log('[parseRecipe] Response JSON:', result);
             if (result.recipe) {
               setRecipeData(result.recipe);
             } else {
@@ -53,6 +58,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({ recip
             setError(normalizeError(responseText));
           }
         } catch (e: any) {
+            console.error('[parseRecipe] Fetch Error:', e);
             setError(normalizeError(e));
         } finally {
             setIsParsingFinished(true);
