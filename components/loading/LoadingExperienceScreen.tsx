@@ -35,6 +35,10 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({ recip
           const requestBody = { input: recipeInput };
           console.log('[parseRecipe] Request Body:', JSON.stringify(requestBody, null, 2));
 
+          // Temporarily log env vars to verify them at runtime
+          console.log('EXPO_PUBLIC_API_URL:', process.env.EXPO_PUBLIC_API_URL);
+          console.log('EXPO_PUBLIC_AUTH_URL:', process.env.EXPO_PUBLIC_AUTH_URL);
+
           const response = await fetch(backendUrl, {
             method: 'POST',
             headers: {
@@ -84,7 +88,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({ recip
     const handleRetry = () => {
         setError(null);
         setIsParsingFinished(false);
-        setComponentKey(prevKey => prevKey + 1);
+        setComponentKey((prevKey: number) => prevKey + 1);
     };
 
     const handleBack = () => {
