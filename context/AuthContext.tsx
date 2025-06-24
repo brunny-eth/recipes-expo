@@ -226,6 +226,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         const { data, error } = await supabase.auth.signInWithIdToken({
           provider: 'apple',
           token: identityToken,
+          clientId: 'app.meez.auth',
         });
   
         if (error) throw error;

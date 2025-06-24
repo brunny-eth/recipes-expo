@@ -21,10 +21,14 @@
   "include": [
     "**/*.ts",
     "**/*.tsx",
+    "**/*.d.ts",
     ".expo/types/**/*.ts",
     "expo-env.d.ts",
     "nativewind-env.d.ts",
     "types/scraperapi-sdk/index.d.ts" 
   ],
-  "exclude": ["server"]
+  "exclude": [
+    "server",
+    "scripts"
+  ]
 }
