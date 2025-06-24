@@ -10,6 +10,17 @@ import { ParseErrorCode } from '../../common/types/errors';
 
 const router = Router()
 
+// Middleware to log all incoming requests to this router, which helps in debugging
+// path matching issues, especially in a serverless environment.
+router.use((req, res, next) => {
+  logger.info({
+    requestId: (req as any).id,
+    method: req.method,
+    path: req.originalUrl,
+  }, 'Incoming request to /api/recipes router');
+  next();
+});
+
 // Get all recipes
 router.get('/', async (req: Request, res: Response) => {
   try {
@@ -25,8 +36,9 @@ router.get('/', async (req: Request, res: Response) => {
 })
 
 // --- Main Parsing Route ---
-// This static route is defined before the dynamic /:id route to ensure
-// requests to /parse are not captured by the /:id handler.
+// It is critical to define static routes like this one *before* dynamic routes.
+// This ensures that a request to '/parse' is handled by this specific handler
+// instead of being mistakenly captured by a dynamic handler like '/:id'.
 router.post('/parse', async (req: Request, res: Response) => {
   // Add logging for incoming request body
   logger.info({ body: req.body, requestId: (req as any).id, route: req.originalUrl, method: req.method }, '[parse] Incoming request');
@@ -88,7 +100,12 @@ router.post('/parse', async (req: Request, res: Response) => {
 });
 
 // Get single recipe with ingredients and substitutions
-router.get('/:id', async (req: Request, res: Response) => {
+// By using `:id(\\d+)`, we apply a regex to the route parameter.
+// This ensures that this route will only match requests where the 'id'
+// segment is composed of one or more digits (i.e., a numeric ID).
+// This prevents conflicts with other routes that might have a string in the same
+// path segment, such as a hypothetical '/api/recipes/latest'.
+router.get('/:id(\\d+)', async (req: Request, res: Response) => {
   try {
     const { id } = req.params
     const { data, error } = await getRecipeById(id);
