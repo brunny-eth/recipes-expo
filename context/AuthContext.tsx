@@ -10,6 +10,7 @@ import React, {
 import { Session, User } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import * as AuthSession from 'expo-auth-session';
 import { supabase } from '@/server/lib/supabase';
 import { useErrorModal } from './ErrorModalContext';
 import { useFreeUsage } from './FreeUsageContext';
@@ -199,7 +200,9 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
 
 
   const signIn = async (provider: AuthProvider) => {
-    const redirectTo = Linking.createURL('auth/callback');
+    const redirectTo = AuthSession.makeRedirectUri({
+      native: 'meez://auth/callback',
+    });
     console.log(`[Auth] Attempting sign-in with ${provider}. Redirect URL: ${redirectTo}`);
 
     try {

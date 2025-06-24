@@ -9,27 +9,27 @@
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		9A02505E06EDBBD8AF9E3E98 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = D184BD43872273F6C1DBB28A /* ExpoModulesProvider.swift */; };
-		AC1E5D372729ED6FCE124D8B /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = EE0EAC230DCCEA76BC2FCFE0 /* PrivacyInfo.xcprivacy */; };
+		9DEE874DB45D4379A0D633F1 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A9E65914DEF09987B382129F /* PrivacyInfo.xcprivacy */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
+		BF059E58869870F02EA74622 /* libPods-Meez.a in Frameworks */ = {isa = PBXBuildFile; fileRef = ECAF112E9DC8D093C89373CE /* libPods-Meez.a */; };
+		E36237403728C51C4899C504 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DDB15B9E65A660E60E0872D /* ExpoModulesProvider.swift */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
-		F2524BE4A5B3193E5A84FAE5 /* libPods-Meez.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 4FECC2DB35126ED7DFBC209A /* libPods-Meez.a */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		13B07F961A680F5B00A75B9A /* Meez.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Meez.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = Meez/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Meez/Info.plist; sourceTree = "<group>"; };
-		3113D0E89536C99086A27D05 /* Pods-Meez.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Meez.debug.xcconfig"; path = "Target Support Files/Pods-Meez/Pods-Meez.debug.xcconfig"; sourceTree = "<group>"; };
-		4FECC2DB35126ED7DFBC209A /* libPods-Meez.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Meez.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		1F3AB338748E81D44443743D /* Pods-Meez.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Meez.debug.xcconfig"; path = "Target Support Files/Pods-Meez/Pods-Meez.debug.xcconfig"; sourceTree = "<group>"; };
+		2DDB15B9E65A660E60E0872D /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-Meez/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		A9E65914DEF09987B382129F /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = Meez/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = Meez/SplashScreen.storyboard; sourceTree = "<group>"; };
-		B70CF1489641868260C25C61 /* Pods-Meez.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Meez.release.xcconfig"; path = "Target Support Files/Pods-Meez/Pods-Meez.release.xcconfig"; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		D184BD43872273F6C1DBB28A /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-Meez/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		ECAF112E9DC8D093C89373CE /* libPods-Meez.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Meez.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
-		EE0EAC230DCCEA76BC2FCFE0 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = Meez/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = Meez/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* Meez-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "Meez-Bridging-Header.h"; path = "Meez/Meez-Bridging-Header.h"; sourceTree = "<group>"; };
+		F5C370DBE0FD4B29973D55C4 /* Pods-Meez.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Meez.release.xcconfig"; path = "Target Support Files/Pods-Meez/Pods-Meez.release.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -37,21 +37,19 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				F2524BE4A5B3193E5A84FAE5 /* libPods-Meez.a in Frameworks */,
+				BF059E58869870F02EA74622 /* libPods-Meez.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		04782FFF31B04DB26290FFBB /* Pods */ = {
+		035FAD5EC5D87AAE067BA1D7 /* Meez */ = {
 			isa = PBXGroup;
 			children = (
-				3113D0E89536C99086A27D05 /* Pods-Meez.debug.xcconfig */,
-				B70CF1489641868260C25C61 /* Pods-Meez.release.xcconfig */,
+				2DDB15B9E65A660E60E0872D /* ExpoModulesProvider.swift */,
 			);
-			name = Pods;
-			path = Pods;
+			name = Meez;
 			sourceTree = "<group>";
 		};
 		13B07FAE1A68108700A75B9A /* Meez */ = {
@@ -63,7 +61,7 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				EE0EAC230DCCEA76BC2FCFE0 /* PrivacyInfo.xcprivacy */,
+				A9E65914DEF09987B382129F /* PrivacyInfo.xcprivacy */,
 			);
 			name = Meez;
 			sourceTree = "<group>";
@@ -72,17 +70,17 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				4FECC2DB35126ED7DFBC209A /* libPods-Meez.a */,
+				ECAF112E9DC8D093C89373CE /* libPods-Meez.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		7C5B51819F97E9296AAD65D0 /* Meez */ = {
+		3C9759EDCDE3FCD7C7BDF8C8 /* ExpoModulesProviders */ = {
 			isa = PBXGroup;
 			children = (
-				D184BD43872273F6C1DBB28A /* ExpoModulesProvider.swift */,
+				035FAD5EC5D87AAE067BA1D7 /* Meez */,
 			);
-			name = Meez;
+			name = ExpoModulesProviders;
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -92,6 +90,15 @@
 			name = Libraries;
 			sourceTree = "<group>";
 		};
+		8326EE24C91E12190340BA42 /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				1F3AB338748E81D44443743D /* Pods-Meez.debug.xcconfig */,
+				F5C370DBE0FD4B29973D55C4 /* Pods-Meez.release.xcconfig */,
+			);
+			path = Pods;
+			sourceTree = "<group>";
+		};
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
@@ -99,8 +106,8 @@
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				04782FFF31B04DB26290FFBB /* Pods */,
-				BDADCB83BE4C7407FA22098A /* ExpoModulesProviders */,
+				8326EE24C91E12190340BA42 /* Pods */,
+				3C9759EDCDE3FCD7C7BDF8C8 /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -124,14 +131,6 @@
 			path = Meez/Supporting;
 			sourceTree = "<group>";
 		};
-		BDADCB83BE4C7407FA22098A /* ExpoModulesProviders */ = {
-			isa = PBXGroup;
-			children = (
-				7C5B51819F97E9296AAD65D0 /* Meez */,
-			);
-			name = ExpoModulesProviders;
-			sourceTree = "<group>";
-		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -140,13 +139,13 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "Meez" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				2EF3BADF66D275B7B53A6813 /* [Expo] Configure project */,
+				2FE1CF515F689AEBB4F15BFB /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				7896B7BFEC1FFB24F17D9848 /* [CP] Embed Pods Frameworks */,
+				4E4CD1DAFAB36D8121F5712A /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -196,7 +195,7 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				AC1E5D372729ED6FCE124D8B /* PrivacyInfo.xcprivacy in Resources */,
+				9DEE874DB45D4379A0D633F1 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -240,7 +239,7 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
-		2EF3BADF66D275B7B53A6813 /* [Expo] Configure project */ = {
+		2FE1CF515F689AEBB4F15BFB /* [Expo] Configure project */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -259,7 +258,7 @@
 			shellPath = /bin/sh;
 			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-Meez/expo-configure-project.sh\"\n";
 		};
-		7896B7BFEC1FFB24F17D9848 /* [CP] Embed Pods Frameworks */ = {
+		4E4CD1DAFAB36D8121F5712A /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -333,7 +332,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				9A02505E06EDBBD8AF9E3E98 /* ExpoModulesProvider.swift in Sources */,
+				E36237403728C51C4899C504 /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -342,12 +341,13 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 3113D0E89536C99086A27D05 /* Pods-Meez.debug.xcconfig */;
+			baseConfigurationReference = 1F3AB338748E81D44443743D /* Pods-Meez.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Meez/Meez.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = QN3PZD4P5S;
 				ENABLE_BITCODE = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
@@ -378,12 +378,13 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = B70CF1489641868260C25C61 /* Pods-Meez.release.xcconfig */;
+			baseConfigurationReference = F5C370DBE0FD4B29973D55C4 /* Pods-Meez.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Meez/Meez.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = QN3PZD4P5S;
 				INFOPLIST_FILE = Meez/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -461,10 +462,7 @@
 				LIBRARY_SEARCH_PATHS = "$(SDKROOT)/usr/lib/swift\"$(inherited)\"";
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					" ",
-				);
+				OTHER_LDFLAGS = "$(inherited)  ";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
@@ -519,10 +517,7 @@
 				);
 				LIBRARY_SEARCH_PATHS = "$(SDKROOT)/usr/lib/swift\"$(inherited)\"";
 				MTL_ENABLE_DEBUG_INFO = NO;
-				OTHER_LDFLAGS = (
-					"$(inherited)",
-					" ",
-				);
+				OTHER_LDFLAGS = "$(inherited)  ";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				USE_HERMES = true;
