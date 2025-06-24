@@ -1,35 +1,68 @@
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { supabase } from '../server/lib/supabase';
+import logger from '../server/lib/logger';
 
 export async function findSimilarRecipe(
   embedding: number[],
   threshold = 0.55
-): Promise<{ recipe: any | null; similarity: number }> {
-  const { data, error } = await supabase.rpc('match_recipes_by_embedding', {
-    query_embedding: embedding,
-    match_threshold: threshold,
-    match_count: 1,
-  })
+): Promise<{ recipe: any | null; similarity: number } | null> {
+  try {
+    logger.debug({
+      function: 'findSimilarRecipe',
+      embeddingLength: embedding?.length,
+      threshold,
+    }, "Executing RPC 'match_recipes_by_embedding'");
 
-  if (error) throw new Error(`RPC error: ${error.message}`)
+    if (!embedding || embedding.length === 0) {
+      logger.warn({ function: 'findSimilarRecipe' }, "findSimilarRecipe called with an empty or null embedding.");
+      return null;
+    }
 
-  if (!data || data.length === 0) return { recipe: null, similarity: 0 }
+    const { data, error } = await supabase.rpc('match_recipes_by_embedding', {
+      query_embedding: embedding,
+      match_threshold: threshold,
+      match_count: 1,
+    });
 
-  const match = data[0]
+    if (error) {
+      logger.error({
+        function: 'findSimilarRecipe',
+        error: error.message,
+        details: error.details,
+      }, "Supabase RPC 'match_recipes_by_embedding' failed.");
+      // We don't re-throw, we just return null to let the caller decide how to proceed.
+      return null; 
+    }
 
-  console.log('[DEBUG] Raw match from RPC:', JSON.stringify(match, null, 2))
+    logger.debug({ function: 'findSimilarRecipe', data }, "Raw data from RPC");
 
-  // Flatten recipe_data if it exists
-  const flatRecipe = match.recipe_data
-    ? { ...match.recipe_data, id: match.id ?? match.recipe_id }
-    : null
+    if (!data || data.length === 0) {
+      logger.info({ function: 'findSimilarRecipe' }, "No similar recipes found from RPC call.");
+      return null;
+    }
 
-  return {
-    recipe: flatRecipe,
-    similarity: match.similarity,
+    const match = data[0];
+
+    // The raw match data contains the nested recipe_data and the similarity score.
+    // The recipe_data is what we want to return, flattened with its ID.
+    const flatRecipe = match.recipe_data
+      ? { ...match.recipe_data, id: match.id ?? match.recipe_id }
+      : null;
+
+    if (!flatRecipe) {
+      logger.warn({ function: 'findSimilarRecipe', match }, "Match found but recipe_data was null or missing.");
+      return null;
+    }
+
+    return {
+      recipe: flatRecipe,
+      similarity: match.similarity,
+    };
+  } catch (e: any) {
+    logger.error({
+        function: 'findSimilarRecipe',
+        error: e.message,
+        stack: e.stack,
+    }, "An unexpected error occurred in findSimilarRecipe.");
+    return null;
   }
 }
