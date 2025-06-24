@@ -257,9 +257,15 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     }
   
     // Google OAuth flow
-    const redirectTo = AuthSession.makeRedirectUri({
-      native: 'meez://auth/callback',
-    });
+    const redirectTo = process.env.EXPO_PUBLIC_AUTH_URL;
+    
+    if (!redirectTo) {
+      const errorMsg = "Missing EXPO_PUBLIC_AUTH_URL environment variable. Cannot proceed with authentication.";
+      console.error(`[Auth] ${errorMsg}`);
+      showError('Configuration Error', errorMsg);
+      return;
+    }
+    
     console.log(`[Auth] Attempting Google sign-in. Redirect URL: ${redirectTo}`);
   
     try {

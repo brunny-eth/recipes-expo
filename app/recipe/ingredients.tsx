@@ -383,7 +383,7 @@ export default function IngredientsScreen() {
        console.log("🧪 Sending to backend:", appliedChanges);
        setIsRewriting(true);
        try {
-         const backendUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+         const backendUrl = process.env.EXPO_PUBLIC_API_URL!;
          const response = await fetch(`${backendUrl}/api/recipes/rewrite-instructions`, {
            method: 'POST',
            headers: { 'Content-Type': 'application/json' },
@@ -425,7 +425,7 @@ export default function IngredientsScreen() {
         logTiming("Started scaling instructions");
         setIsScalingInstructions(true);
         try {
-            const backendUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+            const backendUrl = process.env.EXPO_PUBLIC_API_URL!;
             const response = await fetch(`${backendUrl}/api/recipes/scale-instructions`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

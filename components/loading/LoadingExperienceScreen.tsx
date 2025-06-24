@@ -26,7 +26,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({ recip
     const handleError = useHandleError();
 
     const parseRecipe = async () => {
-        const baseBackendUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+        const baseBackendUrl = process.env.EXPO_PUBLIC_API_URL!;
         const endpoint = '/api/recipes/parse';
         const backendUrl = `${baseBackendUrl}${endpoint}`;
     
