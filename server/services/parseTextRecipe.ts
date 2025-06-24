@@ -54,24 +54,33 @@ export async function parseTextRecipe(
 
     // --- Start Fuzzy Match Logic ---
     if (process.env.ENABLE_FUZZY_MATCH === 'true') {
-        logger.info({ requestId }, "Attempting fuzzy match.");
+        logger.info({ requestId }, "Fuzzy match enabled, attempting to find a similar recipe.");
+        const fuzzyMatchStartTime = Date.now();
         try {
+            // Step 1: Create an embedding for the input text
             const embeddingStartTime = Date.now();
+            logger.info({ requestId, input: trimmedInput.substring(0, 50) + '...' }, "[FuzzyMatch] Generating embedding...");
             const embedding = await embedText(trimmedInput);
             const embeddingTime = Date.now() - embeddingStartTime;
+            logger.info({ requestId, timeMs: embeddingTime }, "[FuzzyMatch] Embedding generated successfully.");
 
+            // Step 2: Use the embedding to find a similar recipe in the database
             const searchStartTime = Date.now();
+            logger.info({ requestId }, "[FuzzyMatch] Searching for similar recipes...");
             const match = await findSimilarRecipe(embedding);
             const searchTime = Date.now() - searchStartTime;
+            logger.info({ requestId, timeMs: searchTime, matchFound: !!match }, "[FuzzyMatch] Search complete.");
 
             if (match && match.recipe && match.similarity > SIMILARITY_THRESHOLD) {
                 logger.info({
                     requestId,
                     similarity: match.similarity,
                     matchedRecipeId: match.recipe.id,
+                    threshold: SIMILARITY_THRESHOLD,
                     llm_skipped: true,
+                    totalFuzzyMatchTime: Date.now() - fuzzyMatchStartTime,
                     timings: { embeddingTime, searchTime }
-                }, "Fuzzy match found, returning matched recipe directly.");
+                }, "Fuzzy match found above threshold, returning matched recipe directly.");
 
                 // The matched recipe data is already in the correct format.
                 // We can short-circuit and return immediately.
@@ -90,15 +99,22 @@ export async function parseTextRecipe(
                     {
                         requestId,
                         similarity: match?.similarity ?? 'N/A',
-                        matchedRecipeId: match?.recipe?.id ?? null,
-                        llm_skipped: false
+                        matchedRecipeId: match?.recipe?.id ?? 'N/A',
+                        threshold: SIMILARITY_THRESHOLD,
+                        llm_skipped: false,
+                        totalFuzzyMatchTime: Date.now() - fuzzyMatchStartTime
                     }, 
-                    "No suitable fuzzy match found or threshold not met. Proceeding with LLM."
+                    "No suitable fuzzy match found or similarity was below threshold. Proceeding with LLM."
                 );
             }
 
         } catch (fuzzyError: any) {
-            logger.error({ requestId, error: fuzzyError.message }, "Error during fuzzy match process. Falling back to LLM.");
+            logger.error({ 
+                requestId, 
+                error: fuzzyError.message, 
+                stack: fuzzyError.stack,
+                totalFuzzyMatchTime: Date.now() - fuzzyMatchStartTime
+            }, "An unexpected error occurred during the fuzzy match process. Falling back to LLM.");
         }
     }
     // --- End Fuzzy Match Logic ---
