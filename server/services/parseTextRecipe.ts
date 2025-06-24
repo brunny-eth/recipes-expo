@@ -39,6 +39,7 @@ export async function parseTextRecipe(
     input: string,
     requestId: string
 ): Promise<ParseResult> {
+    logger.info({ env: process.env.ENABLE_FUZZY_MATCH }, "Env variable ENABLE_FUZZY_MATCH value");
     const requestStartTime = Date.now();
     let overallTimings: ParseResult['timings'] = {
         dbCheck: -1,
@@ -68,6 +69,7 @@ export async function parseTextRecipe(
             const searchStartTime = Date.now();
             logger.info({ requestId }, "[FuzzyMatch] Searching for similar recipes...");
             const match = await findSimilarRecipe(embedding);
+            logger.info({ requestId, match }, "[FuzzyMatch] Raw match result");
             const searchTime = Date.now() - searchStartTime;
             logger.info({ requestId, timeMs: searchTime, matchFound: !!match }, "[FuzzyMatch] Search complete.");
 
