@@ -39,6 +39,7 @@ export async function parseTextRecipe(
     input: string,
     requestId: string
 ): Promise<ParseResult> {
+    logger.info({ requestId }, "🚨🚨🚨 parseTextRecipe was called! 🚨🚨🚨");
     logger.info({ env: process.env.ENABLE_FUZZY_MATCH }, "Env variable ENABLE_FUZZY_MATCH value");
     const requestStartTime = Date.now();
     let overallTimings: ParseResult['timings'] = {
