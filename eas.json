@@ -8,8 +8,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "ios": {
-        "simulator": false,
-        "enterpriseProvisioning": "universal"
+        "simulator": false
       },
       "channel": "development"
     },
@@ -20,6 +19,14 @@
     "production": {
       "autoIncrement": true,
       "channel": "production"
+    },
+    "testflight": {
+      "distribution": "store",
+      "channel": "production",
+      "ios": {
+        "simulator": false
+      },
+      "autoIncrement": true
     }
   },
   "submit": {

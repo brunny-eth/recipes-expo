@@ -8,10 +8,19 @@
     "scheme": "meez",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "entryPoint": "./node_modules/expo-router/entry",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.meez.app"
+      "bundleIdentifier": "com.meez.app",
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "meez"
+            ]
+          }
+        ]
+      }
     },
     "web": {
       "bundler": "metro",
@@ -19,7 +28,8 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true

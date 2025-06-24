@@ -272,6 +272,8 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - Yoga
+  - ExpoAppleAuthentication (7.2.4):
+    - ExpoModulesCore
   - ExpoAsset (11.1.5):
     - ExpoModulesCore
   - ExpoBlur (14.1.5):
@@ -2475,6 +2477,7 @@ DEPENDENCIES:
   - expo-dev-launcher (from `../node_modules/expo-dev-launcher`)
   - expo-dev-menu (from `../node_modules/expo-dev-menu`)
   - expo-dev-menu-interface (from `../node_modules/expo-dev-menu-interface/ios`)
+  - ExpoAppleAuthentication (from `../node_modules/expo-apple-authentication/ios`)
   - ExpoAsset (from `../node_modules/expo-asset/ios`)
   - ExpoBlur (from `../node_modules/expo-blur/ios`)
   - ExpoCrypto (from `../node_modules/expo-crypto/ios`)
@@ -2606,6 +2609,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-dev-menu"
   expo-dev-menu-interface:
     :path: "../node_modules/expo-dev-menu-interface/ios"
+  ExpoAppleAuthentication:
+    :path: "../node_modules/expo-apple-authentication/ios"
   ExpoAsset:
     :path: "../node_modules/expo-asset/ios"
   ExpoBlur:
@@ -2817,6 +2822,7 @@ SPEC CHECKSUMS:
   expo-dev-launcher: 7a4eefa81ebb3ed282838d8b1f282e73fb3d0c95
   expo-dev-menu: 9593e98d9ce6de04121cd9c38b9be29d4d128773
   expo-dev-menu-interface: 609c35ae8b97479cdd4c9e23c8cf6adc44beea0e
+  ExpoAppleAuthentication: 7e358fcbcbacb7685cddb0bbeede0acd677e58f6
   ExpoAsset: 3ea3275cca6a7793b3d36fbf1075c590f803fbcb
   ExpoBlur: 846780b2c90f59e964b9a50385d4deb67174ebfb
   ExpoCrypto: fcb6a8a08d1929f346cb95eb05a8f7818627177a

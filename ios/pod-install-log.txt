@@ -1,0 +1,295 @@
+
+Using Expo modules
+  [Expo] Enabling modular headers for pod ExpoModulesCore
+  [Expo] Enabling modular headers for pod React-RCTAppDelegate
+  [Expo] Enabling modular headers for pod React-RCTFabric
+  [Expo] Enabling modular headers for pod ReactAppDependencyProvider
+  [Expo] Enabling modular headers for pod React-Core
+  [Expo] Enabling modular headers for pod RCT-Folly
+  [Expo] Enabling modular headers for pod glog
+  [Expo] Enabling modular headers for pod ReactCodegen
+  [Expo] Enabling modular headers for pod RCTRequired
+  [Expo] Enabling modular headers for pod RCTTypeSafety
+  [Expo] Enabling modular headers for pod ReactCommon
+  [Expo] Enabling modular headers for pod React-NativeModulesApple
+  [Expo] Enabling modular headers for pod Yoga
+  [Expo] Enabling modular headers for pod React-Fabric
+  [Expo] Enabling modular headers for pod React-graphics
+  [Expo] Enabling modular headers for pod React-utils
+  [Expo] Enabling modular headers for pod React-featureflags
+  [Expo] Enabling modular headers for pod React-debug
+  [Expo] Enabling modular headers for pod React-ImageManager
+  [Expo] Enabling modular headers for pod React-rendererdebug
+  [Expo] Enabling modular headers for pod DoubleConversion
+  [Expo] Enabling modular headers for pod React-jsi
+  [Expo] Enabling modular headers for pod React-renderercss
+  [Expo] Enabling modular headers for pod hermes-engine
+  [Expo] Enabling modular headers for pod React-hermes
+  — expo (53.0.12)
+  — expo-apple-authentication (7.2.4)
+  — expo-application (6.1.4)
+  — expo-asset (11.1.5)
+  — expo-blur (14.1.5)
+  — expo-constants (17.1.6)
+  — expo-crypto (14.1.5)
+  — expo-dev-client (5.2.1)
+  [Expo] Enabling modular headers for pod expo-dev-menu-interface
+  [Expo] Enabling modular headers for pod EXManifests
+  [Expo] Enabling modular headers for pod EXUpdatesInterface
+  [Expo] Enabling modular headers for pod expo-dev-menu
+  [Expo] Enabling modular headers for pod React-jsinspector
+  [Expo] Enabling modular headers for pod expo-dev-launcher
+  — expo-dev-launcher (5.1.13)
+  — expo-dev-menu (6.1.12)
+  — expo-dev-menu-interface (1.10.0)
+  — expo-eas-client (0.14.3)
+  — expo-file-system (18.1.10)
+  — expo-font (13.3.1)
+  — expo-haptics (14.1.4)
+  — expo-json-utils (0.15.0)
+  — expo-keep-awake (14.1.4)
+  — expo-linear-gradient (14.1.5)
+  — expo-linking (7.1.5)
+  — expo-manifests (0.16.5)
+  — expo-modules-core (2.4.0)
+  — expo-random (14.0.1)
+  — expo-router (5.0.7)
+  — expo-splash-screen (0.30.9)
+  — expo-structured-headers (4.1.0)
+  — expo-symbols (0.4.5)
+  — expo-system-ui (5.0.9)
+  [Expo] Enabling modular headers for pod EXStructuredHeaders
+  [Expo] Enabling modular headers for pod EASClient
+  [Expo] Enabling modular headers for pod ReachabilitySwift
+  — expo-updates (0.28.15)
+  — expo-web-browser (14.1.6)
+Found 13 modules for target `Meez`
+link_native_modules! {:ios_packages=>[{:configurations=>[], :name=>"@react-native-async-storage/async-storage", :root=>"/Users/blulinski/code/project-2/node_modules/@react-native-async-storage/async-storage", :path=>"../node_modules/@react-native-async-storage/async-storage", :podspec_path=>"/Users/blulinski/code/project-2/node_modules/@react-native-async-storage/async-storage/RNCAsyncStorage.podspec", :script_phases=>[]}, {:configurations=>[], :name=>"@react-native-community/netinfo", :root=>"/Users/blulinski/code/project-2/node_modules/@react-native-community/netinfo", :path=>"../node_modules/@react-native-community/netinfo", :podspec_path=>"/Users/blulinski/code/project-2/node_modules/@react-native-community/netinfo/react-native-netinfo.podspec", :script_phases=>[]}, {:configurations=>[], :name=>"@react-native-picker/picker", :root=>"/Users/blulinski/code/project-2/node_modules/@react-native-picker/picker", :path=>"../node_modules/@react-native-picker/picker", :podspec_path=>"/Users/blulinski/code/project-2/node_modules/@react-native-picker/picker/RNCPicker.podspec", :script_phases=>[]}, {:configurations=>[], :name=>"@shopify/flash-list", :root=>"/Users/blulinski/code/project-2/node_modules/@shopify/flash-list", :path=>"../node_modules/@shopify/flash-list", :podspec_path=>"/Users/blulinski/code/project-2/node_modules/@shopify/flash-list/RNFlashList.podspec", :script_phases=>[]}, {:configurations=>[], :name=>"expo", :root=>"/Users/blulinski/code/project-2/node_modules/expo", :path=>"../node_modules/expo", :podspec_path=>"/Users/blulinski/code/project-2/node_modules/expo/Expo.podspec", :script_phases=>[]}, {:configurations=>[], :name=>"react-native", :root=>"/Users/blulinski/code/project-2/node_modules/react-native", :path=>"../node_modules/react-native", :podspec_path=>"/Users/blulinski/code/project-2/node_modules/react-native/React-Core.podspec", :script_phases=>[]}, {:configurations=>[], :name=>"react-native-gesture-handler", :root=>"/Users/blulinski/code/project-2/node_modules/react-native-gesture-handler", :path=>"../node_modules/react-native-gesture-handler", :podspec_path=>"/Users/blulinski/code/project-2/node_modules/react-native-gesture-handler/RNGestureHandler.podspec", :script_phases=>[]}, {:configurations=>[], :name=>"react-native-performance", :root=>"/Users/blulinski/code/project-2/node_modules/react-native-performance", :path=>"../node_modules/react-native-performance", :podspec_path=>"/Users/blulinski/code/project-2/node_modules/react-native-performance/react-native-performance.podspec", :script_phases=>[]}, {:configurations=>[], :name=>"react-native-reanimated", :root=>"/Users/blulinski/code/project-2/node_modules/react-native-reanimated", :path=>"../node_modules/react-native-reanimated", :podspec_path=>"/Users/blulinski/code/project-2/node_modules/react-native-reanimated/RNReanimated.podspec", :script_phases=>[]}, {:configurations=>[], :name=>"react-native-safe-area-context", :root=>"/Users/blulinski/code/project-2/node_modules/react-native-safe-area-context", :path=>"../node_modules/react-native-safe-area-context", :podspec_path=>"/Users/blulinski/code/project-2/node_modules/react-native-safe-area-context/react-native-safe-area-context.podspec", :script_phases=>[]}, {:configurations=>[], :name=>"react-native-screens", :root=>"/Users/blulinski/code/project-2/node_modules/react-native-screens", :path=>"../node_modules/react-native-screens", :podspec_path=>"/Users/blulinski/code/project-2/node_modules/react-native-screens/RNScreens.podspec", :script_phases=>[]}, {:configurations=>[], :name=>"react-native-svg", :root=>"/Users/blulinski/code/project-2/node_modules/react-native-svg", :path=>"../node_modules/react-native-svg", :podspec_path=>"/Users/blulinski/code/project-2/node_modules/react-native-svg/RNSVG.podspec", :script_phases=>[]}, {:configurations=>[], :name=>"react-native-webview", :root=>"/Users/blulinski/code/project-2/node_modules/react-native-webview", :path=>"../node_modules/react-native-webview", :podspec_path=>"/Users/blulinski/code/project-2/node_modules/react-native-webview/react-native-webview.podspec", :script_phases=>[]}], :ios_project_root_path=>"/Users/blulinski/code/project-2/ios", :react_native_path=>"../node_modules/react-native"}
+Auto-linking React Native modules for target `Meez`: RNCAsyncStorage, RNCPicker, RNFlashList, RNGestureHandler, RNReanimated, RNSVG, RNScreens, React-Core, react-native-netinfo, react-native-performance, react-native-safe-area-context, and react-native-webview
+Framework build type is static library
+Configuring the target with the New Architecture
+  $ /opt/homebrew/bin/node ./../node_modules/react-native/scripts/generate-codegen-artifacts.js -p /Users/blulinski/code/project-2/ios/.. -o /Users/blulinski/code/project-2/ios -t ios
+  [36m[1m[Codegen][0m Analyzing /Users/blulinski/code/project-2/package.json[0m
+  [36m[1m[Codegen][0m [33mSearching for codegen-enabled libraries in the app.[0m
+  [36m[1m[Codegen][0m [33mThe "codegenConfig" field is not defined in package.json. Assuming there is nothing to generate at the app level.[0m
+  [36m[1m[Codegen][0m [33mSearching for codegen-enabled libraries in the project dependencies.[0m
+  [36m[1m[Codegen][0m Found @react-native-async-storage/async-storage[0m
+  [36m[1m[Codegen][0m Found @react-native-picker/picker[0m
+  [36m[1m[Codegen][0m Found @shopify/flash-list[0m
+  [36m[1m[Codegen][0m Found react-native[0m
+  [36m[1m[Codegen][0m Found react-native-gesture-handler[0m
+  [36m[1m[Codegen][0m Found react-native-performance[0m
+  [36m[1m[Codegen][0m Found react-native-reanimated[0m
+  [36m[1m[Codegen][0m Found react-native-safe-area-context[0m
+  [36m[1m[Codegen][0m Found react-native-screens[0m
+  [36m[1m[Codegen][0m Found react-native-svg[0m
+  [36m[1m[Codegen][0m Found react-native-webview[0m
+  [36m[1m[Codegen][0m [33mSearching for codegen-enabled libraries in react-native.config.js[0m
+  [36m[1m[Codegen][0m Processing rnasyncstorage[0m
+  [36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+  [36m[1m[Codegen][0m Supported Apple platforms: ios, macos, tvos, visionos for rnasyncstorage[0m
+  [36m[1m[Codegen][0m Processing rnpicker[0m
+  [36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+  [36m[1m[Codegen][0m Supported Apple platforms: ios, macos, tvos for rnpicker[0m
+  [36m[1m[Codegen][0m Processing rnflashlist[0m
+  [36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+  [36m[1m[Codegen][0m Supported Apple platforms: ios, tvos for rnflashlist[0m
+  [36m[1m[Codegen][0m Processing FBReactNativeSpec[0m
+  [36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+  [36m[1m[Codegen][0m Processing rncore[0m
+  [36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+  [36m[1m[Codegen][0m Processing rngesturehandler_codegen[0m
+  [36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+  [36m[1m[Codegen][0m Supported Apple platforms: ios, macos, tvos, visionos for rngesturehandler_codegen[0m
+  [36m[1m[Codegen][0m Processing RNPerformanceSpec[0m
+  [36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+  [36m[1m[Codegen][0m Supported Apple platforms: ios for RNPerformanceSpec[0m
+  [36m[1m[Codegen][0m Processing rnreanimated[0m
+  [36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+  [36m[1m[Codegen][0m Supported Apple platforms: ios, macos, tvos, visionos for rnreanimated[0m
+  [36m[1m[Codegen][0m Processing safeareacontext[0m
+  [36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+  [36m[1m[Codegen][0m Supported Apple platforms: ios, macos, tvos, visionos for safeareacontext[0m
+  [36m[1m[Codegen][0m Processing rnscreens[0m
+  [36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+  [36m[1m[Codegen][0m Supported Apple platforms: ios, tvos, visionos for rnscreens[0m
+  [36m[1m[Codegen][0m Processing rnsvg[0m
+  [36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+  [36m[1m[Codegen][0m Supported Apple platforms: ios, macos, tvos, visionos for rnsvg[0m
+  [36m[1m[Codegen][0m Processing RNCWebViewSpec[0m
+  [36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+  [36m[1m[Codegen][0m Supported Apple platforms: ios, macos, visionos for RNCWebViewSpec[0m
+  [36m[1m[Codegen][0m Generating Native Code for rnasyncstorage - ios[0m
+  [36m[1m[Codegen][0m Generated artifacts: /Users/blulinski/code/project-2/ios/build/generated/ios[0m
+  [36m[1m[Codegen][0m Generating Native Code for rnpicker - ios[0m
+  [36m[1m[Codegen][0m Generated artifacts: /Users/blulinski/code/project-2/ios/build/generated/ios[0m
+  [36m[1m[Codegen][0m Generating Native Code for rnflashlist - ios[0m
+  [36m[1m[Codegen][0m Generated artifacts: /Users/blulinski/code/project-2/ios/build/generated/ios[0m
+  [36m[1m[Codegen][0m [33m[Codegen - FBReactNativeSpec] Skipping iOS code generation for FBReactNativeSpec as it has been generated already.[0m
+  [36m[1m[Codegen][0m [33m[Codegen - rncore] Skipping iOS code generation for rncore as it has been generated already.[0m
+  [36m[1m[Codegen][0m Generating Native Code for rngesturehandler_codegen - ios[0m
+  [36m[1m[Codegen][0m Generated artifacts: /Users/blulinski/code/project-2/ios/build/generated/ios[0m
+  [36m[1m[Codegen][0m Generating Native Code for RNPerformanceSpec - ios[0m
+  [36m[1m[Codegen][0m Generated artifacts: /Users/blulinski/code/project-2/ios/build/generated/ios[0m
+  [36m[1m[Codegen][0m Generating Native Code for rnreanimated - ios[0m
+  [36m[1m[Codegen][0m Generated artifacts: /Users/blulinski/code/project-2/ios/build/generated/ios[0m
+  [36m[1m[Codegen][0m Generating Native Code for safeareacontext - ios[0m
+  [36m[1m[Codegen][0m Generated artifacts: /Users/blulinski/code/project-2/ios/build/generated/ios[0m
+  [36m[1m[Codegen][0m Generating Native Code for rnscreens - ios[0m
+  [36m[1m[Codegen][0m Generated artifacts: /Users/blulinski/code/project-2/ios/build/generated/ios[0m
+  [36m[1m[Codegen][0m Generating Native Code for rnsvg - ios[0m
+  [36m[1m[Codegen][0m Generated artifacts: /Users/blulinski/code/project-2/ios/build/generated/ios[0m
+  [36m[1m[Codegen][0m Generating Native Code for RNCWebViewSpec - ios[0m
+  [36m[1m[Codegen][0m Generated artifacts: /Users/blulinski/code/project-2/ios/build/generated/ios[0m
+  [36m[1m[Codegen][0m Generating RCTThirdPartyComponentsProvider.h[0m
+  [36m[1m[Codegen][0m Generated artifact: /Users/blulinski/code/project-2/ios/build/generated/ios/RCTThirdPartyComponentsProvider.h[0m
+  [36m[1m[Codegen][0m Generating RCTThirdPartyComponentsProvider.mm[0m
+  [36m[1m[Codegen][0m Crawling @shopify/flash-list library for components[0m
+  [36m[1m[Codegen][0m Match found AutoLayoutView -> AutoLayoutViewComponentView[0m
+  [36m[1m[Codegen][0m Match found CellContainer -> CellContainerComponentView[0m
+  [36m[1m[Codegen][0m [33m[DEPRECATED] @shopify/flash-list should add the 'ios.componentProvider' property in their codegenConfig[0m
+  [36m[1m[Codegen][0m Crawling react-native-webview library for components[0m
+  [36m[1m[Codegen][0m Match found RNCWebView -> RNCWebView[0m
+  [36m[1m[Codegen][0m [33m[DEPRECATED] react-native-webview should add the 'ios.componentProvider' property in their codegenConfig[0m
+  [36m[1m[Codegen][0m Generated artifact: /Users/blulinski/code/project-2/ios/build/generated/ios/RCTThirdPartyComponentsProvider.mm[0m
+  [36m[1m[Codegen][0m Generating RCTModulesProvider.h[0m
+  [36m[1m[Codegen][0m Generated artifact: /Users/blulinski/code/project-2/ios/build/generated/ios/RCTModuleProviders.h[0m
+  [36m[1m[Codegen][0m Generating RCTModuleProviders.mm[0m
+  [36m[1m[Codegen][0m Generated artifact: /Users/blulinski/code/project-2/ios/build/generated/ios/RCTModuleProviders.mm[0m
+  [36m[1m[Codegen][0m Generating RCTAppDependencyProvider[0m
+  [36m[1m[Codegen][0m Generated artifact: /Users/blulinski/code/project-2/ios/build/generated/ios/RCTAppDependencyProvider.h[0m
+  [36m[1m[Codegen][0m Generated artifact: /Users/blulinski/code/project-2/ios/build/generated/ios/RCTAppDependencyProvider.mm[0m
+  [36m[1m[Codegen][0m Generated podspec: /Users/blulinski/code/project-2/ios/build/generated/ios/ReactAppDependencyProvider.podspec[0m
+  [36m[1m[Codegen][0m Generated podspec: /Users/blulinski/code/project-2/ios/build/generated/ios/ReactCodegen.podspec[0m
+  [36m[1m[Codegen][0m [33mDone.[0m
+[36m[1m[Codegen][0m Analyzing /Users/blulinski/code/project-2/package.json[0m
+[36m[1m[Codegen][0m [33mSearching for codegen-enabled libraries in the app.[0m
+[36m[1m[Codegen][0m [33mThe "codegenConfig" field is not defined in package.json. Assuming there is nothing to generate at the app level.[0m
+[36m[1m[Codegen][0m [33mSearching for codegen-enabled libraries in the project dependencies.[0m
+[36m[1m[Codegen][0m Found @react-native-async-storage/async-storage[0m
+[36m[1m[Codegen][0m Found @react-native-picker/picker[0m
+[36m[1m[Codegen][0m Found @shopify/flash-list[0m
+[36m[1m[Codegen][0m Found react-native[0m
+[36m[1m[Codegen][0m Found react-native-gesture-handler[0m
+[36m[1m[Codegen][0m Found react-native-performance[0m
+[36m[1m[Codegen][0m Found react-native-reanimated[0m
+[36m[1m[Codegen][0m Found react-native-safe-area-context[0m
+[36m[1m[Codegen][0m Found react-native-screens[0m
+[36m[1m[Codegen][0m Found react-native-svg[0m
+[36m[1m[Codegen][0m Found react-native-webview[0m
+[36m[1m[Codegen][0m [33mSearching for codegen-enabled libraries in react-native.config.js[0m
+[36m[1m[Codegen][0m Processing rnasyncstorage[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, macos, tvos, visionos for rnasyncstorage[0m
+[36m[1m[Codegen][0m Processing rnpicker[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, macos, tvos for rnpicker[0m
+[36m[1m[Codegen][0m Processing rnflashlist[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, tvos for rnflashlist[0m
+[36m[1m[Codegen][0m Processing FBReactNativeSpec[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Processing rncore[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Processing rngesturehandler_codegen[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, macos, tvos, visionos for rngesturehandler_codegen[0m
+[36m[1m[Codegen][0m Processing RNPerformanceSpec[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios for RNPerformanceSpec[0m
+[36m[1m[Codegen][0m Processing rnreanimated[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, macos, tvos, visionos for rnreanimated[0m
+[36m[1m[Codegen][0m Processing safeareacontext[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, macos, tvos, visionos for safeareacontext[0m
+[36m[1m[Codegen][0m Processing rnscreens[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, tvos, visionos for rnscreens[0m
+[36m[1m[Codegen][0m Processing rnsvg[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, macos, tvos, visionos for rnsvg[0m
+[36m[1m[Codegen][0m Processing RNCWebViewSpec[0m
+[36m[1m[Codegen][0m [33mSearching for podspec in the project dependencies.[0m
+[36m[1m[Codegen][0m Supported Apple platforms: ios, macos, visionos for RNCWebViewSpec[0m
+[36m[1m[Codegen][0m Generating Native Code for rnasyncstorage - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/blulinski/code/project-2/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m Generating Native Code for rnpicker - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/blulinski/code/project-2/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m Generating Native Code for rnflashlist - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/blulinski/code/project-2/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m [33m[Codegen - FBReactNativeSpec] Skipping iOS code generation for FBReactNativeSpec as it has been generated already.[0m
+[36m[1m[Codegen][0m [33m[Codegen - rncore] Skipping iOS code generation for rncore as it has been generated already.[0m
+[36m[1m[Codegen][0m Generating Native Code for rngesturehandler_codegen - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/blulinski/code/project-2/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m Generating Native Code for RNPerformanceSpec - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/blulinski/code/project-2/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m Generating Native Code for rnreanimated - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/blulinski/code/project-2/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m Generating Native Code for safeareacontext - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/blulinski/code/project-2/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m Generating Native Code for rnscreens - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/blulinski/code/project-2/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m Generating Native Code for rnsvg - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/blulinski/code/project-2/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m Generating Native Code for RNCWebViewSpec - ios[0m
+[36m[1m[Codegen][0m Generated artifacts: /Users/blulinski/code/project-2/ios/build/generated/ios[0m
+[36m[1m[Codegen][0m Generating RCTThirdPartyComponentsProvider.h[0m
+[36m[1m[Codegen][0m Generated artifact: /Users/blulinski/code/project-2/ios/build/generated/ios/RCTThirdPartyComponentsProvider.h[0m
+[36m[1m[Codegen][0m Generating RCTThirdPartyComponentsProvider.mm[0m
+[36m[1m[Codegen][0m Crawling @shopify/flash-list library for components[0m
+[36m[1m[Codegen][0m Match found AutoLayoutView -> AutoLayoutViewComponentView[0m
+[36m[1m[Codegen][0m Match found CellContainer -> CellContainerComponentView[0m
+[36m[1m[Codegen][0m [33m[DEPRECATED] @shopify/flash-list should add the 'ios.componentProvider' property in their codegenConfig[0m
+[36m[1m[Codegen][0m Crawling react-native-webview library for components[0m
+[36m[1m[Codegen][0m Match found RNCWebView -> RNCWebView[0m
+[36m[1m[Codegen][0m [33m[DEPRECATED] react-native-webview should add the 'ios.componentProvider' property in their codegenConfig[0m
+[36m[1m[Codegen][0m Generated artifact: /Users/blulinski/code/project-2/ios/build/generated/ios/RCTThirdPartyComponentsProvider.mm[0m
+[36m[1m[Codegen][0m Generating RCTModulesProvider.h[0m
+[36m[1m[Codegen][0m Generated artifact: /Users/blulinski/code/project-2/ios/build/generated/ios/RCTModuleProviders.h[0m
+[36m[1m[Codegen][0m Generating RCTModuleProviders.mm[0m
+[36m[1m[Codegen][0m Generated artifact: /Users/blulinski/code/project-2/ios/build/generated/ios/RCTModuleProviders.mm[0m
+[36m[1m[Codegen][0m Generating RCTAppDependencyProvider[0m
+[36m[1m[Codegen][0m Generated artifact: /Users/blulinski/code/project-2/ios/build/generated/ios/RCTAppDependencyProvider.h[0m
+[36m[1m[Codegen][0m Generated artifact: /Users/blulinski/code/project-2/ios/build/generated/ios/RCTAppDependencyProvider.mm[0m
+[36m[1m[Codegen][0m Generated podspec: /Users/blulinski/code/project-2/ios/build/generated/ios/ReactAppDependencyProvider.podspec[0m
+[36m[1m[Codegen][0m Generated podspec: /Users/blulinski/code/project-2/ios/build/generated/ios/ReactCodegen.podspec[0m
+[36m[1m[Codegen][0m [33mDone.[0m
+  Preparing
+
+Updating local specs repositories
+  CDN: trunk Relative path: CocoaPods-version.yml exists! Returning local because checking is only performed in repo update
+
+Updating spec repo `trunk`
+  CDN: trunk Relative path: deprecated_podspecs.txt, has ETag? W/"685a9b48-cefb0"
+  CDN: trunk Relative path not modified: deprecated_podspecs.txt
+  CDN: trunk Going to update 1 files
+  CDN: trunk Relative path: CocoaPods-version.yml, has ETag? "685a9b48-38"
+  CDN: trunk Relative path not modified: CocoaPods-version.yml
+
+Analyzing dependencies
+
+Inspecting targets to integrate
+  Using `ARCHS` setting to build architectures of target `Pods-Meez`: (``)
+[!] There are multiple dependencies with different sources for `React-Core` in `Podfile`:
+
+- React-Core (from `../node_modules/react-native`)
+- React-Core (from `../node_modules/react-native/`)
+- React-Core/RCTWebSocket (from `../node_modules/react-native/`)
+
+/opt/homebrew/lib/ruby/gems/3.3.0/gems/cocoapods-1.16.2/lib/cocoapods/installer/analyzer.rb:985:in `block in verify_no_pods_with_different_sources!'
+/opt/homebrew/lib/ruby/gems/3.3.0/gems/cocoapods-1.16.2/lib/cocoapods/installer/analyzer.rb:984:in `each'
+/opt/homebrew/lib/ruby/gems/3.3.0/gems/cocoapods-1.16.2/lib/cocoapods/installer/analyzer.rb:984:in `verify_no_pods_with_different_sources!'
+/opt/homebrew/lib/ruby/gems/3.3.0/gems/cocoapods-1.16.2/lib/cocoapods/installer/analyzer.rb:970:in `fetch_external_sources'
+/opt/homebrew/lib/ruby/gems/3.3.0/gems/cocoapods-1.16.2/lib/cocoapods/installer/analyzer.rb:118:in `analyze'
+/opt/homebrew/lib/ruby/gems/3.3.0/gems/cocoapods-1.16.2/lib/cocoapods/installer.rb:422:in `analyze'
+/opt/homebrew/lib/ruby/gems/3.3.0/gems/cocoapods-1.16.2/lib/cocoapods/installer.rb:244:in `block in resolve_dependencies'
+/opt/homebrew/lib/ruby/gems/3.3.0/gems/cocoapods-1.16.2/lib/cocoapods/user_interface.rb:64:in `section'
+/opt/homebrew/lib/ruby/gems/3.3.0/gems/cocoapods-1.16.2/lib/cocoapods/installer.rb:243:in `resolve_dependencies'
+/opt/homebrew/lib/ruby/gems/3.3.0/gems/cocoapods-1.16.2/lib/cocoapods/installer.rb:162:in `install!'
+/opt/homebrew/lib/ruby/gems/3.3.0/gems/cocoapods-1.16.2/lib/cocoapods/command/install.rb:52:in `run'
+/opt/homebrew/lib/ruby/gems/3.3.0/gems/claide-1.1.0/lib/claide/command.rb:334:in `run'
+/opt/homebrew/lib/ruby/gems/3.3.0/gems/cocoapods-1.16.2/lib/cocoapods/command.rb:52:in `run'
+/opt/homebrew/lib/ruby/gems/3.3.0/gems/cocoapods-1.16.2/bin/pod:55:in `<top (required)>'
+/opt/homebrew/lib/ruby/gems/3.3.0/bin/pod:25:in `load'
+/opt/homebrew/lib/ruby/gems/3.3.0/bin/pod:25:in `<main>'

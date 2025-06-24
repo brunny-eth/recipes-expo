@@ -15,6 +15,7 @@ import { supabase } from '@/server/lib/supabase';
 import { useErrorModal } from './ErrorModalContext';
 import { useFreeUsage } from './FreeUsageContext';
 import { router } from 'expo-router';
+import * as AppleAuthentication from 'expo-apple-authentication';
 
 interface UserMetadata {
   role?: 'beta_user' | 'control' | 'variant';
@@ -200,50 +201,98 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
 
 
   const signIn = async (provider: AuthProvider) => {
+    if (provider !== 'apple' && provider !== 'google') {
+      console.error(`[Auth] Unsupported provider "${provider}" passed to signIn.`);
+      showError('Sign In Error', `Authentication with ${provider} is not supported.`);
+      return;
+    }
+    if (provider === 'apple') {
+      try {
+        const credential = await AppleAuthentication.signInAsync({
+          requestedScopes: [
+            AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+            AppleAuthentication.AppleAuthenticationScope.EMAIL,
+          ],
+        });
+  
+        const { identityToken, email, fullName } = credential;
+  
+        if (!identityToken) {
+          throw new Error('No identity token returned by Apple');
+        }
+  
+        console.log('[Apple] Received identityToken, signing in with Supabase');
+  
+        const { data, error } = await supabase.auth.signInWithIdToken({
+          provider: 'apple',
+          token: identityToken,
+        });
+  
+        if (error) throw error;
+  
+        if (data?.user && (email || fullName)) {
+          const fullNameStr = fullName
+            ? [fullName.givenName, fullName.familyName].filter(Boolean).join(' ')
+            : undefined;
+  
+          const metadataUpdate: Record<string, any> = {};
+          if (email) metadataUpdate.email = email;
+          if (fullNameStr) metadataUpdate.full_name = fullNameStr;
+  
+          if (Object.keys(metadataUpdate).length > 0) {
+            console.log('[Apple] Updating user metadata with Apple-provided values:', metadataUpdate);
+            const { error: metadataError } = await supabase.auth.updateUser({
+              data: metadataUpdate,
+            });
+            if (metadataError) {
+              console.error('[Apple] Failed to update user metadata:', metadataError);
+            }
+          }
+        }
+      } catch (err: any) {
+        console.error('[Apple] Native Sign-In Error:', err.message);
+        showError('Sign In Error', err.message || 'An unknown error occurred during Apple sign-in.');
+      }
+      return;
+    }
+  
+    // Google OAuth flow
     const redirectTo = AuthSession.makeRedirectUri({
       native: 'meez://auth/callback',
     });
-    console.log(`[Auth] Attempting sign-in with ${provider}. Redirect URL: ${redirectTo}`);
-
+    console.log(`[Auth] Attempting Google sign-in. Redirect URL: ${redirectTo}`);
+  
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo,
-          skipBrowserRedirect: true, // This is crucial for native app flow
+          skipBrowserRedirect: true,
         },
       });
   
       if (error) throw error;
   
       if (data.url) {
-        console.log('[OAuth] Received redirect URL from Supabase for browser:', data.url);
         const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-        console.log('[OAuth] Web browser session result:', result);
-
-        // --- THIS IS THE CRITICAL AND CORRECTED LOGIC FOR signIn ---
         if (result.type === 'success' && result.url) {
-          console.log('[OAuth] Web browser session successful. Explicitly processing result.url via handleUrl.');
-          await handleUrl(result.url); // <--- THIS IS THE LINE TO ENSURE IT'S PROCESSED
+          await handleUrl(result.url);
         } else {
-          console.warn(`[OAuth] Web browser session not successful or URL missing. Type: ${result.type}`);
           if (result.type === 'cancel') {
-             showError('Sign In Cancelled', 'You cancelled the sign-in process.');
+            showError('Sign In Cancelled', 'You cancelled the sign-in process.');
           } else {
-             showError('Sign In Error', `The sign-in process was not completed (reason: ${result.type}).`);
+            showError('Sign In Error', `Sign-in was not completed. Reason: ${result.type}`);
           }
         }
-        console.log('[OAuth] Web browser session processing complete.');
       } else {
-        console.warn('[OAuth] No URL received from signInWithOAuth. This might indicate an issue.');
-        showError('Sign In Error', 'No redirect URL received from sign-in process. Please try again.');
+        showError('Sign In Error', 'No redirect URL received. Please try again.');
       }
     } catch (err: any) {
-      console.error('[Auth] Sign In Error:', err.message);
+      console.error('[Auth] Google Sign-In Error:', err.message);
       showError('Sign In Error', err.message || 'An unknown error occurred during sign-in.');
     }
   };
-
+  
   const signOut = async () => {
     console.log('[Auth] Attempting to sign out.');
     try {
