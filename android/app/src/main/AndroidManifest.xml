@@ -27,6 +27,7 @@
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="meez"/>
+        <data android:scheme="exp+meez"/>
       </intent-filter>
     </activity>
   </application>

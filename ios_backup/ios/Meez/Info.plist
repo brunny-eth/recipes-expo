@@ -28,6 +28,7 @@
         <key>CFBundleURLSchemes</key>
         <array>
           <string>meez</string>
+          <string>com.meez.app</string>
         </array>
       </dict>
       <dict>

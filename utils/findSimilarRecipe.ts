@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '../server/lib/supabase';
+import { supabaseAdmin } from '../server/lib/supabaseAdmin';
 import logger from '../server/lib/logger';
 
 export async function findSimilarRecipe(
