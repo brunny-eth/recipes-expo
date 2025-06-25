@@ -168,8 +168,10 @@ export async function parseTextRecipe(
             logger.error({ requestId, cacheKey, err: cacheError }, `Exception during cache check.`);
         }
 
+        let insertedId: number | null = null;
         let processingError: string | null = null;
         let finalRecipeData: CombinedParsedRecipe | null = null;
+        let parsedRecipe: CombinedParsedRecipe | null = null;
         let usedFallback = false;
 
         const { preparedText, error: prepareError, timings: prepTimings } = extractFromRawText(trimmedInput, requestId);
@@ -256,37 +258,46 @@ export async function parseTextRecipe(
                 finalRecipeData.recipeYield = normalizeServings(finalRecipeData.recipeYield);
             }
 
+            finalRecipeData.sourceUrl = cacheKey;
+
             const preview = finalRecipeData.title
                 ? finalRecipeData.title.substring(0, MAX_PREVIEW_LENGTH) + (finalRecipeData.title.length > MAX_PREVIEW_LENGTH ? '...' : '')
                 : '(No title found)';
-            logger.info({ requestId, preview }, `Successfully parsed recipe.`);
+            logger.info({ requestId, preview }, `Successfully parsed recipe from raw text.`);
 
             const dbInsertStartTime = Date.now();
             try {
-                const { error: insertError } = await supabase
+                const { data: insertData, error: insertError } = await supabase
                     .from('processed_recipes_cache')
                     .insert({
                         url: cacheKey,
                         recipe_data: finalRecipeData,
                         source_type: inputType
-                    });
+                    })
+                    .select('id')
+                    .single();
 
                 overallTimings.dbInsert = Date.now() - dbInsertStartTime;
 
-                if (insertError) {
+                if (insertError || !insertData?.id) {
                     logger.error({ requestId, cacheKey, err: insertError }, `Error saving recipe to cache.`);
                 } else {
-                    logger.info({ requestId, cacheKey, dbInsertMs: overallTimings.dbInsert }, `Successfully cached new recipe.`);
+                    insertedId = insertData.id;
+                    logger.info({ requestId, cacheKey, id: insertedId, dbInsertMs: overallTimings.dbInsert }, `Successfully cached new recipe from raw text.`);
                 }
             } catch (cacheInsertError) {
                 overallTimings.dbInsert = Date.now() - dbInsertStartTime;
                 logger.error({ requestId, cacheKey, err: cacheInsertError }, `Exception during cache insertion.`);
             }
 
-            if (finalRecipeData) {
-              const finalSizeKb = Buffer.byteLength(JSON.stringify(finalRecipeData), 'utf8') / 1024;
-              logger.info({ requestId, sizeKb: finalSizeKb.toFixed(2), event: 'final_recipe_size' }, 'Size of final structured recipe JSON');
-            }
+            const finalSizeKb = Buffer.byteLength(JSON.stringify(finalRecipeData), 'utf8') / 1024;
+            logger.info({ requestId, sizeKb: finalSizeKb.toFixed(2), event: 'final_recipe_size' }, 'Size of final structured recipe JSON');
+            
+            parsedRecipe = {
+                ...finalRecipeData,
+                id: insertedId ?? undefined,
+            };
+
         } else {
             logger.warn({ requestId, inputType }, `Processing finished without error, but no final recipe data was produced.`);
             overallTimings.dbInsert = 0;
@@ -295,7 +306,7 @@ export async function parseTextRecipe(
         overallTimings.total = Date.now() - requestStartTime;
         logger.info({ 
             requestId, 
-            success: !!finalRecipeData, 
+            success: !!parsedRecipe, 
             inputType, 
             fromCache: false, 
             fetchMethod: 'N/A', 
@@ -308,13 +319,16 @@ export async function parseTextRecipe(
 
         logger.debug({
           requestId,
-          finalRecipeTitle: finalRecipeData?.title,
-          numIngredients: finalRecipeData?.ingredients?.length ?? 0,
-          servings: finalRecipeData?.recipeYield
+          finalRecipeTitle: parsedRecipe?.title,
+          ingredients: parsedRecipe?.ingredients,
+          instructions: parsedRecipe?.instructions,
+          servings: parsedRecipe?.recipeYield
         }, "Final structured recipe returned to client");
 
+        console.log('[parseTextRecipe] Returning parsedRecipe with ID:', parsedRecipe?.id);
+
         return {
-            recipe: finalRecipeData,
+            recipe: parsedRecipe,
             error: null,
             fromCache: false,
             inputType,

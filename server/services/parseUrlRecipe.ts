@@ -81,8 +81,10 @@ export async function parseUrlRecipe(
             logger.error({ requestId, cacheKey, err: cacheError }, `Exception during cache check.`);
         }
 
+        let insertedId: number | null = null;
         let processingError: string | null = null;
         let finalRecipeData: CombinedParsedRecipe | null = null;
+        let parsedRecipe: CombinedParsedRecipe | null = null;
         let usedFallback = false;
 
         const { extractedContent, error: fetchExtractError, fetchMethodUsed: fmUsed, timings: feTimings } = await fetchAndExtractFromUrl(trimmedInput, requestId, scraperApiKey, scraperClient);
@@ -200,18 +202,20 @@ export async function parseUrlRecipe(
 
                 overallTimings.dbInsert = Date.now() - dbInsertStartTime;
 
-                if (insertError) {
+                if (insertError || !insertData?.id) {
                     logger.error({ requestId, cacheKey, err: insertError }, `Error saving recipe to cache.`);
                 } else {
-                    logger.info({ requestId, cacheKey, dbInsertMs: overallTimings.dbInsert }, `Successfully cached new recipe.`);
-                    if (process.env.ENABLE_EMBEDDING === 'true' && insertData) {
-                        const recipeId = insertData.id;
-                        logger.info({ recipeId }, 'Embedding queued after successful URL parse');
-                        await generateAndSaveEmbedding(recipeId, {
+                    insertedId = insertData.id; // ✅ store the ID
+                    logger.info({ requestId, cacheKey, id: insertedId, dbInsertMs: overallTimings.dbInsert }, `Successfully cached new recipe.`);
+                    console.log('[parseUrlRecipe] Inserted recipe with ID:', insertedId);
+
+                    if (insertedId && process.env.ENABLE_EMBEDDING === 'true') {
+                        logger.info({ recipeId: insertedId }, 'Embedding queued after successful URL parse');
+                        await generateAndSaveEmbedding(insertedId, {
                             title: finalRecipeData.title,
-                            ingredientsText: finalRecipeData.ingredients?.join('\n'),
+                            ingredientsText: finalRecipeData.ingredients?.map(i => i.name).join('\n'),
                             instructionsText: finalRecipeData.instructions?.join('\n'),
-                         });
+                        });
                     }
                 }
             } catch (cacheInsertError) {
@@ -219,10 +223,13 @@ export async function parseUrlRecipe(
                 logger.error({ requestId, cacheKey, err: cacheInsertError }, `Exception during cache insertion.`);
             }
 
-            if (finalRecipeData) {
-              const finalSizeKb = Buffer.byteLength(JSON.stringify(finalRecipeData), 'utf8') / 1024;
-              logger.info({ requestId, sizeKb: finalSizeKb.toFixed(2), event: 'final_recipe_size' }, 'Size of final structured recipe JSON');
-            }
+            const finalSizeKb = Buffer.byteLength(JSON.stringify(finalRecipeData), 'utf8') / 1024;
+            logger.info({ requestId, sizeKb: finalSizeKb.toFixed(2), event: 'final_recipe_size' }, 'Size of final structured recipe JSON');
+            
+            parsedRecipe = {
+                ...finalRecipeData,
+                id: insertedId ?? undefined,
+            };
         } else {
             logger.warn({ requestId, inputType }, `Processing finished without error, but no final recipe data was produced.`);
             overallTimings.dbInsert = 0;
@@ -245,12 +252,15 @@ export async function parseUrlRecipe(
         logger.debug({
           requestId,
           finalRecipeTitle: finalRecipeData?.title,
-          numIngredients: finalRecipeData?.ingredients?.length ?? 0,
+          ingredients: finalRecipeData?.ingredients,
+          instructions: finalRecipeData?.instructions,
           servings: finalRecipeData?.recipeYield
         }, "Final structured recipe returned to client");
 
+        console.log('[parseUrlRecipe] Returning parsedRecipe with ID:', parsedRecipe?.id);
+
         return {
-            recipe: finalRecipeData,
+            recipe: parsedRecipe,
             error: null,
             fromCache: false,
             inputType,

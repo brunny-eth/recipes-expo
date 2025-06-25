@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, View } from 'react-native';
 import { supabase } from '../lib/supabaseClient';
 import { isRecipeSaved, saveRecipe, unsaveRecipe } from '../lib/savedRecipes';
 
@@ -11,7 +11,14 @@ const SaveButton: React.FC<SaveButtonProps> = ({ recipeId }) => {
   const [isSaved, setIsSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  const isIdValid = recipeId !== undefined && recipeId !== null && !isNaN(recipeId);
+
   useEffect(() => {
+    if (!isIdValid) {
+      setIsLoading(false);
+      return;
+    }
+
     const checkSavedStatus = async () => {
       setIsLoading(true);
       console.log(`Checking saved status for recipe: ${recipeId}`);
@@ -29,9 +36,15 @@ const SaveButton: React.FC<SaveButtonProps> = ({ recipeId }) => {
     };
 
     checkSavedStatus();
-  }, [recipeId]);
+  }, [recipeId, isIdValid]);
 
   const handlePress = async () => {
+    if (!isIdValid) {
+      console.warn('[SaveButton] Save pressed with invalid recipeId:', recipeId);
+      return;
+    }
+
+    console.log('[SaveButton] Saving recipe with ID:', recipeId);
     setIsLoading(true);
     console.log(`Button pressed. Current state isSaved: ${isSaved}`);
 
@@ -65,6 +78,14 @@ const SaveButton: React.FC<SaveButtonProps> = ({ recipeId }) => {
     
     setIsLoading(false);
   };
+
+  if (!isIdValid) {
+    return (
+      <View style={[styles.button, styles.disabled]}>
+        <Text style={styles.text}>Save</Text>
+      </View>
+    );
+  }
 
   return (
     <TouchableOpacity

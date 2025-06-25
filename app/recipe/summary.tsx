@@ -6,7 +6,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { decode } from 'he';
 import { COLORS } from '@/constants/theme';
 import { scaleIngredient, parseServingsValue, getScaledYieldText, parseAmountString, formatAmountNumber } from '@/utils/recipeUtils'; // Correct import path assuming utils is under root/src or similar alias
-import { StructuredIngredient } from '../../common/types';
+import { StructuredIngredient, CombinedParsedRecipe as ParsedRecipe } from '../../common/types';
 import { coerceToStructuredIngredients } from '@/utils/ingredientHelpers'; 
 import { useErrorModal } from '@/context/ErrorModalContext'; 
 import InlineErrorBanner from '@/components/InlineErrorBanner'; 
@@ -99,25 +99,11 @@ const buttonTotalGap = servingsContainerGap * (numButtons - 1);
 const buttonWidth = (availableWidth - buttonTotalGap) / numButtons;
 
 // --- Define Types (Matching Backend Output) ---
-// Re-define types here or import from a shared types file
-type ParsedRecipe = {
-  title: string | null;
-  description?: string | null;
-  image?: string | null;
-  thumbnailUrl?: string | null;
-  ingredients: StructuredIngredient[] | string[] | null; // This holds the ORIGINAL ingredients initially
-  instructions: string[] | null;
-  substitutions_text: string | null;
-  recipeYield?: string | null;
-  prepTime?: string | null;
-  cookTime?: string | null;
-  totalTime?: string | null;
-  nutrition?: { calories?: string | null; protein?: string | null; [key: string]: any } | null;
-  sourceUrl?: string | null;
-};
+
 
 // Type for data passed to IngredientsScreen
 type IngredientsNavParams = {
+    id?: number;
     title: string | null;
     originalIngredients: StructuredIngredient[] | string[] | null;
     scaledIngredients: StructuredIngredient[] | null;
@@ -227,6 +213,7 @@ export default function RecipeSummaryScreen() {
     }
     
     const navParams: IngredientsNavParams = {
+        id: recipe.id,
         title: cleanTitle || recipe.title,
         originalIngredients: structuredOriginals, // Pass the coerced originals
         scaledIngredients: scaledIngredients,
@@ -236,11 +223,13 @@ export default function RecipeSummaryScreen() {
         scaleFactor: selectedScaleFactor
     };
 
+    const recipeData = JSON.stringify(navParams);
+    console.log('[SummaryScreen] Navigating with recipeData:', recipeData);
+
     router.push({
       pathname: '/recipe/ingredients',
       params: { 
-        recipeData: JSON.stringify(navParams) // Reverted to original
-        // recipeData: "this is not valid json for ingredients" // Temporary change for testing
+        recipeData
       }
     });
   };

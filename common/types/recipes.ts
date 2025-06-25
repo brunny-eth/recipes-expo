@@ -9,6 +9,7 @@ export type StructuredIngredient = {
 };
 
 export type CombinedParsedRecipe = {
+  id?: number;
   title: string | null;
   description?: string | null;
   image?: string | null;

@@ -7,6 +7,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { useHandleError } from '@/hooks/useHandleError';
 import { normalizeError } from '@/utils/normalizeError';
 import GlobalErrorModal from '../GlobalErrorModal';
+import { CombinedParsedRecipe as ParsedRecipe } from '../../common/types';
 
 interface LoadingExperienceScreenProps {
   recipeInput: string;
@@ -20,7 +21,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({ recip
     const router = useRouter();
     const alreadyNavigated = useRef(false);
     const [isParsingFinished, setIsParsingFinished] = useState(false);
-    const [recipeData, setRecipeData] = useState<any>(null);
+    const [recipeData, setRecipeData] = useState<ParsedRecipe | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [componentKey, setComponentKey] = useState(0);
     const handleError = useHandleError();
@@ -77,6 +78,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({ recip
         if (isParsingFinished && !error && recipeData && !alreadyNavigated.current) {
             alreadyNavigated.current = true;
             console.log('[LoadingExperienceScreen] Parsing complete. Navigating...');
+            console.log('[LoadingExperienceScreen] recipeData with ID:', recipeData?.id);
             router.replace({
               pathname: '/recipe/summary',
               params: { recipeData: JSON.stringify(recipeData) },
