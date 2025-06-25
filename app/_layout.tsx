@@ -9,6 +9,8 @@ import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { ErrorModalProvider } from '@/context/ErrorModalContext';
 import { FreeUsageProvider, useFreeUsage } from '@/context/FreeUsageContext';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import WelcomeScreen from '@/components/WelcomeScreen';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -116,14 +118,30 @@ export default function RootLayout() {
     'Inter-Regular': require('../assets/fonts/Inter-Regular.ttf'),
     'Inter-SemiBold': require('../assets/fonts/Inter-SemiBold.ttf'),
   });
+  const [isFirstLaunch, setIsFirstLaunch] = useState<boolean | null>(null);
 
   useEffect(() => {
     async function prepare() {
+      console.log('[RootLayout] Starting prepare function...');
       try {
         await Asset.loadAsync(require('@/assets/images/meez_logo.png'));
+        console.log('[RootLayout] Assets loaded.');
+
+        const hasLaunched = await AsyncStorage.getItem('hasLaunched');
+        console.log(`[RootLayout] AsyncStorage 'hasLaunched' value: ${hasLaunched}`);
+
+        if (hasLaunched === null) {
+          console.log('[RootLayout] First launch detected. Setting isFirstLaunch to true.');
+          setIsFirstLaunch(true);
+        } else {
+          console.log('[RootLayout] Not first launch. Setting isFirstLaunch to false.');
+          setIsFirstLaunch(false);
+        }
       } catch (e) {
-        console.warn('Failed to preload logo', e);
+        console.warn('[RootLayout] Failed to load assets or check first launch', e);
+        setIsFirstLaunch(false); // Default to not first launch on error
       } finally {
+        console.log('[RootLayout] Prepare function finished. Setting assetsLoaded to true.');
         setAssetsLoaded(true);
       }
     }
@@ -131,7 +149,8 @@ export default function RootLayout() {
     prepare();
   }, []);
 
-  const ready = fontsLoaded && assetsLoaded;
+  const ready = fontsLoaded && assetsLoaded && isFirstLaunch !== null;
+  console.log(`[RootLayout] ready state: ${ready} (fontsLoaded: ${fontsLoaded}, assetsLoaded: ${assetsLoaded}, isFirstLaunch: ${isFirstLaunch})`);
 
   useEffect(() => {
     if (ready) {
@@ -139,8 +158,23 @@ export default function RootLayout() {
     }
   }, [ready]);
 
+  const handleWelcomeDismiss = async () => {
+    try {
+      await AsyncStorage.setItem('hasLaunched', 'true');
+      setIsFirstLaunch(false);
+    } catch (error) {
+      console.error('Failed to set hasLaunched flag', error);
+      // Still proceed to app
+      setIsFirstLaunch(false);
+    }
+  };
+
   if (!ready) {
     return null;
+  }
+
+  if (isFirstLaunch) {
+    return <WelcomeScreen onDismiss={handleWelcomeDismiss} />;
   }
 
   return (

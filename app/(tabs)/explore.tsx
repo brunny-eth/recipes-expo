@@ -81,7 +81,7 @@ const ExploreScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { paddingTop: 20 }]} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
         <Text style={styles.title}>Explore Recipes</Text>
       </View>
@@ -92,19 +92,10 @@ const ExploreScreen = () => {
         data={DUMMY_RECIPES}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <RecipeCard
-            recipe={item}
-            onPress={() => {
-              if (!isAuthenticated && hasUsedFreeRecipe) {
-                showError("Login Required", "You've already used your free recipe. Please log in to continue.");
-              } else {
-                router.push({
-                  pathname: '/loading',
-                  params: { recipeInput: item.title },
-                });
-              }
-            }}
-          />
+          <View style={{ height: 120, marginVertical: 8, backgroundColor: '#f0f0f0', padding: 10, borderRadius: 8 }}>
+            <Text style={{ fontWeight: 'bold' }}>{item.title}</Text>
+            <Text>Calories: {item.calories}</Text>
+          </View>
         )}
         contentContainerStyle={styles.listContentContainer}
       />
@@ -118,7 +109,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   header: {
-    paddingTop: 20,
     paddingHorizontal: 20,
     marginBottom: 10,
   },

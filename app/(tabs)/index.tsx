@@ -15,7 +15,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const [isInputFocused, setIsInputFocused] = React.useState(false);
   const { showError } = useErrorModal();
-  const { session } = useAuth(); 
+  const { session, user } = useAuth(); 
   const { hasUsedFreeRecipe } = useFreeUsage(); 
 
   React.useEffect(() => {
@@ -72,7 +72,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoidingView}
@@ -108,6 +108,7 @@ export default function HomeScreen() {
                 autoCorrect={false}
                 onFocus={() => setIsInputFocused(true)}
                 onBlur={() => setIsInputFocused(false)}
+                onSubmitEditing={handleSubmit}
               />
               <TouchableOpacity 
                 style={styles.submitButton} 
