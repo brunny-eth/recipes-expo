@@ -281,14 +281,9 @@ export default function StepsScreen() {
           <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textDark} />
         </TouchableOpacity>
         <Image source={require('@/assets/images/meez_logo.png')} style={styles.headerLogo} />
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <TouchableOpacity style={styles.toolsButton} onPress={() => setIsHeaderToolsVisible(true)}>
-              <MaterialCommunityIcons name="tools" size={24} color={COLORS.textDark} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.exitButton} onPress={() => router.replace('/(tabs)')}>
-            <MaterialCommunityIcons name="close" size={24} color={COLORS.textDark} />
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity style={styles.exitButton} onPress={() => router.replace('/')}>
+          <MaterialCommunityIcons name="close" size={24} color={COLORS.textDark} />
+        </TouchableOpacity>
       </Animated.View>
       
       <Modal
@@ -465,7 +460,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'ios' ? 0 : 10,
-    paddingBottom: 6,
+    paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.lightGray,
     backgroundColor: COLORS.background,
@@ -615,9 +610,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   exitButton: {
-    padding: 8,
-  },
-  toolsButton: {
     padding: 8,
   },
   headerToolsBackdrop: {

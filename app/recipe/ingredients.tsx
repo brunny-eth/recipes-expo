@@ -954,8 +954,8 @@ const styles = StyleSheet.create({
   },
   helpModalCloseButton: {
     position: 'absolute',
-    top: 10,
-    right: 10,
+    top: 15,
+    right: 15,
     padding: 5,
   },
   // --- End Help Modal Styles ---
