@@ -188,9 +188,11 @@ export async function parseUrlRecipe(
                 : '(No title found)';
             logger.info({ requestId, preview }, `Successfully parsed recipe.`);
 
+            let insertData: { id: number } | null = null;
             const dbInsertStartTime = Date.now();
             try {
-                const { data: insertData, error: insertError } = await supabase
+                console.log('[parseUrlRecipe] attempting insert with cacheKey:', cacheKey);
+                const { data, error: insertError } = await supabase
                     .from('processed_recipes_cache')
                     .insert({
                         url: cacheKey,
@@ -199,7 +201,11 @@ export async function parseUrlRecipe(
                     })
                     .select('id')
                     .single();
+                
+                console.log('[parseUrlRecipe] insertData:', data);
+                console.log('[parseUrlRecipe] insertError:', insertError);
 
+                insertData = data;
                 overallTimings.dbInsert = Date.now() - dbInsertStartTime;
 
                 if (insertError || !insertData?.id) {
@@ -222,6 +228,9 @@ export async function parseUrlRecipe(
                 overallTimings.dbInsert = Date.now() - dbInsertStartTime;
                 logger.error({ requestId, cacheKey, err: cacheInsertError }, `Exception during cache insertion.`);
             }
+
+            console.log('[parseUrlRecipe] insertData:', insertData);
+            console.log('[parseUrlRecipe] insertedId after insert:', insertedId);
 
             const finalSizeKb = Buffer.byteLength(JSON.stringify(finalRecipeData), 'utf8') / 1024;
             logger.info({ requestId, sizeKb: finalSizeKb.toFixed(2), event: 'final_recipe_size' }, 'Size of final structured recipe JSON');
