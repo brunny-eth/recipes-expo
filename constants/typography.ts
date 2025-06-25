@@ -37,4 +37,9 @@ export const captionText: TextStyle = {
 export const captionStrongText: TextStyle = {
   fontFamily: interSemiBold,
   fontSize: 13,
+};
+
+export const monoSpacedText: TextStyle = {
+  fontFamily: 'monospace', // A generic font family that should work on both platforms
+  fontSize: 14,
 }; 

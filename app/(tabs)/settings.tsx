@@ -51,6 +51,15 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
 
+        {__DEV__ && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Developer Tools</Text>
+            <TouchableOpacity style={styles.linkRow} onPress={() => router.push('/debug' as any)}>
+              <Text style={styles.linkText}>Open Debug Menu</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {isAuthenticated && (
             <TouchableOpacity style={styles.signOutButton} onPress={signOut}>
                 <Text style={styles.signOutButtonText}>Sign Out</Text>
@@ -133,4 +142,4 @@ const styles = StyleSheet.create({
       color: COLORS.white,
       fontSize: 16,
   },
-}); 
+});
