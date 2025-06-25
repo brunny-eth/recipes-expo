@@ -10,10 +10,10 @@ import React, {
 import { Session, User } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
-import { supabase } from '@/server/lib/supabase';
+import { supabase } from '@/lib/supabaseClient';
 import { useErrorModal } from './ErrorModalContext';
 import { useFreeUsage } from './FreeUsageContext';
-import { router } from 'expo-router';
+import { router, useSegments } from 'expo-router';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as SecureStore from 'expo-secure-store';
 

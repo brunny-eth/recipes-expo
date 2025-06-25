@@ -5,7 +5,7 @@ import { COLORS } from '@/constants/theme';
 import RecipeCard from '@/components/RecipeCard';
 import { useFreeUsage } from '@/context/FreeUsageContext';
 import { router } from 'expo-router';
-import { supabase } from '@/server/lib/supabase';
+import { supabase } from '@/lib/supabaseClient';
 import { bodyText, screenTitleText } from '@/constants/typography';
 import { useAuth } from '@/context/AuthContext';
 import { useErrorModal } from '@/context/ErrorModalContext';

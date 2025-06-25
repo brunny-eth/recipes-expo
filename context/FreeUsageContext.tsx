@@ -8,7 +8,8 @@ import React, {
     useCallback,
   } from 'react';
 import { getHasUsedFreeRecipe, setHasUsedFreeRecipe as setFreeUsageInStorage, clearFreeRecipeFlag } from '@/server/lib/freeUsageTracker'; // Renamed import for clarity
-import { supabase } from '@/server/lib/supabase';
+import { supabase } from '@/lib/supabaseClient';
+import { useAuth } from './AuthContext';
   
 interface FreeUsageContextType {
   hasUsedFreeRecipe: boolean | null; // null for initial loading, true/false after check

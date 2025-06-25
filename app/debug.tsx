@@ -6,7 +6,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Session, User } from '@supabase/supabase-js';
 
 import { useAuth } from '@/context/AuthContext';
-import { getSecureStoreLogs, supabase } from '@/server/lib/supabase';
+import { getSecureStoreLogs, supabase } from '@/lib/supabaseClient';
 import { COLORS } from '@/constants/theme';
 import { bodyStrongText, monoSpacedText, screenTitleText } from '@/constants/typography';
 

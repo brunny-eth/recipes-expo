@@ -1,3 +1,5 @@
+import { Database } from './database.types';
+
 export type StructuredIngredient = {
   name: string;
   amount: string | null;
@@ -31,4 +33,9 @@ export type SubstitutionSuggestion = {
   description?: string | null;
   amount?: string | number | null;
   unit?: string | null;
+};
+
+export type Recipe = Database['public']['Tables']['recipes']['Row'] & {
+  ingredients: Database['public']['Tables']['ingredients']['Row'][];
+  instructions: { step: number; text: string }[];
 }; 
