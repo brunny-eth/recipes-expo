@@ -21,7 +21,7 @@ export default function SettingsScreen() {
   const { signOut, isAuthenticated } = useAuth();
   
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { paddingTop: 20 }]} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>Settings</Text>
       </View>
@@ -79,7 +79,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   header: {
-    paddingTop: 20,
     marginBottom: 10,
   },
   title: {

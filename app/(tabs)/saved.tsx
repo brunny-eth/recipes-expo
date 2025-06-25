@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function SavedScreen() {
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={[styles.container, { paddingTop: 20 }]} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
         <Text style={styles.title}>Favorites</Text>
       </View>
@@ -22,13 +22,13 @@ export default function SavedScreen() {
   );
 }
 
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
   },
   header: {
-    paddingTop: 20,
     paddingHorizontal: 20,
     marginBottom: 10,
   },

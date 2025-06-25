@@ -4,6 +4,8 @@ import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { Asset } from 'expo-asset';
 import * as SplashScreen from 'expo-splash-screen';
+import { StyleSheet } from 'react-native';
+import Animated, { FadeOut } from 'react-native-reanimated';
 
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { ErrorModalProvider } from '@/context/ErrorModalContext';
@@ -169,22 +171,26 @@ export default function RootLayout() {
     }
   };
 
+  // 1. Show nothing (splash screen) while loading fonts/assets/state
   if (!ready) {
     return null;
   }
 
-  if (isFirstLaunch) {
-    return <WelcomeScreen onDismiss={handleWelcomeDismiss} />;
-  }
-
+  // 2. Always render the main app structure first
   return (
     <ErrorModalProvider>
-      {/* Corrected order: FreeUsageProvider wraps AuthProvider */}
       <FreeUsageProvider>
         <AuthProvider>
           <RootLayoutNav />
         </AuthProvider>
       </FreeUsageProvider>
+
+      {/* 3. Conditionally render the WelcomeScreen as an overlay on top */}
+      {isFirstLaunch && (
+        <Animated.View style={StyleSheet.absoluteFill} exiting={FadeOut.duration(500)}>
+          <WelcomeScreen onDismiss={handleWelcomeDismiss} />
+        </Animated.View>
+      )}
     </ErrorModalProvider>
   );
 }
