@@ -23,6 +23,7 @@ export default function TabLayout() {
             tabBarIcon: ({ color, size }: { color: string; size: number }) => (
               <MaterialCommunityIcons name="home-outline" size={size} color={color} />
             ),
+            unmountOnBlur: false,
           }}
         />
         <Tabs.Screen
@@ -32,6 +33,7 @@ export default function TabLayout() {
             tabBarIcon: ({ color, size }: { color: string; size: number }) => (
               <MaterialCommunityIcons name="compass-outline" size={size} color={color} />
             ),
+            unmountOnBlur: false,
           }}
         />
         <Tabs.Screen
@@ -42,6 +44,7 @@ export default function TabLayout() {
             tabBarIcon: ({ color, size }: { color: string; size: number }) => (
               <MaterialCommunityIcons name="heart-outline" size={size} color={color} />
             ),
+            unmountOnBlur: false,
           }}
         />
         <Tabs.Screen
@@ -51,6 +54,7 @@ export default function TabLayout() {
             tabBarIcon: ({ color, size }: { color: string; size: number }) => (
               <MaterialCommunityIcons name="cog-outline" size={size} color={color} />
             ),
+            unmountOnBlur: false,
           }}
         />
       </Tabs>

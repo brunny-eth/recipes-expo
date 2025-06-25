@@ -4,6 +4,7 @@ import { COLORS } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { bodyText, bodyStrongText, screenTitleText, sectionHeaderText } from '@/constants/typography';
+import { useEffect } from 'react';
 
 function AuthStatus() {
   const { session } = useAuth();
@@ -20,20 +21,29 @@ function AuthStatus() {
 export default function SettingsScreen() {
   const { signOut, isAuthenticated } = useAuth();
   
+  useEffect(() => {
+    console.log('[SettingsScreen] Mounted!');
+    
+    return () => {
+      console.log('[SettingsScreen] Unmounted!');
+    };
+  }, []);
+
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: 20 }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { paddingTop: 20 }]} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
         <Text style={styles.title}>Settings</Text>
       </View>
-      <View style={styles.authStatusContainer}></View>
       
-      {isAuthenticated ? (
-        <AuthStatus />
-      ) : (
-        <TouchableOpacity onPress={() => router.push('/login')} style={[styles.loginButton, {marginBottom: 20}]}>
-            <Text style={styles.loginButtonText}>Log In or Sign Up</Text>
-        </TouchableOpacity>
-      )}
+      <View style={{ minHeight: 70, marginBottom: 20 }}>
+        {isAuthenticated ? (
+          <AuthStatus />
+        ) : (
+          <TouchableOpacity onPress={() => router.push('/login')} style={styles.loginButton}>
+              <Text style={styles.loginButtonText}>Log In or Sign Up</Text>
+          </TouchableOpacity>
+        )}
+      </View>
       
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40}}>
         <View style={styles.section}>

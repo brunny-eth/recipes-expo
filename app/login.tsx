@@ -46,9 +46,9 @@ const LoginScreen = () => {
         <MaterialCommunityIcons name="close" size={24} color={COLORS.textDark} />
       </TouchableOpacity>
       <View style={styles.content}>
-        <Text style={styles.title}>Welcome to Meez</Text>
+        <Text style={styles.title}>Meez</Text>
         <Text style={styles.subtitle}>
-          Login with Google or Apple to save, use, and discover new recipes.
+          Create an account to use, save, and find new recipes.
         </Text>
 
         <TouchableOpacity
