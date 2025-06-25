@@ -13,6 +13,7 @@ import InlineErrorBanner from '@/components/InlineErrorBanner';
 import { titleText, sectionHeaderText, bodyText, captionStrongText, bodyStrongText, captionText } from '@/constants/typography';
 import { useAuth } from '@/context/AuthContext';
 import { setHasUsedFreeRecipe } from '@/server/lib/freeUsageTracker';
+import SaveButton from '@/components/SaveButton';
 
 const ALLERGENS = [
   {
@@ -115,7 +116,7 @@ type IngredientsNavParams = {
 // --- End Types ---
 
 export default function RecipeSummaryScreen() {
-  const params = useLocalSearchParams<{ recipeData?: string }>();
+  const params = useLocalSearchParams<{ recipeData?: string; from?: string }>();
   const router = useRouter();
   const { showError } = useErrorModal(); // Added hook usage
   const { session } = useAuth();
@@ -127,6 +128,12 @@ export default function RecipeSummaryScreen() {
   // NEW state for original yield value and selected scale factor
   const [originalYieldValue, setOriginalYieldValue] = useState<number | null>(null);
   const [selectedScaleFactor, setSelectedScaleFactor] = useState<number>(1.0); // Default to 1x
+
+  const handleExitPress = () => {
+    // If 'from' exists, go there. Otherwise, default to the main input screen.
+    const exitPath = params.from || '/'; 
+    router.replace(exitPath as any);
+  };
 
   useEffect(() => {
     console.log('[SummaryScreen] Mount');
@@ -147,6 +154,9 @@ export default function RecipeSummaryScreen() {
         }
 
         setRecipe(parsed);
+        if (!parsed.id) {
+          console.warn('[SummaryScreen] Missing recipe.id, SaveButton will not be rendered.');
+        }
         
         const yieldNum = parseServingsValue(parsed.recipeYield); 
         setOriginalYieldValue(yieldNum);
@@ -270,7 +280,7 @@ export default function RecipeSummaryScreen() {
            <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textDark} />
          </TouchableOpacity>
          <Image source={require('@/assets/images/meez_logo.png')} style={styles.headerLogo} />
-         <TouchableOpacity style={styles.exitButton} onPress={() => router.replace('/')}>
+         <TouchableOpacity style={styles.exitButton} onPress={handleExitPress}>
            <MaterialCommunityIcons name="close" size={24} color={COLORS.textDark} />
          </TouchableOpacity>
       </View>
@@ -290,6 +300,12 @@ export default function RecipeSummaryScreen() {
                 )}
             </View>
         </View>
+
+        {recipe?.id && (
+          <View style={{ marginBottom: 24 }}>
+            <SaveButton recipeId={recipe.id} />
+          </View>
+        )}
 
         {/* --- Metadata Sections --- */}
         

@@ -81,7 +81,10 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({ recip
             console.log('[LoadingExperienceScreen] recipeData with ID:', recipeData?.id);
             router.replace({
               pathname: '/recipe/summary',
-              params: { recipeData: JSON.stringify(recipeData) },
+              params: { 
+                recipeData: JSON.stringify(recipeData),
+                from: '/' 
+              },
             });
             onComplete();
         }
