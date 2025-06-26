@@ -9,12 +9,14 @@ import {
   ActivityIndicator,
   Platform,
   Dimensions,
-  Image,
   Linking,
   ViewStyle,
   TextStyle,
   ImageStyle,
 } from 'react-native';
+// Import FastImage from the new library
+import FastImage from '@d11/react-native-fast-image';
+
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -375,9 +377,9 @@ export default function RecipeSummaryScreen() {
             color={COLORS.textDark}
           />
         </TouchableOpacity>
-        <Image
+        <FastImage
           source={require('@/assets/images/meez_logo.webp')}
-          style={styles.headerLogo}
+          style={styles.headerLogo as any}
         />
         <TouchableOpacity style={styles.exitButton} onPress={handleExitPress}>
           <MaterialCommunityIcons
@@ -391,10 +393,13 @@ export default function RecipeSummaryScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.recipeInfoContainer}>
           {(recipe.image || recipe.thumbnailUrl) && (
-            <Image
+            <FastImage
               source={{ uri: (recipe.image || recipe.thumbnailUrl) as string }}
-              style={styles.recipeImage}
+              style={styles.recipeImage as any}
               resizeMode="cover"
+              onLoad={(e) => {
+                console.log(`[PERF: FastImage] Image for ${cleanTitle || 'recipe'} loaded from cache: ${(e.nativeEvent as any).source.cache}`);
+              }}
             />
           )}
           <View style={styles.recipeTextContainer}>

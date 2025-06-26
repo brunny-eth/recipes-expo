@@ -5,9 +5,10 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Image,
   ActivityIndicator,
 } from 'react-native';
+import FastImage from '@d11/react-native-fast-image';
+
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import {
@@ -31,7 +32,6 @@ type SavedRecipe = {
     recipe_data: ParsedRecipe;
   } | null;
 };
-
 
 export default function SavedScreen() {
   const insets = useSafeAreaInsets();
@@ -89,6 +89,8 @@ export default function SavedScreen() {
             `[SavedScreen] Fetched ${data?.length || 0} saved recipes from DB.`,
           );
 
+          // The linter is struggling with the joined type. We cast to 'any' and then to our expected type.
+          // This is safe as long as the RLS and DB schema are correct.
           const validRecipes =
             ((data as any[])?.filter(
               (r) => r.processed_recipes_cache?.recipe_data,
@@ -110,7 +112,6 @@ export default function SavedScreen() {
       fetchSavedRecipes();
     }, [session]),
   );
-
 
   const handleRecipePress = (item: SavedRecipe) => {
     // Ensure data exists before proceeding
@@ -156,16 +157,16 @@ const renderRecipeItem = ({ item }: { item: SavedRecipe }) => {
           onPress={() => handleRecipePress(item)}
       >
           {imageUrl && (
-              <Image
-                  source={{ uri: imageUrl }}
-                  style={styles.cardImage}
-                  onLoad={() => {
-                      console.log(`[PERF: SavedScreen] Image loaded for recipe: ${recipe_data.title}`);
-                  }}
-                  onError={(e) => {
-                      console.error(`[PERF: SavedScreen] Image failed to load for recipe: ${recipe_data.title}`, e.nativeEvent.error);
-                  }}
-              />
+            <FastImage
+              source={{ uri: imageUrl }}
+              style={styles.cardImage}
+              onLoad={() => {
+                  console.log(`[PERF: SavedScreen] Image loaded for recipe: ${recipe_data.title}`);
+              }}
+              onError={() => {
+                  console.error(`[PERF: SavedScreen] Image failed to load for recipe: ${recipe_data.title}`);
+              }}
+          />
           )}
           <View style={styles.cardTextContainer}>
               <Text style={styles.cardTitle} numberOfLines={2}>

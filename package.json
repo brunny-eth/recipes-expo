@@ -13,6 +13,7 @@
     "start": "expo start --dev-client"
   },
   "dependencies": {
+    "@d11/react-native-fast-image": "^8.9.2",
     "@expo-google-fonts/poppins": "^0.2.3",
     "@expo/vector-icons": "^14.0.2",
     "@google/generative-ai": "^0.24.1",
