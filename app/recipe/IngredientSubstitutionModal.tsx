@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     borderRadius: RADIUS.md,
     backgroundColor: COLORS.white,
-    marginBottom: 12, // TODO: No token for 12
+    marginBottom: SPACING.base,
     borderWidth: BORDER_WIDTH.default,
     borderColor: COLORS.lightGray,
   },
@@ -295,7 +295,7 @@ const styles = StyleSheet.create({
   radioButtonInner: {
     width: ICON_SIZE.xs,
     height: ICON_SIZE.xs,
-    borderRadius: 6, // TODO: No token for 6
+    borderRadius: RADIUS.smAlt,
     backgroundColor: COLORS.primary,
   },
   optionContent: {

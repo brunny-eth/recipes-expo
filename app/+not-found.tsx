@@ -34,8 +34,8 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   } as TextStyle,
   linkContainer: {
-    marginTop: 15, // TODO: No SPACING token for 15
-    paddingVertical: 15, // TODO: No SPACING token for 15
+    marginTop: SPACING.smLg,
+    paddingVertical: SPACING.smLg,
   } as ViewStyle,
   linkText: {
     ...bodyStrongText,

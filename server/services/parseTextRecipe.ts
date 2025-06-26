@@ -147,9 +147,11 @@ export async function parseTextRecipe(
         try {
             const { data: cachedRecipe, error: dbError } = await supabase
                 .from('processed_recipes_cache')
-                .select('recipe_data')
+                .select('id, recipe_data')
                 .eq('url', cacheKey)
                 .maybeSingle();
+
+            logger.debug({ cachedRecipe }, '[debug] Supabase returned cachedRecipe');
 
             overallTimings.dbCheck = Date.now() - dbCheckStartTime;
 
@@ -160,7 +162,20 @@ export async function parseTextRecipe(
             if (cachedRecipe && cachedRecipe.recipe_data) {
                 logger.info({ requestId, cacheKey, dbCheckMs: overallTimings.dbCheck }, `Cache hit. Returning cached data.`);
                 overallTimings.total = Date.now() - requestStartTime;
-                return { recipe: cachedRecipe.recipe_data, error: null, fromCache: true, inputType, cacheKey, timings: overallTimings, usage: handlerUsage, fetchMethodUsed: 'N/A' };
+                logger.debug({ requestId, cachedRecipe }, 'Inspecting cachedRecipe result before return');
+                return {
+                    recipe: {
+                        ...(cachedRecipe.recipe_data as CombinedParsedRecipe),
+                        id: cachedRecipe.id,
+                    },
+                    error: null,
+                    fromCache: true,
+                    inputType,
+                    cacheKey,
+                    timings: overallTimings,
+                    usage: handlerUsage,
+                    fetchMethodUsed: 'N/A'
+                };
             }
             logger.info({ requestId, cacheKey, dbCheckMs: overallTimings.dbCheck }, `Cache miss. Proceeding with processing.`);
         } catch (cacheError) {
@@ -295,7 +310,6 @@ export async function parseTextRecipe(
             
             parsedRecipe = {
                 ...finalRecipeData,
-                id: insertedId ?? undefined,
             };
 
         } else {

@@ -28,6 +28,7 @@ import {
   BORDER_WIDTH,
   ICON_SIZE,
   SHADOWS,
+  IMAGE_SIZE,
 } from '@/constants/theme';
 import ToolsModal from '@/components/ToolsModal';
 import MiniTimerDisplay from '@/components/MiniTimerDisplay';
@@ -604,10 +605,10 @@ const styles = StyleSheet.create({
     padding: SPACING.sm,
   } as ViewStyle,
   headerLogo: {
-    width: 70,
-    height: 25,
+    width: IMAGE_SIZE.thumbnail,
+    height: IMAGE_SIZE.badge,
     resizeMode: 'center',
-    marginTop: 2,
+    marginTop: SPACING.xxs,
   } as ImageStyle,
   headerMeezText: {
     ...captionText,
@@ -622,14 +623,14 @@ const styles = StyleSheet.create({
     color: COLORS.textDark,
     textAlign: 'center',
     paddingHorizontal: SPACING.pageHorizontal,
-    paddingVertical: 12,
-    lineHeight: 34,
+    paddingVertical: SPACING.base,
+    lineHeight: FONT.lineHeight.spacious,
   } as TextStyle,
   stepItem: {
     flexDirection: 'row',
-    marginBottom: 15,
+    marginBottom: SPACING.smLg,
     alignItems: 'flex-start',
-    padding: 5,
+    padding: SPACING.smAlt,
     borderRadius: RADIUS.smMd,
   } as ViewStyle,
   activeStep: {
@@ -642,8 +643,8 @@ const styles = StyleSheet.create({
     marginRight: SPACING.md,
   } as ViewStyle,
   stepNumber: {
-    width: 36,
-    height: 36,
+    width: ICON_SIZE.xxl,
+    height: ICON_SIZE.xxl,
     borderRadius: RADIUS.xxl,
     backgroundColor: COLORS.white,
     borderWidth: BORDER_WIDTH.thick,
@@ -673,7 +674,7 @@ const styles = StyleSheet.create({
     ...bodyText,
     color: COLORS.textDark,
     marginBottom: SPACING.smMd,
-    lineHeight: 22,
+    lineHeight: FONT.lineHeight.compact,
   } as TextStyle,
   stepTextCompleted: {
     color: COLORS.gray,
@@ -695,7 +696,7 @@ const styles = StyleSheet.create({
     right: 0,
     backgroundColor: OVERLAYS.whiteOpaque,
     padding: SPACING.pageHorizontal,
-    paddingBottom: 30,
+    paddingBottom: SPACING.xxlAlt,
     borderTopLeftRadius: RADIUS.xxxl,
     borderTopRightRadius: RADIUS.xxxl,
     ...SHADOWS.mediumUp,
@@ -711,7 +712,7 @@ const styles = StyleSheet.create({
   completionText: {
     ...bodyText,
     color: COLORS.textDark,
-    marginBottom: 15,
+    marginBottom: SPACING.smLg,
   } as TextStyle,
   centeredStatusContainer: {
     flex: 1,
@@ -753,7 +754,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: SPACING.smMd,
-    paddingHorizontal: 15,
+    paddingHorizontal: SPACING.smLg,
   } as ViewStyle,
   headerToolButtonText: {
     ...bodyStrongText,

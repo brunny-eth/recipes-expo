@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   image: {
     width: '100%',
-    height: 180,
+    height: 180, // TODO: Consider tokenizing if reused elsewhere
   } as ImageStyle,
   content: {
     padding: SPACING.md,

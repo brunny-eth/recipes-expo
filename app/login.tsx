@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
     borderRadius: RADIUS.md,
     marginBottom: SPACING.md,
-    minHeight: 54,
+    minHeight: 54, // TODO: Consider tokenizing if reused elsewhere
   } as ViewStyle,
   googleButton: {
     backgroundColor: COLORS.googleBlue,

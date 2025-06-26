@@ -21,6 +21,7 @@ export const FONT = {
     xl: 24,
     title: 28,
     screenTitle: 28,
+    h1: 30,
     xxl: 32,
   },
   weight: {
@@ -29,9 +30,13 @@ export const FONT = {
     bold: '700',
   },
   lineHeight: {
-    normal: 20,
-    relaxed: 24,
-    loose: 30,
+    none: 1,
+    compact: 22,
+    snug: 1.3,
+    normal: 1.5,
+    relaxed: 1.625,
+    loose: 1.75,
+    spacious: 34,
   },
 };
 

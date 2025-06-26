@@ -30,19 +30,6 @@ type SavedRecipe = {
   } | null;
 };
 
-// This type needs to reflect that the joined table can be an array, but we only want the first match.
-// For a to-one relationship, PostgREST returns an object, not an array. Let's assume the relationship is one-to-one or many-to-one
-// and that `processed_recipes_cache` is correctly configured in Supabase to return a single object.
-// The linter error suggests it might be coming back as an array from a many-to-many join.
-// The query should be using a one-to-one join. Let's adjust the select and the type.
-type SavedRecipeFromRPC = {
-  base_recipe_id: number;
-  processed_recipes_cache: {
-    id: number;
-    recipe_data: ParsedRecipe;
-  } | null; // Can be null if the join finds no match
-};
-
 export default function SavedScreen() {
   const router = useRouter();
   const { session } = useAuth();

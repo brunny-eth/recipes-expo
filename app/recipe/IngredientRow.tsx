@@ -183,14 +183,14 @@ const styles = StyleSheet.create({
   ingredientItemContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 15,
+    marginBottom: SPACING.smLg,
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.smMd,
   } as ViewStyle,
   checkboxPlaceholder: {
     width: ICON_SIZE.md,
     height: ICON_SIZE.md,
-    marginRight: 15,
+    marginRight: SPACING.smLg,
   } as ViewStyle,
   checkboxBase: {
     width: ICON_SIZE.md,
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.xs,
     borderWidth: BORDER_WIDTH.thick,
     borderColor: COLORS.primary,
-    marginRight: 15,
+    marginRight: SPACING.smLg,
     justifyContent: 'center',
     alignItems: 'center',
   } as ViewStyle,
@@ -240,8 +240,8 @@ const styles = StyleSheet.create({
     ...captionText,
     fontStyle: 'italic',
     color: COLORS.darkGray,
-    marginTop: 2,
-    marginLeft: 2,
+    marginTop: SPACING.xxs,
+    marginLeft: SPACING.xxs,
   } as TextStyle,
   ingredientQuantityParenthetical: {
     ...bodyText,

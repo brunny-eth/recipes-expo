@@ -38,15 +38,23 @@ export const OVERLAYS = {
 };
 
 export const SPACING = {
+  xxs: 2,
   xs: 4,
+  smAlt: 5,
   sm: 8,
   smMd: 10,
+  base: 12,
+  smLg: 15,
   md: 16,
+  lg: 20,
   pageHorizontal: 20,
-  lg: 24,
   xl: 24,
+  xlAlt: 25,
   xxl: 32,
+  xxlAlt: 30,
   xxxl: 48,
+  xxxlAlt: 35,
+  footerHeight: 80,
 };
 
 export const BORDER_WIDTH = {
@@ -59,12 +67,14 @@ export const ICON_SIZE = {
   xs: 12,
   sm: 16,
   md: 24,
-  lg: 28,
+  lg: 20,
   xl: 32,
+  xxl: 36,
 };
 
 export const RADIUS = {
   xs: 4,
+  smAlt: 6,
   sm: 8,
   smMd: 10,
   md: 12,
@@ -74,6 +84,13 @@ export const RADIUS = {
   xxxl: 24,
   pill: 999,
   full: 9999,
+};
+
+export const IMAGE_SIZE = {
+  badge: 25,
+  thumbnail: 70,
+  hero: 80,
+  large: 120,
 };
 
 export const SHADOWS = {

@@ -33,6 +33,8 @@ import {
   RADIUS,
   ICON_SIZE,
   OVERLAYS,
+  IMAGE_SIZE,
+  SHADOWS,
 } from '@/constants/theme';
 import IngredientSubstitutionModal from './IngredientSubstitutionModal';
 import {
@@ -962,31 +964,31 @@ const styles = StyleSheet.create({
     padding: SPACING.sm,
   } as ViewStyle,
   headerLogo: {
-    width: 70, // TODO: Tokenize image sizes
-    height: 25,
+    width: IMAGE_SIZE.thumbnail,
+    height: IMAGE_SIZE.badge,
     resizeMode: 'center',
-    marginTop: 2, // TODO: No SPACING token for 2
+    marginTop: SPACING.xxs,
   } as ImageStyle,
   pageTitle: {
     ...titleText,
     color: COLORS.textDark,
     textAlign: 'center',
     paddingHorizontal: SPACING.pageHorizontal,
-    paddingVertical: 12, // TODO: No SPACING token for 12
-    lineHeight: 34, // TODO: No FONT.lineHeight token for 34
+    paddingVertical: SPACING.base,
+    lineHeight: FONT.lineHeight.spacious,
   } as TextStyle,
   exitButton: {
     padding: SPACING.sm,
   } as ViewStyle,
   ingredientsList: {
     paddingHorizontal: SPACING.pageHorizontal,
-    paddingTop: 15, // TODO: No SPACING token for 15
+    paddingTop: SPACING.smLg,
   } as ViewStyle,
   footer: {
     padding: SPACING.pageHorizontal,
     borderTopWidth: BORDER_WIDTH.default,
     borderTopColor: COLORS.lightGray,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.background,
   } as ViewStyle,
   nextButton: {
     backgroundColor: COLORS.primary,
@@ -1018,7 +1020,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   backButtonSimple: {
-    marginTop: 15, // TODO: No SPACING token for 15
+    marginTop: SPACING.smLg,
     paddingVertical: SPACING.smMd,
     paddingHorizontal: SPACING.pageHorizontal,
     backgroundColor: COLORS.lightGray,
@@ -1032,7 +1034,7 @@ const styles = StyleSheet.create({
     ...captionText,
     fontStyle: 'italic',
     color: COLORS.darkGray,
-    marginTop: 5, // TODO: No SPACING token for 5
+    marginTop: 5,
     textAlign: 'center',
     paddingVertical: SPACING.pageHorizontal,
   } as TextStyle,
@@ -1147,23 +1149,16 @@ const styles = StyleSheet.create({
     backgroundColor: OVERLAYS.medium,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 30, // TODO: No SPACING token for 30
+    padding: SPACING.xxlAlt,
   } as ViewStyle,
   helpModalContent: {
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.md,
-    padding: 25, // TODO: No SPACING token for 25
-    paddingTop: 35, // TODO: No SPACING token for 35
+    padding: SPACING.xlAlt,
+    paddingTop: SPACING.xxxlAlt,
     alignItems: 'center',
     position: 'relative',
-    shadowColor: COLORS.black,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    ...SHADOWS.small,
     width: '100%',
     maxWidth: 400,
   } as ViewStyle,
@@ -1175,16 +1170,16 @@ const styles = StyleSheet.create({
   } as TextStyle,
   helpModalCloseButton: {
     position: 'absolute',
-    top: 15, // TODO: No SPACING token for 15
-    right: 15, // TODO: No SPACING token for 15
-    padding: 5, // TODO: No SPACING token for 5
+    top: SPACING.smLg,
+    right: SPACING.smLg,
+    padding: SPACING.smAlt,
   } as ViewStyle,
   // --- End Help Modal Styles ---
   scaleInfoBanner: {
     backgroundColor: COLORS.darkGray,
-    padding: 12, // TODO: No SPACING token for 12
+    padding: SPACING.base,
     borderRadius: RADIUS.sm,
-    marginBottom: 15, // TODO: No SPACING token for 15
+    marginBottom: SPACING.smLg,
   } as ViewStyle,
   scaleInfoText: {
     ...bodyStrongText,
