@@ -13,6 +13,10 @@ import {
   ViewStyle,
   TextStyle,
   ImageStyle,
+  InteractionManager,
+  FlatList,
+  Modal,
+  Pressable,
 } from 'react-native';
 // Import FastImage from the new library
 import FastImage from '@d11/react-native-fast-image';
@@ -21,7 +25,14 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { decode } from 'he';
-import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
+import {
+  COLORS,
+  SPACING,
+  RADIUS,
+  BORDER_WIDTH,
+  OVERLAYS,
+  SHADOWS,
+} from '@/constants/theme';
 import {
   scaleIngredient,
   parseServingsValue,
@@ -32,12 +43,15 @@ import {
 import {
   StructuredIngredient,
   CombinedParsedRecipe as ParsedRecipe,
+  SubstitutionSuggestion,
 } from '../../common/types';
-import { coerceToStructuredIngredients } from '@/utils/ingredientHelpers';
+import {
+  coerceToStructuredIngredients,
+  parseIngredientDisplayName,
+} from '@/utils/ingredientHelpers';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import InlineErrorBanner from '@/components/InlineErrorBanner';
 import {
-  titleText,
   sectionHeaderText,
   bodyText,
   captionStrongText,
@@ -46,8 +60,21 @@ import {
   FONT,
 } from '@/constants/typography';
 import { useAuth } from '@/context/AuthContext';
-import { setHasUsedFreeRecipe } from '@/server/lib/freeUsageTracker';
+import IngredientSubstitutionModal from '@/app/recipe/IngredientSubstitutionModal';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import CollapsibleSection from '@/components/CollapsibleSection';
+import IngredientList from '@/components/recipe/IngredientList';
+import ServingScaler from '@/components/recipe/ServingScaler';
+import RecipeFooterButtons from '@/components/recipe/RecipeFooterButtons';
 import SaveButton from '@/components/SaveButton';
+import ShareButton from '@/components/recipe/ShareButton';
+import RecipeStepsHeader from '@/components/recipe/RecipeStepsHeader';
+
+// Type for a change (substitution or removal)
+type AppliedChange = {
+  from: string;
+  to: StructuredIngredient | null;
+};
 
 const ALLERGENS = [
   {
@@ -178,162 +205,297 @@ const availableWidth = screenWidth - contentHorizontalPadding * 2;
 const buttonTotalGap = servingsContainerGap * (numButtons - 1);
 const buttonWidth = (availableWidth - buttonTotalGap) / numButtons;
 
-// --- Define Types (Matching Backend Output) ---
-
-// Type for data passed to IngredientsScreen
-type IngredientsNavParams = {
-  id?: number;
-  title: string | null;
-  originalIngredients: StructuredIngredient[] | string[] | null;
-  scaledIngredients: StructuredIngredient[] | null;
-  instructions: string[] | null;
-  substitutions_text: string | null;
-  originalYieldDisplay: string | null;
-  scaleFactor: number;
-};
 // --- End Types ---
 
 export default function RecipeSummaryScreen() {
   const params = useLocalSearchParams<{ recipeData?: string; from?: string }>();
   const router = useRouter();
-  const { showError } = useErrorModal(); // Added hook usage
+  const { showError } = useErrorModal();
   const { session } = useAuth();
 
   const [recipe, setRecipe] = useState<ParsedRecipe | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const [isAllergensExpanded, setIsAllergensExpanded] = useState(false);
+  const [isSourceExpanded, setIsSourceExpanded] = useState(false);
+  const [isRecipeSizeExpanded, setIsRecipeSizeExpanded] = useState(true);
+  const [isIngredientsExpanded, setIsIngredientsExpanded] = useState(true);
 
-  // NEW state for original yield value and selected scale factor
   const [originalYieldValue, setOriginalYieldValue] = useState<number | null>(
     null,
   );
-  const [selectedScaleFactor, setSelectedScaleFactor] = useState<number>(1.0); // Default to 1x
+  const [selectedScaleFactor, setSelectedScaleFactor] = useState<number>(1.0);
+
+  const [checkedIngredients, setCheckedIngredients] = useState<{
+    [key: number]: boolean;
+  }>({});
+  const [substitutionModalVisible, setSubstitutionModalVisible] =
+    useState(false);
+  const [selectedIngredient, setSelectedIngredient] =
+    useState<StructuredIngredient | null>(null);
+  const [appliedChanges, setAppliedChanges] = useState<AppliedChange[]>([]);
+  const [isRewriting, setIsRewriting] = useState(false);
+  const [isScalingInstructions, setIsScalingInstructions] = useState(false);
+  const [isHelpModalVisible, setIsHelpModalVisible] = useState(false);
+  const [selectedIngredientOriginalData, setSelectedIngredientOriginalData] =
+    useState<StructuredIngredient | null>(null);
+  const [processedSubstitutionsForModal, setProcessedSubstitutionsForModal] =
+    useState<SubstitutionSuggestion[] | null>(null);
+  const [lastRemoved, setLastRemoved] = useState<{
+    from: string;
+    to: string | null;
+  } | null>(null);
+
+  const scaledIngredients = React.useMemo<StructuredIngredient[]>(() => {
+    if (!recipe?.ingredients) return [];
+    const baseIngredients = coerceToStructuredIngredients(recipe.ingredients);
+    const scaledBaseIngredients = baseIngredients.map((ingredient) =>
+      scaleIngredient(ingredient, selectedScaleFactor),
+    );
+    if (appliedChanges.length === 0) return scaledBaseIngredients;
+    return scaledBaseIngredients.map((baseIngredient) => {
+      const change = appliedChanges.find((c) => c.from === baseIngredient.name);
+      if (change) {
+        if (change.to === null) {
+          return {
+            ...baseIngredient,
+            name: `${baseIngredient.name} (removed)`,
+            amount: null,
+            unit: null,
+            suggested_substitutions: null,
+          };
+        }
+        return {
+          ...change.to,
+          name: `${change.to.name} (substituted for ${change.from})`,
+        };
+      }
+      return baseIngredient;
+    });
+  }, [recipe, selectedScaleFactor, appliedChanges]);
 
   const handleExitPress = () => {
-    // If 'from' exists, go there. Otherwise, default to the main input screen.
     const exitPath = params.from || '/';
     router.replace(exitPath as any);
   };
 
   useEffect(() => {
-    console.log('[SummaryScreen] Mount');
-    setIsLoading(true); // Start loading
-    setRecipe(null); // Reset recipe on new data
-
     if (params.recipeData) {
       try {
-        const parsed = JSON.parse(params.recipeData) as ParsedRecipe;
-        if (
-          !parsed ||
-          typeof parsed !== 'object' ||
-          Object.keys(parsed).length === 0
-        ) {
-          // Added check for empty/invalid parsed object
-          console.error(
-            'Parsed recipe data is empty or invalid on summary screen.',
-          );
-          showError(
-            'Error Loading Summary',
-            'Recipe data is invalid. Please go back and try again.',
-          );
+        const parsed = JSON.parse(params.recipeData as string);
+        if (!parsed || typeof parsed !== 'object' || Object.keys(parsed).length === 0) {
+          showError('Error Loading Summary', 'Recipe data is invalid.');
           setIsLoading(false);
           return;
         }
-
         setRecipe(parsed);
-        if (!parsed.id) {
-          console.warn(
-            '[SummaryScreen] Missing recipe.id, SaveButton will not be rendered.',
-          );
-        }
-
         const yieldNum = parseServingsValue(parsed.recipeYield);
         setOriginalYieldValue(yieldNum);
         setSelectedScaleFactor(1.0);
+        setAppliedChanges([]);
+        setCheckedIngredients({});
       } catch (e: any) {
-        console.error('Failed to parse recipe data on summary screen:', e);
-        showError(
-          'Error Loading Summary',
-          `Could not load recipe details: ${e.message}. Please go back and try again.`,
-        );
-        setIsLoading(false); // Ensure loading is false on error
-        return; // Prevent further processing
+        showError('Error Loading Summary', `Could not load recipe details: ${e.message}.`);
       }
     } else {
-      showError(
-        'Error Loading Summary',
-        'Recipe data not provided. Please go back and try again.',
-      );
-      setIsLoading(false); // Ensure loading is false on error
-      return; // Prevent further processing
+      showError('Error Loading Summary', 'Recipe data not provided.');
     }
-    setIsLoading(false); // Finish loading successfully
-  }, [params.recipeData, showError, router]); // Added showError and router
+    setIsLoading(false);
+  }, [params.recipeData, showError]);
 
   const detectedAllergens = React.useMemo(() => {
     if (!recipe) return [];
     return extractAllergens(recipe.ingredients);
   }, [recipe]);
 
-  const handleScaleFactorChange = (factor: number) => {
-    setSelectedScaleFactor(factor);
-  };
+  const handleScaleFactorChange = (factor: number) => setSelectedScaleFactor(factor);
 
-  // Clean the title to remove attribution text and "Recipe" suffix
-  const cleanTitle = recipe?.title
-    ?.replace(/\s*(?:[–-]\s*)?by\s+.*$/i, '') // Remove " - by Publisher"
-    .replace(/\s+recipe\s*$/i, '') // Remove "Recipe" from the end
-    .trim();
+  const toggleCheckIngredient = React.useCallback((index: number) => {
+    setCheckedIngredients((prev) => ({ ...prev, [index]: !prev[index] }));
+  }, []);
 
-  const navigateToIngredients = () => {
-    if (!recipe || !recipe.ingredients) return;
-
-    if (!session) {
-      if (__DEV__) {
-        console.log(
-          '[FreeUsage] User is not logged in. Setting hasUsedFreeRecipe flag.',
-        );
+  const openSubstitutionModal = React.useCallback(
+    (ingredient: StructuredIngredient) => {
+      let scaledSuggestions: SubstitutionSuggestion[] | null = null;
+      if (ingredient.suggested_substitutions && selectedScaleFactor !== 1) {
+        const scalingFactor = selectedScaleFactor;
+        scaledSuggestions = ingredient.suggested_substitutions.map((sub) => {
+          let finalAmount: string | number | null = sub.amount ?? null;
+          if (sub.amount != null) {
+            const parsedAmount = parseAmountString(String(sub.amount));
+            if (parsedAmount !== null) {
+              const calculatedAmount = parsedAmount * scalingFactor;
+              finalAmount = formatAmountNumber(calculatedAmount) || calculatedAmount.toFixed(2);
+            }
+          }
+          return { ...sub, amount: finalAmount };
+        });
+      } else {
+        scaledSuggestions = ingredient.suggested_substitutions || null;
       }
-      setHasUsedFreeRecipe();
-    }
+      setSelectedIngredientOriginalData(ingredient);
+      setProcessedSubstitutionsForModal(scaledSuggestions);
+      setSubstitutionModalVisible(true);
+    },
+    [selectedScaleFactor],
+  );
 
-    // Use the helper to coerce ingredients
-    const structuredOriginals: StructuredIngredient[] =
-      coerceToStructuredIngredients(recipe.ingredients);
+  const onApplySubstitution = (substitution: SubstitutionSuggestion) => {
+    if (!selectedIngredientOriginalData) return;
 
-    let scaledIngredients: StructuredIngredient[] | null = null;
+    const ingredientToSubstitute = selectedIngredientOriginalData;
+    setSubstitutionModalVisible(false);
+    setSelectedIngredientOriginalData(null);
+    setProcessedSubstitutionsForModal(null);
 
-    if (structuredOriginals.length > 0) {
-      scaledIngredients = structuredOriginals.map((ingredient) =>
-        scaleIngredient(ingredient, selectedScaleFactor),
-      );
-    } else {
-      console.warn('No valid structured ingredients to scale after coercion.');
-      // Pass an empty array or null, depending on desired downstream handling
-      scaledIngredients = [];
-    }
+    InteractionManager.runAfterInteractions(() => {
+      if (substitution.name === 'Remove ingredient') {
+        const currentRemovals = appliedChanges.filter((c) => !c.to).length;
+        if (currentRemovals >= 2) {
+          showError('Limit Reached', 'You can only remove up to 2 ingredients.');
+          return;
+        }
+      }
 
-    const navParams: IngredientsNavParams = {
-      id: recipe.id,
-      title: cleanTitle || recipe.title,
-      originalIngredients: structuredOriginals, // Pass the coerced originals
-      scaledIngredients: scaledIngredients,
-      instructions: recipe.instructions,
-      substitutions_text: recipe.substitutions_text,
-      originalYieldDisplay: recipe.recipeYield || null,
-      scaleFactor: selectedScaleFactor,
-    };
+      const isRemoval = substitution.name === 'Remove ingredient';
+      let originalNameForSub = ingredientToSubstitute.name;
+      const { substitutedFor } = parseIngredientDisplayName(ingredientToSubstitute.name);
+      if (substitutedFor) originalNameForSub = substitutedFor;
+      
+      const newChange: AppliedChange = {
+        from: originalNameForSub,
+        to: isRemoval
+          ? null
+          : {
+              name: substitution.name,
+              amount: substitution.amount != null ? String(substitution.amount) : null,
+              unit: substitution.unit ?? null,
+              preparation: substitution.description ?? null,
+              suggested_substitutions: null,
+            },
+      };
 
-    const recipeData = JSON.stringify(navParams);
-    console.log('[SummaryScreen] Navigating with recipeData:', recipeData);
+      if (isRemoval) setLastRemoved({ from: newChange.from, to: null });
 
-    router.push({
-      pathname: '/recipe/ingredients',
-      params: {
-        recipeData,
-      },
+      setAppliedChanges((prev) => {
+        const existingChangeIndex = prev.findIndex((c) => c.from === originalNameForSub);
+        if (existingChangeIndex > -1) {
+          const updated = [...prev];
+          updated[existingChangeIndex] = newChange;
+          return updated;
+        }
+        return [...prev, newChange];
+      });
     });
   };
+
+  const undoIngredientRemoval = React.useCallback(
+    (fullName: string) => {
+      const { baseName: originalName } = parseIngredientDisplayName(fullName);
+      setAppliedChanges((prev) => prev.filter((change) => change.from !== originalName));
+      if (lastRemoved?.from === originalName) setLastRemoved(null);
+    },
+    [lastRemoved],
+  );
+
+  const undoSubstitution = React.useCallback((originalName: string) => {
+    setAppliedChanges((prev) => prev.filter((change) => change.from !== originalName));
+  }, []);
+
+  const cleanTitle = recipe?.title?.replace(/\s*(?:[–-]\s*)?by\s+.*$/i, '').replace(/\s+recipe\s*$/i, '').trim();
+
+  const navigateToNextScreen = React.useCallback(async () => {
+    const removalCount = appliedChanges.filter((c) => !c.to).length;
+    if (removalCount > 2) {
+      showError('Limit Reached', 'You can only remove up to 2 ingredients per recipe.');
+      return;
+    }
+
+    if (!recipe || !scaledIngredients) {
+      console.error('Cannot navigate, essential data is missing.');
+      return;
+    }
+
+    let finalInstructions = recipe.instructions || [];
+    const needsScaling = selectedScaleFactor !== 1;
+
+    // --- 1. Handle Substitution Rewriting (if applicable) ---
+    if (appliedChanges.length > 0) {
+      setIsRewriting(true);
+      try {
+        const backendUrl = process.env.EXPO_PUBLIC_API_URL!;
+        const response = await fetch(`${backendUrl}/api/recipes/rewrite-instructions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            originalInstructions: recipe.instructions || [],
+            substitutions: appliedChanges.map((change) => ({
+              from: change.from,
+              to: change.to ? change.to.name : null,
+            })),
+          }),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || `Rewrite failed (Status: ${response.status})`);
+        if (!result.rewrittenInstructions) throw new Error('Invalid format for rewritten instructions.');
+        finalInstructions = result.rewrittenInstructions;
+      } catch (rewriteError: any) {
+        showError('Update Failed', `Couldn't update steps for substitutions: ${rewriteError.message}`);
+        return; // Stop navigation on failure
+      } finally {
+        setIsRewriting(false);
+      }
+    }
+
+    // --- 2. Handle Instruction Scaling (if applicable) ---
+    if (needsScaling && scaledIngredients.length > 0) {
+      setIsScalingInstructions(true);
+      try {
+        const backendUrl = process.env.EXPO_PUBLIC_API_URL!;
+        const originalIngredients = coerceToStructuredIngredients(recipe.ingredients);
+        const response = await fetch(`${backendUrl}/api/recipes/scale-instructions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            instructionsToScale: finalInstructions,
+            originalIngredients: originalIngredients,
+            scaledIngredients: scaledIngredients,
+          }),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || `Scaling failed (Status: ${response.status})`);
+        if (!result.scaledInstructions) throw new Error('Invalid format for scaled instructions.');
+        finalInstructions = result.scaledInstructions;
+      } catch (scalingError: any) {
+        showError('Update Failed', `Couldn't adjust steps for scaling: ${scalingError.message}`);
+        return; // Stop navigation on failure
+      } finally {
+        setIsScalingInstructions(false);
+      }
+    }
+
+    // --- 3. Navigate to Steps Screen ---
+    router.push({
+      pathname: '/recipe/steps',
+      params: {
+        recipeData: JSON.stringify({
+          title: recipe.title,
+          instructions: finalInstructions,
+          ingredients: scaledIngredients,
+          image: recipe.image,
+          thumbnailUrl: recipe.thumbnailUrl,
+          // Pass other relevant data
+          recipeYield: getScaledYieldText(recipe.recipeYield, selectedScaleFactor),
+          prepTime: recipe.prepTime,
+          cookTime: recipe.cookTime,
+          totalTime: recipe.totalTime,
+          nutrition: recipe.nutrition,
+        }),
+      },
+    });
+  }, [recipe, scaledIngredients, appliedChanges, router, showError, selectedScaleFactor]);
+
+  const handleGoToSteps = () => InteractionManager.runAfterInteractions(navigateToNextScreen);
 
   if (isLoading) {
     return (
@@ -346,354 +508,198 @@ export default function RecipeSummaryScreen() {
   if (!recipe) {
     return (
       <SafeAreaView style={styles.centeredStatusContainer}>
-        <InlineErrorBanner
-          message="Could not load recipe summary. The data might be missing or corrupted."
-          showGoBackButton={true}
-        />
+        <InlineErrorBanner message="Could not load recipe summary." showGoBackButton />
       </SafeAreaView>
     );
   }
 
-  // Define scale factor options
-  const scaleFactorOptions = [
-    { label: 'Half', value: 0.5 },
-    { label: 'Original', value: 1.0 },
-    { label: '1.5x', value: 1.5 },
-    { label: '2x', value: 2.0 },
-    { label: '4x', value: 4.0 },
-  ];
-
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <MaterialCommunityIcons
-            name="arrow-left"
-            size={24}
-            color={COLORS.textDark}
-          />
-        </TouchableOpacity>
-        <FastImage
-          source={require('@/assets/images/meez_logo.webp')}
-          style={styles.headerLogo as any}
+      {/* Modals */}
+      {substitutionModalVisible && selectedIngredientOriginalData && (
+        <IngredientSubstitutionModal
+          visible={substitutionModalVisible}
+          onClose={() => setSubstitutionModalVisible(false)}
+          ingredientName={selectedIngredientOriginalData.name}
+          substitutions={processedSubstitutionsForModal}
+          onApply={onApplySubstitution}
         />
-        <TouchableOpacity style={styles.exitButton} onPress={handleExitPress}>
-          <MaterialCommunityIcons
-            name="close"
-            size={24}
-            color={COLORS.textDark}
-          />
-        </TouchableOpacity>
-      </View>
+      )}
+      
+      <RecipeStepsHeader
+        title={cleanTitle}
+        imageUrl={recipe.image || recipe.thumbnailUrl}
+      />
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.recipeInfoContainer}>
-          {(recipe.image || recipe.thumbnailUrl) && (
-            <FastImage
-              source={{ uri: (recipe.image || recipe.thumbnailUrl) as string }}
-              style={styles.recipeImage as any}
-              resizeMode="cover"
-              onLoad={(e) => {
-                console.log(`[PERF: FastImage] Image for ${cleanTitle || 'recipe'} loaded from cache: ${(e.nativeEvent as any).source.cache}`);
-              }}
-            />
-          )}
-          <View style={styles.recipeTextContainer}>
-            {cleanTitle && <Text style={styles.pageTitle}>{cleanTitle}</Text>}
-          </View>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.actionsContainer}>
+          {recipe.id && <SaveButton recipeId={recipe.id} />}
+          <ShareButton />
         </View>
 
-        {recipe?.id && (
-          <View style={{ marginBottom: 24 }}>
-            <SaveButton recipeId={recipe.id} />
-          </View>
-        )}
-
-        {/* --- Metadata Sections --- */}
-
-        {/* Description */}
-        {recipe.description &&
-          (() => {
-            const fullDescription = decode(recipe.description);
-            const sentences = fullDescription.split(/(?<=[.!?])\s+/);
-            const firstSentence = sentences[0] || fullDescription;
-            const canBeTruncated =
-              sentences.length > 1 ||
-              (sentences.length === 1 &&
-                fullDescription.length > firstSentence.length);
-
-            return (
-              <>
-                <Text style={styles.sectionTitle}>Description</Text>
-                <Text style={styles.sectionSubtext}>
-                  {isDescriptionExpanded ? fullDescription : firstSentence}
-                  {canBeTruncated && (
-                    <Text
-                      style={styles.readMoreToggle}
-                      onPress={() => setIsDescriptionExpanded((prev) => !prev)}
-                    >
-                      {isDescriptionExpanded ? ' Read less' : ' Read more'}
-                    </Text>
-                  )}
-                </Text>
-              </>
-            );
-          })()}
-
-        {recipe.description && <View style={styles.divider} />}
-
-        {/* Servings Selector */}
-        <Text style={styles.sectionTitle}>Adjust Recipe Size</Text>
-        <Text style={styles.helperText}>
-          {(() => {
-            if (selectedScaleFactor === 1.0) {
-              return recipe.recipeYield
-                ? `This recipe makes ${recipe.recipeYield}. We make it easy to scale it up or down.`
-                : `This recipe doesn't specify servings amount, but we can still scale amounts up or down if you'd like.`;
-            }
-
-            const direction = selectedScaleFactor < 1 ? 'down' : 'up';
-
-            if (
-              originalYieldValue &&
-              originalYieldValue > 0 &&
-              recipe.recipeYield
-            ) {
-              const scaledYieldString = getScaledYieldText(
-                recipe.recipeYield,
-                selectedScaleFactor,
-              );
-              return `Now scaled ${direction} by ${selectedScaleFactor}x (${scaledYieldString}).`;
-            }
-
-            return `Now scaled ${direction} by ${selectedScaleFactor}x.`;
-          })()}
-        </Text>
-        <View style={styles.servingsContainer}>
-          {scaleFactorOptions.map((option) => (
-            <TouchableOpacity
-              key={option.value}
-              style={[
-                styles.servingButton,
-                selectedScaleFactor === option.value &&
-                  styles.servingButtonSelected,
-              ]}
-              onPress={() => handleScaleFactorChange(option.value)}
-            >
-              <Text
-                style={[
-                  styles.servingButtonText,
-                  selectedScaleFactor === option.value &&
-                    styles.servingButtonTextSelected,
-                ]}
+        <View style={styles.infoTable}>
+          {recipe.description && (
+            <View style={styles.infoRow}>
+              <TouchableOpacity
+                style={styles.infoRowTouchable}
+                onPress={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
               >
-                {option.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <Text style={styles.infoRowLabel}>Description</Text>
+                <MaterialCommunityIcons
+                  name={isDescriptionExpanded ? 'chevron-up' : 'chevron-down'}
+                  size={20}
+                  color={COLORS.textSubtle}
+                />
+              </TouchableOpacity>
+              {isDescriptionExpanded && (
+                <Text style={styles.infoRowContent}>{decode(recipe.description)}</Text>
+              )}
+            </View>
+          )}
+          {detectedAllergens.length > 0 && (
+            <View style={styles.infoRow}>
+              <TouchableOpacity
+                style={styles.infoRowTouchable}
+                onPress={() => setIsAllergensExpanded(!isAllergensExpanded)}
+              >
+                <Text style={styles.infoRowLabel}>Allergens</Text>
+                <MaterialCommunityIcons
+                  name={isAllergensExpanded ? 'chevron-up' : 'chevron-down'}
+                  size={20}
+                  color={COLORS.textSubtle}
+                />
+              </TouchableOpacity>
+              {isAllergensExpanded && (
+                <Text style={styles.infoRowContent}>
+                  {detectedAllergens.join(', ')}
+                </Text>
+              )}
+            </View>
+          )}
+          {recipe.sourceUrl && (
+            <View style={styles.infoRow}>
+              <TouchableOpacity
+                style={styles.infoRowTouchable}
+                onPress={() => setIsSourceExpanded(!isSourceExpanded)}
+              >
+                <Text style={styles.infoRowLabel}>Original Source</Text>
+                <MaterialCommunityIcons
+                  name={isSourceExpanded ? 'chevron-up' : 'chevron-down'}
+                  size={20}
+                  color={COLORS.textSubtle}
+                />
+              </TouchableOpacity>
+              {isSourceExpanded && (
+                <Text
+                  style={[styles.infoRowContent, styles.link]}
+                  onPress={() => Linking.openURL(recipe.sourceUrl!)}
+                >
+                  Visit Source ↗︎
+                </Text>
+              )}
+            </View>
+          )}
         </View>
+
+        <CollapsibleSection
+          title="Adjust Recipe Size"
+          isExpanded={isRecipeSizeExpanded}
+          onToggle={() => setIsRecipeSizeExpanded(!isRecipeSizeExpanded)}
+        >
+          <ServingScaler
+            selectedScaleFactor={selectedScaleFactor}
+            handleScaleFactorChange={handleScaleFactorChange}
+            recipeYield={recipe.recipeYield}
+            originalYieldValue={originalYieldValue}
+          />
+        </CollapsibleSection>
 
         <View style={styles.divider} />
 
-        {/* Allergen Info */}
-        {detectedAllergens && detectedAllergens.length > 0 && (
-          <>
-            <Text style={styles.sectionTitle}>Allergens</Text>
-            <Text style={styles.helperText}>
-              This recipe contains{' '}
-              {detectedAllergens.map((allergen, index) => (
-                <React.Fragment key={allergen}>
-                  <Text style={styles.allergenText}>{allergen}</Text>
-                  {index < detectedAllergens.length - 1 && ', '}
-                </React.Fragment>
-              ))}
-              . If you are allergic or insensitive to any of these, you can
-              substitute them out on the following page.
-            </Text>
-          </>
-        )}
-
-        {/* Original Source */}
-        {recipe.sourceUrl && (
-          <>
-            <View style={styles.divider} />
-            <Text style={styles.sectionTitle}>From the Original Author</Text>
-            <Text
-              style={styles.sourceLink}
-              onPress={() => Linking.openURL(recipe.sourceUrl!)}
-            >
-              Visit ↗︎
-            </Text>
-          </>
-        )}
+        <CollapsibleSection
+          title="Ingredients"
+          isExpanded={isIngredientsExpanded}
+          onToggle={() => setIsIngredientsExpanded(!isIngredientsExpanded)}
+        >
+          <IngredientList
+            scaledIngredients={scaledIngredients}
+            selectedScaleFactor={selectedScaleFactor}
+            appliedChanges={appliedChanges}
+            checkedIngredients={checkedIngredients}
+            toggleCheckIngredient={toggleCheckIngredient}
+            openSubstitutionModal={openSubstitutionModal}
+            undoIngredientRemoval={undoIngredientRemoval}
+            undoSubstitution={undoSubstitution}
+          />
+        </CollapsibleSection>
       </ScrollView>
 
-      {/* Footer Button */}
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={styles.nextButton}
-          onPress={navigateToIngredients}
-        >
-          <Text style={styles.nextButtonText}>Go to Ingredients</Text>
-          <MaterialCommunityIcons
-            name="chevron-right"
-            size={20}
-            color={COLORS.white}
-          />
-        </TouchableOpacity>
-      </View>
+      <RecipeFooterButtons
+        handleGoToSteps={handleGoToSteps}
+        isRewriting={isRewriting}
+        isScalingInstructions={isScalingInstructions}
+      />
     </SafeAreaView>
   );
 }
 
-// --- Add Styles for Summary Screen ---
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  } as ViewStyle,
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.md,
-    paddingTop: Platform.OS === 'ios' ? 0 : 10, // TODO: No SPACING token for 10
-    paddingBottom: 10, // TODO: No SPACING token for 10
-    borderBottomWidth: BORDER_WIDTH.default,
-    borderBottomColor: COLORS.lightGray,
-    backgroundColor: COLORS.background,
-  } as ViewStyle,
-  backButton: {
-    padding: SPACING.sm,
-  } as ViewStyle,
-  exitButton: {
-    padding: SPACING.sm,
-  } as ViewStyle,
-  headerLogo: {
-    width: 70, // TODO: Asset-specific, consider tokenizing if reused
-    height: 25, // TODO: Asset-specific
-    resizeMode: 'center',
-    marginTop: 2, // TODO: No SPACING token for 2
-  } as ImageStyle,
-  pageTitle: {
-    ...titleText,
-    color: COLORS.textDark,
-    textAlign: 'left',
-    lineHeight: 34, // TODO: No FONT.lineHeight token for 34
-  } as TextStyle,
+  container: { flex: 1, backgroundColor: COLORS.background },
   scrollContent: {
     paddingHorizontal: SPACING.pageHorizontal,
     paddingTop: SPACING.md,
-    paddingBottom: Platform.OS === 'ios' ? 100 : 80, // TODO: Tokenize footer height
-  } as ViewStyle,
-  recipeInfoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.lg,
-  } as ViewStyle,
-  recipeTextContainer: {
-    flex: 1,
-  } as ViewStyle,
-  recipeImage: {
-    width: 80, // TODO: Consider image size tokens
-    height: 80, // TODO: Consider image size tokens
-    borderRadius: RADIUS.sm,
-    marginRight: SPACING.md,
-  } as ImageStyle,
-  sectionTitle: {
-    ...sectionHeaderText,
-    color: COLORS.textDark,
-    marginBottom: SPACING.sm,
-    textAlign: 'left',
-    marginTop: 12, // TODO: No SPACING token for 12
-  } as TextStyle,
-  sectionSubtext: {
-    ...bodyText,
-    color: COLORS.gray,
-    marginBottom: 12, // TODO: No SPACING token for 12
-    lineHeight: 22, // TODO: No FONT.lineHeight token for 22
-    textAlign: 'left',
-  } as TextStyle,
-  helperText: {
-    ...bodyText,
-    color: COLORS.textMuted,
-    marginBottom: SPACING.md,
-    lineHeight: 22, // TODO: No FONT.lineHeight token for 22
-    textAlign: 'left',
-  } as TextStyle,
-  readMoreToggle: {
-    ...captionStrongText,
-    color: COLORS.primary,
-    marginLeft: SPACING.sm,
-  } as TextStyle,
-  allergenText: {
-    ...bodyStrongText,
-    color: COLORS.textDark,
-    fontWeight: FONT.weight.semiBold,
-  } as TextStyle,
-  sourceLink: {
-    ...bodyStrongText,
-    color: COLORS.primary,
-  } as TextStyle,
-  servingsContainer: {
-    flexDirection: 'row',
-    marginBottom: 12, // TODO: No SPACING token for 12
-    gap: servingsContainerGap,
-  } as ViewStyle,
-  servingButton: {
-    width: buttonWidth,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.sm,
-    borderWidth: BORDER_WIDTH.default,
-    borderColor: COLORS.lightGray,
-    backgroundColor: COLORS.white,
-    alignItems: 'center',
-  } as ViewStyle,
-  servingButtonSelected: {
-    backgroundColor: COLORS.primaryLight,
-    borderColor: COLORS.primary,
-  } as ViewStyle,
-  servingButtonText: {
-    ...captionStrongText,
-    color: COLORS.textDark,
-  } as TextStyle,
-  servingButtonTextSelected: {
-    color: COLORS.primary,
-  } as TextStyle,
-  footer: {
-    padding: SPACING.pageHorizontal,
-    borderTopWidth: BORDER_WIDTH.default,
-    borderTopColor: COLORS.lightGray,
-    backgroundColor: COLORS.white,
-  } as ViewStyle,
-  nextButton: {
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.sm,
-    paddingVertical: SPACING.md,
+    paddingBottom: 100,
+  },
+  actionsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
+    gap: SPACING.md,
+    marginBottom: SPACING.lg,
+  },
+  infoTable: {
+    borderRadius: RADIUS.md,
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
+    backgroundColor: 'transparent',
+    marginBottom: SPACING.lg,
+  },
+  infoRow: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.base,
+    borderBottomWidth: BORDER_WIDTH.hairline,
+    borderBottomColor: COLORS.divider,
+  },
+  infoRowTouchable: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: SPACING.pageHorizontal,
-  } as ViewStyle,
-  nextButtonText: {
-    ...bodyStrongText,
-    color: COLORS.white,
-    marginRight: SPACING.sm,
-  } as TextStyle,
+  },
+  infoRowLabel: {
+    fontFamily: FONT.family.recoleta,
+    fontSize: FONT.size.body,
+  },
+  infoRowContent: {
+    ...bodyText,
+    marginTop: SPACING.sm,
+    color: COLORS.textMuted,
+  },
+  link: {
+    color: COLORS.primary,
+    textDecorationLine: 'underline',
+  },
+  divider: {
+    height: BORDER_WIDTH.hairline,
+    backgroundColor: COLORS.divider,
+    marginVertical: SPACING.lg,
+  },
   centeredStatusContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20, // TODO: No SPACING token for 20
+    padding: 20,
     backgroundColor: COLORS.background,
-  } as ViewStyle,
-  divider: {
-    height: BORDER_WIDTH.default,
-    backgroundColor: COLORS.divider,
-    marginVertical: 12, // TODO: No SPACING token for 12
-  } as ViewStyle,
+  },
 });

@@ -8,6 +8,9 @@ import {
 } from 'react-native';
 import { supabase } from '../lib/supabaseClient';
 import { isRecipeSaved, saveRecipe, unsaveRecipe } from '../lib/savedRecipes';
+import { COLORS, RADIUS, SPACING } from '@/constants/theme';
+import { captionStrongText, FONT } from '@/constants/typography';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 interface SaveButtonProps {
   recipeId: number;
@@ -28,20 +31,14 @@ const SaveButton: React.FC<SaveButtonProps> = ({ recipeId }) => {
 
     const checkSavedStatus = async () => {
       setIsLoading(true);
-      console.log(`Checking saved status for recipe: ${recipeId}`);
       const {
         data: { session },
       } = await supabase.auth.getSession();
       if (!session?.user) {
-        console.warn(
-          'No user session found on mount. Cannot check saved status.',
-        );
         setIsLoading(false);
         return;
       }
-
       const saved = await isRecipeSaved(recipeId);
-      console.log(`Recipe ${recipeId} is ${saved ? 'saved' : 'not saved'}`);
       setIsSaved(saved);
       setIsLoading(false);
     };
@@ -50,75 +47,62 @@ const SaveButton: React.FC<SaveButtonProps> = ({ recipeId }) => {
   }, [recipeId, isIdValid]);
 
   const handlePress = async () => {
-    if (!isIdValid) {
-      console.warn(
-        '[SaveButton] Save pressed with invalid recipeId:',
-        recipeId,
-      );
-      return;
-    }
-
-    console.log('[SaveButton] Saving recipe with ID:', recipeId);
+    if (!isIdValid) return;
     setIsLoading(true);
-    console.log(`Button pressed. Current state isSaved: ${isSaved}`);
-
     const {
       data: { session },
     } = await supabase.auth.getSession();
     if (!session?.user) {
-      console.warn(
-        'No user session found on button press. Cannot save/unsave recipe.',
-      );
       setIsLoading(false);
       return;
     }
-
     const previousState = isSaved;
-    setIsSaved(!previousState); // Optimistic update
-
-    let success;
-    if (previousState) {
-      console.log(`Attempting to unsave recipe: ${recipeId}`);
-      success = await unsaveRecipe(recipeId);
-    } else {
-      console.log(`Attempting to save recipe: ${recipeId}`);
-      success = await saveRecipe(recipeId);
-    }
-
-    if (success) {
-      console.log(
-        `Successfully ${previousState ? 'unsaved' : 'saved'} recipe: ${recipeId}`,
-      );
-    } else {
-      console.error(
-        `Failed to ${previousState ? 'unsave' : 'save'} recipe: ${recipeId}`,
-      );
-      // Revert on failure
+    setIsSaved(!previousState);
+    const success = previousState
+      ? await unsaveRecipe(recipeId)
+      : await saveRecipe(recipeId);
+    if (!success) {
       setIsSaved(previousState);
-      // TODO: Show toast message on failure
     }
-
     setIsLoading(false);
   };
 
   if (!isIdValid) {
-    return (
-      <View style={[styles.button, styles.disabled]}>
-        <Text style={styles.text}>Save</Text>
-      </View>
-    );
+    return null; // Don't render if there's no ID
   }
+
+  const buttonStyle = [
+    styles.button,
+    isSaved ? styles.buttonSaved : styles.buttonUnsaved,
+    isLoading && styles.disabled,
+  ];
+
+  const textStyle = [
+    styles.text,
+    isSaved ? styles.textSaved : styles.textUnsaved,
+  ];
 
   return (
     <TouchableOpacity
-      style={[styles.button, isLoading && styles.disabled]}
+      style={buttonStyle}
       onPress={handlePress}
       disabled={isLoading}
     >
       {isLoading ? (
-        <ActivityIndicator color="#000" />
+        <ActivityIndicator
+          color={isSaved ? COLORS.successDark : COLORS.white}
+          size="small"
+        />
       ) : (
-        <Text style={styles.text}>{isSaved ? 'Saved ✓' : 'Save'}</Text>
+        <>
+          <MaterialCommunityIcons
+            name={isSaved ? 'check' : 'bookmark-outline'}
+            size={16}
+            color={isSaved ? COLORS.successDark : COLORS.white}
+            style={{ marginRight: SPACING.sm }}
+          />
+          <Text style={textStyle}>{isSaved ? 'Saved' : 'Save'}</Text>
+        </>
       )}
     </TouchableOpacity>
   );
@@ -126,19 +110,38 @@ const SaveButton: React.FC<SaveButtonProps> = ({ recipeId }) => {
 
 const styles = StyleSheet.create({
   button: {
-    backgroundColor: '#E0E0E0', // A light gray
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.pill,
+  },
+  buttonSaved: {
+    backgroundColor: 'transparent',
+    borderColor: COLORS.primary,
+    borderWidth: 1,
+  },
+  buttonUnsaved: {
+    backgroundColor: COLORS.primaryLight,
+  },
+  disabled: {
+    opacity: 0.6,
+  },
+  contentContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  disabled: {
-    backgroundColor: '#BDBDBD', // A darker gray for disabled state
-  },
   text: {
-    fontSize: 16,
-    fontWeight: '600',
+    ...captionStrongText,
+    fontSize: FONT.size.smBody,
+  },
+  textSaved: {
+    color: COLORS.primary,
+  },
+  textUnsaved: {
+    color: COLORS.primary,
   },
 });
 

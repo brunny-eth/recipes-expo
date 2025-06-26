@@ -49,6 +49,7 @@ import {
 import { parseAmountString } from '@/utils/recipeUtils';
 import { useAuth } from '@/context/AuthContext';
 import { useFreeUsage } from '@/context/FreeUsageContext';
+import RecipeStepsHeader from '@/components/recipe/RecipeStepsHeader';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -60,6 +61,7 @@ export default function StepsScreen() {
   const { markFreeRecipeUsed } = useFreeUsage();
 
   const [recipeTitle, setRecipeTitle] = useState<string | null>(null);
+  const [recipeImageUrl, setRecipeImageUrl] = useState<string | null>(null);
   const [instructions, setInstructions] = useState<string[]>([]);
   const [ingredients, setIngredients] = useState<StructuredIngredient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -91,6 +93,8 @@ export default function StepsScreen() {
           title?: string | null;
           instructions?: string[] | null;
           ingredients?: StructuredIngredient[] | null;
+          image?: string | null;
+          thumbnailUrl?: string | null;
         };
 
         if (parsedData.instructions && Array.isArray(parsedData.instructions)) {
@@ -103,6 +107,7 @@ export default function StepsScreen() {
         }
 
         setRecipeTitle(parsedData.title || 'Instructions');
+        setRecipeImageUrl(parsedData.image || parsedData.thumbnailUrl || null);
 
         if (parsedData.ingredients && Array.isArray(parsedData.ingredients)) {
           setIngredients(parsedData.ingredients);
@@ -366,32 +371,7 @@ export default function StepsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Animated.View entering={FadeIn.duration(300)} style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <MaterialCommunityIcons
-            name="arrow-left"
-            size={24}
-            color={COLORS.textDark}
-          />
-        </TouchableOpacity>
-        <Image
-          source={require('@/assets/images/meez_logo.webp')}
-          style={styles.headerLogo}
-        />
-        <TouchableOpacity
-          style={styles.exitButton}
-          onPress={() => router.replace('/')}
-        >
-          <MaterialCommunityIcons
-            name="close"
-            size={24}
-            color={COLORS.textDark}
-          />
-        </TouchableOpacity>
-      </Animated.View>
+      <RecipeStepsHeader title={recipeTitle} imageUrl={recipeImageUrl} />
 
       <Modal
         transparent
@@ -449,8 +429,6 @@ export default function StepsScreen() {
           </View>
         </Pressable>
       </Modal>
-
-      {recipeTitle && <Text style={styles.pageTitle}>{recipeTitle}</Text>}
 
       <ScrollView
         style={styles.stepsContainer}
