@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,11 +17,12 @@ import {
   bodyTextLoose,
   FONT,
 } from '@/constants/typography';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
+import ScreenHeader from '@/components/ScreenHeader';
 
 type SavedRecipe = {
   base_recipe_id: number;
@@ -32,6 +33,8 @@ type SavedRecipe = {
 };
 
 export default function SavedScreen() {
+  const insets = useSafeAreaInsets();
+
   const router = useRouter();
   const { session } = useAuth();
   const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>([]);
@@ -203,18 +206,16 @@ const renderRecipeItem = ({ item }: { item: SavedRecipe }) => {
         data={savedRecipes}
         renderItem={renderRecipeItem}
         keyExtractor={(item) => item.base_recipe_id.toString()}
-        contentContainerStyle={styles.listContainer}
+        contentContainerStyle={styles.listContent}
       />
     );
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Favorites</Text>
-      </View>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <ScreenHeader title="Favorites" />
       {renderContent()}
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -223,10 +224,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
     paddingHorizontal: SPACING.pageHorizontal,
-    paddingTop: SPACING.pageHorizontal,
-  },
-  header: {
-    paddingBottom: SPACING.md,
   },
   title: {
     ...screenTitleText,
@@ -268,7 +265,7 @@ const styles = StyleSheet.create({
     ...bodyStrongText,
     color: COLORS.white,
   },
-  listContainer: {
+  listContent: {
     paddingTop: SPACING.sm,
   },
   card: {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   ViewStyle,
   TextStyle,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import RecipeCard from '@/components/RecipeCard';
 import { useFreeUsage } from '@/context/FreeUsageContext';
@@ -17,6 +17,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { bodyText, screenTitleText, FONT } from '@/constants/typography';
 import { useAuth } from '@/context/AuthContext';
 import { useErrorModal } from '@/context/ErrorModalContext';
+import ScreenHeader from '@/components/ScreenHeader';
 
 const DUMMY_RECIPES = [
   {
@@ -81,6 +82,8 @@ const DevTools = () => {
 };
 
 const ExploreScreen = () => {
+  const insets = useSafeAreaInsets();
+
   const { hasUsedFreeRecipe, isLoadingFreeUsage, resetFreeRecipeUsage } =
     useFreeUsage();
   const { session, isAuthenticated } = useAuth();
@@ -94,10 +97,8 @@ const ExploreScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Explore Recipes</Text>
-      </View>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <ScreenHeader title="Explore Recipes" />
 
       <DevTools />
 
@@ -112,7 +113,7 @@ const ExploreScreen = () => {
         )}
         contentContainerStyle={styles.listContentContainer}
       />
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -120,19 +121,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingTop: SPACING.pageHorizontal,
-  } as ViewStyle,
-  header: {
     paddingHorizontal: SPACING.pageHorizontal,
-    marginBottom: SPACING.smMd,
   } as ViewStyle,
-  title: {
-    ...screenTitleText,
-    color: COLORS.textDark,
-    paddingBottom: SPACING.pageHorizontal,
-  } as TextStyle,
   listContentContainer: {
-    paddingHorizontal: SPACING.pageHorizontal,
     paddingBottom: SPACING.pageHorizontal,
   } as ViewStyle,
   devToolsContainer: {

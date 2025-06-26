@@ -819,7 +819,7 @@ export default function IngredientsScreen() {
             />
           </TouchableOpacity>
           <Image
-            source={require('@/assets/images/meez_logo.png')}
+            source={require('@/assets/images/meez_logo.webp')}
             style={styles.headerLogo}
           />
           <TouchableOpacity

@@ -1,55 +1,31 @@
 import React from 'react';
-import { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  View as RNView,
-  Image,
-  Modal,
-} from 'react-native';
+import { useState, useEffect, useRef } from 'react'; 
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Keyboard, KeyboardAvoidingView, Platform, View as RNView, Image, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
-import {
-  COLORS,
-  OVERLAYS,
-  SPACING,
-  RADIUS,
-  BORDER_WIDTH,
-} from '@/constants/theme';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { COLORS, OVERLAYS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useErrorModal } from '@/context/ErrorModalContext';
-import {
-  titleText,
-  bodyText,
-  bodyStrongText,
-  captionText,
-  FONT,
-} from '@/constants/typography';
+import { titleText, bodyText, bodyStrongText, captionText, FONT } from '@/constants/typography';
 import { useAuth } from '@/context/AuthContext';
 import { useFreeUsage } from '@/context/FreeUsageContext';
 
 export default function HomeScreen() {
+  const insets = useSafeAreaInsets();
   const [recipeUrl, setRecipeUrl] = React.useState('');
   const router = useRouter();
   const [isInputFocused, setIsInputFocused] = React.useState(false);
   const { showError } = useErrorModal();
-  const { session, user } = useAuth();
-  const { hasUsedFreeRecipe } = useFreeUsage();
+  const { session, user } = useAuth(); 
+  const { hasUsedFreeRecipe } = useFreeUsage(); 
 
   React.useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
       'keyboardDidShow',
-      () => {},
+      () => {}
     );
     const keyboardDidHideListener = Keyboard.addListener(
       'keyboardDidHide',
-      () => {},
+      () => {}
     );
 
     return () => {
@@ -69,7 +45,7 @@ export default function HomeScreen() {
 
   const handleSubmit = async () => {
     if (!recipeUrl || recipeUrl.trim() === '') {
-      showError('Input Required', 'Please paste a recipe URL or recipe text.');
+      showError("Input Required", "Please paste a recipe URL or recipe text.");
       return;
     }
 
@@ -82,12 +58,13 @@ export default function HomeScreen() {
         // This case should theoretically be handled by the layout redirect,
         // but as a safeguard, we prevent submission and show an error.
         showError(
-          'Login Required',
+          "Login Required",
           "You've already used your free recipe. Please log in to continue.",
-          () => router.replace('/login'),
+          () => router.replace('/login')
         );
         return;
       }
+      
     }
 
     // Proceed with navigation
@@ -95,36 +72,28 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoidingView}
         enabled={isInputFocused}
       >
         <RNView style={styles.outerContainer}>
-          <Animated.View
-            entering={FadeIn.duration(500)}
-            style={styles.logoContainer}
-          >
+        <View style={styles.logoContainer}>
             <Image
-              source={require('@/assets/images/meez_logo.png')}
-              style={{ width: 150, height: 150 }}
+              source={require('@/assets/images/meez_logo.webp')}
+              style={styles.logo}
+              resizeMode="contain"
             />
-          </Animated.View>
-
-          <Animated.View
-            entering={FadeInDown.delay(300).duration(500)}
+          </View>
+          <View 
             style={styles.contentContainer}
           >
             <View style={styles.featuresContainer}>
-              <Text style={styles.mainFeatureText}>
-                {'No essays. No ads.\nJust the recipe.'}
-              </Text>
-              <Text style={styles.featureText}>
-                Skip the scrolling and start cooking.
-              </Text>
+              <Text style={styles.mainFeatureText}>{'No essays. No ads.\nJust the recipe.'}</Text>
+              <Text style={styles.featureText}>Skip the scrolling and start cooking.</Text>
             </View>
-          </Animated.View>
+          </View>
 
           <View style={styles.inputWrapper}>
             <View style={styles.inputContainer}>
@@ -140,8 +109,8 @@ export default function HomeScreen() {
                 onBlur={() => setIsInputFocused(false)}
                 onSubmitEditing={handleSubmit}
               />
-              <TouchableOpacity
-                style={styles.submitButton}
+              <TouchableOpacity 
+                style={styles.submitButton} 
                 onPress={handleSubmit}
               >
                 <Text style={styles.submitButtonText}>Go</Text>
@@ -150,7 +119,7 @@ export default function HomeScreen() {
           </View>
         </RNView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -314,5 +283,9 @@ const styles = StyleSheet.create({
     ...bodyText,
     color: COLORS.darkGray,
     fontSize: 14, // TODO: new FONT.size?
+  },
+  logo: {
+    width: 150,
+    height: 150,
   },
 });

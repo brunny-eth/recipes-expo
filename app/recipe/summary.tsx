@@ -376,7 +376,7 @@ export default function RecipeSummaryScreen() {
           />
         </TouchableOpacity>
         <Image
-          source={require('@/assets/images/meez_logo.png')}
+          source={require('@/assets/images/meez_logo.webp')}
           style={styles.headerLogo}
         />
         <TouchableOpacity style={styles.exitButton} onPress={handleExitPress}>

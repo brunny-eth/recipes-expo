@@ -140,7 +140,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
         <View style={styles.checklistContainer}>
           <View style={styles.logoContainer}>
             <Image
-              source={require('@/assets/images/meez_logo.png')}
+              source={require('@/assets/images/meez_logo.webp')}
               style={styles.logoImage}
             />
             <Text style={styles.tagline}>Working on our mise en place...</Text>
@@ -165,7 +165,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
         style={styles.logoContainer}
       >
         <Image
-          source={require('@/assets/images/meez_logo.png')}
+          source={require('@/assets/images/meez_logo.webp')}
           style={styles.logoImage}
         />
         <Text style={styles.loadingText}>Loading....</Text>

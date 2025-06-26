@@ -1,3 +1,4 @@
+// lib/supabaseClient.ts
 import { createClient } from '@supabase/supabase-js'
 import * as SecureStore from 'expo-secure-store'
 import { Database } from '../common/types/database.types'
@@ -24,7 +25,7 @@ const ExpoSecureStoreAdapter = {
     return value
   },
   setItem: async (key: string, value: string) => {
-    log(`[setItem] ${key} <- ${value.slice(0, 15)}...`)
+    log(`[setItem] Storing key: ${key} with value length: ${value.length} bytes.`)
     return SecureStore.setItemAsync(key, value)
   },
   removeItem: async (key: string) => {
@@ -40,4 +41,4 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     detectSessionInUrl: false, // we'll handle this manually in Linking
   },
-}) 
+})

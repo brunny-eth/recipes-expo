@@ -83,7 +83,7 @@ export default function ToolsModal({
         return (
           <View style={styles.placeholderContainer}>
             <Image
-              source={require('@/assets/images/meez_logo.png')}
+              source={require('@/assets/images/meez_logo.webp')}
               style={[styles.chefIcon, { width: 80, height: 80 }]}
             />
             <Text style={styles.placeholderText}>

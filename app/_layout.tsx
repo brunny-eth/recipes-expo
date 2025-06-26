@@ -2,10 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
-import { Asset } from 'expo-asset';
 import * as SplashScreen from 'expo-splash-screen';
 import { StyleSheet } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
+import * as Font from 'expo-font';
+import { Asset } from 'expo-asset';
 
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { ErrorModalProvider } from '@/context/ErrorModalContext';
@@ -163,8 +164,13 @@ export default function RootLayout() {
     async function prepare() {
       console.log('[RootLayout] Starting prepare function...');
       try {
-        await Asset.loadAsync(require('@/assets/images/meez_logo.png'));
-        console.log('[RootLayout] Assets loaded.');
+        // You have a duplicated loadAsync call. Let's make sure it's not causing issues.
+        // It's already handled by useFonts. You can remove this or keep it for pre-loading,
+        // but it's redundant.
+        // await Font.loadAsync({ ... });
+
+        await Asset.loadAsync(require('@/assets/images/meez_logo.webp'));
+        console.log('[RootLayout] Assets loaded successfully.');
 
         const hasLaunched = await AsyncStorage.getItem('hasLaunched');
         console.log(
@@ -195,10 +201,16 @@ export default function RootLayout() {
         setAssetsLoaded(true);
       }
     }
+    // Let's log the fontsLoaded status when it changes
+    console.log(`[RootLayout] useFonts hook state: fontsLoaded = ${fontsLoaded}`);
+    if (fontsLoaded) {
+        console.log('[RootLayout] Fonts are now loaded via useFonts.');
+    }
 
+    // Call prepare only once
     prepare();
-  }, []);
-
+  }, [fontsLoaded]); // Add fontsLoaded to the dependency array to see when it changes
+  
   const ready = fontsLoaded && assetsLoaded && isFirstLaunch !== null;
   console.log(
     `[RootLayout] ready state: ${ready} (fontsLoaded: ${fontsLoaded}, assetsLoaded: ${assetsLoaded}, isFirstLaunch: ${isFirstLaunch})`,
@@ -213,7 +225,7 @@ export default function RootLayout() {
   const handleWelcomeDismiss = async () => {
     try {
       await AsyncStorage.setItem('hasLaunched', 'true');
-      setIsFirstLaunch(false);
+      setIsFirstLaunch(false); // Hide the welcome screen immediately
     } catch (error) {
       console.error('Failed to set hasLaunched flag', error);
       // Still proceed to app

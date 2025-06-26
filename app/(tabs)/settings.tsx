@@ -10,7 +10,7 @@ import {
 import { router } from 'expo-router';
 import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   bodyText,
   bodyStrongText,
@@ -18,7 +18,7 @@ import {
   sectionHeaderText,
   FONT,
 } from '@/constants/typography';
-import { useEffect } from 'react';
+import ScreenHeader from '@/components/ScreenHeader';
 
 function AuthStatus() {
   const { session } = useAuth();
@@ -34,20 +34,11 @@ function AuthStatus() {
 
 export default function SettingsScreen() {
   const { signOut, isAuthenticated } = useAuth();
-
-  useEffect(() => {
-    console.log('[SettingsScreen] Mounted!');
-
-    return () => {
-      console.log('[SettingsScreen] Unmounted!');
-    };
-  }, []);
+  const insets = useSafeAreaInsets();
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Settings</Text>
-      </View>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <ScreenHeader title="Settings" />
 
       <View style={styles.authContainer}>
         {isAuthenticated ? (
@@ -100,7 +91,7 @@ export default function SettingsScreen() {
 
         <Text style={styles.versionText}>Version 1.0.0</Text>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -109,15 +100,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
     paddingHorizontal: SPACING.pageHorizontal,
-    paddingTop: SPACING.pageHorizontal,
   } as ViewStyle,
-  header: {
-    marginBottom: SPACING.smMd,
-  } as ViewStyle,
-  title: {
-    ...screenTitleText,
-    color: COLORS.textDark,
-  } as TextStyle,
   authContainer: {
     minHeight: 70, // TODO: Tokenize component heights?
     marginBottom: SPACING.pageHorizontal,
