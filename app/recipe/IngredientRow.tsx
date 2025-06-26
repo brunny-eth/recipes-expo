@@ -19,6 +19,7 @@ import { StructuredIngredient } from '../../common/types';
 import {
   bodyStrongText,
   bodyText,
+  bodyTextLoose,
   captionText,
   FONT,
 } from '@/constants/typography';
@@ -220,7 +221,7 @@ const styles = StyleSheet.create({
   ingredientName: {
     ...bodyStrongText,
     color: COLORS.textDark,
-    lineHeight: FONT.lineHeight.relaxed,
+    lineHeight: 24,
     flexShrink: 1,
     marginRight: SPACING.sm,
   } as TextStyle,
@@ -244,7 +245,7 @@ const styles = StyleSheet.create({
     marginLeft: SPACING.xxs,
   } as TextStyle,
   ingredientQuantityParenthetical: {
-    ...bodyText,
+    ...bodyTextLoose,
     fontSize: FONT.size.bodyMedium,
     color: COLORS.darkGray,
   } as TextStyle,

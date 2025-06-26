@@ -14,7 +14,7 @@ import { useAuth } from '@/context/AuthContext';
 import { COLORS, SPACING, RADIUS, ICON_SIZE } from '@/constants/theme';
 import { FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { FONT, bodyText, bodyStrongText } from '@/constants/typography';
+import { FONT, bodyText, bodyTextLoose, bodyStrongText } from '@/constants/typography';
 
 type AuthProvider = 'google' | 'apple';
 
@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT.family.recoleta,
   } as TextStyle,
   subtitle: {
-    ...bodyText,
+    ...bodyTextLoose,
     color: COLORS.secondary,
     textAlign: 'center',
     marginBottom: SPACING.xxxl,

@@ -55,9 +55,17 @@ export const sectionHeaderText: TextStyle = {
   fontSize: FONT.size.sectionHeader,
 };
 
-export const bodyText: TextStyle = {
+// Use `bodyText` for settings, buttons, and dense UI
+export const bodyText = {
   fontFamily: FONT.family.inter,
-  fontSize: FONT.size.body,
+  fontSize: FONT.size.smBody,
+  lineHeight: 20, // UI-safe baseline
+};
+
+// Use `bodyTextLoose` only where font clipping was observed (e.g. Recoleta on iOS)
+export const bodyTextLoose = {
+  ...bodyText,
+  lineHeight: 24, // for custom font rendering quirks
 };
 
 export const bodyStrongText: TextStyle = {

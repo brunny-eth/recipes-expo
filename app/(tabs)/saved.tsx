@@ -14,6 +14,7 @@ import {
   screenTitleText,
   bodyStrongText,
   bodyText,
+  bodyTextLoose,
   FONT,
 } from '@/constants/typography';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -222,10 +223,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyContainer: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.xl,
   },
   emptyText: {
     fontFamily: FONT.family.recoleta,
@@ -235,10 +237,10 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   emptySubtext: {
-    ...bodyText,
+    ...bodyTextLoose,
     color: COLORS.darkGray,
     textAlign: 'center',
-    lineHeight: FONT.lineHeight.relaxed,
+    marginTop: SPACING.xs,
   },
   loginButton: {
     marginTop: SPACING.lg,

@@ -41,6 +41,7 @@ import {
   titleText,
   sectionHeaderText,
   bodyText,
+  bodyTextLoose,
   bodyStrongText,
   captionText,
   FONT,
@@ -671,19 +672,18 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.smMd,
   } as ViewStyle,
   stepText: {
-    ...bodyText,
+    ...bodyTextLoose,
     color: COLORS.textDark,
     marginBottom: SPACING.smMd,
-    lineHeight: FONT.lineHeight.compact,
   } as TextStyle,
   stepTextCompleted: {
     color: COLORS.gray,
     textDecorationLine: 'line-through',
   } as TextStyle,
   activeStepText: {
-    ...bodyText,
+    ...bodyTextLoose,
     fontSize: FONT.size.lg,
-    lineHeight: FONT.lineHeight.loose,
+    lineHeight: 26,
   } as TextStyle,
   highlightedText: {
     fontFamily: FONT.family.interSemiBold,
@@ -710,7 +710,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xs,
   } as TextStyle,
   completionText: {
-    ...bodyText,
+    ...bodyTextLoose,
     color: COLORS.textDark,
     marginBottom: SPACING.smLg,
   } as TextStyle,
@@ -784,7 +784,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   } as TextStyle,
   tooltipText: {
-    ...bodyText,
+    ...bodyTextLoose,
     color: COLORS.textDark,
     textAlign: 'center',
   } as TextStyle,
