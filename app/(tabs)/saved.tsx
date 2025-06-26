@@ -90,45 +90,60 @@ export default function SavedScreen() {
     }, [session]),
   );
 
-  const handleRecipePress = (recipeData: ParsedRecipe) => {
-    console.log(`[SavedScreen] Opening recipe: ${recipeData.title}`);
+  const handleRecipePress = (item: SavedRecipe) => {
+    // Ensure data exists before proceeding
+    if (!item.processed_recipes_cache?.recipe_data) {
+        console.warn('[SavedScreen] Missing recipe data for navigation:', item);
+        return;
+    }
+
+    // Create a complete recipe object by merging the ID with the recipe_data
+    const recipeWithId = {
+        ...item.processed_recipes_cache.recipe_data,
+        id: item.processed_recipes_cache.id 
+    };
+
+    console.log(`[SavedScreen] Opening recipe: ${recipeWithId.title}`);
+    console.log(`[SavedScreen] Sending recipe with ID: ${recipeWithId.id}`); // Add a debug log to confirm the ID is present
+
     router.push({
       pathname: '/recipe/summary',
       params: {
-        recipeData: JSON.stringify(recipeData),
+        recipeData: JSON.stringify(recipeWithId), 
         from: '/saved',
       },
     });
-  };
+};
 
-  const renderRecipeItem = ({ item }: { item: SavedRecipe }) => {
+
+const renderRecipeItem = ({ item }: { item: SavedRecipe }) => {
     if (!item.processed_recipes_cache?.recipe_data) {
-      console.warn(
-        '[SavedScreen] Rendering a saved recipe item without complete data:',
-        item,
-      );
-      return null; // Gracefully skip rendering this item
+        console.warn(
+            '[SavedScreen] Rendering a saved recipe item without complete data:',
+            item,
+        );
+        return null; // Gracefully skip rendering this item
     }
 
     const { recipe_data } = item.processed_recipes_cache;
     const imageUrl = recipe_data.image || recipe_data.thumbnailUrl;
 
     return (
-      <TouchableOpacity
-        style={styles.card}
-        onPress={() => handleRecipePress(recipe_data)}
-      >
-        {imageUrl && (
-          <Image source={{ uri: imageUrl }} style={styles.cardImage} />
-        )}
-        <View style={styles.cardTextContainer}>
-          <Text style={styles.cardTitle} numberOfLines={2}>
-            {recipe_data.title}
-          </Text>
-        </View>
-      </TouchableOpacity>
+        <TouchableOpacity
+            style={styles.card}
+            onPress={() => handleRecipePress(item)} // <-- Pass the entire item here
+        >
+            {imageUrl && (
+                <Image source={{ uri: imageUrl }} style={styles.cardImage} />
+            )}
+            <View style={styles.cardTextContainer}>
+                <Text style={styles.cardTitle} numberOfLines={2}>
+                    {recipe_data.title}
+                </Text>
+            </View>
+        </TouchableOpacity>
     );
-  };
+};
 
   const renderContent = () => {
     if (isLoading) {
