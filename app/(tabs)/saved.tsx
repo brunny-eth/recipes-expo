@@ -32,9 +32,9 @@ type SavedRecipe = {
   } | null;
 };
 
+
 export default function SavedScreen() {
   const insets = useSafeAreaInsets();
-
   const router = useRouter();
   const { session } = useAuth();
   const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>([]);
@@ -44,8 +44,11 @@ export default function SavedScreen() {
   useFocusEffect(
     useCallback(() => {
       const fetchSavedRecipes = async () => {
+        const startTime = performance.now();
+        console.log(`[PERF: SavedScreen] Start fetchSavedRecipes at ${startTime.toFixed(2)}ms`);
+
         if (!session?.user) {
-          console.warn('[SavedScreen] No user session found.');
+          console.warn('[SavedScreen] No user session found. Skipping fetch.');
           setIsLoading(false);
           setSavedRecipes([]); // Clear recipes if user logs out
           return;
@@ -53,6 +56,9 @@ export default function SavedScreen() {
 
         setIsLoading(true);
         setError(null);
+        
+        const dbQueryStart = performance.now();
+        console.log(`[PERF: SavedScreen] Starting Supabase query at ${dbQueryStart.toFixed(2)}ms`);
 
         const { data, error: fetchError } = await supabase
           .from('user_saved_recipes')
@@ -67,6 +73,9 @@ export default function SavedScreen() {
           )
           .eq('user_id', session.user.id);
 
+        const dbQueryEnd = performance.now();
+        console.log(`[PERF: SavedScreen] Supabase query finished in ${(dbQueryEnd - dbQueryStart).toFixed(2)}ms`);
+        
         if (fetchError) {
           console.error(
             '[SavedScreen] Error fetching saved recipes:',
@@ -74,24 +83,34 @@ export default function SavedScreen() {
           );
           setError('Could not load saved recipes. Please try again.');
         } else {
+          const processingStart = performance.now();
+          console.log(`[PERF: SavedScreen] Starting data processing at ${processingStart.toFixed(2)}ms`);
           console.log(
-            `[SavedScreen] Fetched ${data?.length || 0} saved recipes.`,
+            `[SavedScreen] Fetched ${data?.length || 0} saved recipes from DB.`,
           );
-          // The linter is struggling with the joined type. We cast to 'any' and then to our expected type.
-          // This is safe as long as the RLS and DB schema are correct.
+
           const validRecipes =
             ((data as any[])?.filter(
               (r) => r.processed_recipes_cache?.recipe_data,
             ) as SavedRecipe[]) || [];
           setSavedRecipes(validRecipes);
+          const processingEnd = performance.now();
+          console.log(`[PERF: SavedScreen] Data processing and state update took ${(processingEnd - processingStart).toFixed(2)}ms`);
         }
 
+        const finalStateUpdateStart = performance.now();
         setIsLoading(false);
+        const finalStateUpdateEnd = performance.now();
+        console.log(`[PERF: SavedScreen] setIsLoading(false) took ${(finalStateUpdateEnd - finalStateUpdateStart).toFixed(2)}ms`);
+        
+        const totalTime = performance.now() - startTime;
+        console.log(`[PERF: SavedScreen] Total fetchSavedRecipes duration: ${totalTime.toFixed(2)}ms`);
       };
 
       fetchSavedRecipes();
     }, [session]),
   );
+
 
   const handleRecipePress = (item: SavedRecipe) => {
     // Ensure data exists before proceeding
@@ -120,32 +139,41 @@ export default function SavedScreen() {
 
 
 const renderRecipeItem = ({ item }: { item: SavedRecipe }) => {
-    if (!item.processed_recipes_cache?.recipe_data) {
-        console.warn(
-            '[SavedScreen] Rendering a saved recipe item without complete data:',
-            item,
-        );
-        return null; // Gracefully skip rendering this item
-    }
+  if (!item.processed_recipes_cache?.recipe_data) {
+      console.warn(
+          '[SavedScreen] Rendering a saved recipe item without complete data:',
+          item,
+      );
+      return null; // Gracefully skip rendering this item
+  }
 
-    const { recipe_data } = item.processed_recipes_cache;
-    const imageUrl = recipe_data.image || recipe_data.thumbnailUrl;
+  const { recipe_data } = item.processed_recipes_cache;
+  const imageUrl = recipe_data.image || recipe_data.thumbnailUrl;
 
-    return (
-        <TouchableOpacity
-            style={styles.card}
-            onPress={() => handleRecipePress(item)} // <-- Pass the entire item here
-        >
-            {imageUrl && (
-                <Image source={{ uri: imageUrl }} style={styles.cardImage} />
-            )}
-            <View style={styles.cardTextContainer}>
-                <Text style={styles.cardTitle} numberOfLines={2}>
-                    {recipe_data.title}
-                </Text>
-            </View>
-        </TouchableOpacity>
-    );
+  return (
+      <TouchableOpacity
+          style={styles.card}
+          onPress={() => handleRecipePress(item)}
+      >
+          {imageUrl && (
+              <Image
+                  source={{ uri: imageUrl }}
+                  style={styles.cardImage}
+                  onLoad={() => {
+                      console.log(`[PERF: SavedScreen] Image loaded for recipe: ${recipe_data.title}`);
+                  }}
+                  onError={(e) => {
+                      console.error(`[PERF: SavedScreen] Image failed to load for recipe: ${recipe_data.title}`, e.nativeEvent.error);
+                  }}
+              />
+          )}
+          <View style={styles.cardTextContainer}>
+              <Text style={styles.cardTitle} numberOfLines={2}>
+                  {recipe_data.title}
+              </Text>
+          </View>
+      </TouchableOpacity>
+  );
 };
 
   const renderContent = () => {

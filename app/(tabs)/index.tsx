@@ -1,6 +1,6 @@
 import React from 'react';
 import { useState, useEffect, useRef } from 'react'; 
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Keyboard, KeyboardAvoidingView, Platform, View as RNView, Image, Modal } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Keyboard, KeyboardAvoidingView, Platform, View as RNView, Image, Modal, TouchableWithoutFeedback } from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS, OVERLAYS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -78,46 +78,47 @@ export default function HomeScreen() {
         style={styles.keyboardAvoidingView}
         enabled={isInputFocused}
       >
-        <RNView style={styles.outerContainer}>
-        <View style={styles.logoContainer}>
-            <Image
-              source={require('@/assets/images/meez_logo.webp')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-          </View>
-          <View 
-            style={styles.contentContainer}
-          >
-            <View style={styles.featuresContainer}>
-              <Text style={styles.mainFeatureText}>{'No essays. No ads.\nJust the recipe.'}</Text>
-              <Text style={styles.featureText}>Skip the scrolling and start cooking.</Text>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <RNView style={styles.outerContainer}>
+            <View>
+              <View style={styles.logoContainer}>
+                <Image
+                  source={require('@/assets/images/meez_logo.webp')}
+                  style={styles.logo}
+                  resizeMode="contain"
+                />
+              </View>
+              <View style={styles.contentContainer}>
+                <View style={styles.featuresContainer}>
+                  <Text style={styles.mainFeatureText}>{'No essays. No ads.\nJust the recipe.'}</Text>
+                  <Text style={styles.featureText}>Skip the scrolling and start cooking.</Text>
+                </View>
+              </View>
             </View>
-          </View>
-
-          <View style={styles.inputWrapper}>
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="Drop a recipe link or text."
-                placeholderTextColor={COLORS.darkGray}
-                value={recipeUrl}
-                onChangeText={setRecipeUrl}
-                autoCapitalize="none"
-                autoCorrect={false}
-                onFocus={() => setIsInputFocused(true)}
-                onBlur={() => setIsInputFocused(false)}
-                onSubmitEditing={handleSubmit}
-              />
-              <TouchableOpacity 
-                style={styles.submitButton} 
-                onPress={handleSubmit}
-              >
-                <Text style={styles.submitButtonText}>Go</Text>
-              </TouchableOpacity>
+            <View style={styles.inputWrapper}>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Drop a recipe link or text."
+                  placeholderTextColor={COLORS.darkGray}
+                  value={recipeUrl}
+                  onChangeText={setRecipeUrl}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onFocus={() => setIsInputFocused(true)}
+                  onBlur={() => setIsInputFocused(false)}
+                  onSubmitEditing={handleSubmit}
+                />
+                <TouchableOpacity 
+                  style={styles.submitButton} 
+                  onPress={handleSubmit}
+                >
+                  <Text style={styles.submitButtonText}>Go</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </RNView>
+          </RNView>
+        </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
     </View>
   );
@@ -135,11 +136,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.lg,
+    paddingTop: SPACING.xxl,
+    paddingBottom: SPACING.xxl,
   },
   logoContainer: {
     alignItems: 'center',
-    paddingTop: SPACING.xxl, // Adjust this value to move the logo up or down
+    marginBottom: SPACING.xxl,
   },
   contentContainer: {
     alignItems: 'center',
@@ -147,7 +149,6 @@ const styles = StyleSheet.create({
   featuresContainer: {
     alignItems: 'center',
     paddingHorizontal: SPACING.xl,
-    marginTop: -SPACING.xl, // TODO: This is awkward. Maybe a different layout approach?
   },
   mainFeatureText: {
     fontFamily: FONT.family.interSemiBold,
@@ -160,12 +161,13 @@ const styles = StyleSheet.create({
   },
   featureText: {
     fontFamily: FONT.family.inter,
-    fontSize: FONT.size.body,
+    fontSize: FONT.size.lg,
     color: COLORS.textDark, // instead of darkGray
     opacity: 0.7, // gives contrast without using a different color
     textAlign: 'center',
     maxWidth: 300,
     marginTop: SPACING.sm,
+    overflow: 'hidden',
   },
   inputWrapper: {
     marginBottom: SPACING.xl, // Adjust this value to move the input bar up or down
@@ -187,10 +189,11 @@ const styles = StyleSheet.create({
     height: '100%',
     paddingHorizontal: SPACING.md,
     color: COLORS.textDark,
+    textAlignVertical: 'center',
   },
   submitButton: {
     height: '100%',
-    width: SPACING.xxl,
+    width: 60,
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',

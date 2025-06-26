@@ -1,8 +1,10 @@
-// lib/supabaseClient.ts
 import { createClient } from '@supabase/supabase-js'
 import * as SecureStore from 'expo-secure-store'
 import { Database } from '../common/types/database.types'
 import 'react-native-url-polyfill/auto'
+
+// ADD THIS LINE at the very top of the file
+console.log('[DEBUG] supabaseClient.ts file is being loaded.');
 
 let _logHistory: string[] = []
 
@@ -25,7 +27,8 @@ const ExpoSecureStoreAdapter = {
     return value
   },
   setItem: async (key: string, value: string) => {
-    log(`[setItem] Storing key: ${key} with value length: ${value.length} bytes.`)
+    console.log(`[DEBUG] setItem is being called for key: ${key}`);
+    console.log(`[setItem] Storing key: ${key} with value length: ${value.length} bytes.`);
     return SecureStore.setItemAsync(key, value)
   },
   removeItem: async (key: string) => {
