@@ -6,12 +6,15 @@ import {
   StyleSheet,
   ActivityIndicator,
   Platform,
+  ViewStyle,
+  TextStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
-import { COLORS } from '@/constants/theme';
+import { COLORS, SPACING, RADIUS, ICON_SIZE } from '@/constants/theme';
 import { FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { FONT, bodyText, bodyStrongText } from '@/constants/typography';
 
 type AuthProvider = 'google' | 'apple';
 
@@ -42,8 +45,15 @@ const LoginScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <TouchableOpacity style={styles.exitButton} onPress={() => router.replace('/(tabs)')}>
-        <MaterialCommunityIcons name="close" size={24} color={COLORS.textDark} />
+      <TouchableOpacity
+        style={styles.exitButton}
+        onPress={() => router.replace('/(tabs)')}
+      >
+        <MaterialCommunityIcons
+          name="close"
+          size={ICON_SIZE.md}
+          color={COLORS.textDark}
+        />
       </TouchableOpacity>
       <View style={styles.content}>
         <Text style={styles.title}>Meez</Text>
@@ -62,7 +72,12 @@ const LoginScreen = () => {
             <ActivityIndicator color={COLORS.white} />
           ) : (
             <>
-              <FontAwesome name="google" size={20} color={COLORS.white} style={styles.icon} />
+              <FontAwesome
+                name="google"
+                size={ICON_SIZE.lg}
+                color={COLORS.white}
+                style={styles.icon}
+              />
               <Text style={styles.buttonText}>Continue with Google</Text>
             </>
           )}
@@ -80,7 +95,12 @@ const LoginScreen = () => {
               <ActivityIndicator color={COLORS.white} />
             ) : (
               <>
-                <FontAwesome name="apple" size={20} color={COLORS.white} style={styles.icon} />
+                <FontAwesome
+                  name="apple"
+                  size={ICON_SIZE.lg}
+                  color={COLORS.white}
+                  style={styles.icon}
+                />
                 <Text style={styles.buttonText}>Continue with Apple</Text>
               </>
             )}
@@ -96,63 +116,60 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
     justifyContent: 'center',
-  },
+  } as ViewStyle,
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: COLORS.background,
-  },
+  } as ViewStyle,
   content: {
-    paddingHorizontal: 24,
+    paddingHorizontal: SPACING.pageHorizontal,
     alignItems: 'center',
-  },
+  } as ViewStyle,
   title: {
-    fontSize: 32,
-    fontWeight: '700',
+    fontSize: FONT.size.xxl,
+    fontWeight: FONT.weight.bold,
     color: COLORS.textDark,
-    marginBottom: 16,
-    fontFamily: 'Recoleta-Medium',
-  },
+    marginBottom: SPACING.md,
+    fontFamily: FONT.family.recoleta,
+  } as TextStyle,
   subtitle: {
-    fontSize: 16,
+    ...bodyText,
     color: COLORS.secondary,
     textAlign: 'center',
-    marginBottom: 48,
-    fontFamily: 'Inter-Regular',
-  },
+    marginBottom: SPACING.xxxl,
+  } as TextStyle,
   button: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
-    paddingVertical: 16,
-    borderRadius: 12,
-    marginBottom: 16,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.md,
     minHeight: 54,
-  },
+  } as ViewStyle,
   googleButton: {
-    backgroundColor: '#4285F4',
-  },
+    backgroundColor: COLORS.googleBlue,
+  } as ViewStyle,
   appleButton: {
     backgroundColor: COLORS.black,
-  },
+  } as ViewStyle,
   buttonText: {
+    ...bodyStrongText,
     color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Inter-SemiBold',
-  },
+  } as TextStyle,
   icon: {
-    marginRight: 12,
-  },
+    marginRight: SPACING.smMd,
+  } as TextStyle,
   exitButton: {
     position: 'absolute',
-    top: 20,
-    right: 20,
-    padding: 8,
+    top: SPACING.pageHorizontal,
+    right: SPACING.pageHorizontal,
+    padding: SPACING.sm,
     zIndex: 1,
-  },
+  } as ViewStyle,
 });
 
-export default LoginScreen; 
+export default LoginScreen;

@@ -39,52 +39,56 @@ interface ToolsSidePanelProps {
 }
 
 export default function ToolsModal({
-    isVisible,
-    onClose,
-    timeRemaining,
-    isActive,
-    formatTime,
-    addTime,
-    handleStartPause,
-    handleReset
+  isVisible,
+  onClose,
+  timeRemaining,
+  isActive,
+  formatTime,
+  addTime,
+  handleStartPause,
+  handleReset,
 }: ToolsSidePanelProps) {
   return (
     <Modal
-        visible={isVisible}
-        transparent
-        animationType="none"
-        onRequestClose={onClose}
+      visible={isVisible}
+      transparent
+      animationType="none"
+      onRequestClose={onClose}
     >
       <View style={styles.modalContainer}>
         {/* Backdrop */}
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose}>
-            <Animated.View 
-                style={styles.backdrop} 
-                entering={FadeIn.duration(200)} 
-                exiting={FadeOut.duration(200)} 
-            />
+          <Animated.View
+            style={styles.backdrop}
+            entering={FadeIn.duration(200)}
+            exiting={FadeOut.duration(200)}
+          />
         </Pressable>
 
         {/* Panel Content - Animated within the Modal */}
-        <Animated.View 
-            style={styles.panelContainer} 
-            entering={SlideInDown.springify().damping(15)} 
-            exiting={SlideOutDown}
+        <Animated.View
+          style={styles.panelContainer}
+          entering={SlideInDown.springify().damping(15)}
+          exiting={SlideOutDown}
         >
-          <SafeAreaView style={styles.safeArea}> 
+          <SafeAreaView style={styles.safeArea}>
             {/* Header */}
             <View style={styles.header}>
-               {/* <SlidersHorizontal size={22} color={COLORS.textDark} /> */}
+              {/* <SlidersHorizontal size={22} color={COLORS.textDark} /> */}
               <Text style={styles.title}>Tools</Text>
               <TouchableOpacity style={styles.closeButton} onPress={onClose}>
                 {/* <X size={24} color={COLORS.textDark} /> */}
-                <MaterialCommunityIcons name="close" size={24} color={COLORS.textDark} />
+                <MaterialCommunityIcons
+                  name="close"
+                  size={24}
+                  color={COLORS.textDark}
+                />
               </TouchableOpacity>
             </View>
 
             {/* Tool Content Area */}
             <View style={styles.toolContent}>
-              <TimerTool 
+              <TimerTool
                 timeRemaining={timeRemaining}
                 isActive={isActive}
                 formatTime={formatTime}
@@ -102,15 +106,15 @@ export default function ToolsModal({
 
 const styles = StyleSheet.create({
   modalContainer: {
-      flex: 1,
-      justifyContent: 'flex-end',
+    flex: 1,
+    justifyContent: 'flex-end',
   },
   backdrop: {
-      ...StyleSheet.absoluteFillObject,
-      backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
   },
   panelContainer: {
-    backgroundColor: COLORS.background, 
+    backgroundColor: COLORS.background,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '60%',
@@ -123,7 +127,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   safeArea: {
-    padding: 15, 
+    padding: 15,
   },
   header: {
     flexDirection: 'row',
@@ -138,12 +142,11 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-Bold',
     fontSize: 18,
     color: COLORS.textDark,
-    marginLeft: 10, 
-    flex: 1, 
+    marginLeft: 10,
+    flex: 1,
   },
   closeButton: {
     // padding: 5,
   },
-  toolContent: {
-  },
-}); 
+  toolContent: {},
+});

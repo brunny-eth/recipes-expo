@@ -10,8 +10,18 @@ import {
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { COLORS } from '@/constants/theme';
-import { convertUnits, availableUnits, Unit, getUnitDisplayName } from '@/utils/units';
-import { sectionHeaderText, bodyText, captionText, bodyStrongText } from '@/constants/typography';
+import {
+  convertUnits,
+  availableUnits,
+  Unit,
+  getUnitDisplayName,
+} from '@/utils/units';
+import {
+  sectionHeaderText,
+  bodyText,
+  captionText,
+  bodyStrongText,
+} from '@/constants/typography';
 
 export default function UnitsTool() {
   const [amount, setAmount] = useState<string>('1');
@@ -29,17 +39,17 @@ export default function UnitsTool() {
         setResult('Invalid conversion');
       }
     } else if (amount.trim() === '') {
-        setResult(null); // Clear result if input is empty
+      setResult(null); // Clear result if input is empty
     } else {
       setResult('Invalid amount');
     }
   }, [amount, fromUnit, toUnit]);
 
   const handleAmountChange = (text: string) => {
-      // Allow only numbers and a single decimal point
-      if (/^\d*\.?\d*$/.test(text)) {
-         setAmount(text);
-      }
+    // Allow only numbers and a single decimal point
+    if (/^\d*\.?\d*$/.test(text)) {
+      setAmount(text);
+    }
   };
 
   // Sort units alphabetically by display name for the pickers
@@ -73,7 +83,11 @@ export default function UnitsTool() {
             >
               {/* Map over the sorted array */}
               {sortedUnits.map((unit) => (
-                <Picker.Item key={unit} label={getUnitDisplayName(unit)} value={unit} />
+                <Picker.Item
+                  key={unit}
+                  label={getUnitDisplayName(unit)}
+                  value={unit}
+                />
               ))}
             </Picker>
           </View>
@@ -90,7 +104,11 @@ export default function UnitsTool() {
             >
               {/* Map over the sorted array */}
               {sortedUnits.map((unit) => (
-                <Picker.Item key={unit} label={getUnitDisplayName(unit)} value={unit} />
+                <Picker.Item
+                  key={unit}
+                  label={getUnitDisplayName(unit)}
+                  value={unit}
+                />
               ))}
             </Picker>
           </View>
@@ -174,4 +192,4 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     textAlign: 'center',
   },
-}); 
+});

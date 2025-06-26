@@ -25,7 +25,7 @@ export default function TimerTool({
   return (
     <View style={styles.container}>
       <Text style={styles.timerDisplay}>{formatTime(timeRemaining)}</Text>
-      
+
       <View style={styles.quickAddContainer}>
         <TouchableOpacity
           style={styles.quickAddButton}
@@ -57,13 +57,25 @@ export default function TimerTool({
           disabled={timeRemaining === 0 && !isActive}
         >
           {isActive ? (
-            <MaterialCommunityIcons name="pause" size={32} color={COLORS.textDark} />
+            <MaterialCommunityIcons
+              name="pause"
+              size={32}
+              color={COLORS.textDark}
+            />
           ) : (
-            <MaterialCommunityIcons name="play" size={32} color={COLORS.textDark} />
+            <MaterialCommunityIcons
+              name="play"
+              size={32}
+              color={COLORS.textDark}
+            />
           )}
         </TouchableOpacity>
         <TouchableOpacity style={styles.controlButton} onPress={handleReset}>
-          <MaterialCommunityIcons name="replay" size={32} color={COLORS.textDark} />
+          <MaterialCommunityIcons
+            name="replay"
+            size={32}
+            color={COLORS.textDark}
+          />
         </TouchableOpacity>
       </View>
     </View>
@@ -121,4 +133,4 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
-}); 
+});

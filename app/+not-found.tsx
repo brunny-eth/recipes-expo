@@ -1,15 +1,20 @@
+import React from 'react';
 import { Link, Stack } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, ViewStyle, TextStyle } from 'react-native';
+import { COLORS, SPACING } from '@/constants/theme';
+import { sectionHeaderText, bodyStrongText } from '@/constants/typography';
 
 export default function NotFoundScreen() {
   return (
     <>
       <Stack.Screen options={{ title: 'Oops!' }} />
       <View style={styles.container}>
-        <Text style={styles.text}>This screen doesn't exist.</Text>
-        <Link href="/" style={styles.link}>
-          <Text>Go to home screen!</Text>
-        </Link>
+        <Text style={styles.title}>This screen doesn't exist.</Text>
+        <View style={styles.linkContainer}>
+          <Link href="/" asChild>
+            <Text style={styles.linkText}>Go to home screen!</Text>
+          </Link>
+        </View>
       </View>
     </>
   );
@@ -20,14 +25,20 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
-  },
-  text: {
-    fontSize: 20,
-    fontWeight: 600,
-  },
-  link: {
-    marginTop: 15,
-    paddingVertical: 15,
-  },
+    padding: SPACING.pageHorizontal,
+    backgroundColor: COLORS.background,
+  } as ViewStyle,
+  title: {
+    ...sectionHeaderText,
+    textAlign: 'center',
+    marginBottom: SPACING.lg,
+  } as TextStyle,
+  linkContainer: {
+    marginTop: 15, // TODO: No SPACING token for 15
+    paddingVertical: 15, // TODO: No SPACING token for 15
+  } as ViewStyle,
+  linkText: {
+    ...bodyStrongText,
+    color: COLORS.primary,
+  } as TextStyle,
 });

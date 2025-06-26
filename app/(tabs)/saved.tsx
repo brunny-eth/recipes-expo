@@ -1,8 +1,21 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
-import { COLORS } from '@/constants/theme';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  Image,
+  ActivityIndicator,
+} from 'react-native';
+import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { screenTitleText, bodyStrongText, bodyText } from '@/constants/typography';
+import {
+  screenTitleText,
+  bodyStrongText,
+  bodyText,
+  FONT,
+} from '@/constants/typography';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
@@ -52,23 +65,33 @@ export default function SavedScreen() {
 
         const { data, error: fetchError } = await supabase
           .from('user_saved_recipes')
-          .select(`
+          .select(
+            `
             base_recipe_id,
             processed_recipes_cache (
               id,
               recipe_data
             )
-          `)
+          `,
+          )
           .eq('user_id', session.user.id);
 
         if (fetchError) {
-          console.error('[SavedScreen] Error fetching saved recipes:', fetchError);
+          console.error(
+            '[SavedScreen] Error fetching saved recipes:',
+            fetchError,
+          );
           setError('Could not load saved recipes. Please try again.');
         } else {
-          console.log(`[SavedScreen] Fetched ${data?.length || 0} saved recipes.`);
+          console.log(
+            `[SavedScreen] Fetched ${data?.length || 0} saved recipes.`,
+          );
           // The linter is struggling with the joined type. We cast to 'any' and then to our expected type.
           // This is safe as long as the RLS and DB schema are correct.
-          const validRecipes = (data as any[])?.filter(r => r.processed_recipes_cache?.recipe_data) as SavedRecipe[] || [];
+          const validRecipes =
+            ((data as any[])?.filter(
+              (r) => r.processed_recipes_cache?.recipe_data,
+            ) as SavedRecipe[]) || [];
           setSavedRecipes(validRecipes);
         }
 
@@ -76,23 +99,26 @@ export default function SavedScreen() {
       };
 
       fetchSavedRecipes();
-    }, [session])
+    }, [session]),
   );
 
   const handleRecipePress = (recipeData: ParsedRecipe) => {
     console.log(`[SavedScreen] Opening recipe: ${recipeData.title}`);
     router.push({
       pathname: '/recipe/summary',
-      params: { 
+      params: {
         recipeData: JSON.stringify(recipeData),
-        from: '/saved'
-      }
+        from: '/saved',
+      },
     });
   };
 
   const renderRecipeItem = ({ item }: { item: SavedRecipe }) => {
     if (!item.processed_recipes_cache?.recipe_data) {
-      console.warn("[SavedScreen] Rendering a saved recipe item without complete data:", item);
+      console.warn(
+        '[SavedScreen] Rendering a saved recipe item without complete data:',
+        item,
+      );
       return null; // Gracefully skip rendering this item
     }
 
@@ -100,8 +126,13 @@ export default function SavedScreen() {
     const imageUrl = recipe_data.image || recipe_data.thumbnailUrl;
 
     return (
-      <TouchableOpacity style={styles.card} onPress={() => handleRecipePress(recipe_data)}>
-        {imageUrl && <Image source={{ uri: imageUrl }} style={styles.cardImage} />}
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => handleRecipePress(recipe_data)}
+      >
+        {imageUrl && (
+          <Image source={{ uri: imageUrl }} style={styles.cardImage} />
+        )}
         <View style={styles.cardTextContainer}>
           <Text style={styles.cardTitle} numberOfLines={2}>
             {recipe_data.title}
@@ -110,27 +141,40 @@ export default function SavedScreen() {
       </TouchableOpacity>
     );
   };
-  
+
   const renderContent = () => {
     if (isLoading) {
-      return <ActivityIndicator style={styles.centered} size="large" color={COLORS.primary} />;
+      return (
+        <ActivityIndicator
+          style={styles.centered}
+          size="large"
+          color={COLORS.primary}
+        />
+      );
     }
 
     if (!session) {
       return (
         <View style={styles.emptyContainer}>
-          <MaterialCommunityIcons name="login" size={48} color={COLORS.lightGray} />
+          <MaterialCommunityIcons
+            name="login"
+            size={48}
+            color={COLORS.lightGray}
+          />
           <Text style={styles.emptyText}>Log in to see your favorites</Text>
           <Text style={styles.emptySubtext}>
             Your saved recipes will appear here once you're logged in.
           </Text>
-          <TouchableOpacity style={styles.loginButton} onPress={() => router.push('/(tabs)/settings')}>
+          <TouchableOpacity
+            style={styles.loginButton}
+            onPress={() => router.push('/(tabs)/settings')}
+          >
             <Text style={styles.loginButtonText}>Go to Settings</Text>
           </TouchableOpacity>
         </View>
       );
     }
-    
+
     if (error) {
       return <Text style={styles.errorText}>{error}</Text>;
     }
@@ -138,7 +182,11 @@ export default function SavedScreen() {
     if (savedRecipes.length === 0) {
       return (
         <View style={styles.emptyContainer}>
-          <MaterialCommunityIcons name="heart-outline" size={48} color={COLORS.lightGray} />
+          <MaterialCommunityIcons
+            name="heart-outline"
+            size={48}
+            color={COLORS.lightGray}
+          />
           <Text style={styles.emptyText}>No saved recipes yet</Text>
           <Text style={styles.emptySubtext}>
             When you save a recipe, it will appear here for quick access
@@ -171,11 +219,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+    paddingHorizontal: SPACING.pageHorizontal,
+    paddingTop: SPACING.pageHorizontal,
   },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 10,
+    paddingBottom: SPACING.md,
   },
   title: {
     ...screenTitleText,
@@ -190,43 +238,42 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: SPACING.xl,
   },
   emptyText: {
-    fontFamily: 'Recoleta-Medium',
+    fontFamily: FONT.family.recoleta,
     fontSize: 18,
     color: COLORS.textDark,
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: SPACING.md,
+    marginBottom: SPACING.sm,
   },
   emptySubtext: {
     ...bodyText,
     color: COLORS.darkGray,
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: FONT.lineHeight.relaxed,
   },
   loginButton: {
-    marginTop: 24,
+    marginTop: SPACING.lg,
     backgroundColor: COLORS.primary,
     paddingVertical: 12,
     paddingHorizontal: 32,
-    borderRadius: 8,
+    borderRadius: RADIUS.sm,
   },
   loginButtonText: {
     ...bodyStrongText,
     color: COLORS.white,
   },
   listContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
+    paddingTop: SPACING.sm,
   },
   card: {
     flexDirection: 'row',
     backgroundColor: COLORS.white,
-    borderRadius: 8,
+    borderRadius: RADIUS.sm,
     padding: 12,
-    marginBottom: 16,
-    shadowColor: '#000',
+    marginBottom: SPACING.md,
+    shadowColor: COLORS.black,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
@@ -234,10 +281,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cardImage: {
-    width: 60,
-    height: 60,
+    width: SPACING.xxl,
+    height: SPACING.xxl,
     borderRadius: 6,
-    marginRight: 16,
+    marginRight: SPACING.md,
   },
   cardTextContainer: {
     flex: 1,
@@ -245,12 +292,11 @@ const styles = StyleSheet.create({
   cardTitle: {
     ...bodyStrongText,
     color: COLORS.textDark,
-    fontSize: 16,
   },
   errorText: {
     ...bodyText,
     color: COLORS.error,
     textAlign: 'center',
-    marginTop: 20,
-  }
+    marginTop: SPACING.lg,
+  },
 });

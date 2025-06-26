@@ -1,20 +1,35 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, ViewStyle } from 'react-native';
 import StepItem from './StepItem';
+import { SPACING } from '@/constants/theme';
 
 const STEPS = [
-  { label: 'Skipping the slop', subtext: 'Sifting through 3,000 words of fluff' },
+  {
+    label: 'Skipping the slop',
+    subtext: 'Sifting through 3,000 words of fluff',
+  },
   { label: 'Deleting the ads', subtext: 'Why are there so many of them?' },
-  { label: 'Finding backup ingredients', subtext: "Just in case you don't have cardamom" },
-  { label: 'Throwing out all the junk', subtext: 'Cleaning up unnecessary extras' },
-  { label: 'Doing the servings math', subtext: 'Scaling things up or down for you' },
+  {
+    label: 'Finding backup ingredients',
+    subtext: "Just in case you don't have cardamom",
+  },
+  {
+    label: 'Throwing out all the junk',
+    subtext: 'Cleaning up unnecessary extras',
+  },
+  {
+    label: 'Doing the servings math',
+    subtext: 'Scaling things up or down for you',
+  },
 ];
 
 interface ChecklistProgressProps {
   isFinished?: boolean;
 }
 
-const ChecklistProgress: React.FC<ChecklistProgressProps> = ({ isFinished }) => {
+const ChecklistProgress: React.FC<ChecklistProgressProps> = ({
+  isFinished,
+}) => {
   const checklistId = useRef(Math.random().toFixed(5));
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const intervalRef = useRef<number | null>(null);
@@ -22,7 +37,7 @@ const ChecklistProgress: React.FC<ChecklistProgressProps> = ({ isFinished }) => 
 
   useEffect(() => {
     intervalRef.current = setInterval(() => {
-      setCurrentStepIndex(prevIndex => {
+      setCurrentStepIndex((prevIndex) => {
         if (prevIndex < STEPS.length - 1) {
           return prevIndex + 1;
         }
@@ -44,7 +59,7 @@ const ChecklistProgress: React.FC<ChecklistProgressProps> = ({ isFinished }) => 
         clearInterval(intervalRef.current);
       }
       const fastForwardInterval = setInterval(() => {
-        setCurrentStepIndex(prevIndex => {
+        setCurrentStepIndex((prevIndex) => {
           if (prevIndex < STEPS.length - 1) {
             return prevIndex + 1;
           }
@@ -63,7 +78,9 @@ const ChecklistProgress: React.FC<ChecklistProgressProps> = ({ isFinished }) => 
     const maybeComplete = () => {
       const isLastStep = currentStepIndex === STEPS.length - 1;
       if (isLastStep && isFinished && !hasCompleted.current) {
-        console.log('[ChecklistProgress] maybeComplete: Firing onChecklistComplete...');
+        console.log(
+          '[ChecklistProgress] maybeComplete: Firing onChecklistComplete...',
+        );
         hasCompleted.current = true;
       }
     };
@@ -99,8 +116,8 @@ const styles = StyleSheet.create({
   container: {
     justifyContent: 'center',
     alignItems: 'flex-start',
-    paddingHorizontal: 20,
-  },
+    paddingHorizontal: SPACING.pageHorizontal,
+  } as ViewStyle,
 });
 
-export default ChecklistProgress; 
+export default ChecklistProgress;

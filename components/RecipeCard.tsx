@@ -1,6 +1,23 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
-import { COLORS } from '@/constants/theme';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Image,
+  TouchableOpacity,
+  ViewStyle,
+  TextStyle,
+  ImageStyle,
+} from 'react-native';
+import {
+  COLORS,
+  RADIUS,
+  SPACING,
+  SHADOWS,
+  BORDER_WIDTH,
+  ICON_SIZE,
+} from '@/constants/theme';
+import { FONT, bodyStrongText } from '@/constants/typography';
 
 type RecipeCardProps = {
   recipe: {
@@ -20,13 +37,15 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onPress }) => {
       onPress={onPress}
       activeOpacity={0.9}
     >
-      <Image 
+      <Image
         source={{ uri: recipe.imageUrl }}
         style={styles.image}
         resizeMode="cover"
       />
       <View style={styles.content}>
-        <Text style={styles.title} numberOfLines={1}>{recipe.title}</Text>
+        <Text style={styles.title} numberOfLines={1}>
+          {recipe.title}
+        </Text>
         <View style={styles.nutritionRow}>
           <View style={styles.nutritionItem}>
             <Text style={styles.nutritionValue}>{recipe.calories}</Text>
@@ -46,51 +65,46 @@ const RecipeCard: React.FC<RecipeCardProps> = ({ recipe, onPress }) => {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: COLORS.white,
-    borderRadius: 12,
-    marginBottom: 16,
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.md,
     overflow: 'hidden',
-    shadowColor: COLORS.textDark,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
+    ...SHADOWS.medium,
+  } as ViewStyle,
   image: {
     width: '100%',
     height: 180,
-  },
+  } as ImageStyle,
   content: {
-    padding: 16,
-  },
+    padding: SPACING.md,
+  } as ViewStyle,
   title: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 18,
+    fontFamily: FONT.family.interSemiBold,
+    fontSize: FONT.size.lg,
     color: COLORS.textDark,
-    marginBottom: 12,
-  },
+    marginBottom: SPACING.smMd,
+  } as TextStyle,
   nutritionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
+  } as ViewStyle,
   nutritionItem: {
     flex: 1,
-  },
+  } as ViewStyle,
   nutritionValue: {
-    fontFamily: 'Poppins-Bold',
-    fontSize: 16,
+    ...bodyStrongText,
     color: COLORS.textDark,
-  },
+  } as TextStyle,
   nutritionLabel: {
-    fontFamily: 'Poppins-Regular',
-    fontSize: 12,
+    fontFamily: FONT.family.inter,
+    fontSize: FONT.size.xs,
     color: COLORS.darkGray,
-  },
+  } as TextStyle,
   divider: {
-    width: 1,
-    height: 24,
+    width: BORDER_WIDTH.default,
+    height: ICON_SIZE.md,
     backgroundColor: COLORS.lightGray,
-    marginHorizontal: 16,
-  },
+    marginHorizontal: SPACING.md,
+  } as ViewStyle,
 });
 
 export default RecipeCard;

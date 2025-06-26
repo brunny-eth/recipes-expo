@@ -28,13 +28,16 @@ interface HelpToolProps {
   recipeSubstitutions?: string | null;
 }
 
-export default function HelpTool({ recipeInstructions, recipeSubstitutions }: HelpToolProps) {
+export default function HelpTool({
+  recipeInstructions,
+  recipeSubstitutions,
+}: HelpToolProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'intro-message',
       text: "I'm ready to help with your recipe! Ask me anything.",
-      sender: 'bot'
-    }
+      sender: 'bot',
+    },
   ]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -53,13 +56,13 @@ export default function HelpTool({ recipeInstructions, recipeSubstitutions }: He
     setIsLoading(true);
 
     const historyForApi = messages
-      .filter(msg => msg.id !== 'intro-message')
-      .map(msg => ({
-        role: msg.sender === 'user' ? 'user' : 'model' as 'user' | 'model',
+      .filter((msg) => msg.id !== 'intro-message')
+      .map((msg) => ({
+        role: msg.sender === 'user' ? 'user' : ('model' as 'user' | 'model'),
         parts: [{ text: msg.text }],
       }))
       .reverse();
-      
+
     const context = `
       Recipe Instructions:
       ---
@@ -69,8 +72,11 @@ export default function HelpTool({ recipeInstructions, recipeSubstitutions }: He
 
     const messageWithContext = `${context}\n\nUser Question: ${newUserMessage.text}`;
 
-    const botResponseText = await sendMessageWithFallback(messageWithContext, historyForApi);
-    
+    const botResponseText = await sendMessageWithFallback(
+      messageWithContext,
+      historyForApi,
+    );
+
     setIsLoading(false);
 
     if (botResponseText) {
@@ -78,7 +84,7 @@ export default function HelpTool({ recipeInstructions, recipeSubstitutions }: He
         id: (Date.now() + 1).toString(),
         text: botResponseText,
         sender: 'bot',
-        error: botResponseText.startsWith("Error:"),
+        error: botResponseText.startsWith('Error:'),
       };
       setMessages((prevMessages) => [newBotMessage, ...prevMessages]);
     } else {
@@ -100,7 +106,13 @@ export default function HelpTool({ recipeInstructions, recipeSubstitutions }: He
         item.error && styles.errorMessageBubble,
       ]}
     >
-      <Text style={item.sender === 'user' ? styles.userMessageText : styles.botMessageText}>
+      <Text
+        style={
+          item.sender === 'user'
+            ? styles.userMessageText
+            : styles.botMessageText
+        }
+      >
         {item.text}
       </Text>
     </View>
@@ -135,8 +147,16 @@ export default function HelpTool({ recipeInstructions, recipeSubstitutions }: He
           multiline
           editable={!isLoading}
         />
-        <TouchableOpacity style={styles.sendButton} onPress={handleSend} disabled={isLoading}>
-          <MaterialCommunityIcons name="send" size={24} color={isLoading ? COLORS.darkGray : COLORS.primary} />
+        <TouchableOpacity
+          style={styles.sendButton}
+          onPress={handleSend}
+          disabled={isLoading}
+        >
+          <MaterialCommunityIcons
+            name="send"
+            size={24}
+            color={isLoading ? COLORS.darkGray : COLORS.primary}
+          />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -228,4 +248,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 10,
   },
-}); 
+});

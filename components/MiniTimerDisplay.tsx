@@ -11,11 +11,24 @@ interface MiniTimerDisplayProps {
   onPress?: () => void;
 }
 
-export default function MiniTimerDisplay({ timeRemaining, formatTime, onPress }: MiniTimerDisplayProps) {
+export default function MiniTimerDisplay({
+  timeRemaining,
+  formatTime,
+  onPress,
+}: MiniTimerDisplayProps) {
   return (
-    <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity
+      style={styles.container}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
       {/* <Timer size={18} color={COLORS.white} style={styles.icon}/> */}
-      <MaterialCommunityIcons name="timer-outline" size={18} color={COLORS.white} style={styles.icon}/>
+      <MaterialCommunityIcons
+        name="timer-outline"
+        size={18}
+        color={COLORS.white}
+        style={styles.icon}
+      />
       <Text style={styles.timeText}>{formatTime(timeRemaining)}</Text>
     </TouchableOpacity>
   );
@@ -25,7 +38,7 @@ const styles = StyleSheet.create({
   container: {
     position: 'absolute',
     bottom: 30, // Adjust position as needed
-    right: 20,  // Adjust position as needed
+    right: 20, // Adjust position as needed
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.7)', // Semi-transparent background
@@ -50,4 +63,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontVariant: ['tabular-nums'],
   },
-}); 
+});

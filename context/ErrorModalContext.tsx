@@ -1,4 +1,12 @@
-import React, { createContext, useContext, useState, ReactNode, useCallback, useRef, useEffect } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  ReactNode,
+  useCallback,
+  useRef,
+  useEffect,
+} from 'react';
 import GlobalErrorModal from '@/components/GlobalErrorModal';
 
 interface ModalData {
@@ -8,13 +16,21 @@ interface ModalData {
 }
 
 interface ErrorModalContextType {
-  showError: (title: string, message: string, onDismissCallback?: () => void) => void;
+  showError: (
+    title: string,
+    message: string,
+    onDismissCallback?: () => void,
+  ) => void;
   hideError: () => void;
 }
 
-const ErrorModalContext = createContext<ErrorModalContextType | undefined>(undefined);
+const ErrorModalContext = createContext<ErrorModalContextType | undefined>(
+  undefined,
+);
 
-export const ErrorModalProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const ErrorModalProvider: React.FC<{ children: ReactNode }> = ({
+  children,
+}) => {
   const [modalData, setModalData] = useState<ModalData | null>(null);
   const [visible, setVisible] = useState(false);
   const isMountedRef = useRef(true);
@@ -36,24 +52,38 @@ export const ErrorModalProvider: React.FC<{ children: ReactNode }> = ({ children
       setVisible(false);
     }
   }, [modalData]);
-  
-  const showError = useCallback((title: string, message: string, onDismissCallback?: () => void) => {
-    // prevent duplicate flashes if the same error is already showing
-    if (visible && modalData?.title === title && modalData?.message === message && modalData?.onDismissCallback === onDismissCallback) {
-      console.warn('[GlobalErrorModal] Duplicate error suppressed:', title);
-      return;
-    }
-    
-    if (!isMountedRef.current) {
-      console.warn('[GlobalErrorModal] Tried to show after unmount – skipping');
-      return;
-    }
-    
-    console.log(`[GlobalErrorModal] Showing with: ${title} ${message}`);
-    console.log('[DEBUG] ErrorModalContext: showError called with:', { title, message, onDismissCallback: !!onDismissCallback });
-    console.trace('[DEBUG] Trace for showError');
-    setModalData({ title, message, onDismissCallback });
-  }, [visible, modalData]);
+
+  const showError = useCallback(
+    (title: string, message: string, onDismissCallback?: () => void) => {
+      // prevent duplicate flashes if the same error is already showing
+      if (
+        visible &&
+        modalData?.title === title &&
+        modalData?.message === message &&
+        modalData?.onDismissCallback === onDismissCallback
+      ) {
+        console.warn('[GlobalErrorModal] Duplicate error suppressed:', title);
+        return;
+      }
+
+      if (!isMountedRef.current) {
+        console.warn(
+          '[GlobalErrorModal] Tried to show after unmount – skipping',
+        );
+        return;
+      }
+
+      console.log(`[GlobalErrorModal] Showing with: ${title} ${message}`);
+      console.log('[DEBUG] ErrorModalContext: showError called with:', {
+        title,
+        message,
+        onDismissCallback: !!onDismissCallback,
+      });
+      console.trace('[DEBUG] Trace for showError');
+      setModalData({ title, message, onDismissCallback });
+    },
+    [visible, modalData],
+  );
 
   const hideError = useCallback(() => {
     requestAnimationFrame(() => {
@@ -67,8 +97,8 @@ export const ErrorModalProvider: React.FC<{ children: ReactNode }> = ({ children
 
       // Safely clear data after the hide animation is complete
       setTimeout(() => {
-        setModalData(null); 
-      }, 500); 
+        setModalData(null);
+      }, 500);
     });
   }, [modalData]);
 
@@ -79,7 +109,7 @@ export const ErrorModalProvider: React.FC<{ children: ReactNode }> = ({ children
         visible={visible}
         title={modalData?.title ?? null}
         message={modalData?.message ?? ''}
-        onClose={hideError} 
+        onClose={hideError}
       />
     </ErrorModalContext.Provider>
   );
@@ -91,4 +121,4 @@ export const useErrorModal = () => {
     throw new Error('useErrorModal must be used within an ErrorModalProvider');
   }
   return context;
-}; 
+};

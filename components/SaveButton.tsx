@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, View } from 'react-native';
+import {
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+  View,
+} from 'react-native';
 import { supabase } from '../lib/supabaseClient';
 import { isRecipeSaved, saveRecipe, unsaveRecipe } from '../lib/savedRecipes';
 
@@ -11,7 +17,8 @@ const SaveButton: React.FC<SaveButtonProps> = ({ recipeId }) => {
   const [isSaved, setIsSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const isIdValid = recipeId !== undefined && recipeId !== null && !isNaN(recipeId);
+  const isIdValid =
+    recipeId !== undefined && recipeId !== null && !isNaN(recipeId);
 
   useEffect(() => {
     if (!isIdValid) {
@@ -22,9 +29,13 @@ const SaveButton: React.FC<SaveButtonProps> = ({ recipeId }) => {
     const checkSavedStatus = async () => {
       setIsLoading(true);
       console.log(`Checking saved status for recipe: ${recipeId}`);
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session?.user) {
-        console.warn("No user session found on mount. Cannot check saved status.");
+        console.warn(
+          'No user session found on mount. Cannot check saved status.',
+        );
         setIsLoading(false);
         return;
       }
@@ -40,7 +51,10 @@ const SaveButton: React.FC<SaveButtonProps> = ({ recipeId }) => {
 
   const handlePress = async () => {
     if (!isIdValid) {
-      console.warn('[SaveButton] Save pressed with invalid recipeId:', recipeId);
+      console.warn(
+        '[SaveButton] Save pressed with invalid recipeId:',
+        recipeId,
+      );
       return;
     }
 
@@ -48,9 +62,13 @@ const SaveButton: React.FC<SaveButtonProps> = ({ recipeId }) => {
     setIsLoading(true);
     console.log(`Button pressed. Current state isSaved: ${isSaved}`);
 
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     if (!session?.user) {
-      console.warn("No user session found on button press. Cannot save/unsave recipe.");
+      console.warn(
+        'No user session found on button press. Cannot save/unsave recipe.',
+      );
       setIsLoading(false);
       return;
     }
@@ -68,14 +86,18 @@ const SaveButton: React.FC<SaveButtonProps> = ({ recipeId }) => {
     }
 
     if (success) {
-      console.log(`Successfully ${previousState ? 'unsaved' : 'saved'} recipe: ${recipeId}`);
+      console.log(
+        `Successfully ${previousState ? 'unsaved' : 'saved'} recipe: ${recipeId}`,
+      );
     } else {
-      console.error(`Failed to ${previousState ? 'unsave' : 'save'} recipe: ${recipeId}`);
+      console.error(
+        `Failed to ${previousState ? 'unsave' : 'save'} recipe: ${recipeId}`,
+      );
       // Revert on failure
       setIsSaved(previousState);
       // TODO: Show toast message on failure
     }
-    
+
     setIsLoading(false);
   };
 
@@ -120,4 +142,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default SaveButton; 
+export default SaveButton;

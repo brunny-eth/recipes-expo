@@ -41,7 +41,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const isFirstLogin = (session: Session) => {
   const metadata = session?.user?.user_metadata as UserMetadata | undefined;
   const isNewUser = !metadata?.first_login_at;
-  console.log(`[AuthContext] isFirstLogin check: user ID ${session?.user?.id}, first_login_at: ${metadata?.first_login_at}, result: ${isNewUser}`);
+  console.log(
+    `[AuthContext] isFirstLogin check: user ID ${session?.user?.id}, first_login_at: ${metadata?.first_login_at}, result: ${isNewUser}`,
+  );
   return isNewUser;
 };
 
@@ -49,7 +51,12 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { showError } = useErrorModal();
-  const { hasUsedFreeRecipe: localHasUsedFreeRecipe, refetchFreeUsage, resetFreeRecipeUsage, isLoadingFreeUsage } = useFreeUsage();
+  const {
+    hasUsedFreeRecipe: localHasUsedFreeRecipe,
+    refetchFreeUsage,
+    resetFreeRecipeUsage,
+    isLoadingFreeUsage,
+  } = useFreeUsage();
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -62,46 +69,57 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     return () => clearTimeout(timeout);
   }, [session, isLoading]);
 
-  const handleUrl = useCallback(async (url: string | null) => {
-    if (!url) {
-      return;
-    }
-    
-    // Extract tokens from URL fragment and set session explicitly using setSession()
-    const urlParts = url.split('#');
-    let fragment = null;
-    if (urlParts.length > 1) {
-        fragment = urlParts[1];
-    }
-
-    if (!fragment) {
-      return;
-    }
-    
-    const params = new URLSearchParams(fragment);
-    const accessToken = params.get('access_token');
-    const refreshToken = params.get('refresh_token');
-
-    if (accessToken && refreshToken) {
-      try {
-        const { data: { session: newSession }, error: sessionError } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken,
-        });
-
-        if (sessionError) {
-          showError('Authentication Error', `Failed to set session: ${sessionError.message}`);
-        } else if (newSession) {
-          if (__DEV__) {
-            console.log('[Auth] Session successfully set via deeplink.');
-          }
-        }
-      } catch (e: any) {
-        showError('Authentication Error', `Unexpected error setting session: ${e.message}`);
+  const handleUrl = useCallback(
+    async (url: string | null) => {
+      if (!url) {
+        return;
       }
-    }
 
-  }, [showError]); 
+      // Extract tokens from URL fragment and set session explicitly using setSession()
+      const urlParts = url.split('#');
+      let fragment = null;
+      if (urlParts.length > 1) {
+        fragment = urlParts[1];
+      }
+
+      if (!fragment) {
+        return;
+      }
+
+      const params = new URLSearchParams(fragment);
+      const accessToken = params.get('access_token');
+      const refreshToken = params.get('refresh_token');
+
+      if (accessToken && refreshToken) {
+        try {
+          const {
+            data: { session: newSession },
+            error: sessionError,
+          } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (sessionError) {
+            showError(
+              'Authentication Error',
+              `Failed to set session: ${sessionError.message}`,
+            );
+          } else if (newSession) {
+            if (__DEV__) {
+              console.log('[Auth] Session successfully set via deeplink.');
+            }
+          }
+        } catch (e: any) {
+          showError(
+            'Authentication Error',
+            `Unexpected error setting session: ${e.message}`,
+          );
+        }
+      }
+    },
+    [showError],
+  );
 
   // Effect to set up auth state change listener and deep link listener
   useEffect(() => {
@@ -116,34 +134,44 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         if (__DEV__) {
           console.log(`[Auth] onAuthStateChange event: ${event}`);
         }
-        
+
         setSession(currentSession);
         setIsLoading(false);
 
         setTimeout(async () => {
           if (currentSession && event === 'SIGNED_IN') {
             if (__DEV__) {
-              console.log(`[Auth] Rehydrated session for user: ${currentSession.user.id}`);
+              console.log(
+                `[Auth] Rehydrated session for user: ${currentSession.user.id}`,
+              );
             }
-            await new Promise(res => setTimeout(res, 300));
+            await new Promise((res) => setTimeout(res, 300));
 
             if (!isLoadingFreeUsage) {
               if (isFirstLogin(currentSession)) {
                 if (localHasUsedFreeRecipe !== null) {
-                  const { error: updateError } = await supabase.auth.updateUser({
-                    data: { has_used_free_recipe: localHasUsedFreeRecipe, first_login_at: new Date().toISOString() },
-                  });
+                  const { error: updateError } = await supabase.auth.updateUser(
+                    {
+                      data: {
+                        has_used_free_recipe: localHasUsedFreeRecipe,
+                        first_login_at: new Date().toISOString(),
+                      },
+                    },
+                  );
                   if (updateError) {
-                    console.error('[Auth] Error updating user metadata on first login (deferred):', updateError);
+                    console.error(
+                      '[Auth] Error updating user metadata on first login (deferred):',
+                      updateError,
+                    );
                   }
                 }
               }
             }
           } else if (!currentSession && event === 'SIGNED_OUT') {
-              resetFreeRecipeUsage();
+            resetFreeRecipeUsage();
           }
         }, 0);
-      }
+      },
     );
 
     return () => {
@@ -152,13 +180,24 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       }
       linkingSubscription.remove();
     };
-  }, [localHasUsedFreeRecipe, refetchFreeUsage, handleUrl, showError, resetFreeRecipeUsage, isLoadingFreeUsage]);
-
+  }, [
+    localHasUsedFreeRecipe,
+    refetchFreeUsage,
+    handleUrl,
+    showError,
+    resetFreeRecipeUsage,
+    isLoadingFreeUsage,
+  ]);
 
   const signIn = async (provider: AuthProvider) => {
     if (provider !== 'apple' && provider !== 'google') {
-      console.error(`[Auth] Unsupported provider "${provider}" passed to signIn.`);
-      showError('Sign In Error', `Authentication with ${provider} is not supported.`);
+      console.error(
+        `[Auth] Unsupported provider "${provider}" passed to signIn.`,
+      );
+      showError(
+        'Sign In Error',
+        `Authentication with ${provider} is not supported.`,
+      );
       return;
     }
     if (provider === 'apple') {
@@ -169,62 +208,76 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
             AppleAuthentication.AppleAuthenticationScope.EMAIL,
           ],
         });
-  
+
         const { identityToken, email, fullName } = credential;
-  
+
         if (!identityToken) {
           throw new Error('No identity token returned by Apple');
         }
-  
+
         console.log('[Apple] Received identityToken, signing in with Supabase');
-  
+
         const { data, error } = await supabase.auth.signInWithIdToken({
           provider: 'apple',
           token: identityToken,
           // @ts-expect-error Supabase types don't include clientId but it's supported at runtime
           clientId: 'app.meez.auth',
         });
-  
+
         if (error) throw error;
-  
+
         if (data?.user && (email || fullName)) {
           const fullNameStr = fullName
-            ? [fullName.givenName, fullName.familyName].filter(Boolean).join(' ')
+            ? [fullName.givenName, fullName.familyName]
+                .filter(Boolean)
+                .join(' ')
             : undefined;
-  
+
           const metadataUpdate: Record<string, any> = {};
           if (email) metadataUpdate.email = email;
           if (fullNameStr) metadataUpdate.full_name = fullNameStr;
-  
+
           if (Object.keys(metadataUpdate).length > 0) {
-            console.log('[Apple] Updating user metadata with Apple-provided values:', metadataUpdate);
+            console.log(
+              '[Apple] Updating user metadata with Apple-provided values:',
+              metadataUpdate,
+            );
             const { error: metadataError } = await supabase.auth.updateUser({
               data: metadataUpdate,
             });
             if (metadataError) {
-              console.error('[Apple] Failed to update user metadata:', metadataError);
+              console.error(
+                '[Apple] Failed to update user metadata:',
+                metadataError,
+              );
             }
           }
         }
       } catch (err: any) {
         console.error('[Apple] Native Sign-In Error:', err.message);
-        showError('Sign In Error', err.message || 'An unknown error occurred during Apple sign-in.');
+        showError(
+          'Sign In Error',
+          err.message || 'An unknown error occurred during Apple sign-in.',
+        );
       }
       return;
     }
-  
+
     // Google OAuth flow
     const redirectTo = process.env.EXPO_PUBLIC_AUTH_URL;
-    
+
     if (!redirectTo) {
-      const errorMsg = "Missing EXPO_PUBLIC_AUTH_URL environment variable. Cannot proceed with authentication.";
+      const errorMsg =
+        'Missing EXPO_PUBLIC_AUTH_URL environment variable. Cannot proceed with authentication.';
       console.error(`[Auth] ${errorMsg}`);
       showError('Configuration Error', errorMsg);
       return;
     }
-    
-    console.log(`[Auth] Attempting Google sign-in. Redirect URL: ${redirectTo}`);
-  
+
+    console.log(
+      `[Auth] Attempting Google sign-in. Redirect URL: ${redirectTo}`,
+    );
+
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
@@ -233,75 +286,108 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           skipBrowserRedirect: true,
         },
       });
-  
+
       if (error) throw error;
-  
+
       if (data.url) {
-        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+        const result = await WebBrowser.openAuthSessionAsync(
+          data.url,
+          redirectTo,
+        );
         if (result.type === 'success' && result.url) {
           await handleUrl(result.url);
         } else {
           if (result.type === 'cancel') {
-            showError('Sign In Cancelled', 'You cancelled the sign-in process.');
+            showError(
+              'Sign In Cancelled',
+              'You cancelled the sign-in process.',
+            );
           } else {
-            showError('Sign In Error', `Sign-in was not completed. Reason: ${result.type}`);
+            showError(
+              'Sign In Error',
+              `Sign-in was not completed. Reason: ${result.type}`,
+            );
           }
         }
       } else {
-        showError('Sign In Error', 'No redirect URL received. Please try again.');
+        showError(
+          'Sign In Error',
+          'No redirect URL received. Please try again.',
+        );
       }
     } catch (err: any) {
       console.error('[Auth] Google Sign-In Error:', err.message);
-      showError('Sign In Error', err.message || 'An unknown error occurred during sign-in.');
+      showError(
+        'Sign In Error',
+        err.message || 'An unknown error occurred during sign-in.',
+      );
     }
   };
-  
+
   const signOut = async () => {
     console.log('[Auth] Attempting to sign out.');
-  
+
     try {
       console.log('[Auth] Initiating supabase.auth.signOut() promise.');
       const signOutPromise = supabase.auth.signOut();
       console.log('[Auth] supabase.auth.signOut() promise initiated.');
-  
-      const timeoutPromise = new Promise<{ error: Error | null }>(resolve => {
+
+      const timeoutPromise = new Promise<{ error: Error | null }>((resolve) => {
         const id = setTimeout(() => {
           clearTimeout(id);
-          console.warn('[Auth] Sign out operation timed out (Timeout Promise resolved).');
-          resolve({ error: new Error('Sign out timed out after 10 seconds. Forcing local logout.') });
+          console.warn(
+            '[Auth] Sign out operation timed out (Timeout Promise resolved).',
+          );
+          resolve({
+            error: new Error(
+              'Sign out timed out after 10 seconds. Forcing local logout.',
+            ),
+          });
         }, 10000);
       });
-  
+
       const result = await Promise.race([
         signOutPromise
           .then(() => {
-            console.log('[Auth] supabase.auth.signOut() promise resolved successfully.');
+            console.log(
+              '[Auth] supabase.auth.signOut() promise resolved successfully.',
+            );
             return { error: null };
           })
           .catch((e) => {
-            console.error('[Auth] supabase.auth.signOut() promise rejected immediately:', e.message);
+            console.error(
+              '[Auth] supabase.auth.signOut() promise rejected immediately:',
+              e.message,
+            );
             return { error: e };
           }),
-        timeoutPromise
+        timeoutPromise,
       ]);
-  
+
       if (result.error) {
         throw result.error;
       }
-  
+
       console.log('[Auth] User signed out successfully via Supabase call.');
-  
+
       // ✅ App-level session cleanup
       setSession(null);
       setIsLoading(false);
       resetFreeRecipeUsage();
       router.replace('/explore');
-  
     } catch (err: any) {
-      console.error('[Auth] Sign Out Error: Caught an error or timeout:', err.message);
-      showError('Sign Out Error', err.message || 'An unknown error occurred during sign-out.');
-  
-      console.log('[Auth] Forcing local session clear due to sign out error/timeout.');
+      console.error(
+        '[Auth] Sign Out Error: Caught an error or timeout:',
+        err.message,
+      );
+      showError(
+        'Sign Out Error',
+        err.message || 'An unknown error occurred during sign-out.',
+      );
+
+      console.log(
+        '[Auth] Forcing local session clear due to sign out error/timeout.',
+      );
       setSession(null);
       setIsLoading(false);
       resetFreeRecipeUsage();

@@ -1,7 +1,12 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import Animated, { useAnimatedStyle, withTiming, FadeIn } from 'react-native-reanimated';
-import { COLORS } from '@/constants/theme';
+import { View, Text, StyleSheet, ViewStyle, TextStyle } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  withTiming,
+  FadeIn,
+} from 'react-native-reanimated';
+import { COLORS, SPACING } from '@/constants/theme';
+import { FONT } from '@/constants/typography';
 
 type StepState = 'complete' | 'active' | 'pending';
 
@@ -13,16 +18,16 @@ interface StepItemProps {
 
 const stateConfig = {
   pending: {
-    labelColor: '#cccccc',
-    subtextColor: '#a8a29e',
+    labelColor: COLORS.disabled,
+    subtextColor: COLORS.textSubtle,
   },
   active: {
-    labelColor: '#000000',
-    subtextColor: '#a8a29e',
+    labelColor: COLORS.textDark,
+    subtextColor: COLORS.textSubtle,
   },
   complete: {
-    labelColor: '#E1572A',
-    subtextColor: '#a8a29e',
+    labelColor: COLORS.accent,
+    subtextColor: COLORS.textSubtle,
   },
 };
 
@@ -40,10 +45,14 @@ const StepItem: React.FC<StepItemProps> = ({ label, subtext, state }) => {
   });
 
   return (
-    <Animated.View entering={FadeIn.delay(200).duration(500)} style={styles.container}>
+    <Animated.View
+      entering={FadeIn.delay(200).duration(500)}
+      style={styles.container}
+    >
       <View style={styles.textContainer}>
         <Animated.Text style={[styles.label, animatedLabelStyle]}>
-          {state === 'complete' ? '✓ ' : ''}{label}
+          {state === 'complete' ? '✓ ' : ''}
+          {label}
         </Animated.Text>
         {state === 'active' && (
           <Animated.Text style={[styles.subtext, animatedSubtextStyle]}>
@@ -59,21 +68,21 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
-    paddingHorizontal: 20,
-  },
+    marginBottom: SPACING.md,
+    paddingHorizontal: SPACING.pageHorizontal,
+  } as ViewStyle,
   textContainer: {
     marginLeft: 12,
-  },
+  } as ViewStyle,
   label: {
-    fontSize: 18,
-    fontFamily: 'Poppins-SemiBold',
-  },
+    fontSize: FONT.size.lg,
+    fontFamily: FONT.family.interSemiBold,
+  } as TextStyle,
   subtext: {
-    fontSize: 14,
-    fontFamily: 'Poppins-Regular',
-    color: '#a8a29e',
-  },
+    fontSize: FONT.size.smBody,
+    fontFamily: FONT.family.inter,
+    color: COLORS.textSubtle,
+  } as TextStyle,
 });
 
-export default StepItem; 
+export default StepItem;

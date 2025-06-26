@@ -1,18 +1,64 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ActivityIndicator, Platform, Alert, Modal, Pressable, Image, InteractionManager } from 'react-native';
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  SafeAreaView,
+  ActivityIndicator,
+  Platform,
+  Alert,
+  Modal,
+  Pressable,
+  Image,
+  InteractionManager,
+  ViewStyle,
+  TextStyle,
+  ImageStyle,
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PerformanceObserver } from 'react-native-performance';
 // import Animated, { FadeIn } from 'react-native-reanimated'; // Removed for gesture debug
-import { COLORS } from '@/constants/theme';
+import {
+  COLORS,
+  SPACING,
+  BORDER_WIDTH,
+  RADIUS,
+  ICON_SIZE,
+  OVERLAYS,
+} from '@/constants/theme';
 import IngredientSubstitutionModal from './IngredientSubstitutionModal';
-import { StructuredIngredient, SubstitutionSuggestion } from '../../common/types';
+import {
+  StructuredIngredient,
+  SubstitutionSuggestion,
+} from '../../common/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { formatMeasurement, abbreviateUnit } from '@/utils/format';
-import { coerceToStructuredIngredients, parseIngredientDisplayName } from '@/utils/ingredientHelpers';
-import { getScaledYieldText, scaleIngredient, parseAmountString, formatAmountNumber } from '@/utils/recipeUtils';
+import {
+  coerceToStructuredIngredients,
+  parseIngredientDisplayName,
+} from '@/utils/ingredientHelpers';
+import {
+  getScaledYieldText,
+  scaleIngredient,
+  parseAmountString,
+  formatAmountNumber,
+} from '@/utils/recipeUtils';
 import { useErrorModal } from '@/context/ErrorModalContext';
-import { titleText, bodyStrongText, bodyText, captionText } from '@/constants/typography';
+import {
+  titleText,
+  bodyStrongText,
+  bodyText,
+  captionText,
+  FONT,
+} from '@/constants/typography';
 import { FlatList } from 'react-native';
 import IngredientRow from './IngredientRow';
 
@@ -25,18 +71,18 @@ type AppliedChange = {
 
 // Type for data received via navigation params
 type IngredientsNavParams = {
-    title: string | null;
-    originalIngredients: StructuredIngredient[] | string[] | null; 
-    scaledIngredients: StructuredIngredient[] | null;
-    instructions: string[] | null;
-    substitutions_text: string | null;
-    originalYieldDisplay: string | null; // Renamed from originalYield, and it's the display string
-    scaleFactor: number; // Added
-    // Optional fields (ensure they are handled if not present)
-    prepTime?: string | null;
-    cookTime?: string | null;
-    totalTime?: string | null;
-    nutrition?: { [key: string]: any; } | null;
+  title: string | null;
+  originalIngredients: StructuredIngredient[] | string[] | null;
+  scaledIngredients: StructuredIngredient[] | null;
+  instructions: string[] | null;
+  substitutions_text: string | null;
+  originalYieldDisplay: string | null; // Renamed from originalYield, and it's the display string
+  scaleFactor: number; // Added
+  // Optional fields (ensure they are handled if not present)
+  prepTime?: string | null;
+  cookTime?: string | null;
+  totalTime?: string | null;
+  nutrition?: { [key: string]: any } | null;
 };
 // --- End Types ---
 
@@ -45,11 +91,11 @@ type IngredientsNavParams = {
  */
 function getOriginalIngredientNameFromAppliedChanges(
   appliedChanges: AppliedChange[],
-  displayName: string
+  displayName: string,
 ): string {
   const { substitutedFor, baseName } = parseIngredientDisplayName(displayName);
   const fallback = substitutedFor || baseName;
-  const match = appliedChanges.find(change => change.to?.name === fallback);
+  const match = appliedChanges.find((change) => change.to?.name === fallback);
   return match?.from || fallback;
 }
 
@@ -61,41 +107,53 @@ const logTiming = (label: string) => {
 };
 
 export default function IngredientsScreen() {
-  if (__DEV__) console.log("🚨 INGREDIENTS SCREEN MOUNTED 🚨");
+  if (__DEV__) console.log('🚨 INGREDIENTS SCREEN MOUNTED 🚨');
   const renderCount = useRef(0);
   const params = useLocalSearchParams<{ recipeData?: string }>();
   const router = useRouter();
   const { showError } = useErrorModal();
-  
+
   const [navData, setNavData] = useState<IngredientsNavParams | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [checkedIngredients, setCheckedIngredients] = useState<{ [key: number]: boolean }>({});
-  const [substitutionModalVisible, setSubstitutionModalVisible] = useState(false);
-  const [selectedIngredient, setSelectedIngredient] = useState<StructuredIngredient | null>(null);
+  const [checkedIngredients, setCheckedIngredients] = useState<{
+    [key: number]: boolean;
+  }>({});
+  const [substitutionModalVisible, setSubstitutionModalVisible] =
+    useState(false);
+  const [selectedIngredient, setSelectedIngredient] =
+    useState<StructuredIngredient | null>(null);
   const [appliedChanges, setAppliedChanges] = useState<AppliedChange[]>([]);
   const [isRewriting, setIsRewriting] = useState(false);
   const [isScalingInstructions, setIsScalingInstructions] = useState(false);
   const [isHelpModalVisible, setIsHelpModalVisible] = useState(false);
-  const [selectedIngredientOriginalData, setSelectedIngredientOriginalData] = useState<StructuredIngredient | null>(null);
-  const [processedSubstitutionsForModal, setProcessedSubstitutionsForModal] = useState<SubstitutionSuggestion[] | null>(null);
+  const [selectedIngredientOriginalData, setSelectedIngredientOriginalData] =
+    useState<StructuredIngredient | null>(null);
+  const [processedSubstitutionsForModal, setProcessedSubstitutionsForModal] =
+    useState<SubstitutionSuggestion[] | null>(null);
   const processedRecipeData = useRef<string | null>(null);
-  const [lastRemoved, setLastRemoved] = useState<{ from: string; to: string | null } | null>(null);
+  const [lastRemoved, setLastRemoved] = useState<{
+    from: string;
+    to: string | null;
+  } | null>(null);
 
   const scaledIngredients = useMemo(() => {
     if (!navData?.scaledIngredients) {
       return [];
     }
 
-    const baseIngredients = coerceToStructuredIngredients(navData.scaledIngredients);
+    const baseIngredients = coerceToStructuredIngredients(
+      navData.scaledIngredients,
+    );
     if (appliedChanges.length === 0) {
       return baseIngredients;
     }
 
-    const finalIngredients = baseIngredients.map(baseIngredient => {
-      const change = appliedChanges.find(c => c.from === baseIngredient.name);
+    const finalIngredients = baseIngredients.map((baseIngredient) => {
+      const change = appliedChanges.find((c) => c.from === baseIngredient.name);
 
       if (change) {
-        if (change.to === null) { // Removal
+        if (change.to === null) {
+          // Removal
           return {
             ...baseIngredient,
             name: `${baseIngredient.name} (removed)`,
@@ -103,7 +161,8 @@ export default function IngredientsScreen() {
             unit: null,
             suggested_substitutions: null,
           };
-        } else { // Substitution
+        } else {
+          // Substitution
           return {
             ...change.to,
             name: `${change.to.name} (substituted for ${change.from})`,
@@ -120,7 +179,9 @@ export default function IngredientsScreen() {
     const observer = new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {
         if (entry.duration > 16) {
-          console.warn(`[⚠️ FRAME BLOCKED] ${entry.name} took ${entry.duration.toFixed(2)}ms`);
+          console.warn(
+            `[⚠️ FRAME BLOCKED] ${entry.name} took ${entry.duration.toFixed(2)}ms`,
+          );
         }
       }
     });
@@ -138,7 +199,10 @@ export default function IngredientsScreen() {
   // Debug logs for modal visibility state changes
   useEffect(() => {
     if (__DEV__) {
-      console.log('[DEBUG] substitutionModalVisible:', substitutionModalVisible);
+      console.log(
+        '[DEBUG] substitutionModalVisible:',
+        substitutionModalVisible,
+      );
     }
   }, [substitutionModalVisible]);
 
@@ -153,7 +217,10 @@ export default function IngredientsScreen() {
 
   useEffect(() => {
     if (__DEV__) {
-      console.log('[DEBUG] selectedIngredientOriginalData:', selectedIngredientOriginalData);
+      console.log(
+        '[DEBUG] selectedIngredientOriginalData:',
+        selectedIngredientOriginalData,
+      );
     }
   }, [selectedIngredientOriginalData]);
 
@@ -199,30 +266,52 @@ export default function IngredientsScreen() {
       params.recipeData &&
       params.recipeData === processedRecipeData.current
     ) {
-      console.warn("🔁 Duplicate recipeData received — skipping reprocessing");
+      console.warn('🔁 Duplicate recipeData received — skipping reprocessing');
       return;
     }
     // Only re-process if the recipeData param has actually changed
-    if (params.recipeData && params.recipeData !== processedRecipeData.current) {
+    if (
+      params.recipeData &&
+      params.recipeData !== processedRecipeData.current
+    ) {
       setIsLoading(true);
 
       if (typeof params.recipeData === 'string') {
         try {
-          console.log('[IngredientsScreen] Received recipeData:', params.recipeData);
-          const parsedNavData = JSON.parse(params.recipeData) as IngredientsNavParams;
+          console.log(
+            '[IngredientsScreen] Received recipeData:',
+            params.recipeData,
+          );
+          const parsedNavData = JSON.parse(
+            params.recipeData,
+          ) as IngredientsNavParams;
 
           // 🧠 If scaled ingredients aren't provided (e.g., scale=1x), create them from originals
-          if (!parsedNavData.scaledIngredients && parsedNavData.originalIngredients) {
-              const structured = coerceToStructuredIngredients(parsedNavData.originalIngredients);
-              const scale = parsedNavData.scaleFactor || 1;
-              parsedNavData.scaledIngredients = structured.map(i => scaleIngredient(i, scale));
+          if (
+            !parsedNavData.scaledIngredients &&
+            parsedNavData.originalIngredients
+          ) {
+            const structured = coerceToStructuredIngredients(
+              parsedNavData.originalIngredients,
+            );
+            const scale = parsedNavData.scaleFactor || 1;
+            parsedNavData.scaledIngredients = structured.map((i) =>
+              scaleIngredient(i, scale),
+            );
           }
 
-          if (!parsedNavData || typeof parsedNavData !== 'object' || Object.keys(parsedNavData).length === 0) {
-            console.error("[IngredientsScreen] Parsed nav data is empty or invalid. Original data:", params.recipeData);
+          if (
+            !parsedNavData ||
+            typeof parsedNavData !== 'object' ||
+            Object.keys(parsedNavData).length === 0
+          ) {
+            console.error(
+              '[IngredientsScreen] Parsed nav data is empty or invalid. Original data:',
+              params.recipeData,
+            );
             showError(
-              "Error Loading Ingredients",
-              "Ingredient data is invalid. Please go back and try again."
+              'Error Loading Ingredients',
+              'Ingredient data is invalid. Please go back and try again.',
             );
             setIsLoading(false);
             return;
@@ -235,20 +324,26 @@ export default function IngredientsScreen() {
             processedRecipeData.current = params.recipeData ?? null; // Mark as processed
             setIsLoading(false);
           });
-        } catch (e: any) { 
-          console.error(`[IngredientsScreen] Failed to parse recipeData. Error: ${e.message}. Raw data:`, params.recipeData);
+        } catch (e: any) {
+          console.error(
+            `[IngredientsScreen] Failed to parse recipeData. Error: ${e.message}. Raw data:`,
+            params.recipeData,
+          );
           showError(
-              "Error Loading Ingredients",
-              `Could not load ingredient data: ${e.message}. Please go back and try again.`
+            'Error Loading Ingredients',
+            `Could not load ingredient data: ${e.message}. Please go back and try again.`,
           );
           setIsLoading(false);
           return;
         }
       } else {
-        console.error("[IngredientsScreen] Recipe data not provided or not a string in params. Received:", params.recipeData);
+        console.error(
+          '[IngredientsScreen] Recipe data not provided or not a string in params. Received:',
+          params.recipeData,
+        );
         showError(
-          "Error Loading Ingredients",
-          "Recipe data not provided. Please go back and try again."
+          'Error Loading Ingredients',
+          'Recipe data not provided. Please go back and try again.',
         );
         setIsLoading(false);
         return;
@@ -256,70 +351,90 @@ export default function IngredientsScreen() {
     } else {
       // If recipeData is null/undefined and we haven't processed anything yet, it's a problem.
       if (!processedRecipeData.current) {
-         setIsLoading(false);
+        setIsLoading(false);
       }
     }
   }, [params.recipeData]);
 
   const toggleCheckIngredient = useCallback((index: number) => {
-    setCheckedIngredients(prev => ({
+    setCheckedIngredients((prev) => ({
       ...prev,
-      [index]: !prev[index]
+      [index]: !prev[index],
     }));
   }, []);
 
-  const openSubstitutionModal = useCallback((ingredient: StructuredIngredient) => {
-    console.log("Opening substitution modal for:", JSON.stringify(ingredient));
-    let scaledSuggestions: SubstitutionSuggestion[] | null = null;
-    if (ingredient.suggested_substitutions && navData && navData.scaleFactor !== null && navData.scaleFactor !== 1) {
-      const scalingFactor = navData.scaleFactor;
-      scaledSuggestions = ingredient.suggested_substitutions.map(sub => {
-        let finalAmount: string | number | null = sub.amount ?? null;
-        if (sub.amount != null) {
-          try {
-            const parsedAmount = parseAmountString(String(sub.amount));
-            if (parsedAmount !== null) {
-              const calculatedAmount = parsedAmount * scalingFactor;
-              finalAmount = formatAmountNumber(calculatedAmount) || calculatedAmount.toFixed(2);
-            } else {
+  const openSubstitutionModal = useCallback(
+    (ingredient: StructuredIngredient) => {
+      console.log(
+        'Opening substitution modal for:',
+        JSON.stringify(ingredient),
+      );
+      let scaledSuggestions: SubstitutionSuggestion[] | null = null;
+      if (
+        ingredient.suggested_substitutions &&
+        navData &&
+        navData.scaleFactor !== null &&
+        navData.scaleFactor !== 1
+      ) {
+        const scalingFactor = navData.scaleFactor;
+        scaledSuggestions = ingredient.suggested_substitutions.map((sub) => {
+          let finalAmount: string | number | null = sub.amount ?? null;
+          if (sub.amount != null) {
+            try {
+              const parsedAmount = parseAmountString(String(sub.amount));
+              if (parsedAmount !== null) {
+                const calculatedAmount = parsedAmount * scalingFactor;
+                finalAmount =
+                  formatAmountNumber(calculatedAmount) ||
+                  calculatedAmount.toFixed(2);
+              } else {
+                finalAmount = sub.amount;
+              }
+            } catch (e) {
+              console.error('Error scaling substitution amount:', e);
               finalAmount = sub.amount;
             }
-          } catch (e) {
-            console.error("Error scaling substitution amount:", e);
-            finalAmount = sub.amount;
+          } else {
+            finalAmount = null;
           }
-        } else {
-          finalAmount = null;
-        }
-        return {
-          ...sub,
-          amount: finalAmount
-        };
-      });
-    } else {
-      scaledSuggestions = ingredient.suggested_substitutions || null;
-    }
-    setSelectedIngredientOriginalData(ingredient);
-    setProcessedSubstitutionsForModal(scaledSuggestions);
-    setTimeout(() => {
-      setSubstitutionModalVisible(true);
-    }, 0);
-  }, [navData]);
+          return {
+            ...sub,
+            amount: finalAmount,
+          };
+        });
+      } else {
+        scaledSuggestions = ingredient.suggested_substitutions || null;
+      }
+      setSelectedIngredientOriginalData(ingredient);
+      setProcessedSubstitutionsForModal(scaledSuggestions);
+      setTimeout(() => {
+        setSubstitutionModalVisible(true);
+      }, 0);
+    },
+    [navData],
+  );
 
-  const undoIngredientRemoval = useCallback((fullName: string) => {
-    if (__DEV__) console.log(`[Handler] Undo removal: ${fullName}`);
-    const { baseName: originalName } = parseIngredientDisplayName(fullName);
+  const undoIngredientRemoval = useCallback(
+    (fullName: string) => {
+      if (__DEV__) console.log(`[Handler] Undo removal: ${fullName}`);
+      const { baseName: originalName } = parseIngredientDisplayName(fullName);
 
-    setAppliedChanges(prev => prev.filter(change => change.from !== originalName));
+      setAppliedChanges((prev) =>
+        prev.filter((change) => change.from !== originalName),
+      );
 
-    if (lastRemoved?.from === originalName) {
-      setLastRemoved(null);
-    }
-  }, [lastRemoved]);
+      if (lastRemoved?.from === originalName) {
+        setLastRemoved(null);
+      }
+    },
+    [lastRemoved],
+  );
 
   const undoSubstitution = useCallback((originalName: string) => {
     if (__DEV__) console.log(`[Handler] Undo substitution: ${originalName}`);
-    setAppliedChanges(prev => prev.filter(change => change.from !== originalName));
+    setAppliedChanges((prev) =>
+      prev.filter((change) => change.from !== originalName),
+    );
   }, []);
 
   const handleGoToSteps = () => {
@@ -350,26 +465,26 @@ export default function IngredientsScreen() {
       openSubstitutionModal,
       undoIngredientRemoval,
       undoSubstitution,
-    ]
+    ],
   );
 
   const navigateToNextScreen = useCallback(async () => {
     console.log('🚀 navigateToNextScreen CALLED');
     const navStart = Date.now();
-    logTiming("Entered navigateToNextScreen");
+    logTiming('Entered navigateToNextScreen');
 
-    const removalCount = appliedChanges.filter(c => !c.to).length;
+    const removalCount = appliedChanges.filter((c) => !c.to).length;
     if (removalCount > 2) {
-      console.warn("[NAV BLOCKED] Too many removals, canceling navigation");
+      console.warn('[NAV BLOCKED] Too many removals, canceling navigation');
       showError(
-        "Limit Reached",
-        "You can only remove up to 2 ingredients per recipe."
+        'Limit Reached',
+        'You can only remove up to 2 ingredients per recipe.',
       );
       return;
     }
 
     if (!navData || !scaledIngredients) {
-      console.error("Cannot navigate, essential data is missing.");
+      console.error('Cannot navigate, essential data is missing.');
       return;
     }
 
@@ -378,92 +493,109 @@ export default function IngredientsScreen() {
     const needsScaling = navData.scaleFactor !== 1;
 
     performance.mark('navigateToNextScreen-start');
-    // --- 1. Handle Substitution Rewriting (if applicable) --- 
+    // --- 1. Handle Substitution Rewriting (if applicable) ---
     if (appliedChanges.length > 0) {
-       console.log('[Navigate] Triggering rewrite with changes:', appliedChanges);
-       console.log("🧪 Sending to backend:", appliedChanges);
-       setIsRewriting(true);
-       try {
-         const backendUrl = process.env.EXPO_PUBLIC_API_URL!;
-         const response = await fetch(`${backendUrl}/api/recipes/rewrite-instructions`, {
-           method: 'POST',
-           headers: { 'Content-Type': 'application/json' },
-           body: JSON.stringify({
-             originalInstructions: navData.instructions || [],
-             substitutions: appliedChanges.map(change => ({
+      console.log(
+        '[Navigate] Triggering rewrite with changes:',
+        appliedChanges,
+      );
+      console.log('🧪 Sending to backend:', appliedChanges);
+      setIsRewriting(true);
+      try {
+        const backendUrl = process.env.EXPO_PUBLIC_API_URL!;
+        const response = await fetch(
+          `${backendUrl}/api/recipes/rewrite-instructions`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              originalInstructions: navData.instructions || [],
+              substitutions: appliedChanges.map((change) => ({
                 from: change.from,
-                to: change.to ? change.to.name : null
-             })),
-           }),
-         });
-         const result = await response.json();
-         if (!response.ok) {
-           console.error("💥 Rewrite fetch failed", result);
-           throw new Error(result.error || `Rewrite failed (Status: ${response.status})`);
-         }
-         if (!result.rewrittenInstructions) {
-            console.error("💥 Rewrite response invalid format", result);
-            throw new Error("Invalid format for rewritten instructions.");
-         }
-         finalInstructions = result.rewrittenInstructions;
-         logTiming("Finished rewriting instructions");
-       } catch (rewriteError) {
-         console.error("Error rewriting instructions:", rewriteError);
-         showError(
-           "Update Failed", 
-           "We couldn't update the recipe steps for the ingredient substitution. The original steps will be used."
-         );
-         return;
-       } finally {
-         setIsRewriting(false);
-       }
-     } else {
-       if (__DEV__) console.log('[Navigate] No substitutions provided – skipping rewrite');
-     }
-
-    // --- 2. Handle Instruction Scaling (if applicable) --- 
-    if (needsScaling && scaledIngredients.length > 0) {
-        logTiming("Started scaling instructions");
-        setIsScalingInstructions(true);
-        try {
-            const backendUrl = process.env.EXPO_PUBLIC_API_URL!;
-            const response = await fetch(`${backendUrl}/api/recipes/scale-instructions`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    instructionsToScale: finalInstructions,
-                    originalIngredients: navData.originalIngredients,
-                    scaledIngredients: scaledIngredients,
-                }),
-            });
-            const result = await response.json();
-             if (!response.ok) {
-                console.error("💥 Scale fetch failed", result);
-                throw new Error(result.error || `Scaling failed (Status: ${response.status})`);
-             }
-             if (!result.scaledInstructions) {
-                console.error("💥 Scale response invalid format", result);
-                throw new Error("Invalid format for scaled instructions.");
-             }
-             finalInstructions = result.scaledInstructions;
-             logTiming("Finished scaling instructions");
-        } catch (scalingError) {
-             console.error("Error scaling instructions:", scalingError);
-             showError(
-               "Update Failed",
-               "We couldn't automatically adjust ingredient quantities in the recipe steps. The original quantities will be shown."
-             );
-             return;
-        } finally {
-            setIsScalingInstructions(false);
+                to: change.to ? change.to.name : null,
+              })),
+            }),
+          },
+        );
+        const result = await response.json();
+        if (!response.ok) {
+          console.error('💥 Rewrite fetch failed', result);
+          throw new Error(
+            result.error || `Rewrite failed (Status: ${response.status})`,
+          );
         }
+        if (!result.rewrittenInstructions) {
+          console.error('💥 Rewrite response invalid format', result);
+          throw new Error('Invalid format for rewritten instructions.');
+        }
+        finalInstructions = result.rewrittenInstructions;
+        logTiming('Finished rewriting instructions');
+      } catch (rewriteError) {
+        console.error('Error rewriting instructions:', rewriteError);
+        showError(
+          'Update Failed',
+          "We couldn't update the recipe steps for the ingredient substitution. The original steps will be used.",
+        );
+        return;
+      } finally {
+        setIsRewriting(false);
+      }
+    } else {
+      if (__DEV__)
+        console.log('[Navigate] No substitutions provided – skipping rewrite');
+    }
+
+    // --- 2. Handle Instruction Scaling (if applicable) ---
+    if (needsScaling && scaledIngredients.length > 0) {
+      logTiming('Started scaling instructions');
+      setIsScalingInstructions(true);
+      try {
+        const backendUrl = process.env.EXPO_PUBLIC_API_URL!;
+        const response = await fetch(
+          `${backendUrl}/api/recipes/scale-instructions`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              instructionsToScale: finalInstructions,
+              originalIngredients: navData.originalIngredients,
+              scaledIngredients: scaledIngredients,
+            }),
+          },
+        );
+        const result = await response.json();
+        if (!response.ok) {
+          console.error('💥 Scale fetch failed', result);
+          throw new Error(
+            result.error || `Scaling failed (Status: ${response.status})`,
+          );
+        }
+        if (!result.scaledInstructions) {
+          console.error('💥 Scale response invalid format', result);
+          throw new Error('Invalid format for scaled instructions.');
+        }
+        finalInstructions = result.scaledInstructions;
+        logTiming('Finished scaling instructions');
+      } catch (scalingError) {
+        console.error('Error scaling instructions:', scalingError);
+        showError(
+          'Update Failed',
+          "We couldn't automatically adjust ingredient quantities in the recipe steps. The original quantities will be shown.",
+        );
+        return;
+      } finally {
+        setIsScalingInstructions(false);
+      }
     }
 
     if (__DEV__) {
-      console.log('[Navigate] Pushing to /steps with instructions:', finalInstructions);
+      console.log(
+        '[Navigate] Pushing to /steps with instructions:',
+        finalInstructions,
+      );
     }
-    logTiming("Beginning navigation to Steps screen");
-    // --- 3. Navigate to Steps Screen --- 
+    logTiming('Beginning navigation to Steps screen');
+    // --- 3. Navigate to Steps Screen ---
     router.replace({
       pathname: '/recipe/steps',
       params: {
@@ -472,49 +604,67 @@ export default function IngredientsScreen() {
           instructions: finalInstructions,
           substitutions_text: finalSubstitutionsText,
           ingredients: scaledIngredients,
-          recipeYield: getScaledYieldText(navData.originalYieldDisplay, navData.scaleFactor),
+          recipeYield: getScaledYieldText(
+            navData.originalYieldDisplay,
+            navData.scaleFactor,
+          ),
           prepTime: navData.prepTime,
           cookTime: navData.cookTime,
           totalTime: navData.totalTime,
-          nutrition: navData.nutrition
-        })
-      }
+          nutrition: navData.nutrition,
+        }),
+      },
     });
 
     performance.mark('navigateToNextScreen-end');
-    performance.measure('navigateToNextScreen', 'navigateToNextScreen-start', 'navigateToNextScreen-end');
+    performance.measure(
+      'navigateToNextScreen',
+      'navigateToNextScreen-start',
+      'navigateToNextScreen-end',
+    );
 
-    logTiming(`navigateToNextScreen completed (total ${Date.now() - navStart}ms)`);
+    logTiming(
+      `navigateToNextScreen completed (total ${Date.now() - navStart}ms)`,
+    );
   }, [navData, scaledIngredients, appliedChanges, router, showError]);
 
   const handleApplySubstitution = (substitution: SubstitutionSuggestion) => {
     try {
       if (!selectedIngredientOriginalData) {
-        console.error("Apply error: Missing original ingredient data or display list.");
+        console.error(
+          'Apply error: Missing original ingredient data or display list.',
+        );
         return;
       }
-  
+
       const ingredientToSubstitute = selectedIngredientOriginalData;
       console.log(`[TIMING] Modal close trigger at ${Date.now()}ms`);
       setSubstitutionModalVisible(false);
       setSelectedIngredientOriginalData(null);
       setProcessedSubstitutionsForModal(null);
-  
+
       requestAnimationFrame(() => {
         InteractionManager.runAfterInteractions(() => {
-          console.log(`[TIMING] Running deferred state updates at ${Date.now()}ms`);
+          console.log(
+            `[TIMING] Running deferred state updates at ${Date.now()}ms`,
+          );
           performance.mark('applySubstitution-start');
-  
+
           if (substitution.name === 'Remove ingredient') {
-            const currentRemovals = appliedChanges.filter(change => !change.to).length;
+            const currentRemovals = appliedChanges.filter(
+              (change) => !change.to,
+            ).length;
             if (currentRemovals >= 2) {
-              console.warn('🚫 Blocked 3rd removal attempt:', ingredientToSubstitute?.name);
+              console.warn(
+                '🚫 Blocked 3rd removal attempt:',
+                ingredientToSubstitute?.name,
+              );
               InteractionManager.runAfterInteractions(() => {
                 setTimeout(() => {
                   console.log('🔥 Triggering showError modal');
                   showError(
                     'Limit Reached',
-                    'You can only remove up to 2 ingredients per recipe.'
+                    'You can only remove up to 2 ingredients per recipe.',
                   );
                 }, 300);
               });
@@ -522,50 +672,68 @@ export default function IngredientsScreen() {
               return;
             }
           }
-  
-          console.log("🧪 Current appliedChanges:", appliedChanges);
-  
+
+          console.log('🧪 Current appliedChanges:', appliedChanges);
+
           const isRemoval = substitution.name === 'Remove ingredient';
           const originalIngredientNameFromState = ingredientToSubstitute.name;
-          const index = scaledIngredients.findIndex(ing => {
+          const index = scaledIngredients.findIndex((ing) => {
             const { substitutedFor } = parseIngredientDisplayName(ing.name);
-            return ing.name === originalIngredientNameFromState || substitutedFor === originalIngredientNameFromState;
+            return (
+              ing.name === originalIngredientNameFromState ||
+              substitutedFor === originalIngredientNameFromState
+            );
           });
-  
+
           if (index === -1) {
-            console.error(`Apply error: Cannot find ingredient matching "${originalIngredientNameFromState}" in display list.`);
-            console.log("Current scaledIngredients names:", scaledIngredients.map(i => i.name));
+            console.error(
+              `Apply error: Cannot find ingredient matching "${originalIngredientNameFromState}" in display list.`,
+            );
+            console.log(
+              'Current scaledIngredients names:',
+              scaledIngredients.map((i) => i.name),
+            );
             return;
           }
-  
+
           const currentDisplayName = scaledIngredients[index].name;
           let originalNameForSub = ingredientToSubstitute.name;
-          const { substitutedFor } = parseIngredientDisplayName(currentDisplayName);
+          const { substitutedFor } =
+            parseIngredientDisplayName(currentDisplayName);
           if (substitutedFor) {
             originalNameForSub = substitutedFor;
           }
-  
-          console.log(`Applying substitution: ${substitution.name} (Amount: ${substitution.amount}, Unit: ${substitution.unit}) for original ${originalNameForSub} at index ${index}`);
-  
+
+          console.log(
+            `Applying substitution: ${substitution.name} (Amount: ${substitution.amount}, Unit: ${substitution.unit}) for original ${originalNameForSub} at index ${index}`,
+          );
+
           const newChange: AppliedChange = {
             from: originalNameForSub,
-            to: isRemoval ? null : {
-              name: substitution.name,
-              amount: substitution.amount != null ? String(substitution.amount) : null,
-              unit: substitution.unit ?? null,
-              preparation: substitution.description ?? null,
-              suggested_substitutions: null,
-            }
+            to: isRemoval
+              ? null
+              : {
+                  name: substitution.name,
+                  amount:
+                    substitution.amount != null
+                      ? String(substitution.amount)
+                      : null,
+                  unit: substitution.unit ?? null,
+                  preparation: substitution.description ?? null,
+                  suggested_substitutions: null,
+                },
           };
-  
+
           if (isRemoval) {
             setLastRemoved({ from: newChange.from, to: null });
           }
-  
+
           console.log('Applying change:', newChange);
           console.log(`[TIMING] setAppliedChanges will run at ${Date.now()}ms`);
-          setAppliedChanges(prev => {
-            const existingChangeIndex = prev.findIndex(c => c.from === originalNameForSub);
+          setAppliedChanges((prev) => {
+            const existingChangeIndex = prev.findIndex(
+              (c) => c.from === originalNameForSub,
+            );
             if (existingChangeIndex > -1) {
               const updated = [...prev];
               updated[existingChangeIndex] = newChange;
@@ -573,15 +741,19 @@ export default function IngredientsScreen() {
             }
             return [...prev, newChange];
           });
-  
+
           performance.mark('applySubstitution-end');
-          performance.measure('applySubstitution', 'applySubstitution-start', 'applySubstitution-end');
-          console.log("✅ Substitution applied (deferred)");
+          performance.measure(
+            'applySubstitution',
+            'applySubstitution-start',
+            'applySubstitution-end',
+          );
+          console.log('✅ Substitution applied (deferred)');
         });
       });
     } catch (err) {
-      console.error("💥 Unexpected applySubstitution failure", err);
-      showError("Substitution Error", "Something went wrong.");
+      console.error('💥 Unexpected applySubstitution failure', err);
+      showError('Substitution Error', 'Something went wrong.');
     }
   };
 
@@ -597,16 +769,24 @@ export default function IngredientsScreen() {
   if (!navData) {
     return (
       <SafeAreaView style={styles.centeredStatusContainer}>
-        <TouchableOpacity style={styles.backButtonSimple} onPress={() => router.canGoBack() ? router.back() : router.replace('/')}>
-            <Text style={styles.backButtonText}>Go Back</Text>
+        <TouchableOpacity
+          style={styles.backButtonSimple}
+          onPress={() =>
+            router.canGoBack() ? router.back() : router.replace('/')
+          }
+        >
+          <Text style={styles.backButtonText}>Go Back</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
   }
 
-  // --- RENDER LOGIC (assuming navData is available) --- 
+  // --- RENDER LOGIC (assuming navData is available) ---
   if (__DEV__ && scaledIngredients) {
-    console.log('[IngredientsScreen] scaledIngredients names:', scaledIngredients.map(i=>i.name));
+    console.log(
+      '[IngredientsScreen] scaledIngredients names:',
+      scaledIngredients.map((i) => i.name),
+    );
   }
 
   return (
@@ -630,30 +810,57 @@ export default function IngredientsScreen() {
             style={styles.backButton}
             onPress={() => router.back()}
           >
-            <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textDark} />
+            <MaterialCommunityIcons
+              name="arrow-left"
+              size={24}
+              color={COLORS.textDark}
+            />
           </TouchableOpacity>
-          <Image source={require('@/assets/images/meez_logo.png')} style={styles.headerLogo} />
-          <TouchableOpacity style={styles.exitButton} onPress={() => router.replace('/')}>
-            <MaterialCommunityIcons name="close" size={24} color={COLORS.textDark} />
+          <Image
+            source={require('@/assets/images/meez_logo.png')}
+            style={styles.headerLogo}
+          />
+          <TouchableOpacity
+            style={styles.exitButton}
+            onPress={() => router.replace('/')}
+          >
+            <MaterialCommunityIcons
+              name="close"
+              size={24}
+              color={COLORS.textDark}
+            />
           </TouchableOpacity>
         </View>
-        
+
         {navData?.title && (
           <Text style={styles.pageTitle}>{navData.title}</Text>
         )}
-        
+
         <FlatList
           data={scaledIngredients}
-          keyExtractor={(item: StructuredIngredient, index: number) => `${item.name}-${index}`}
+          keyExtractor={(item: StructuredIngredient, index: number) =>
+            `${item.name}-${index}`
+          }
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={[styles.ingredientsList, { paddingBottom: 100 }]}
-          ListHeaderComponent={navData && navData.scaleFactor !== 1 ? (
-            <View style={styles.scaleInfoBanner}>
-              <Text style={styles.scaleInfoText}>{`Showing ${navData.scaleFactor}x scaled up ingredients`}</Text>
-            </View>
-          ) : undefined}
-          ListEmptyComponent={<Text style={styles.placeholderText}>No ingredients found.</Text>}
-          extraData={appliedChanges.length + Object.keys(checkedIngredients).length}
+          contentContainerStyle={[
+            styles.ingredientsList,
+            { paddingBottom: 100 },
+          ]}
+          ListHeaderComponent={
+            navData && navData.scaleFactor !== 1 ? (
+              <View style={styles.scaleInfoBanner}>
+                <Text
+                  style={styles.scaleInfoText}
+                >{`Showing ${navData.scaleFactor}x scaled up ingredients`}</Text>
+              </View>
+            ) : undefined
+          }
+          ListEmptyComponent={
+            <Text style={styles.placeholderText}>No ingredients found.</Text>
+          }
+          extraData={
+            appliedChanges.length + Object.keys(checkedIngredients).length
+          }
           renderItem={memoizedRenderIngredientRow}
         />
 
@@ -664,21 +871,38 @@ export default function IngredientsScreen() {
               console.log('[BUTTON] onPress');
               handleGoToSteps();
             }}
-            onLayout={(e) => console.log('[BUTTON] Layout:', e.nativeEvent.layout)}
+            onLayout={(e) =>
+              console.log('[BUTTON] Layout:', e.nativeEvent.layout)
+            }
             style={[
               styles.nextButton,
-              (isRewriting || isScalingInstructions) && styles.nextButtonDisabled
+              (isRewriting || isScalingInstructions) &&
+                styles.nextButtonDisabled,
             ]}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             disabled={isRewriting || isScalingInstructions}
           >
             {(isRewriting || isScalingInstructions) && (
-              <ActivityIndicator size="small" color={COLORS.white} style={{ marginRight: 8 }}/>
+              <ActivityIndicator
+                size="small"
+                color={COLORS.white}
+                style={{ marginRight: 8 }}
+              />
             )}
             <Text style={styles.nextButtonText}>
-              {isRewriting ? 'Customizing instructions...' : isScalingInstructions ? 'Making sure everything lines up...' : 'Go to Steps'}
+              {isRewriting
+                ? 'Customizing instructions...'
+                : isScalingInstructions
+                  ? 'Making sure everything lines up...'
+                  : 'Go to Steps'}
             </Text>
-            {!(isRewriting || isScalingInstructions) && <MaterialCommunityIcons name="chevron-right" size={20} color={COLORS.white} />}
+            {!(isRewriting || isScalingInstructions) && (
+              <MaterialCommunityIcons
+                name="chevron-right"
+                size={20}
+                color={COLORS.white}
+              />
+            )}
           </TouchableOpacity>
         </View>
 
@@ -689,25 +913,30 @@ export default function IngredientsScreen() {
           animationType="fade"
           onRequestClose={() => setIsHelpModalVisible(false)} // For Android back button
         >
-          <Pressable 
-            style={styles.helpModalBackdrop} 
+          <Pressable
+            style={styles.helpModalBackdrop}
             onPress={() => setIsHelpModalVisible(false)} // Dismiss on backdrop press
           >
-            <Pressable style={styles.helpModalContent} onPress={() => {}}> 
+            <Pressable style={styles.helpModalContent} onPress={() => {}}>
               {/* Prevent backdrop press from triggering through content */}
               <Text style={styles.helpModalText}>
-                Tip: substitute out an ingredient in the recipe by clicking the button next to the ingredient name. The recipe will adjust accordingly!
+                Tip: substitute out an ingredient in the recipe by clicking the
+                button next to the ingredient name. The recipe will adjust
+                accordingly!
               </Text>
-              <TouchableOpacity 
-                style={styles.helpModalCloseButton} 
+              <TouchableOpacity
+                style={styles.helpModalCloseButton}
                 onPress={() => setIsHelpModalVisible(false)}
               >
-                <MaterialCommunityIcons name="close" size={20} color={COLORS.textDark} />
+                <MaterialCommunityIcons
+                  name="close"
+                  size={20}
+                  color={COLORS.textDark}
+                />
               </TouchableOpacity>
             </Pressable>
           </Pressable>
         </Modal>
-
       </SafeAreaView>
     </>
   );
@@ -717,107 +946,96 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-  },
+  } as ViewStyle,
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 0 : 10,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
+    paddingHorizontal: SPACING.md,
+    paddingTop: Platform.OS === 'ios' ? 0 : SPACING.smMd,
+    paddingBottom: SPACING.smMd,
+    borderBottomWidth: BORDER_WIDTH.default,
     borderBottomColor: COLORS.lightGray,
     backgroundColor: COLORS.background,
-  },
+  } as ViewStyle,
   backButton: {
-    padding: 8, 
-  },
+    padding: SPACING.sm,
+  } as ViewStyle,
   headerLogo: {
-    width: 70,
+    width: 70, // TODO: Tokenize image sizes
     height: 25,
     resizeMode: 'center',
-    marginTop: 2,
-  },
+    marginTop: 2, // TODO: No SPACING token for 2
+  } as ImageStyle,
   pageTitle: {
     ...titleText,
     color: COLORS.textDark,
     textAlign: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    lineHeight: 34,
-  },
+    paddingHorizontal: SPACING.pageHorizontal,
+    paddingVertical: 12, // TODO: No SPACING token for 12
+    lineHeight: 34, // TODO: No FONT.lineHeight token for 34
+  } as TextStyle,
   exitButton: {
-    padding: 8,
-  },
-  placeholder: {
-    width: 24 + 16,
-  },
+    padding: SPACING.sm,
+  } as ViewStyle,
   ingredientsList: {
-     paddingHorizontal: 20,
-     paddingTop: 15,
-  },
-  ingredientItemSimple: {
-     marginBottom: 12,
-  },
-  ingredientTextSimple: {
-    ...bodyText,
-    color: COLORS.textDark,
-    lineHeight: 24,
-  },
+    paddingHorizontal: SPACING.pageHorizontal,
+    paddingTop: 15, // TODO: No SPACING token for 15
+  } as ViewStyle,
   footer: {
-    padding: 20,
-    borderTopWidth: 1,
+    padding: SPACING.pageHorizontal,
+    borderTopWidth: BORDER_WIDTH.default,
     borderTopColor: COLORS.lightGray,
-    backgroundColor: COLORS.white, 
-  },
+    backgroundColor: COLORS.white,
+  } as ViewStyle,
   nextButton: {
     backgroundColor: COLORS.primary,
-    borderRadius: 8,
-    paddingVertical: 16,
+    borderRadius: RADIUS.sm,
+    paddingVertical: SPACING.md,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-  },
+  } as ViewStyle,
   nextButtonDisabled: {
-      backgroundColor: COLORS.darkGray, // Or another disabled color
-  },
+    backgroundColor: COLORS.darkGray,
+  } as ViewStyle,
   nextButtonText: {
     ...bodyStrongText,
     color: COLORS.white,
-    marginRight: 8,
-  },
+    marginRight: SPACING.sm,
+  } as TextStyle,
   centeredStatusContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: SPACING.pageHorizontal,
     backgroundColor: COLORS.background,
-  },
+  } as ViewStyle,
   errorText: {
     ...bodyText,
-    color: COLORS.error, 
+    color: COLORS.error,
     textAlign: 'center',
     marginBottom: 20,
   },
-  backButtonSimple: { 
-     marginTop: 15,
-     paddingVertical: 10,
-     paddingHorizontal: 20,
-     backgroundColor: COLORS.lightGray,
-     borderRadius: 8,
-  },
+  backButtonSimple: {
+    marginTop: 15, // TODO: No SPACING token for 15
+    paddingVertical: SPACING.smMd,
+    paddingHorizontal: SPACING.pageHorizontal,
+    backgroundColor: COLORS.lightGray,
+    borderRadius: RADIUS.sm,
+  } as ViewStyle,
   backButtonText: {
     ...bodyStrongText,
     color: COLORS.textDark,
-  },
-   placeholderText: {
+  } as TextStyle,
+  placeholderText: {
     ...captionText,
     fontStyle: 'italic',
     color: COLORS.darkGray,
-    marginTop: 5,
+    marginTop: 5, // TODO: No SPACING token for 5
     textAlign: 'center',
-    paddingVertical: 20, 
-  },
+    paddingVertical: SPACING.pageHorizontal,
+  } as TextStyle,
   ingredientItemContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -849,18 +1067,18 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
   },
   checkboxInnerCheck: {
-      width: 12,
-      height: 12,
-      backgroundColor: COLORS.white,
+    width: 12,
+    height: 12,
+    backgroundColor: COLORS.white,
   },
   ingredientTextContainer: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'flex-start',
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
   },
   ingredientTextChecked: {
-      color: COLORS.darkGray,
-      textDecorationLine: 'line-through',
+    color: COLORS.darkGray,
+    textDecorationLine: 'line-through',
   },
   ingredientTextRemoved: {
     color: COLORS.darkGray,
@@ -876,10 +1094,10 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   ingredientNameContainer: {
-      flex: 1, // Takes remaining space
-      flexDirection: 'row',
-      alignItems: 'flex-start', // Align items to the top within this row
-      justifyContent: 'space-between',
+    flex: 1, // Takes remaining space
+    flexDirection: 'row',
+    alignItems: 'flex-start', // Align items to the top within this row
+    justifyContent: 'space-between',
   },
   ingredientName: {
     ...bodyStrongText,
@@ -888,7 +1106,8 @@ const styles = StyleSheet.create({
     flexShrink: 1, // Allow text to shrink if needed, but prefer wrapping
     marginRight: 8, // Space between text and S button
   },
-  ingredientNameFullWidth: { // May no longer be needed, merged into ingredientName
+  ingredientNameFullWidth: {
+    // May no longer be needed, merged into ingredientName
     // ... keep for now, might remove later if unused ...
     ...bodyStrongText,
     color: COLORS.textDark,
@@ -896,7 +1115,8 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 8,
   },
-  ingredientQuantityParenthetical: { // Style for the (qty unit) part
+  ingredientQuantityParenthetical: {
+    // Style for the (qty unit) part
     ...bodyText,
     fontSize: 15, // Slightly smaller
     color: COLORS.darkGray, // Lighter color
@@ -924,19 +1144,19 @@ const styles = StyleSheet.create({
   // --- Help Modal Styles ---
   helpModalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: OVERLAYS.medium,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 30,
-  },
+    padding: 30, // TODO: No SPACING token for 30
+  } as ViewStyle,
   helpModalContent: {
     backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 25,
-    paddingTop: 35, // Extra padding top for close button
+    borderRadius: RADIUS.md,
+    padding: 25, // TODO: No SPACING token for 25
+    paddingTop: 35, // TODO: No SPACING token for 35
     alignItems: 'center',
     position: 'relative',
-    shadowColor: "#000",
+    shadowColor: COLORS.black,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -946,32 +1166,32 @@ const styles = StyleSheet.create({
     elevation: 5,
     width: '100%',
     maxWidth: 400,
-  },
+  } as ViewStyle,
   helpModalText: {
     ...bodyText,
     color: COLORS.textDark,
     textAlign: 'center',
-    lineHeight: 24,
-  },
+    lineHeight: FONT.lineHeight.relaxed,
+  } as TextStyle,
   helpModalCloseButton: {
     position: 'absolute',
-    top: 15,
-    right: 15,
-    padding: 5,
-  },
+    top: 15, // TODO: No SPACING token for 15
+    right: 15, // TODO: No SPACING token for 15
+    padding: 5, // TODO: No SPACING token for 5
+  } as ViewStyle,
   // --- End Help Modal Styles ---
   scaleInfoBanner: {
     backgroundColor: COLORS.darkGray,
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 15,
-  },
+    padding: 12, // TODO: No SPACING token for 12
+    borderRadius: RADIUS.sm,
+    marginBottom: 15, // TODO: No SPACING token for 15
+  } as ViewStyle,
   scaleInfoText: {
     ...bodyStrongText,
-    fontSize: 15,
+    fontSize: FONT.size.bodyMedium,
     color: COLORS.white,
     textAlign: 'center',
-  },
+  } as TextStyle,
   ingredientPreparation: {
     ...captionText,
     fontStyle: 'italic',

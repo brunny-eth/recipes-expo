@@ -1,7 +1,21 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, runOnJS } from 'react-native-reanimated';
-import { COLORS } from '../constants/theme';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  ViewStyle,
+  TextStyle,
+} from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  runOnJS,
+} from 'react-native-reanimated';
+import { COLORS, OVERLAYS, SPACING, RADIUS } from '../constants/theme';
+import { FONT } from '../constants/typography';
 
 interface GlobalErrorModalProps {
   visible: boolean;
@@ -50,7 +64,8 @@ const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
   });
 
   const safeTitle = title ?? 'Error';
-  const safeMessage = typeof message === 'string' ? message : String(message ?? '');
+  const safeMessage =
+    typeof message === 'string' ? message : String(message ?? '');
 
   if (!isRendered) {
     return null;
@@ -72,39 +87,39 @@ const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
 const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: OVERLAYS.medium,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 9999,
-  },
+  } as ViewStyle,
   modalContent: {
     width: '80%',
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 10,
+    backgroundColor: COLORS.white,
+    padding: SPACING.pageHorizontal,
+    borderRadius: RADIUS.smMd,
     alignItems: 'center',
-  },
+  } as ViewStyle,
   title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
+    fontSize: FONT.size.lg,
+    fontWeight: FONT.weight.bold,
+    marginBottom: SPACING.smMd,
+  } as TextStyle,
   message: {
-    fontSize: 16,
-    marginBottom: 20,
+    fontSize: FONT.size.body,
+    marginBottom: SPACING.pageHorizontal,
     textAlign: 'center',
-  },
+  } as TextStyle,
   button: {
     backgroundColor: COLORS.primary,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-  },
+    paddingVertical: SPACING.smMd,
+    paddingHorizontal: SPACING.pageHorizontal,
+    borderRadius: RADIUS.sm,
+  } as ViewStyle,
   buttonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
+    color: COLORS.white,
+    fontWeight: FONT.weight.bold,
+    fontSize: FONT.size.body,
+  } as TextStyle,
 });
 
-export default GlobalErrorModal; 
+export default GlobalErrorModal;

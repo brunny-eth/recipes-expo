@@ -2,8 +2,14 @@
 import React from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import LoadingExperienceScreen from '@/components/loading/LoadingExperienceScreen';
-import { SafeAreaView, StyleSheet, View, TouchableOpacity, Text } from 'react-native';
-import { COLORS } from '@/constants/theme';
+import {
+  SafeAreaView,
+  StyleSheet,
+  View,
+  TouchableOpacity,
+  ViewStyle,
+} from 'react-native';
+import { COLORS, SPACING, ICON_SIZE } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useFreeUsage } from '@/context/FreeUsageContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -28,7 +34,11 @@ export default function LoadingRoute() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-          <MaterialCommunityIcons name="close" size={28} color={COLORS.darkGray} />
+          <MaterialCommunityIcons
+            name="close"
+            size={ICON_SIZE.lg}
+            color={COLORS.darkGray}
+          />
         </TouchableOpacity>
       </View>
 
@@ -51,20 +61,20 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-  },
+  } as ViewStyle,
   header: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: 60,
+    height: SPACING.xxl,
     justifyContent: 'flex-end',
     alignItems: 'flex-end',
-    paddingRight: 20,
-    paddingBottom: 10,
+    paddingRight: SPACING.pageHorizontal,
+    paddingBottom: SPACING.smMd,
     zIndex: 10,
-  },
+  } as ViewStyle,
   closeButton: {
-    padding: 8,
-  },
+    padding: SPACING.sm,
+  } as ViewStyle,
 });

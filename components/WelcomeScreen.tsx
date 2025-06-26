@@ -1,5 +1,12 @@
 import React from 'react';
-import { View, StyleSheet, SafeAreaView, Image, Text, TouchableOpacity } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  SafeAreaView,
+  Image,
+  Text,
+  TouchableOpacity,
+} from 'react-native';
 import { COLORS } from '@/constants/theme';
 import { bodyText, screenTitleText } from '@/constants/typography';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -15,7 +22,8 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onDismiss }) => {
         <View style={styles.bodyContainer}>
           <Text style={styles.welcomeTitle}>Welcome to Meez</Text>
           <Text style={styles.welcomeText}>
-            We help you get rid of annoying recipe slop, standardize your recipe formats, and substitute ingredients with what you have on hand.
+            We help you get rid of annoying recipe slop, standardize your recipe
+            formats, and substitute ingredients with what you have on hand.
           </Text>
           <Text style={styles.welcomeText}>
             Ready to cook? We'll start the digital mise en place for you.
@@ -23,7 +31,10 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onDismiss }) => {
         </View>
       </View>
 
-      <Animated.View entering={FadeIn.duration(500)} style={styles.buttonContainer}>
+      <Animated.View
+        entering={FadeIn.duration(500)}
+        style={styles.buttonContainer}
+      >
         <TouchableOpacity style={styles.button} onPress={onDismiss}>
           <Text style={styles.buttonText}>Get Started</Text>
         </TouchableOpacity>
@@ -93,4 +104,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default WelcomeScreen; 
+export default WelcomeScreen;

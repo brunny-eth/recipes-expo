@@ -1,5 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+  Alert,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import * as SecureStore from 'expo-secure-store';
@@ -8,16 +16,29 @@ import { Session, User } from '@supabase/supabase-js';
 import { useAuth } from '@/context/AuthContext';
 import { getSecureStoreLogs, supabase } from '@/lib/supabaseClient';
 import { COLORS } from '@/constants/theme';
-import { bodyStrongText, monoSpacedText, screenTitleText } from '@/constants/typography';
+import {
+  bodyStrongText,
+  monoSpacedText,
+  screenTitleText,
+} from '@/constants/typography';
 
 const SUPABASE_AUTH_TOKEN_KEY = 'sb-ttmijswwzijvyhnrpnoi-auth-token';
 
 // Helper component for displaying a piece of debug info
-const DebugField = ({ label, value }: { label: string; value: string | null | undefined }) => {
+const DebugField = ({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | null | undefined;
+}) => {
   const onCopy = async () => {
     try {
       await Clipboard.setStringAsync(value ?? 'null');
-      Alert.alert('Copied!', `${label} value has been copied to the clipboard.`);
+      Alert.alert(
+        'Copied!',
+        `${label} value has been copied to the clipboard.`,
+      );
     } catch (e: any) {
       Alert.alert('Copy Failed', e.message);
     }
@@ -27,7 +48,9 @@ const DebugField = ({ label, value }: { label: string; value: string | null | un
     <View style={styles.fieldContainer}>
       <Text style={styles.fieldLabel}>{label}</Text>
       <View style={styles.valueContainer}>
-        <Text style={styles.fieldValue} selectable>{value ?? 'null'}</Text>
+        <Text style={styles.fieldValue} selectable>
+          {value ?? 'null'}
+        </Text>
         <TouchableOpacity onPress={onCopy} style={styles.copyButton}>
           <Text style={styles.copyButtonText}>Copy</Text>
         </TouchableOpacity>
@@ -36,27 +59,36 @@ const DebugField = ({ label, value }: { label: string; value: string | null | un
   );
 };
 
-
 export default function SessionDebugScreen() {
-  const { user, session, isAuthenticated, isLoading: isAuthLoading, signOut } = useAuth();
-  
+  const {
+    user,
+    session,
+    isAuthenticated,
+    isLoading: isAuthLoading,
+    signOut,
+  } = useAuth();
+
   const [hydratedSession, setHydratedSession] = useState<Session | null>(null);
   const [hydratedUser, setHydratedUser] = useState<User | null>(null);
   const [storedToken, setStoredToken] = useState<string | null>(null);
   const [isRehydrating, setIsRehydrating] = useState(false);
   const [secureStoreLogs, setSecureStoreLogs] = useState<string[]>([]);
-  const [debugRawValueOnMount, setDebugRawValueOnMount] = useState<string | null>(null);
+  const [debugRawValueOnMount, setDebugRawValueOnMount] = useState<
+    string | null
+  >(null);
 
   const forceRehydrate = useCallback(async () => {
     setIsRehydrating(true);
     try {
       // 1. Get session from Supabase client
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
       if (sessionError) throw sessionError;
       setHydratedSession(sessionData.session);
 
       // 2. Get user from Supabase client
-      const { data: userData, error: userError } = await supabase.auth.getUser();
+      const { data: userData, error: userError } =
+        await supabase.auth.getUser();
       if (userError) throw userError;
       setHydratedUser(userData.user);
 
@@ -66,7 +98,6 @@ export default function SessionDebugScreen() {
 
       // 4. Get SecureStore logs
       setSecureStoreLogs(getSecureStoreLogs());
-
     } catch (error: any) {
       Alert.alert('Rehydration Failed', error.message);
     } finally {
@@ -95,27 +126,63 @@ export default function SessionDebugScreen() {
     return (
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <DebugField label="user.id" value={user?.id} />
-        <DebugField label="session.expires_at" value={session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : null} />
-        <DebugField label="isAuthenticated (from AuthContext)" value={String(isAuthenticated)} />
-        <DebugField label="isLoading (from AuthContext)" value={String(isAuthLoading)} />
-        <DebugField label="auth.getSession() (on Rehydrate)" value={JSON.stringify(hydratedSession, null, 2)} />
-        <DebugField label="auth.getUser() (on Rehydrate)" value={JSON.stringify(hydratedUser, null, 2)} />
+        <DebugField
+          label="session.expires_at"
+          value={
+            session?.expires_at
+              ? new Date(session.expires_at * 1000).toISOString()
+              : null
+          }
+        />
+        <DebugField
+          label="isAuthenticated (from AuthContext)"
+          value={String(isAuthenticated)}
+        />
+        <DebugField
+          label="isLoading (from AuthContext)"
+          value={String(isAuthLoading)}
+        />
+        <DebugField
+          label="auth.getSession() (on Rehydrate)"
+          value={JSON.stringify(hydratedSession, null, 2)}
+        />
+        <DebugField
+          label="auth.getUser() (on Rehydrate)"
+          value={JSON.stringify(hydratedUser, null, 2)}
+        />
         <DebugField label="SecureStore (on Rehydrate)" value={storedToken} />
-        <DebugField label="SecureStore (on Mount)" value={debugRawValueOnMount} />
-        <DebugField label="ExpoSecureStoreAdapter Logs" value={secureStoreLogs.join('\n')} />
+        <DebugField
+          label="SecureStore (on Mount)"
+          value={debugRawValueOnMount}
+        />
+        <DebugField
+          label="ExpoSecureStoreAdapter Logs"
+          value={secureStoreLogs.join('\n')}
+        />
 
         <View style={styles.buttonContainer}>
-          <TouchableOpacity style={styles.button} onPress={forceRehydrate} disabled={isRehydrating}>
-            {isRehydrating ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Force Rehydrate</Text>}
+          <TouchableOpacity
+            style={styles.button}
+            onPress={forceRehydrate}
+            disabled={isRehydrating}
+          >
+            {isRehydrating ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>Force Rehydrate</Text>
+            )}
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.button, styles.signOutButton]} onPress={signOut}>
+          <TouchableOpacity
+            style={[styles.button, styles.signOutButton]}
+            onPress={signOut}
+          >
             <Text style={styles.buttonText}>Sign Out</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
     );
   };
-  
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
@@ -201,4 +268,4 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
   },
-}); 
+});

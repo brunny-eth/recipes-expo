@@ -43,59 +43,90 @@ function RootLayoutNav() {
   useEffect(() => {
     // Wait for authentication and free usage contexts to finish loading
     if (isAuthLoading || isLoadingFreeUsage) {
-      console.log(`[RootLayoutNav] Waiting for contexts to load. isAuthLoading: ${isAuthLoading}, isLoadingFreeUsage: ${isLoadingFreeUsage}`);
+      console.log(
+        `[RootLayoutNav] Waiting for contexts to load. isAuthLoading: ${isAuthLoading}, isLoadingFreeUsage: ${isLoadingFreeUsage}`,
+      );
       return;
     }
 
     const currentPathSegments = segments.join('/'); // e.g., "login", "(tabs)/explore", "recipe/summary"
     const inAuthFlow = segments[0] === 'login' || segments[0] === 'auth';
-    const inRecipeContentFlow = segments[0] === 'loading' || segments[0] === 'recipe';
+    const inRecipeContentFlow =
+      segments[0] === 'loading' || segments[0] === 'recipe';
 
     // Check if the current route is one of the explicitly allowed public routes
-    const isCurrentlyOnAllowedPublicRoute = PUBLIC_ALLOWED_ROUTES_PREFIXES.some(prefix => {
-      // For '(tabs)', we check if the first segment is '(tabs)' to cover all tab routes
-      if (prefix === '(tabs)') {
-        return segments[0] === '(tabs)';
-      }
-      // For other specific routes like 'login' or '+not-found', we check for exact match or startWith
-      return currentPathSegments === prefix || currentPathSegments.startsWith(prefix + '/');
-    });
+    const isCurrentlyOnAllowedPublicRoute = PUBLIC_ALLOWED_ROUTES_PREFIXES.some(
+      (prefix) => {
+        // For '(tabs)', we check if the first segment is '(tabs)' to cover all tab routes
+        if (prefix === '(tabs)') {
+          return segments[0] === '(tabs)';
+        }
+        // For other specific routes like 'login' or '+not-found', we check for exact match or startWith
+        return (
+          currentPathSegments === prefix ||
+          currentPathSegments.startsWith(prefix + '/')
+        );
+      },
+    );
 
-    if (!session) { // User is NOT authenticated
-      if (hasUsedFreeRecipe) { // And has used their free recipe
+    if (!session) {
+      // User is NOT authenticated
+      if (hasUsedFreeRecipe) {
+        // And has used their free recipe
         if (inAuthFlow || isCurrentlyOnAllowedPublicRoute) {
           // Allow navigation if already in the authentication flow,
           // or if on a route explicitly allowed for unauthenticated users
           // (e.g., home, explore, settings, or returning from a recipe page via 'X' button).
-          console.log(`[RootLayoutNav] Unauthenticated, free recipe used, but on allowed route: ${currentPathSegments}. No redirect.`);
+          console.log(
+            `[RootLayoutNav] Unauthenticated, free recipe used, but on allowed route: ${currentPathSegments}. No redirect.`,
+          );
         } else if (inRecipeContentFlow) {
           // If unauthenticated and free recipe used, and trying to access
           // recipe content (loading, summary, steps), redirect to login.
-          console.log(`[RootLayoutNav] Unauthenticated, free recipe used, trying to access restricted recipe content: ${currentPathSegments}. Redirecting to login.`);
+          console.log(
+            `[RootLayoutNav] Unauthenticated, free recipe used, trying to access restricted recipe content: ${currentPathSegments}. Redirecting to login.`,
+          );
           router.replace('/login');
         } else {
           // Fallback for any other unexpected restricted routes that aren't explicit public or auth routes.
-          console.warn(`[RootLayoutNav] Unauthenticated, free recipe used, accessing unexpected restricted route: ${currentPathSegments}. Redirecting to login.`);
+          console.warn(
+            `[RootLayoutNav] Unauthenticated, free recipe used, accessing unexpected restricted route: ${currentPathSegments}. Redirecting to login.`,
+          );
           router.replace('/login');
         }
-      } else { // User is NOT authenticated AND has NOT used their free recipe
+      } else {
+        // User is NOT authenticated AND has NOT used their free recipe
         // They are allowed to browse most of the app freely, including starting a recipe,
         // but prevent direct bypass of login if they somehow land there.
         if (inAuthFlow) {
-          console.log(`[RootLayoutNav] Unauthenticated, free recipe NOT used, attempting auth flow: ${currentPathSegments}. No redirect.`);
+          console.log(
+            `[RootLayoutNav] Unauthenticated, free recipe NOT used, attempting auth flow: ${currentPathSegments}. No redirect.`,
+          );
           return; // Stay on login/auth page if they are already there
         }
         // Implicitly allows navigation to (tabs) and initial recipe flow if not in auth group
-        console.log(`[RootLayoutNav] Unauthenticated, free recipe NOT used, allowing access to: ${currentPathSegments}.`);
+        console.log(
+          `[RootLayoutNav] Unauthenticated, free recipe NOT used, allowing access to: ${currentPathSegments}.`,
+        );
       }
-    } else { // User IS authenticated
+    } else {
+      // User IS authenticated
       // If authenticated, prevent them from accessing login/auth pages directly
       if (inAuthFlow) {
-        console.log(`[RootLayoutNav] Authenticated user on auth page: ${currentPathSegments}. Redirecting to main app.`);
+        console.log(
+          `[RootLayoutNav] Authenticated user on auth page: ${currentPathSegments}. Redirecting to main app.`,
+        );
         router.replace('/(tabs)');
       }
     }
-  }, [session, hasUsedFreeRecipe, isAuthLoading, isLoadingFreeUsage, segments, router]);
+  }, [
+    session,
+    hasUsedFreeRecipe,
+    isAuthLoading,
+    isLoadingFreeUsage,
+    segments,
+    router,
+  ]);
 
   return (
     <Stack screenOptions={{ animation: 'fade' }}>
@@ -105,8 +136,14 @@ function RootLayoutNav() {
       <Stack.Screen name="+not-found" />
       <Stack.Screen name="login" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="recipe/ingredients" options={{ presentation: 'card', headerShown: false }} />
-      <Stack.Screen name="recipe/steps" options={{ presentation: 'card', headerShown: false }} />
+      <Stack.Screen
+        name="recipe/ingredients"
+        options={{ presentation: 'card', headerShown: false }}
+      />
+      <Stack.Screen
+        name="recipe/steps"
+        options={{ presentation: 'card', headerShown: false }}
+      />
     </Stack>
   );
 }
@@ -130,20 +167,31 @@ export default function RootLayout() {
         console.log('[RootLayout] Assets loaded.');
 
         const hasLaunched = await AsyncStorage.getItem('hasLaunched');
-        console.log(`[RootLayout] AsyncStorage 'hasLaunched' value: ${hasLaunched}`);
+        console.log(
+          `[RootLayout] AsyncStorage 'hasLaunched' value: ${hasLaunched}`,
+        );
 
         if (hasLaunched === null) {
-          console.log('[RootLayout] First launch detected. Setting isFirstLaunch to true.');
+          console.log(
+            '[RootLayout] First launch detected. Setting isFirstLaunch to true.',
+          );
           setIsFirstLaunch(true);
         } else {
-          console.log('[RootLayout] Not first launch. Setting isFirstLaunch to false.');
+          console.log(
+            '[RootLayout] Not first launch. Setting isFirstLaunch to false.',
+          );
           setIsFirstLaunch(false);
         }
       } catch (e) {
-        console.warn('[RootLayout] Failed to load assets or check first launch', e);
+        console.warn(
+          '[RootLayout] Failed to load assets or check first launch',
+          e,
+        );
         setIsFirstLaunch(false); // Default to not first launch on error
       } finally {
-        console.log('[RootLayout] Prepare function finished. Setting assetsLoaded to true.');
+        console.log(
+          '[RootLayout] Prepare function finished. Setting assetsLoaded to true.',
+        );
         setAssetsLoaded(true);
       }
     }
@@ -152,7 +200,9 @@ export default function RootLayout() {
   }, []);
 
   const ready = fontsLoaded && assetsLoaded && isFirstLaunch !== null;
-  console.log(`[RootLayout] ready state: ${ready} (fontsLoaded: ${fontsLoaded}, assetsLoaded: ${assetsLoaded}, isFirstLaunch: ${isFirstLaunch})`);
+  console.log(
+    `[RootLayout] ready state: ${ready} (fontsLoaded: ${fontsLoaded}, assetsLoaded: ${assetsLoaded}, isFirstLaunch: ${isFirstLaunch})`,
+  );
 
   useEffect(() => {
     if (ready) {
@@ -187,7 +237,10 @@ export default function RootLayout() {
 
       {/* 3. Conditionally render the WelcomeScreen as an overlay on top */}
       {isFirstLaunch && (
-        <Animated.View style={StyleSheet.absoluteFill} exiting={FadeOut.duration(500)}>
+        <Animated.View
+          style={StyleSheet.absoluteFill}
+          exiting={FadeOut.duration(500)}
+        >
           <WelcomeScreen onDismiss={handleWelcomeDismiss} />
         </Animated.View>
       )}

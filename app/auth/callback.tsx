@@ -3,7 +3,6 @@ import { View, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 
 export default function AuthCallbackScreen() {
-
   const router = useRouter(); // Still needed for the component structure, even if not used for navigation here.
 
   return (

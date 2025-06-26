@@ -1,9 +1,34 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Modal,
+  Pressable,
+  ViewStyle,
+  TextStyle,
+} from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
-import { COLORS } from '@/constants/theme';
-import { sectionHeaderText, bodyText } from '@/constants/typography';
+import Animated, {
+  FadeIn,
+  FadeOut,
+  SlideInDown,
+  SlideOutDown,
+} from 'react-native-reanimated';
+import {
+  COLORS,
+  OVERLAYS,
+  SPACING,
+  RADIUS,
+  ICON_SIZE,
+} from '@/constants/theme';
+import {
+  sectionHeaderText,
+  bodyText,
+  FONT,
+  bodyStrongText,
+} from '@/constants/typography';
 
 interface ConfirmationModalProps {
   visible: boolean;
@@ -43,7 +68,11 @@ export default function ConfirmationModal({
           <View style={styles.header}>
             <Text style={styles.title}>{title}</Text>
             <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <MaterialCommunityIcons name="close" size={24} color={COLORS.textDark} />
+              <MaterialCommunityIcons
+                name="close"
+                size={ICON_SIZE.md}
+                color={COLORS.textDark}
+              />
             </TouchableOpacity>
           </View>
 
@@ -67,46 +96,45 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
+    backgroundColor: OVERLAYS.medium,
+  } as ViewStyle,
   modalContent: {
     backgroundColor: COLORS.background,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
+    padding: SPACING.pageHorizontal,
     maxHeight: '80%',
-  },
+  } as ViewStyle,
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
-  },
+    marginBottom: SPACING.pageHorizontal,
+  } as ViewStyle,
   title: {
     ...sectionHeaderText,
     color: COLORS.textDark,
-  },
+  } as TextStyle,
   closeButton: {
-    padding: 8,
-  },
+    padding: SPACING.sm,
+  } as ViewStyle,
   messageContainer: {
     marginBottom: 30,
-    paddingHorizontal: 10,
-  },
+    paddingHorizontal: SPACING.smMd,
+  } as ViewStyle,
   message: {
     ...bodyText,
     color: COLORS.textDark,
     textAlign: 'center',
-  },
+  } as TextStyle,
   doneButton: {
     backgroundColor: COLORS.primary,
-    paddingVertical: 16,
-    borderRadius: 12,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.md,
     alignItems: 'center',
-  },
+  } as ViewStyle,
   doneButtonText: {
-    ...bodyText,
+    ...bodyStrongText,
     color: COLORS.white,
-    fontWeight: 'bold',
-  },
-}); 
+  } as TextStyle,
+});

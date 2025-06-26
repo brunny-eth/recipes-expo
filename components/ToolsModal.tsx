@@ -82,8 +82,13 @@ export default function ToolsModal({
       default:
         return (
           <View style={styles.placeholderContainer}>
-            <Image source={require('@/assets/images/meez_logo.png')} style={[styles.chefIcon, { width: 80, height: 80 }]} />
-            <Text style={styles.placeholderText}>Click on a Tool to use it</Text>
+            <Image
+              source={require('@/assets/images/meez_logo.png')}
+              style={[styles.chefIcon, { width: 80, height: 80 }]}
+            />
+            <Text style={styles.placeholderText}>
+              Click on a Tool to use it
+            </Text>
           </View>
         );
     }
@@ -98,15 +103,24 @@ export default function ToolsModal({
     >
       <BlurView intensity={20} tint="light" style={styles.absolute}>
         <Pressable style={styles.centeredView} onPress={onClose}>
-          <Pressable style={styles.modalView} onPress={(e) => e.stopPropagation()}>
+          <Pressable
+            style={styles.modalView}
+            onPress={(e) => e.stopPropagation()}
+          >
             <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <MaterialCommunityIcons name="close" size={24} color={COLORS.darkGray} />
+              <MaterialCommunityIcons
+                name="close"
+                size={24}
+                color={COLORS.darkGray}
+              />
             </TouchableOpacity>
 
-            <View style={[
-              styles.toolContentContainer,
-              activeTool === 'help' && styles.toolContentContainerHelpActive
-            ]}>
+            <View
+              style={[
+                styles.toolContentContainer,
+                activeTool === 'help' && styles.toolContentContainerHelpActive,
+              ]}
+            >
               {renderToolContent()}
             </View>
           </Pressable>
@@ -183,4 +197,4 @@ const styles = StyleSheet.create({
     color: COLORS.darkGray,
     marginTop: 20,
   },
-}); 
+});

@@ -1,12 +1,36 @@
 import React from 'react';
-import { useState, useEffect, useRef } from 'react'; 
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Keyboard, KeyboardAvoidingView, Platform, View as RNView, Image, Modal } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  View as RNView,
+  Image,
+  Modal,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
-import { COLORS } from '@/constants/theme';
+import {
+  COLORS,
+  OVERLAYS,
+  SPACING,
+  RADIUS,
+  BORDER_WIDTH,
+} from '@/constants/theme';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useErrorModal } from '@/context/ErrorModalContext';
-import { titleText, bodyText, bodyStrongText, captionText } from '@/constants/typography';
+import {
+  titleText,
+  bodyText,
+  bodyStrongText,
+  captionText,
+  FONT,
+} from '@/constants/typography';
 import { useAuth } from '@/context/AuthContext';
 import { useFreeUsage } from '@/context/FreeUsageContext';
 
@@ -15,17 +39,17 @@ export default function HomeScreen() {
   const router = useRouter();
   const [isInputFocused, setIsInputFocused] = React.useState(false);
   const { showError } = useErrorModal();
-  const { session, user } = useAuth(); 
-  const { hasUsedFreeRecipe } = useFreeUsage(); 
+  const { session, user } = useAuth();
+  const { hasUsedFreeRecipe } = useFreeUsage();
 
   React.useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
       'keyboardDidShow',
-      () => {}
+      () => {},
     );
     const keyboardDidHideListener = Keyboard.addListener(
       'keyboardDidHide',
-      () => {}
+      () => {},
     );
 
     return () => {
@@ -45,7 +69,7 @@ export default function HomeScreen() {
 
   const handleSubmit = async () => {
     if (!recipeUrl || recipeUrl.trim() === '') {
-      showError("Input Required", "Please paste a recipe URL or recipe text.");
+      showError('Input Required', 'Please paste a recipe URL or recipe text.');
       return;
     }
 
@@ -58,13 +82,12 @@ export default function HomeScreen() {
         // This case should theoretically be handled by the layout redirect,
         // but as a safeguard, we prevent submission and show an error.
         showError(
-          "Login Required",
+          'Login Required',
           "You've already used your free recipe. Please log in to continue.",
-          () => router.replace('/login')
+          () => router.replace('/login'),
         );
         return;
       }
-      
     }
 
     // Proceed with navigation
@@ -79,20 +102,27 @@ export default function HomeScreen() {
         enabled={isInputFocused}
       >
         <RNView style={styles.outerContainer}>
-          <Animated.View 
+          <Animated.View
             entering={FadeIn.duration(500)}
             style={styles.logoContainer}
           >
-            <Image source={require('@/assets/images/meez_logo.png')} style={{ width: 150, height: 150 }} />
+            <Image
+              source={require('@/assets/images/meez_logo.png')}
+              style={{ width: 150, height: 150 }}
+            />
           </Animated.View>
-          
-          <Animated.View 
+
+          <Animated.View
             entering={FadeInDown.delay(300).duration(500)}
             style={styles.contentContainer}
           >
             <View style={styles.featuresContainer}>
-              <Text style={styles.mainFeatureText}>{'No essays. No ads.\nJust the recipe.'}</Text>
-              <Text style={styles.featureText}>Skip the scrolling and start cooking.</Text>
+              <Text style={styles.mainFeatureText}>
+                {'No essays. No ads.\nJust the recipe.'}
+              </Text>
+              <Text style={styles.featureText}>
+                Skip the scrolling and start cooking.
+              </Text>
             </View>
           </Animated.View>
 
@@ -110,8 +140,8 @@ export default function HomeScreen() {
                 onBlur={() => setIsInputFocused(false)}
                 onSubmitEditing={handleSubmit}
               />
-              <TouchableOpacity 
-                style={styles.submitButton} 
+              <TouchableOpacity
+                style={styles.submitButton}
                 onPress={handleSubmit}
               >
                 <Text style={styles.submitButtonText}>Go</Text>
@@ -135,49 +165,49 @@ const styles = StyleSheet.create({
   outerContainer: {
     flex: 1,
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 24,
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.lg,
   },
   logoContainer: {
     alignItems: 'center',
-    paddingTop: 60, // Adjust this value to move the logo up or down
+    paddingTop: SPACING.xxl, // Adjust this value to move the logo up or down
   },
   contentContainer: {
     alignItems: 'center',
   },
   featuresContainer: {
     alignItems: 'center',
-    paddingHorizontal: 20,
-    marginTop: -48,
+    paddingHorizontal: SPACING.xl,
+    marginTop: -SPACING.xl, // TODO: This is awkward. Maybe a different layout approach?
   },
   mainFeatureText: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 30,
+    fontFamily: FONT.family.interSemiBold,
+    fontSize: 30, // TODO: Add FONT.size.h1? or similar
     color: COLORS.textDark,
     textAlign: 'center',
-    marginBottom: 12,
-    lineHeight: 34,
+    marginBottom: SPACING.md,
+    lineHeight: 34, // TODO: No token for 34. FONT.lineHeight.loose is 30.
     letterSpacing: -0.5,
   },
   featureText: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 16,
+    fontFamily: FONT.family.inter,
+    fontSize: FONT.size.body,
     color: COLORS.textDark, // instead of darkGray
     opacity: 0.7, // gives contrast without using a different color
     textAlign: 'center',
     maxWidth: 300,
-    marginTop: 6,
+    marginTop: SPACING.sm,
   },
   inputWrapper: {
-    marginBottom: 50, // Adjust this value to move the input bar up or down
+    marginBottom: SPACING.xl, // Adjust this value to move the input bar up or down
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
-    height: 50,
-    borderRadius: 8,
-    borderWidth: 1,
+    height: 50, // TODO: Should this be a token? SPACING.xxl?
+    borderRadius: RADIUS.sm,
+    borderWidth: BORDER_WIDTH.default,
     borderColor: COLORS.lightGray,
     backgroundColor: COLORS.white,
     overflow: 'hidden',
@@ -186,12 +216,12 @@ const styles = StyleSheet.create({
     ...bodyText,
     flex: 1,
     height: '100%',
-    paddingHorizontal: 15,
+    paddingHorizontal: SPACING.md,
     color: COLORS.textDark,
   },
   submitButton: {
     height: '100%',
-    width: 60,
+    width: SPACING.xxl,
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
@@ -205,34 +235,34 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     ...bodyStrongText,
-    marginTop: 20,
-    fontSize: 18,
+    marginTop: SPACING.xl,
+    fontSize: 18, // TODO: Add FONT.size.lg?
     color: COLORS.textDark,
   },
   loadingIndicator: {
-    width: 60,
-    height: 3,
+    width: SPACING.xxl,
+    height: 3, // TODO: BORDER_WIDTH.md?
     backgroundColor: COLORS.primary,
-    marginVertical: 15,
+    marginVertical: SPACING.md,
   },
   loadingHint: {
     ...captionText,
     color: COLORS.darkGray,
     textAlign: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: SPACING.xl,
   },
   // --- Modal Styles ---
   modalOverlay: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: OVERLAYS.dark,
   },
   modalContainer: {
     width: '85%',
     backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 24,
+    borderRadius: RADIUS.md,
+    padding: SPACING.lg,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: {
@@ -245,44 +275,44 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     ...titleText,
-    fontSize: 20,
-    marginBottom: 12,
+    fontSize: FONT.size.sectionHeader,
+    marginBottom: SPACING.md,
     textAlign: 'center',
   },
   modalMessage: {
     ...bodyText,
-    marginBottom: 24,
+    marginBottom: SPACING.lg,
     textAlign: 'center',
     color: COLORS.darkGray,
-    lineHeight: 22,
+    lineHeight: FONT.lineHeight.relaxed, // Was 22, now 24
   },
   modalButton: {
     width: '100%',
     backgroundColor: COLORS.primary,
-    paddingVertical: 14,
-    borderRadius: 8,
+    paddingVertical: 14, // TODO: SPACING.md is 16. New token?
+    borderRadius: RADIUS.sm,
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: SPACING.md,
   },
   modalButtonSecondary: {
     backgroundColor: COLORS.white,
-    borderWidth: 1,
+    borderWidth: BORDER_WIDTH.default,
     borderColor: COLORS.primary,
   },
   modalButtonText: {
     ...bodyStrongText,
     color: COLORS.white,
-    fontSize: 16,
+    fontSize: FONT.size.body,
   },
   modalButtonTextSecondary: {
     color: COLORS.primary,
   },
   modalCancelButton: {
-    marginTop: 8,
+    marginTop: SPACING.sm,
   },
   modalCancelButtonText: {
     ...bodyText,
     color: COLORS.darkGray,
-    fontSize: 14,
+    fontSize: 14, // TODO: new FONT.size?
   },
 });

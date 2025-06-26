@@ -1,5 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Platform,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '@/constants/theme';
@@ -36,19 +42,34 @@ const InlineErrorBanner: React.FC<InlineErrorBannerProps> = ({
 
   return (
     <View style={styles.container}>
-      <MaterialCommunityIcons name="alert-circle-outline" size={28} color={COLORS.error} style={styles.icon} />
+      <MaterialCommunityIcons
+        name="alert-circle-outline"
+        size={28}
+        color={COLORS.error}
+        style={styles.icon}
+      />
       <View style={styles.textContainer}>
         <Text style={styles.messageText}>{message}</Text>
       </View>
       <View style={styles.buttonContainer}>
         {retryAction && (
-          <TouchableOpacity style={[styles.button, styles.retryButton]} onPress={retryAction}>
-            <Text style={[styles.buttonText, styles.retryButtonText]}>{retryButtonText}</Text>
+          <TouchableOpacity
+            style={[styles.button, styles.retryButton]}
+            onPress={retryAction}
+          >
+            <Text style={[styles.buttonText, styles.retryButtonText]}>
+              {retryButtonText}
+            </Text>
           </TouchableOpacity>
         )}
         {showGoBackButton && (
-          <TouchableOpacity style={[styles.button, styles.goBackButton]} onPress={handleGoBack}>
-            <Text style={[styles.buttonText, styles.goBackButtonText]}>{goBackButtonText}</Text>
+          <TouchableOpacity
+            style={[styles.button, styles.goBackButton]}
+            onPress={handleGoBack}
+          >
+            <Text style={[styles.buttonText, styles.goBackButtonText]}>
+              {goBackButtonText}
+            </Text>
           </TouchableOpacity>
         )}
       </View>
@@ -111,10 +132,11 @@ const styles = StyleSheet.create({
     ...captionStrongText,
     color: COLORS.textDark,
   },
-  buttonText: { // General button text, can be overridden by specific button styles
+  buttonText: {
+    // General button text, can be overridden by specific button styles
     ...captionStrongText,
     color: COLORS.white,
   },
 });
 
-export default InlineErrorBanner; 
+export default InlineErrorBanner;

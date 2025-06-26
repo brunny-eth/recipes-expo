@@ -1,12 +1,20 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  ViewStyle,
+  TextStyle,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { COLORS } from '@/constants/theme';
+import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import RecipeCard from '@/components/RecipeCard';
 import { useFreeUsage } from '@/context/FreeUsageContext';
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabaseClient';
-import { bodyText, screenTitleText } from '@/constants/typography';
+import { bodyText, screenTitleText, FONT } from '@/constants/typography';
 import { useAuth } from '@/context/AuthContext';
 import { useErrorModal } from '@/context/ErrorModalContext';
 
@@ -16,28 +24,32 @@ const DUMMY_RECIPES = [
     title: 'Grilled Salmon with Asparagus',
     calories: 450,
     protein: 35,
-    imageUrl: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?q=80&w=2070&auto=format&fit=crop',
+    imageUrl:
+      'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?q=80&w=2070&auto=format&fit=crop',
   },
   {
     id: '2',
     title: 'Avocado Toast with Poached Egg',
     calories: 320,
     protein: 15,
-    imageUrl: 'https://images.unsplash.com/photo-1482049016688-2d3e1b311543?q=80&w=1910&auto=format&fit=crop',
+    imageUrl:
+      'https://images.unsplash.com/photo-1482049016688-2d3e1b311543?q=80&w=1910&auto=format&fit=crop',
   },
   {
     id: '3',
     title: 'Quinoa Salad with Roasted Vegetables',
     calories: 380,
     protein: 12,
-    imageUrl: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?q=80&w=2070&auto=format&fit=crop',
+    imageUrl:
+      'https://images.unsplash.com/photo-1498837167922-ddd27525d352?q=80&w=2070&auto=format&fit=crop',
   },
   {
     id: '4',
     title: 'Classic Beef Tacos',
     calories: 550,
     protein: 28,
-    imageUrl: 'https://images.unsplash.com/photo-1599974538139-4b415a3e1443?q=80&w=1964&auto=format&fit=crop',
+    imageUrl:
+      'https://images.unsplash.com/photo-1599974538139-4b415a3e1443?q=80&w=1964&auto=format&fit=crop',
   },
 ];
 
@@ -69,7 +81,8 @@ const DevTools = () => {
 };
 
 const ExploreScreen = () => {
-  const { hasUsedFreeRecipe, isLoadingFreeUsage, resetFreeRecipeUsage } = useFreeUsage();
+  const { hasUsedFreeRecipe, isLoadingFreeUsage, resetFreeRecipeUsage } =
+    useFreeUsage();
   const { session, isAuthenticated } = useAuth();
   const { showError } = useErrorModal();
 
@@ -81,7 +94,7 @@ const ExploreScreen = () => {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: 20 }]} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
         <Text style={styles.title}>Explore Recipes</Text>
       </View>
@@ -92,8 +105,8 @@ const ExploreScreen = () => {
         data={DUMMY_RECIPES}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <View style={{ height: 120, marginVertical: 8, backgroundColor: '#f0f0f0', padding: 10, borderRadius: 8 }}>
-            <Text style={{ fontWeight: 'bold' }}>{item.title}</Text>
+          <View style={styles.recipeItem}>
+            <Text style={styles.recipeTitle}>{item.title}</Text>
             <Text>Calories: {item.calories}</Text>
           </View>
         )}
@@ -107,44 +120,53 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-  },
+    paddingTop: SPACING.pageHorizontal,
+  } as ViewStyle,
   header: {
-    paddingHorizontal: 20,
-    marginBottom: 10,
-  },
+    paddingHorizontal: SPACING.pageHorizontal,
+    marginBottom: SPACING.smMd,
+  } as ViewStyle,
   title: {
     ...screenTitleText,
     color: COLORS.textDark,
-  },
+    paddingBottom: SPACING.pageHorizontal,
+  } as TextStyle,
   listContentContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
+    paddingHorizontal: SPACING.pageHorizontal,
+    paddingBottom: SPACING.pageHorizontal,
+  } as ViewStyle,
   devToolsContainer: {
-    backgroundColor: '#f0f0f0',
-    padding: 10,
-    marginVertical: 10,
+    backgroundColor: COLORS.surface,
+    padding: SPACING.smMd,
+    marginHorizontal: SPACING.pageHorizontal,
+    marginVertical: SPACING.smMd,
     borderRadius: 5,
     alignItems: 'center',
-  },
+  } as ViewStyle,
   devToolsTitle: {
-    fontWeight: 'bold',
-    fontSize: 16,
+    fontWeight: FONT.weight.semiBold,
+    fontSize: FONT.size.body,
     marginBottom: 5,
-  },
+  } as TextStyle,
   devButton: {
-    backgroundColor: '#ffc107',
-    padding: 10,
+    backgroundColor: COLORS.warning,
+    padding: SPACING.smMd,
     borderRadius: 5,
     marginTop: 5,
-  },
+  } as ViewStyle,
   devButtonText: {
-    color: '#000',
-  },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
+    color: COLORS.black,
+  } as TextStyle,
+  recipeItem: {
+    height: 120,
+    marginVertical: SPACING.sm,
+    backgroundColor: COLORS.surface,
+    padding: SPACING.smMd,
+    borderRadius: RADIUS.sm,
+  } as ViewStyle,
+  recipeTitle: {
+    fontWeight: FONT.weight.semiBold,
+  } as TextStyle,
 });
 
 export default ExploreScreen;
