@@ -2,7 +2,8 @@ import React from 'react';
 import { useState, useEffect, useRef } from 'react'; 
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Keyboard, KeyboardAvoidingView, Platform, View as RNView, Image, Modal, TouchableWithoutFeedback } from 'react-native';
 import { useRouter } from 'expo-router';
-import { COLORS, OVERLAYS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { COLORS, OVERLAYS, SPACING, RADIUS, BORDER_WIDTH, ICON_SIZE } from '@/constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import { titleText, bodyText, bodyStrongText, captionText, FONT } from '@/constants/typography';
@@ -76,11 +77,10 @@ export default function HomeScreen() {
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoidingView}
-        enabled={isInputFocused}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
           <RNView style={styles.outerContainer}>
-            <View>
+            <View style={styles.topContent}>
               <View style={styles.logoContainer}>
                 <Image
                   source={require('@/assets/images/meez_logo.webp')}
@@ -90,25 +90,31 @@ export default function HomeScreen() {
               </View>
               <View style={styles.contentContainer}>
                 <View style={styles.featuresContainer}>
-                  <Text style={styles.mainFeatureText}>{'No essays. No ads.\nJust the recipe.'}</Text>
-                  <Text style={styles.featureText}>Skip the scrolling and start cooking.</Text>
+                  <Text style={styles.mainFeatureText}>{'Recipes, refined.'}</Text>
+                  <Text style={styles.featureText}>Built for the home chef.</Text>
                 </View>
               </View>
             </View>
-            <View style={styles.inputWrapper}>
+            <View style={styles.bottomContent}>
               <View style={styles.inputContainer}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Drop a recipe link or text."
-                  placeholderTextColor={COLORS.darkGray}
-                  value={recipeUrl}
-                  onChangeText={setRecipeUrl}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  onFocus={() => setIsInputFocused(true)}
-                  onBlur={() => setIsInputFocused(false)}
-                  onSubmitEditing={handleSubmit}
-                />
+                <View style={styles.textInputWrapper}>
+                  <TouchableOpacity style={styles.uploadButton} onPress={() => { /* TODO */ }}>
+                    <MaterialCommunityIcons name="plus" size={ICON_SIZE.md} color={COLORS.primary} />
+                  </TouchableOpacity>
+                  <View style={styles.divider} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Drop a recipe link or text."
+                    placeholderTextColor={COLORS.darkGray}
+                    value={recipeUrl}
+                    onChangeText={setRecipeUrl}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    onFocus={() => setIsInputFocused(true)}
+                    onBlur={() => setIsInputFocused(false)}
+                    onSubmitEditing={handleSubmit}
+                  />
+                </View>
                 <TouchableOpacity 
                   style={styles.submitButton} 
                   onPress={handleSubmit}
@@ -134,10 +140,16 @@ const styles = StyleSheet.create({
   },
   outerContainer: {
     flex: 1,
-    justifyContent: 'space-between',
     paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.xxl,
-    paddingBottom: SPACING.xxl,
+  },
+  topContent: {
+    flex: 2,
+    justifyContent: 'center',
+    paddingBottom: SPACING.xl,
+  },
+  bottomContent: {
+    flex: 1,
+    justifyContent: 'center',
   },
   logoContainer: {
     alignItems: 'center',
@@ -169,27 +181,32 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
     overflow: 'hidden',
   },
-  inputWrapper: {
-    marginBottom: SPACING.xl, // Adjust this value to move the input bar up or down
-  },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
-    height: 50, // TODO: Should this be a token? SPACING.xxl?
-    borderRadius: RADIUS.sm,
+    height: 50,
+  },
+  textInputWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: '100%',
+    backgroundColor: COLORS.white,
     borderWidth: BORDER_WIDTH.default,
     borderColor: COLORS.lightGray,
-    backgroundColor: COLORS.white,
-    overflow: 'hidden',
+    borderRightWidth: 0,
+    borderTopLeftRadius: RADIUS.sm,
+    borderBottomLeftRadius: RADIUS.sm,
   },
   input: {
     ...bodyText,
     flex: 1,
     height: '100%',
-    paddingHorizontal: SPACING.md,
+    paddingHorizontal: SPACING.base,
     color: COLORS.textDark,
-    textAlignVertical: 'center',
+    fontSize: FONT.size.body,
+    lineHeight: undefined,
   },
   submitButton: {
     height: '100%',
@@ -197,6 +214,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
+    borderTopRightRadius: RADIUS.sm,
+    borderBottomRightRadius: RADIUS.sm,
   },
   submitButtonDisabled: {
     backgroundColor: COLORS.darkGray,
@@ -204,6 +223,17 @@ const styles = StyleSheet.create({
   submitButtonText: {
     ...bodyStrongText,
     color: COLORS.white,
+  },
+  uploadButton: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingLeft: SPACING.sm,
+    paddingRight: SPACING.sm,
+  },
+  divider: {
+    width: BORDER_WIDTH.default,
+    height: '100%',
+    backgroundColor: COLORS.lightGray,
   },
   loadingText: {
     ...bodyStrongText,
