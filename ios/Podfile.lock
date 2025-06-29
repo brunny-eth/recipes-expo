@@ -278,6 +278,8 @@ PODS:
     - ExpoModulesCore
   - ExpoBlur (14.1.5):
     - ExpoModulesCore
+  - ExpoClipboard (7.1.4):
+    - ExpoModulesCore
   - ExpoCrypto (14.1.5):
     - ExpoModulesCore
   - ExpoFileSystem (18.1.10):
@@ -320,6 +322,8 @@ PODS:
     - ReactCommon/turbomodule/core
     - Yoga
   - ExpoRandom (14.0.1):
+    - ExpoModulesCore
+  - ExpoSecureStore (14.2.3):
     - ExpoModulesCore
   - ExpoSplashScreen (0.30.9):
     - ExpoModulesCore
@@ -369,6 +373,23 @@ PODS:
   - hermes-engine (0.79.4):
     - hermes-engine/Pre-built (= 0.79.4)
   - hermes-engine/Pre-built (0.79.4)
+  - libavif/core (0.11.1)
+  - libavif/libdav1d (0.11.1):
+    - libavif/core
+    - libdav1d (>= 0.6.0)
+  - libdav1d (1.2.0)
+  - libwebp (1.5.0):
+    - libwebp/demux (= 1.5.0)
+    - libwebp/mux (= 1.5.0)
+    - libwebp/sharpyuv (= 1.5.0)
+    - libwebp/webp (= 1.5.0)
+  - libwebp/demux (1.5.0):
+    - libwebp/webp
+  - libwebp/mux (1.5.0):
+    - libwebp/demux
+  - libwebp/sharpyuv (1.5.0)
+  - libwebp/webp (1.5.0):
+    - libwebp/sharpyuv
   - RCT-Folly (2024.11.18.00):
     - boost
     - DoubleConversion
@@ -2189,6 +2210,35 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - Yoga
+  - RNFastImage (8.9.2):
+    - DoubleConversion
+    - glog
+    - hermes-engine
+    - libavif/core (~> 0.11.1)
+    - libavif/libdav1d (~> 0.11.1)
+    - RCT-Folly (= 2024.11.18.00)
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-hermes
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - SDWebImage (>= 5.19.1)
+    - SDWebImageAVIFCoder (~> 0.11.0)
+    - SDWebImageWebPCoder (~> 0.14)
+    - Yoga
   - RNFlashList (1.7.6):
     - DoubleConversion
     - glog
@@ -2461,6 +2511,15 @@ PODS:
     - ReactCommon/turbomodule/bridging
     - ReactCommon/turbomodule/core
     - Yoga
+  - SDWebImage (5.21.1):
+    - SDWebImage/Core (= 5.21.1)
+  - SDWebImage/Core (5.21.1)
+  - SDWebImageAVIFCoder (0.11.0):
+    - libavif/core (>= 0.11.0)
+    - SDWebImage (~> 5.10)
+  - SDWebImageWebPCoder (0.14.6):
+    - libwebp (~> 1.0)
+    - SDWebImage/Core (~> 5.17)
   - SocketRocket (0.7.1)
   - Yoga (0.0.0)
 
@@ -2480,6 +2539,7 @@ DEPENDENCIES:
   - ExpoAppleAuthentication (from `../node_modules/expo-apple-authentication/ios`)
   - ExpoAsset (from `../node_modules/expo-asset/ios`)
   - ExpoBlur (from `../node_modules/expo-blur/ios`)
+  - ExpoClipboard (from `../node_modules/expo-clipboard/ios`)
   - ExpoCrypto (from `../node_modules/expo-crypto/ios`)
   - ExpoFileSystem (from `../node_modules/expo-file-system/ios`)
   - ExpoFont (from `../node_modules/expo-font/ios`)
@@ -2490,6 +2550,7 @@ DEPENDENCIES:
   - ExpoLinking (from `../node_modules/expo-linking/ios`)
   - ExpoModulesCore (from `../node_modules/expo-modules-core`)
   - ExpoRandom (from `../node_modules/expo-random/ios`)
+  - ExpoSecureStore (from `../node_modules/expo-secure-store/ios`)
   - ExpoSplashScreen (from `../node_modules/expo-splash-screen/ios`)
   - ExpoSymbols (from `../node_modules/expo-symbols/ios`)
   - ExpoSystemUI (from `../node_modules/expo-system-ui/ios`)
@@ -2572,6 +2633,7 @@ DEPENDENCIES:
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
   - "RNCAsyncStorage (from `../node_modules/@react-native-async-storage/async-storage`)"
   - "RNCPicker (from `../node_modules/@react-native-picker/picker`)"
+  - "RNFastImage (from `../node_modules/@d11/react-native-fast-image`)"
   - "RNFlashList (from `../node_modules/@shopify/flash-list`)"
   - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
   - RNReanimated (from `../node_modules/react-native-reanimated`)
@@ -2581,7 +2643,13 @@ DEPENDENCIES:
 
 SPEC REPOS:
   trunk:
+    - libavif
+    - libdav1d
+    - libwebp
     - ReachabilitySwift
+    - SDWebImage
+    - SDWebImageAVIFCoder
+    - SDWebImageWebPCoder
     - SocketRocket
 
 EXTERNAL SOURCES:
@@ -2615,6 +2683,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-asset/ios"
   ExpoBlur:
     :path: "../node_modules/expo-blur/ios"
+  ExpoClipboard:
+    :path: "../node_modules/expo-clipboard/ios"
   ExpoCrypto:
     :path: "../node_modules/expo-crypto/ios"
   ExpoFileSystem:
@@ -2635,6 +2705,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-modules-core"
   ExpoRandom:
     :path: "../node_modules/expo-random/ios"
+  ExpoSecureStore:
+    :path: "../node_modules/expo-secure-store/ios"
   ExpoSplashScreen:
     :path: "../node_modules/expo-splash-screen/ios"
   ExpoSymbols:
@@ -2796,6 +2868,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@react-native-async-storage/async-storage"
   RNCPicker:
     :path: "../node_modules/@react-native-picker/picker"
+  RNFastImage:
+    :path: "../node_modules/@d11/react-native-fast-image"
   RNFlashList:
     :path: "../node_modules/@shopify/flash-list"
   RNGestureHandler:
@@ -2825,6 +2899,7 @@ SPEC CHECKSUMS:
   ExpoAppleAuthentication: 7e358fcbcbacb7685cddb0bbeede0acd677e58f6
   ExpoAsset: 3ea3275cca6a7793b3d36fbf1075c590f803fbcb
   ExpoBlur: 846780b2c90f59e964b9a50385d4deb67174ebfb
+  ExpoClipboard: c187b3101e5f38cce4c6321788e0047f1c29e152
   ExpoCrypto: fcb6a8a08d1929f346cb95eb05a8f7818627177a
   ExpoFileSystem: 3a98ca2a6f13674ecfd97327d1b44a8ace444cbd
   ExpoFont: 312c73403bbd4f98e1d6a5330641a56292583cd2
@@ -2835,6 +2910,7 @@ SPEC CHECKSUMS:
   ExpoLinking: 5d151d4a497d7e375308602f0a89b4e8acf7b5f8
   ExpoModulesCore: e2e363bcdee87b46f858586d1887ebb215582001
   ExpoRandom: 099ddce39b39ffb984b45118d031e8713e962a50
+  ExpoSecureStore: 3148869ad24ab94f9e0c5777c7941d7a37d60399
   ExpoSplashScreen: 37e2fd371d4b93215f86a81d8cad3e7b69287e42
   ExpoSymbols: bd4e20b0b6a9dbacc31dd7c861e0d6d01b56e1f2
   ExpoSystemUI: 5dce97654754330ba6e2c39e7242c5d71c8d9952
@@ -2847,6 +2923,9 @@ SPEC CHECKSUMS:
   fmt: a40bb5bd0294ea969aaaba240a927bd33d878cdd
   glog: 5683914934d5b6e4240e497e0f4a3b42d1854183
   hermes-engine: 8b5a5eb386b990287d072fd7b6f6ebd9544dd251
+  libavif: 84bbb62fb232c3018d6f1bab79beea87e35de7b7
+  libdav1d: 23581a4d8ec811ff171ed5e2e05cd27bad64c39f
+  libwebp: 02b23773aedb6ff1fd38cec7a77b81414c6842a8
   RCT-Folly: 36fe2295e44b10d831836cc0d1daec5f8abcf809
   RCTDeprecation: 0418ac97b9f53b2e37f473da1663ef3061e46beb
   RCTRequired: b9fde7f981b11aa898f03a70d3d4d36b80f1b16d
@@ -2916,11 +2995,15 @@ SPEC CHECKSUMS:
   ReactCommon: 2bc79208d91eda74edeff759d82c93460b07612f
   RNCAsyncStorage: c1bbcf629d7206d1e19310827848b98d68a4cbaf
   RNCPicker: 04b02770d871072243f4a95fa2523b9c3398a2f5
+  RNFastImage: d061022ac8bded2d342c2ad066cab88f5b18234a
   RNFlashList: 30b68f572400383347ce7df3777985af0d089624
   RNGestureHandler: ccf4105b125002bd88e39d2a1f2b7e6001bcdf34
   RNReanimated: 8b24b49fc13fce9a6e1729ccff645a63d2b7a6d1
   RNScreens: c2e3cc506212228c607b4785b315205e28acbf0f
   RNSVG: ee32efbed652c5151fd3f98bed13c68af285bc38
+  SDWebImage: f29024626962457f3470184232766516dee8dfea
+  SDWebImageAVIFCoder: 00310d246aab3232ce77f1d8f0076f8c4b021d90
+  SDWebImageWebPCoder: e38c0a70396191361d60c092933e22c20d5b1380
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
   Yoga: a6cb833e04fb8c59a012b49fb1d040fcb0cbb633
 

@@ -2,8 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   StyleSheet,
-  SafeAreaView,
-  Image,
   Text,
   ViewStyle,
   TextStyle,
@@ -18,6 +16,7 @@ import { normalizeError } from '@/utils/normalizeError';
 import GlobalErrorModal from '../GlobalErrorModal';
 import { CombinedParsedRecipe as ParsedRecipe } from '../../common/types';
 import { FONT } from '@/constants/typography';
+import LogoHeaderLayout from '../LogoHeaderLayout';
 
 interface LoadingExperienceScreenProps {
   recipeInput: string;
@@ -130,30 +129,25 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
 
   if (loadingMode === 'checklist') {
     return (
-      <SafeAreaView style={styles.container}>
+      <LogoHeaderLayout>
         <GlobalErrorModal
           visible={!!error}
           message={error ?? ''}
           title="Oops!"
           onClose={handleBack}
         />
-        <View style={styles.checklistContainer}>
-          <View style={styles.logoContainer}>
-            <Image
-              source={require('@/assets/images/meez_logo.webp')}
-              style={styles.logoImage}
-            />
-            <Text style={styles.tagline}>Working on our mise en place...</Text>
+        <View style={styles.contentWrapper}>
+          <Text style={styles.tagline}>Working on our mise en place...</Text>
+          <View style={styles.checklistContainer}>
+            <ChecklistProgress isFinished={isParsingFinished} />
           </View>
-
-          <ChecklistProgress isFinished={isParsingFinished} />
         </View>
-      </SafeAreaView>
+      </LogoHeaderLayout>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, styles.containerDefault]}>
+    <LogoHeaderLayout>
       <GlobalErrorModal
         visible={!!error}
         message={error ?? ''}
@@ -164,10 +158,6 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
         entering={FadeIn.duration(500)}
         style={styles.logoContainer}
       >
-        <Image
-          source={require('@/assets/images/meez_logo.webp')}
-          style={styles.logoImage}
-        />
         <Text style={styles.loadingText}>Loading....</Text>
         <View style={styles.loadingIndicator} />
         <Text style={styles.loadingHint}>
@@ -175,37 +165,29 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
           useful...
         </Text>
       </Animated.View>
-    </SafeAreaView>
+    </LogoHeaderLayout>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  } as ViewStyle,
-  containerDefault: {
-    justifyContent: 'flex-start',
-    paddingTop: SPACING.xxl,
+  contentWrapper: {
+    width: '100%',
+    marginTop: -SPACING.xxxl,
   } as ViewStyle,
   checklistContainer: {
-    paddingTop: SPACING.lg,
-    gap: SPACING.md,
+    alignItems: 'stretch',
   } as ViewStyle,
   logoContainer: {
     alignItems: 'center',
   } as ViewStyle,
-  logoImage: {
-    width: 120, // TODO: Tokenize image sizes
-    height: 120,
-  } as ImageStyle,
   tagline: {
     fontSize: FONT.size.smBody,
     fontFamily: FONT.family.inter,
     color: COLORS.darkGray,
     textAlign: 'center',
     paddingHorizontal: SPACING.xl,
-    marginTop: -SPACING.smMd,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.xxxl,
   } as TextStyle,
   loadingText: {
     marginTop: 12, // TODO: SPACING.md is 16

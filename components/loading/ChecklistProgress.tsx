@@ -117,6 +117,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'flex-start',
     paddingHorizontal: SPACING.pageHorizontal,
+    width: '100%',
   } as ViewStyle,
 });
 
