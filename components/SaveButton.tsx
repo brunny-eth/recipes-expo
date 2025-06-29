@@ -73,13 +73,13 @@ const SaveButton: React.FC<SaveButtonProps> = ({ recipeId }) => {
 
   const buttonStyle = [
     styles.button,
-    isSaved ? styles.buttonSaved : styles.buttonUnsaved,
+    isSaved ? styles.buttonUnsaved : styles.buttonSaved,
     isLoading && styles.disabled,
   ];
 
   const textStyle = [
     styles.text,
-    isSaved ? styles.textSaved : styles.textUnsaved,
+    isSaved ? styles.textUnsaved : styles.textSaved,
   ];
 
   return (
@@ -90,7 +90,7 @@ const SaveButton: React.FC<SaveButtonProps> = ({ recipeId }) => {
     >
       {isLoading ? (
         <ActivityIndicator
-          color={isSaved ? COLORS.successDark : COLORS.white}
+          color={COLORS.primary}
           size="small"
         />
       ) : (
@@ -98,7 +98,7 @@ const SaveButton: React.FC<SaveButtonProps> = ({ recipeId }) => {
           <MaterialCommunityIcons
             name={isSaved ? 'check' : 'bookmark-outline'}
             size={16}
-            color={isSaved ? COLORS.successDark : COLORS.white}
+            color={COLORS.primary}
             style={{ marginRight: SPACING.sm }}
           />
           <Text style={textStyle}>{isSaved ? 'Saved' : 'Save'}</Text>
