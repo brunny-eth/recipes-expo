@@ -7,6 +7,8 @@ export default function LogoHeaderLayout({
 }: {
   children: React.ReactNode;
 }) {
+  console.log(`[${new Date().toISOString()}] [LogoHeaderLayout] render`);
+  
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>

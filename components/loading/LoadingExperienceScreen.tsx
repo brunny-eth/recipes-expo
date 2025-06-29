@@ -38,7 +38,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
   onFailure,
   loadingMode,
 }) => {
-  console.log(`[LoadingExperienceScreen] mount with input: ${recipeInput}`);
+  console.log(`[${new Date().toISOString()}] [LoadingExperienceScreen] render/mount with input: ${recipeInput}`);
   const router = useRouter();
   const alreadyNavigated = useRef(false);
   const [isParsingFinished, setIsParsingFinished] = useState(false);
@@ -68,16 +68,35 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
     };
   }, []);
 
+  // Debug: Track state changes
+  useEffect(() => {
+    console.log(`[${new Date().toISOString()}] [STATE] showSpinner changed to: ${showSpinner}`);
+  }, [showSpinner]);
+
+  useEffect(() => {
+    console.log(`[${new Date().toISOString()}] [STATE] checkmarkShown changed to: ${checkmarkShown}`);
+  }, [checkmarkShown]);
+
+  useEffect(() => {
+    console.log(`[${new Date().toISOString()}] [STATE] hideChecklist changed to: ${hideChecklist}`);
+  }, [hideChecklist]);
+
   const handleSpinComplete = () => {
     if (!isMountedRef.current) return;
     
+    console.log(`[${new Date().toISOString()}] [handleSpinComplete] Starting state changes...`);
+    
+    console.log(`[${new Date().toISOString()}] [handleSpinComplete] setShowSpinner(false) - HIDING SPINNER`);
     setShowSpinner(false);
+    
+    console.log(`[${new Date().toISOString()}] [handleSpinComplete] setCheckmarkShown(true) - SHOWING CHECKMARK`);
     setCheckmarkShown(true);
     
     // Navigate after 1 second
     setTimeout(() => {
       if (!isMountedRef.current || !recipeData) return;
       
+      console.log(`[${new Date().toISOString()}] [handleSpinComplete] Navigating to recipe summary...`);
       router.replace({
         pathname: '/recipe/summary',
         params: {
@@ -162,6 +181,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
       
       // Animate rotation to 360 degrees over 700ms
       rotation.value = withTiming(360, { duration: 700 }, (finished) => {
+        console.log(`[${new Date().toISOString()}] [ROTATION] Spinner rotation animation finished: ${finished}`);
         if (finished) {
           runOnJS(handleSpinComplete)();
         }
@@ -199,23 +219,38 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
           )}
         </LogoHeaderLayout>
 
-        {showSpinner && (
-          <Animated.View 
-            entering={FadeIn.duration(300)}
-            exiting={FadeOut.duration(200)}
-            style={styles.spinnerOverlay}
+        {(showSpinner || checkmarkShown) && (
+          <View 
+            style={styles.overlayContainer}
+            onLayout={() => console.log(`[${new Date().toISOString()}] [OVERLAY_CONTAINER] Persistent overlay mounted/rendered`)}
           >
-            <Animated.View style={[styles.spinner, spinnerStyle]} />
-          </Animated.View>
-        )}
-        {checkmarkShown && (
-          <Animated.View 
-            entering={FadeIn.duration(400)}
-            style={styles.checkmarkOverlay}
-          >
-            <Text style={styles.bigCheckmark}>✓</Text>
-            <Text style={styles.readyText}>Recipe Ready!</Text>
-          </Animated.View>
+            {showSpinner && (
+              <Animated.View 
+                entering={FadeIn.duration(300).withCallback((finished) => {
+                  console.log(`[${new Date().toISOString()}] [SPINNER] FadeIn animation finished: ${finished}`);
+                })}
+                exiting={FadeOut.duration(0).withCallback((finished) => {
+                  console.log(`[${new Date().toISOString()}] [SPINNER] FadeOut animation finished: ${finished}`);
+                })}
+                style={styles.spinnerContent}
+                onLayout={() => console.log(`[${new Date().toISOString()}] [SPINNER] Component mounted/rendered`)}
+              >
+                <Animated.View style={[styles.spinner, spinnerStyle]} />
+              </Animated.View>
+            )}
+            {checkmarkShown && (
+              <Animated.View 
+                entering={FadeIn.duration(400).withCallback((finished) => {
+                  console.log(`[${new Date().toISOString()}] [CHECKMARK] FadeIn animation finished: ${finished}`);
+                })}
+                style={styles.checkmarkContent}
+                onLayout={() => console.log(`[${new Date().toISOString()}] [CHECKMARK] Component mounted/rendered`)}
+              >
+                <Text style={styles.bigCheckmark}>✓</Text>
+                <Text style={styles.readyText}>Recipe Ready!</Text>
+              </Animated.View>
+            )}
+          </View>
         )}
       </View>
     );
@@ -312,14 +347,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  checkmarkOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(245, 243, 236, 0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 999,
-    pointerEvents: 'none',
-  } as ViewStyle,
   bigCheckmark: {
     fontSize: 72,
     fontWeight: 'bold',
@@ -331,14 +358,6 @@ const styles = StyleSheet.create({
     color: COLORS.textDark,
     marginTop: 12,
   } as TextStyle,
-  spinnerOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(245, 243, 236, 0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 998,
-    pointerEvents: 'none',
-  } as ViewStyle,
   spinner: {
     width: 60,
     height: 60,
@@ -346,6 +365,28 @@ const styles = StyleSheet.create({
     borderWidth: 5,
     borderColor: COLORS.lightGray,
     borderTopColor: COLORS.primary,
+  } as ViewStyle,
+  overlayContainer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+    pointerEvents: 'none',
+  } as ViewStyle,
+  spinnerContent: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  } as ViewStyle,
+  checkmarkContent: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   } as ViewStyle,
 });
 
