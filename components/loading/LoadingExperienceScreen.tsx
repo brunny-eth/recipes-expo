@@ -10,7 +10,14 @@ import {
 import { useRouter } from 'expo-router';
 import ChecklistProgress from './ChecklistProgress';
 import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { 
+  FadeIn,
+  FadeOut,
+  useSharedValue, 
+  useAnimatedStyle, 
+  withTiming,
+  runOnJS,
+} from 'react-native-reanimated';
 import { useHandleError } from '@/hooks/useHandleError';
 import { normalizeError } from '@/utils/normalizeError';
 import GlobalErrorModal from '../GlobalErrorModal';
@@ -38,7 +45,49 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
   const [recipeData, setRecipeData] = useState<ParsedRecipe | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [componentKey, setComponentKey] = useState(0);
+  const [checkmarkShown, setCheckmarkShown] = useState(false);
+  const [showSpinner, setShowSpinner] = useState(false);
+  const [hideChecklist, setHideChecklist] = useState(false);
   const handleError = useHandleError();
+  const isMountedRef = useRef(true);
+  
+  // Animation values
+  const rotation = useSharedValue(0);
+  
+  // Animated styles
+  const spinnerStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ rotate: `${rotation.value}deg` }],
+    };
+  });
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const handleSpinComplete = () => {
+    if (!isMountedRef.current) return;
+    
+    setShowSpinner(false);
+    setCheckmarkShown(true);
+    
+    // Navigate after 1 second
+    setTimeout(() => {
+      if (!isMountedRef.current || !recipeData) return;
+      
+      router.replace({
+        pathname: '/recipe/summary',
+        params: {
+          recipeData: JSON.stringify(recipeData),
+          from: '/',
+        },
+      });
+      onComplete();
+    }, 1000);
+  };
 
   const parseRecipe = async () => {
     const baseBackendUrl = process.env.EXPO_PUBLIC_API_URL!;
@@ -101,19 +150,22 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
       !alreadyNavigated.current
     ) {
       alreadyNavigated.current = true;
-      console.log('[LoadingExperienceScreen] Parsing complete. Navigating...');
+      console.log('[LoadingExperienceScreen] Parsing complete. Starting spinner...');
       console.log(
         '[LoadingExperienceScreen] recipeData with ID:',
         recipeData?.id,
       );
-      router.replace({
-        pathname: '/recipe/summary',
-        params: {
-          recipeData: JSON.stringify(recipeData),
-          from: '/',
-        },
+      
+      // Hide checklist and start spinner animation
+      setHideChecklist(true);
+      setShowSpinner(true);
+      
+      // Animate rotation to 360 degrees over 700ms
+      rotation.value = withTiming(360, { duration: 700 }, (finished) => {
+        if (finished) {
+          runOnJS(handleSpinComplete)();
+        }
       });
-      onComplete();
     }
   }, [isParsingFinished, recipeData, error, router]);
 
@@ -129,20 +181,43 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
 
   if (loadingMode === 'checklist') {
     return (
-      <LogoHeaderLayout>
-        <GlobalErrorModal
-          visible={!!error}
-          message={error ?? ''}
-          title="Oops!"
-          onClose={handleBack}
-        />
-        <View style={styles.contentWrapper}>
-          <Text style={styles.tagline}>Working on our mise en place...</Text>
-          <View style={styles.checklistContainer}>
-            <ChecklistProgress isFinished={isParsingFinished} />
-          </View>
-        </View>
-      </LogoHeaderLayout>
+      <View style={{ flex: 1 }}>
+        <LogoHeaderLayout>
+          <GlobalErrorModal
+            visible={!!error}
+            message={error ?? ''}
+            title="Oops!"
+            onClose={handleBack}
+          />
+          {!hideChecklist && (
+            <View style={styles.contentWrapper}>
+              <Text style={styles.tagline}>Working on our mise en place...</Text>
+              <View style={styles.checklistContainer}>
+                <ChecklistProgress isFinished={isParsingFinished} />
+              </View>
+            </View>
+          )}
+        </LogoHeaderLayout>
+
+        {showSpinner && (
+          <Animated.View 
+            entering={FadeIn.duration(300)}
+            exiting={FadeOut.duration(200)}
+            style={styles.spinnerOverlay}
+          >
+            <Animated.View style={[styles.spinner, spinnerStyle]} />
+          </Animated.View>
+        )}
+        {checkmarkShown && (
+          <Animated.View 
+            entering={FadeIn.duration(400)}
+            style={styles.checkmarkOverlay}
+          >
+            <Text style={styles.bigCheckmark}>✓</Text>
+            <Text style={styles.readyText}>Recipe Ready!</Text>
+          </Animated.View>
+        )}
+      </View>
     );
   }
 
@@ -154,17 +229,14 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
         title="Oops!"
         onClose={handleBack}
       />
-      <Animated.View
-        entering={FadeIn.duration(500)}
-        style={styles.logoContainer}
-      >
+      <View style={styles.logoContainer}>
         <Text style={styles.loadingText}>Loading....</Text>
         <View style={styles.loadingIndicator} />
         <Text style={styles.loadingHint}>
           just a moment while we transform the recipe into something more
           useful...
         </Text>
-      </Animated.View>
+      </View>
     </LogoHeaderLayout>
   );
 };
@@ -240,6 +312,41 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  checkmarkOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(245, 243, 236, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+    pointerEvents: 'none',
+  } as ViewStyle,
+  bigCheckmark: {
+    fontSize: 72,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+  } as TextStyle,
+  readyText: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: COLORS.textDark,
+    marginTop: 12,
+  } as TextStyle,
+  spinnerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(245, 243, 236, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 998,
+    pointerEvents: 'none',
+  } as ViewStyle,
+  spinner: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 5,
+    borderColor: COLORS.lightGray,
+    borderTopColor: COLORS.primary,
+  } as ViewStyle,
 });
 
 export default LoadingExperienceScreen;

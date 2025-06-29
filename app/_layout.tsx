@@ -4,7 +4,6 @@ import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { StyleSheet } from 'react-native';
-import Animated, { FadeOut } from 'react-native-reanimated';
 import * as Font from 'expo-font';
 import { Asset } from 'expo-asset';
 
@@ -52,8 +51,7 @@ function RootLayoutNav() {
 
     const currentPathSegments = segments.join('/'); // e.g., "login", "(tabs)/explore", "recipe/summary"
     const inAuthFlow = segments[0] === 'login' || segments[0] === 'auth';
-    const inRecipeContentFlow =
-      segments[0] === 'loading' || segments[0] === 'recipe';
+    const inRecipeContentFlow = segments[0] === 'recipe';
 
     // Check if the current route is one of the explicitly allowed public routes
     const isCurrentlyOnAllowedPublicRoute = PUBLIC_ALLOWED_ROUTES_PREFIXES.some(
@@ -130,13 +128,18 @@ function RootLayoutNav() {
   ]);
 
   return (
-    <Stack screenOptions={{ animation: 'fade' }}>
-      <Stack.Screen name="loading" options={{ headerShown: false }} />
+    <Stack>
       <Stack.Screen name="recipe/summary" options={{ headerShown: false }} />
       <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
       <Stack.Screen name="+not-found" />
       <Stack.Screen name="login" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen
+        name="loading"
+        options={{
+          headerShown: false,
+        }}
+      />
       <Stack.Screen
         name="recipe/steps"
         options={{ presentation: 'card', headerShown: false }}
@@ -244,14 +247,7 @@ export default function RootLayout() {
       </FreeUsageProvider>
 
       {/* 3. Conditionally render the WelcomeScreen as an overlay on top */}
-      {isFirstLaunch && (
-        <Animated.View
-          style={StyleSheet.absoluteFill}
-          exiting={FadeOut.duration(500)}
-        >
-          <WelcomeScreen onDismiss={handleWelcomeDismiss} />
-        </Animated.View>
-      )}
+      {isFirstLaunch && <WelcomeScreen onDismiss={handleWelcomeDismiss} />}
     </ErrorModalProvider>
   );
 }
