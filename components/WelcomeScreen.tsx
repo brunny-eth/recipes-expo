@@ -17,36 +17,42 @@ interface WelcomeScreenProps {
 
 const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onDismiss }) => {
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.contentContainer}>
-        <View style={styles.bodyContainer}>
-          <Text style={styles.welcomeTitle}>Welcome to Meez</Text>
-          <Text style={styles.welcomeText}>
-            We help you get rid of annoying recipe slop, standardize your recipe
-            formats, and substitute ingredients with what you have on hand.
-          </Text>
-          <Text style={styles.welcomeText}>
-            Ready to cook? We'll start the digital mise en place for you.
-          </Text>
+    <View style={styles.overlay}>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.contentContainer}>
+          <View style={styles.bodyContainer}>
+            <Text style={styles.welcomeTitle}>Welcome to Meez</Text>
+            <Text style={styles.welcomeText}>
+              We help you get rid of annoying recipe slop, standardize your recipe
+              formats, and substitute ingredients with what you have on hand.
+            </Text>
+            <Text style={styles.welcomeText}>
+              Ready to cook? We'll start the digital mise en place for you.
+            </Text>
+          </View>
         </View>
-      </View>
 
-      <Animated.View
-        entering={FadeIn.duration(500)}
-        style={styles.buttonContainer}
-      >
-        <TouchableOpacity style={styles.button} onPress={onDismiss}>
-          <Text style={styles.buttonText}>Get Started</Text>
-        </TouchableOpacity>
-      </Animated.View>
-    </SafeAreaView>
+        <Animated.View
+          entering={FadeIn.duration(500)}
+          style={styles.buttonContainer}
+        >
+          <TouchableOpacity style={styles.button} onPress={onDismiss}>
+            <Text style={styles.buttonText}>Get Started</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: COLORS.background,
+    zIndex: 9999,
+  },
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
     paddingBottom: 40,
   },
   contentContainer: {
