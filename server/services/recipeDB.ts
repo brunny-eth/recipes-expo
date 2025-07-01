@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 export async function getAllRecipes() {
   const { data, error } = await supabase
     .from('processed_recipes_cache')
-    .select('id, url, recipe_data, created_at, last_processed_at, source_type')
+    .select('*')
     .order('created_at', { ascending: false });
 
   if (error) {

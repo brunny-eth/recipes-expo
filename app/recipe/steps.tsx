@@ -35,8 +35,15 @@ import MiniTimerDisplay from '@/components/MiniTimerDisplay';
 import { ActiveTool } from '@/components/ToolsModal';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import InlineErrorBanner from '@/components/InlineErrorBanner';
-import { StructuredIngredient } from '../../common/types';
+import { StructuredIngredient, CombinedParsedRecipe as ParsedRecipe, IngredientGroup } from '../../common/types';
+import { IngredientChange } from '../../server/llm/substitutionPrompts';
 import { abbreviateUnit } from '@/utils/format';
+
+// Define AppliedRecipeChanges type for frontend use
+type AppliedRecipeChanges = {
+  ingredientChanges: IngredientChange[];
+  scalingFactor: number;
+};
 import {
   titleText,
   sectionHeaderText,
@@ -54,12 +61,34 @@ import RecipeStepsHeader from '@/components/recipe/RecipeStepsHeader';
 const screenWidth = Dimensions.get('window').width;
 
 export default function StepsScreen() {
-  const params = useLocalSearchParams<{ recipeData?: string }>();
+  const params = useLocalSearchParams<{
+    originalId?: string; // The ID of the original recipe from processed_recipes_cache
+    recipeData?: string; // The original CombinedParsedRecipe (stringified)
+    editedInstructions?: string; // LLM-rewritten instructions (stringified array)
+    editedIngredients?: string; // Scaled/substituted ingredients (stringified array of IngredientGroup)
+    newTitle?: string; // LLM-suggested new title
+    appliedChanges?: string; // The AppliedRecipeChanges object (stringified)
+  }>();
   const router = useRouter();
   const { showError } = useErrorModal();
-  const { isAuthenticated } = useAuth();
+  const { session } = useAuth();
   const { markFreeRecipeUsed } = useFreeUsage();
 
+  // State for save modified recipe functionality
+  const [isLoadingSave, setIsLoadingSave] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // State to hold the original recipe data (if needed for reference)
+  const [originalRecipe, setOriginalRecipe] = useState<ParsedRecipe | null>(null);
+
+  // State to hold the *modified* recipe data that will be sent to the backend
+  const [modifiedRecipe, setModifiedRecipe] = useState<ParsedRecipe | null>(null);
+
+  // State to hold the original recipe ID and applied changes for the save API call
+  const [originalRecipeId, setOriginalRecipeId] = useState<number | null>(null);
+  const [appliedChanges, setAppliedChanges] = useState<AppliedRecipeChanges | null>(null);
+
+  // Legacy state for backward compatibility with existing UI components
   const [recipeTitle, setRecipeTitle] = useState<string | null>(null);
   const [recipeImageUrl, setRecipeImageUrl] = useState<string | null>(null);
   const [instructions, setInstructions] = useState<string[]>([]);
@@ -84,34 +113,72 @@ export default function StepsScreen() {
   const timerIntervalRef = useRef<any>(null);
   // --- End Lifted Timer State ---
 
+  // Effect to initialize recipe state from params
   useEffect(() => {
-    // Existing logic for loading recipe data
     setIsLoading(true);
     try {
       if (params.recipeData) {
-        const parsedData = JSON.parse(params.recipeData) as {
-          title?: string | null;
-          instructions?: string[] | null;
-          ingredients?: StructuredIngredient[] | null;
-          image?: string | null;
-          thumbnailUrl?: string | null;
-        };
+        const parsedOriginalRecipe: ParsedRecipe = JSON.parse(params.recipeData);
+        setOriginalRecipe(parsedOriginalRecipe); // Store original for reference
 
-        if (parsedData.instructions && Array.isArray(parsedData.instructions)) {
-          setInstructions(parsedData.instructions);
+        // Start with a deep copy of the original recipe to preserve all fields
+        const currentModifiedRecipe: ParsedRecipe = JSON.parse(JSON.stringify(parsedOriginalRecipe));
+
+        // Apply specific modifications passed from summary.tsx
+        if (params.editedInstructions) {
+          currentModifiedRecipe.instructions = JSON.parse(params.editedInstructions);
+        }
+        if (params.editedIngredients) {
+          currentModifiedRecipe.ingredientGroups = JSON.parse(params.editedIngredients);
+        }
+        if (params.newTitle && params.newTitle !== 'null') { // Check for "null" string
+          currentModifiedRecipe.title = params.newTitle;
+        }
+        // The recipeYield should already be correctly scaled and formatted from summary.tsx params
+        // So, no specific update needed here, as it's part of the parsedOriginalRecipe already if passed correctly.
+
+        setModifiedRecipe(currentModifiedRecipe);
+
+        // Set originalRecipeId and appliedChanges for the save API call
+        if (params.originalId) {
+          setOriginalRecipeId(Number(params.originalId));
+        }
+        if (params.appliedChanges) {
+          setAppliedChanges(JSON.parse(params.appliedChanges));
+        }
+
+        // Debug logging to verify data flow
+        console.log('[StepsScreen] Recipe data initialized:', {
+          originalRecipeId: params.originalId,
+          hasOriginalRecipe: !!parsedOriginalRecipe,
+          hasModifiedRecipe: !!currentModifiedRecipe,
+          titleChanged: currentModifiedRecipe.title !== parsedOriginalRecipe.title,
+          hasImage: !!currentModifiedRecipe.image,
+          appliedChanges: params.appliedChanges ? JSON.parse(params.appliedChanges) : null,
+        });
+
+        // Update legacy state for backward compatibility with existing UI components
+        setRecipeTitle(currentModifiedRecipe.title || 'Instructions');
+        setRecipeImageUrl(currentModifiedRecipe.image || currentModifiedRecipe.thumbnailUrl || null);
+        
+        if (currentModifiedRecipe.instructions && Array.isArray(currentModifiedRecipe.instructions)) {
+          setInstructions(currentModifiedRecipe.instructions);
         } else {
-          console.warn(
-            '[StepsScreen] Instructions missing or not an array in recipeData.',
-          );
+          console.warn('[StepsScreen] Instructions missing or not an array in modifiedRecipe.');
           setInstructions([]);
         }
 
-        setRecipeTitle(parsedData.title || 'Instructions');
-        setRecipeImageUrl(parsedData.image || parsedData.thumbnailUrl || null);
-
-        if (parsedData.ingredients && Array.isArray(parsedData.ingredients)) {
-          setIngredients(parsedData.ingredients);
+        // Flatten ingredients from ingredient groups for backward compatibility
+        const flatIngredients: StructuredIngredient[] = [];
+        if (currentModifiedRecipe.ingredientGroups && Array.isArray(currentModifiedRecipe.ingredientGroups)) {
+          currentModifiedRecipe.ingredientGroups.forEach(group => {
+            if (group.ingredients && Array.isArray(group.ingredients)) {
+              flatIngredients.push(...group.ingredients);
+            }
+          });
         }
+        setIngredients(flatIngredients);
+
       } else {
         showError(
           'Error Loading Steps',
@@ -122,7 +189,7 @@ export default function StepsScreen() {
         return;
       }
     } catch (e: any) {
-      console.error('Failed to parse recipe data on steps screen:', e);
+      console.error('Error parsing recipe data from params:', e);
       showError(
         'Error Loading Steps',
         `Could not load recipe data: ${e.message}. Please go back and try again.`,
@@ -132,19 +199,94 @@ export default function StepsScreen() {
       return;
     }
     setIsLoading(false);
-  }, [params.recipeData, showError, router]);
+  }, [params.recipeData, params.editedInstructions, params.editedIngredients, params.newTitle, params.originalId, params.appliedChanges, showError]);
 
   useEffect(() => {
     return () => {
       // This cleanup function runs when the component unmounts
-      if (!isAuthenticated) {
+      if (!session) {
         console.log(
           '[StepsScreen] User is NOT authenticated. Marking free recipe used via FreeUsageContext on unmount.',
         );
         markFreeRecipeUsed();
       }
     };
-  }, [isAuthenticated, markFreeRecipeUsed]); // Dependencies to ensure it reacts to auth state changes and function stability
+  }, [session, markFreeRecipeUsed]); // Dependencies to ensure it reacts to auth state changes and function stability
+
+  // Function to handle saving the modified recipe
+  const handleSaveModifiedRecipe = async () => {
+    setSaveError(null); // Clear any previous errors
+    setIsLoadingSave(true);
+
+    if (!modifiedRecipe || !originalRecipeId || !appliedChanges || !session?.user?.id) {
+      const errorMessage = 'Missing data to save the modified recipe. Please ensure all modifications are applied and you are logged in.';
+      setSaveError(errorMessage);
+      showError('Save Failed', errorMessage);
+      setIsLoadingSave(false);
+      return;
+    }
+
+    try {
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+      if (!backendUrl) {
+        throw new Error('Backend API URL is not configured.');
+      }
+
+      const payload = {
+        originalRecipeId: originalRecipeId,
+        userId: session.user.id,
+        modifiedRecipeData: modifiedRecipe, // The fully reconstructed recipe
+        appliedChanges: appliedChanges, // The metadata about changes
+      };
+
+      console.log('[StepsScreen] Saving modified recipe:', {
+        originalRecipeId,
+        userId: session.user.id,
+        title: modifiedRecipe.title,
+        changesCount: appliedChanges.ingredientChanges.length,
+        scalingFactor: appliedChanges.scalingFactor,
+      });
+
+      const response = await fetch(`${backendUrl}/api/recipes/save-modified`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        const errorMsg = data.error || `Failed to save modified recipe: ${response.statusText}`;
+        setSaveError(errorMsg);
+        showError('Save Failed', errorMsg);
+        return;
+      }
+
+      console.log('[StepsScreen] Modified recipe saved successfully:', data);
+
+      // Show success message
+      showError('Recipe Saved!', `${modifiedRecipe.title} has been saved to your collection.`);
+
+      // Navigate to the saved recipes screen
+      router.push('/saved');
+
+    } catch (error) {
+      const errMsg = (error as Error).message || 'An unexpected error occurred while saving the recipe.';
+      setSaveError(errMsg);
+      showError('Save Failed', errMsg);
+      console.error('[StepsScreen] Error saving modified recipe:', error);
+    } finally {
+      setIsLoadingSave(false);
+    }
+  };
+
+  // Helper function to check if recipe has been modified
+  const hasModifications = () => {
+    if (!appliedChanges) return false;
+    return appliedChanges.ingredientChanges.length > 0 || appliedChanges.scalingFactor !== 1;
+  };
 
   // --- Lifted Timer Logic ---
   const formatTime = (seconds: number) => {
@@ -507,6 +649,37 @@ export default function StepsScreen() {
           </Animated.View>
         )}
 
+      {/* Save Modified Recipe Button */}
+      {hasModifications() && modifiedRecipe && originalRecipeId && appliedChanges && session?.user?.id && (
+        <View style={styles.saveButtonContainer}>
+          <TouchableOpacity
+            style={[
+              styles.saveButton,
+              isLoadingSave && styles.saveButtonDisabled
+            ]}
+            onPress={handleSaveModifiedRecipe}
+            disabled={isLoadingSave}
+          >
+            {isLoadingSave ? (
+              <ActivityIndicator color={COLORS.white} />
+            ) : (
+              <>
+                <MaterialCommunityIcons
+                  name="bookmark-plus"
+                  size={20}
+                  color={COLORS.white}
+                  style={{ marginRight: SPACING.sm }}
+                />
+                <Text style={styles.saveButtonText}>Save Modified Recipe</Text>
+              </>
+            )}
+          </TouchableOpacity>
+          {saveError && (
+            <Text style={styles.saveErrorText}>{saveError}</Text>
+          )}
+        </View>
+      )}
+
       <ToolsModal
         isVisible={isToolsPanelVisible}
         onClose={closeToolsModal}
@@ -770,6 +943,40 @@ const styles = StyleSheet.create({
     ...captionText,
     fontStyle: 'italic',
     color: COLORS.darkGray,
+    marginTop: SPACING.xs,
+    textAlign: 'center',
+  } as TextStyle,
+  // --- Save Button Styles ---
+  saveButtonContainer: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? SPACING.lg : SPACING.md,
+    left: SPACING.pageHorizontal,
+    right: SPACING.pageHorizontal,
+    alignItems: 'center',
+    zIndex: 10, // Ensure it's above other content
+  } as ViewStyle,
+  saveButton: {
+    backgroundColor: COLORS.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.md,
+    width: '100%', // Make it full width of its container
+    ...SHADOWS.medium,
+  } as ViewStyle,
+  saveButtonDisabled: {
+    backgroundColor: COLORS.gray,
+    opacity: 0.6,
+  } as ViewStyle,
+  saveButtonText: {
+    ...bodyStrongText,
+    color: COLORS.white,
+  } as TextStyle,
+  saveErrorText: {
+    ...captionText,
+    color: COLORS.error,
     marginTop: SPACING.xs,
     textAlign: 'center',
   } as TextStyle,

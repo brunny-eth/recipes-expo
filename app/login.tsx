@@ -9,7 +9,7 @@ import {
   ViewStyle,
   TextStyle,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
 import { COLORS, SPACING, RADIUS, ICON_SIZE } from '@/constants/theme';
 import { FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -21,6 +21,7 @@ type AuthProvider = 'google' | 'apple';
 const LoginScreen = () => {
   const { signIn, isLoading: isAuthLoading } = useAuth();
   const [isSigningIn, setIsSigningIn] = useState<AuthProvider | null>(null);
+  const insets = useSafeAreaInsets();
 
   const handleSignIn = async (provider: AuthProvider) => {
     if (isSigningIn) return;
@@ -46,7 +47,7 @@ const LoginScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <TouchableOpacity
-        style={styles.exitButton}
+        style={[styles.exitButton, { top: insets.top + SPACING.md }]}
         onPress={() => router.replace('/(tabs)')}
       >
         <MaterialCommunityIcons
@@ -165,10 +166,19 @@ const styles = StyleSheet.create({
   } as TextStyle,
   exitButton: {
     position: 'absolute',
-    top: SPACING.pageHorizontal,
     right: SPACING.pageHorizontal,
     padding: SPACING.sm,
     zIndex: 1,
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.full,
+    shadowColor: COLORS.black,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   } as ViewStyle,
 });
 

@@ -39,9 +39,15 @@ export function buildSubstitutionPrompt(
     2. For any ingredients marked REPLACE, update wording/preparation to use the substitute. Adjust timings/prep if needed.
     3. Preserve step order and DO NOT number the steps.
     4. Output natural instructions without phrases like "omit" or "instead"—just the corrected steps.
+    5. Title Rewriting: Suggest a newTitle if a primary/key ingredient is significantly substituted or removed. Primary ingredients are typically those that:
+       - Appear in common recipe names (e.g., "chicken" in "chicken quesadillas", "blueberry" in "blueberry muffins")
+       - Are the main protein, featured fruit, or defining characteristic of the dish
+       - When substituted/removed, would fundamentally change what the dish is called
+       Examples: strawberry→blueberry pancakes becomes "Blueberry Pancakes", chicken→tofu quesadillas becomes "Tofu Quesadillas", remove chicken from chicken quesadillas becomes "Quesadillas". 
+       Do NOT suggest title changes for minor/supporting ingredients (e.g., removing carrots from chicken pot pie stays "Chicken Pot Pie").
 
     Respond ONLY in valid JSON:
-    { "rewrittenInstructions": [ ... ] }
+    { "rewrittenInstructions": [ ... ], "newTitle": "string | null" }
     `;
 
     const userPrompt = `

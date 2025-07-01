@@ -183,10 +183,8 @@ export const parseServingsValue = (yieldStr: string | null | undefined): number 
  * @returns A user-friendly string describing the scaled yield.
  */
 export function getScaledYieldText(yieldStr: string | null | undefined, factor: number): string {
-  const originalDisplay = yieldStr || "original quantity";
-
-  if (factor === 1 || isNaN(factor) || factor <=0) {
-    return yieldStr || "Original quantity"; // Return original string if no scaling or invalid factor
+  if (factor === 1 || isNaN(factor) || factor <= 0) {
+    return formatRecipeYield(yieldStr) || "Original quantity"; // Use formatted yield for consistency
   }
 
   const baseServings = parseServingsValue(yieldStr);
@@ -197,15 +195,16 @@ export function getScaledYieldText(yieldStr: string | null | undefined, factor: 
       return "a small amount";
     }
     
-    // Try to find the original unit (e.g., "servings", "tacos")
+    // Try to find the original unit (e.g., "servings", "tacos", "burgers")
     const unitMatch = yieldStr?.match(/\b([a-zA-Z]+)\b$/);
-    const unit = unitMatch ? ` ${unitMatch[1]}` : '';
+    const unit = unitMatch ? ` ${unitMatch[1]}` : ' servings'; // Default to servings if no unit found
 
     return `${scaledNumericYield}${unit}`;
   }
   
   // Fallback if original yield string couldn't be parsed into a number but there's a scale factor
-  return `${factor}x of the ${originalDisplay}`;
+  const formattedOriginal = formatRecipeYield(yieldStr);
+  return `${factor}x of the ${formattedOriginal || "original quantity"}`;
 }
 
 // --- Formatting Function ---
@@ -317,4 +316,39 @@ export const scaleIngredient = (
     ...ingredient,
     amount: newAmountStr, // Keep unit the same
   };
-}; 
+};
+
+/**
+ * Formats recipe yield for display by adding "servings" if only a number is provided.
+ * @param yieldStr The original recipe yield string (e.g., "6", "4 burgers", "8 servings").
+ * @returns A formatted string with appropriate units (e.g., "6 servings", "4 burgers", "8 servings").
+ */
+export function formatRecipeYield(yieldStr: string | null | undefined): string | null {
+  if (!yieldStr || typeof yieldStr !== 'string') {
+    return null;
+  }
+
+  const trimmed = yieldStr.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  // Check if the string already has text after a number (like "4 burgers", "2 sandwiches", "8 servings")
+  const hasUnitMatch = trimmed.match(/^\d+(?:\.\d+)?\s+[a-zA-Z]/);
+  
+  if (hasUnitMatch) {
+    // Already has a unit, return as is
+    return trimmed;
+  }
+
+  // Check if it's just a number (possibly with range like "4-6")
+  const justNumberMatch = trimmed.match(/^(\d+(?:\.\d+)?(?:\s*[-–]\s*\d+(?:\.\d+)?)?)$/);
+  
+  if (justNumberMatch) {
+    // Just a number or number range, add "servings"
+    return `${trimmed} servings`;
+  }
+
+  // For any other format, return as is (covers edge cases)
+  return trimmed;
+} 

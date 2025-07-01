@@ -44,9 +44,11 @@ import {
   StructuredIngredient,
   CombinedParsedRecipe as ParsedRecipe,
   SubstitutionSuggestion,
+  IngredientGroup,
 } from '../../common/types';
 import {
   coerceToStructuredIngredients,
+  coerceToIngredientGroups,
   parseIngredientDisplayName,
 } from '@/utils/ingredientHelpers';
 import { useErrorModal } from '@/context/ErrorModalContext';
@@ -178,14 +180,21 @@ const ALLERGENS = [
 ];
 
 const extractAllergens = (
-  ingredients: StructuredIngredient[] | string[] | null,
+  ingredientGroups: IngredientGroup[] | null,
 ): string[] => {
-  if (!ingredients) return [];
+  if (!ingredientGroups || ingredientGroups.length === 0) return [];
 
-  const structuredIngredients = coerceToStructuredIngredients(ingredients);
-  if (!structuredIngredients || structuredIngredients.length === 0) return [];
+  // Flatten all ingredients from all groups
+  const allIngredients: StructuredIngredient[] = [];
+  ingredientGroups.forEach(group => {
+    if (group.ingredients && Array.isArray(group.ingredients)) {
+      allIngredients.push(...group.ingredients);
+    }
+  });
 
-  const ingredientNames = structuredIngredients.map(
+  if (allIngredients.length === 0) return [];
+
+  const ingredientNames = allIngredients.map(
     (i) => i.name?.toLowerCase().trim().normalize('NFKC') ?? '',
   );
 
@@ -246,33 +255,58 @@ export default function RecipeSummaryScreen() {
     to: string | null;
   } | null>(null);
 
-  const scaledIngredients = React.useMemo<StructuredIngredient[]>(() => {
-    if (!recipe?.ingredients) return [];
-    const baseIngredients = coerceToStructuredIngredients(recipe.ingredients);
-    const scaledBaseIngredients = baseIngredients.map((ingredient) =>
-      scaleIngredient(ingredient, selectedScaleFactor),
-    );
-    if (appliedChanges.length === 0) return scaledBaseIngredients;
-    return scaledBaseIngredients.map((baseIngredient) => {
-      const change = appliedChanges.find((c) => c.from === baseIngredient.name);
-      if (change) {
-        if (change.to === null) {
-          return {
-            ...baseIngredient,
-            name: `${baseIngredient.name} (removed)`,
-            amount: null,
-            unit: null,
-            suggested_substitutions: null,
-          };
-        }
-        return {
-          ...change.to,
-          name: `${change.to.name} (substituted for ${change.from})`,
-        };
+  const scaledIngredientGroups = React.useMemo<IngredientGroup[]>(() => {
+    if (!recipe?.ingredientGroups) return [];
+    
+    return recipe.ingredientGroups.map(group => {
+      if (!group.ingredients || !Array.isArray(group.ingredients)) {
+        return { ...group, ingredients: [] };
       }
-      return baseIngredient;
+
+      const scaledIngredients = group.ingredients.map((ingredient) =>
+        scaleIngredient(ingredient, selectedScaleFactor),
+      );
+
+      let finalIngredients = scaledIngredients;
+      if (appliedChanges.length > 0) {
+        finalIngredients = scaledIngredients.map((baseIngredient) => {
+          const change = appliedChanges.find((c) => c.from === baseIngredient.name);
+          if (change) {
+            if (change.to === null) {
+              return {
+                ...baseIngredient,
+                name: `${baseIngredient.name} (removed)`,
+                amount: null,
+                unit: null,
+                suggested_substitutions: null,
+              };
+            }
+            return {
+              ...change.to,
+              name: `${change.to.name} (substituted for ${change.from})`,
+            };
+          }
+          return baseIngredient;
+        });
+      }
+
+      return {
+        ...group,
+        ingredients: finalIngredients,
+      };
     });
   }, [recipe, selectedScaleFactor, appliedChanges]);
+
+  // Keep scaledIngredients as a flat array for backward compatibility with existing code
+  const scaledIngredients = React.useMemo<StructuredIngredient[]>(() => {
+    const allIngredients: StructuredIngredient[] = [];
+    scaledIngredientGroups.forEach(group => {
+      if (group.ingredients && Array.isArray(group.ingredients)) {
+        allIngredients.push(...group.ingredients);
+      }
+    });
+    return allIngredients;
+  }, [scaledIngredientGroups]);
 
   const handleExitPress = () => {
     const exitPath = params.from || '/';
@@ -305,7 +339,7 @@ export default function RecipeSummaryScreen() {
 
   const detectedAllergens = React.useMemo(() => {
     if (!recipe) return [];
-    return extractAllergens(recipe.ingredients);
+    return extractAllergens(recipe.ingredientGroups);
   }, [recipe]);
 
   const handleScaleFactorChange = (factor: number) => setSelectedScaleFactor(factor);
@@ -417,6 +451,7 @@ export default function RecipeSummaryScreen() {
     }
 
     let finalInstructions = recipe.instructions || [];
+    let newTitle: string | null = null; // Capture new title from LLM if suggested
     const needsScaling = selectedScaleFactor !== 1;
 
     // --- 1. Handle Substitution Rewriting (if applicable) ---
@@ -439,6 +474,11 @@ export default function RecipeSummaryScreen() {
         if (!response.ok) throw new Error(result.error || `Rewrite failed (Status: ${response.status})`);
         if (!result.rewrittenInstructions) throw new Error('Invalid format for rewritten instructions.');
         finalInstructions = result.rewrittenInstructions;
+        
+        // Capture new title if suggested by LLM
+        if (result.newTitle && result.newTitle.trim() !== '') {
+          newTitle = result.newTitle;
+        }
       } catch (rewriteError: any) {
         showError('Update Failed', `Couldn't update steps for substitutions: ${rewriteError.message}`);
         return; // Stop navigation on failure
@@ -452,7 +492,16 @@ export default function RecipeSummaryScreen() {
       setIsScalingInstructions(true);
       try {
         const backendUrl = process.env.EXPO_PUBLIC_API_URL!;
-        const originalIngredients = coerceToStructuredIngredients(recipe.ingredients);
+        // Flatten all ingredients from ingredient groups for scaling
+        const allIngredients: StructuredIngredient[] = [];
+        if (recipe.ingredientGroups) {
+          recipe.ingredientGroups.forEach(group => {
+            if (group.ingredients && Array.isArray(group.ingredients)) {
+              allIngredients.push(...group.ingredients);
+            }
+          });
+        }
+        const originalIngredients = allIngredients;
         const response = await fetch(`${backendUrl}/api/recipes/scale-instructions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -478,22 +527,27 @@ export default function RecipeSummaryScreen() {
     router.push({
       pathname: '/recipe/steps',
       params: {
+        originalId: recipe.id?.toString() || '', // Pass the ID of the original recipe
         recipeData: JSON.stringify({
-          title: recipe.title,
-          instructions: finalInstructions,
-          ingredients: scaledIngredients,
-          image: recipe.image,
-          thumbnailUrl: recipe.thumbnailUrl,
-          // Pass other relevant data
+          // Pass the ORIGINAL recipe data with all metadata intact
+          ...recipe,
+          // Update only the scaled yield text for display
           recipeYield: getScaledYieldText(recipe.recipeYield, selectedScaleFactor),
-          prepTime: recipe.prepTime,
-          cookTime: recipe.cookTime,
-          totalTime: recipe.totalTime,
-          nutrition: recipe.nutrition,
+        }),
+        // Pass the edited instructions and ingredients for steps.tsx to apply
+        editedInstructions: JSON.stringify(finalInstructions),
+        editedIngredients: JSON.stringify(scaledIngredientGroups),
+        newTitle: newTitle || 'null', // Pass newTitle from LLM, or 'null' string
+        appliedChanges: JSON.stringify({
+          ingredientChanges: appliedChanges.map((change) => ({
+            from: change.from,
+            to: change.to ? change.to.name : null, // Convert StructuredIngredient to string
+          })),
+          scalingFactor: selectedScaleFactor,
         }),
       },
     });
-  }, [recipe, scaledIngredients, appliedChanges, router, showError, selectedScaleFactor]);
+  }, [recipe, scaledIngredients, scaledIngredientGroups, appliedChanges, router, showError, selectedScaleFactor]);
 
   const handleGoToSteps = () => InteractionManager.runAfterInteractions(navigateToNextScreen);
 
@@ -557,6 +611,16 @@ export default function RecipeSummaryScreen() {
               {isDescriptionExpanded && (
                 <Text style={styles.infoRowContent}>{decode(recipe.description)}</Text>
               )}
+            </View>
+          )}
+          {(recipe.prepTime || recipe.cookTime) && (
+            <View style={styles.infoRow}>
+              <Text style={styles.infoRowLabel}>Time it will take:</Text>
+              <Text style={styles.infoRowContent}>
+                {recipe.prepTime && `Prep: ${recipe.prepTime}`}
+                {recipe.prepTime && recipe.cookTime ? ', ' : ''}
+                {recipe.cookTime && `Cook: ${recipe.cookTime}`}
+              </Text>
             </View>
           )}
           {detectedAllergens.length > 0 && (
@@ -625,7 +689,7 @@ export default function RecipeSummaryScreen() {
           onToggle={() => setIsIngredientsExpanded(!isIngredientsExpanded)}
         >
           <IngredientList
-            scaledIngredients={scaledIngredients}
+            ingredientGroups={scaledIngredientGroups}
             selectedScaleFactor={selectedScaleFactor}
             appliedChanges={appliedChanges}
             checkedIngredients={checkedIngredients}

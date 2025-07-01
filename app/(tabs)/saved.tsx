@@ -27,9 +27,13 @@ import ScreenHeader from '@/components/ScreenHeader';
 
 type SavedRecipe = {
   base_recipe_id: number;
+  title_override: string | null;
+  applied_changes: any | null; // JSON object with ingredient changes and scaling
   processed_recipes_cache: {
     id: number;
     recipe_data: ParsedRecipe;
+    source_type: string | null; // "user_modified" for modified recipes
+    parent_recipe_id: number | null;
   } | null;
 };
 
@@ -65,13 +69,18 @@ export default function SavedScreen() {
           .select(
             `
             base_recipe_id,
+            title_override,
+            applied_changes,
             processed_recipes_cache (
               id,
-              recipe_data
+              recipe_data,
+              source_type,
+              parent_recipe_id
             )
           `,
           )
-          .eq('user_id', session.user.id);
+          .eq('user_id', session.user.id)
+          .order('created_at', { ascending: false }); // Show newest saves first
 
         const dbQueryEnd = performance.now();
         console.log(`[PERF: SavedScreen] Supabase query finished in ${(dbQueryEnd - dbQueryStart).toFixed(2)}ms`);
@@ -95,6 +104,7 @@ export default function SavedScreen() {
             ((data as any[])?.filter(
               (r) => r.processed_recipes_cache?.recipe_data,
             ) as SavedRecipe[]) || [];
+
           setSavedRecipes(validRecipes);
           const processingEnd = performance.now();
           console.log(`[PERF: SavedScreen] Data processing and state update took ${(processingEnd - processingStart).toFixed(2)}ms`);
@@ -120,20 +130,33 @@ export default function SavedScreen() {
         return;
     }
 
+    const { recipe_data, source_type } = item.processed_recipes_cache;
+    const isModified = source_type === 'user_modified';
+    const displayTitle = item.title_override || recipe_data.title;
+    
     // Create a complete recipe object by merging the ID with the recipe_data
     const recipeWithId = {
-        ...item.processed_recipes_cache.recipe_data,
-        id: item.processed_recipes_cache.id 
+        ...recipe_data,
+        id: item.processed_recipes_cache.id,
+        // For modified recipes, override the title if we have a title_override
+        ...(isModified && item.title_override && { title: item.title_override }),
     };
 
-    console.log(`[SavedScreen] Opening recipe: ${recipeWithId.title}`);
-    console.log(`[SavedScreen] Sending recipe with ID: ${recipeWithId.id}`); // Add a debug log to confirm the ID is present
+    console.log(`[SavedScreen] Opening recipe: ${displayTitle}`, {
+      id: recipeWithId.id,
+      isModified,
+      hasAppliedChanges: !!item.applied_changes,
+    });
 
     router.push({
       pathname: '/recipe/summary',
       params: {
         recipeData: JSON.stringify(recipeWithId), 
         from: '/saved',
+        isModified: isModified.toString(),
+        ...(isModified && item.applied_changes && {
+          appliedChanges: JSON.stringify(item.applied_changes)
+        }),
       },
     });
 };
@@ -148,8 +171,20 @@ const renderRecipeItem = ({ item }: { item: SavedRecipe }) => {
       return null; // Gracefully skip rendering this item
   }
 
-  const { recipe_data } = item.processed_recipes_cache;
+  const { recipe_data, source_type } = item.processed_recipes_cache;
   const imageUrl = recipe_data.image || recipe_data.thumbnailUrl;
+  const isModified = source_type === 'user_modified';
+  
+  // Use title_override if available (for modified recipes), otherwise use original title
+  const displayTitle = item.title_override || recipe_data.title;
+
+  // DEBUGGING: Log image URL information
+  console.log(`[DEBUG: SavedScreen] Image data for "${displayTitle}":`, {
+    hasImage: !!recipe_data.image,
+    hasThumbnail: !!recipe_data.thumbnailUrl,
+    imageUrl: imageUrl,
+    imageUrlLength: imageUrl?.length || 0
+  });
 
   return (
       <TouchableOpacity
@@ -161,17 +196,28 @@ const renderRecipeItem = ({ item }: { item: SavedRecipe }) => {
               source={{ uri: imageUrl }}
               style={styles.cardImage}
               onLoad={() => {
-                  console.log(`[PERF: SavedScreen] Image loaded for recipe: ${recipe_data.title}`);
+                  console.log(`[PERF: SavedScreen] Image loaded for recipe: ${displayTitle}`);
               }}
               onError={() => {
-                  console.error(`[PERF: SavedScreen] Image failed to load for recipe: ${recipe_data.title}`);
+                  console.error(`[PERF: SavedScreen] Image failed to load for recipe: ${displayTitle}`);
               }}
           />
           )}
           <View style={styles.cardTextContainer}>
               <Text style={styles.cardTitle} numberOfLines={2}>
-                  {recipe_data.title}
+                  {displayTitle}
               </Text>
+              {isModified && (
+                <View style={styles.modifiedBadge}>
+                  <MaterialCommunityIcons
+                    name="account-edit"
+                    size={14}
+                    color={COLORS.primary}
+                    style={styles.modifiedIcon}
+                  />
+                  <Text style={styles.modifiedText}>Modified by You</Text>
+                </View>
+              )}
           </View>
       </TouchableOpacity>
   );
@@ -322,6 +368,20 @@ const styles = StyleSheet.create({
   cardTitle: {
     ...bodyStrongText,
     color: COLORS.textDark,
+  },
+  modifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: SPACING.xs,
+  },
+  modifiedIcon: {
+    marginRight: SPACING.xs,
+  },
+  modifiedText: {
+    ...bodyText,
+    fontSize: FONT.size.caption,
+    color: COLORS.primary,
+    fontWeight: '500',
   },
   errorText: {
     ...bodyText,

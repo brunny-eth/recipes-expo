@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, FlatList, ViewStyle } from 'react-native';
-import { StructuredIngredient } from '@/common/types';
+import { StructuredIngredient, IngredientGroup } from '@/common/types';
 import IngredientRow from '@/app/recipe/IngredientRow';
 import {
   captionText,
@@ -16,7 +16,7 @@ type AppliedChange = {
 };
 
 type IngredientListProps = {
-  scaledIngredients: StructuredIngredient[];
+  ingredientGroups: IngredientGroup[];
   selectedScaleFactor: number;
   appliedChanges: AppliedChange[];
   checkedIngredients: { [key: number]: boolean };
@@ -27,7 +27,7 @@ type IngredientListProps = {
 };
 
 const IngredientList: React.FC<IngredientListProps> = ({
-  scaledIngredients,
+  ingredientGroups,
   selectedScaleFactor,
   appliedChanges,
   checkedIngredients,
@@ -36,61 +36,86 @@ const IngredientList: React.FC<IngredientListProps> = ({
   undoIngredientRemoval,
   undoSubstitution,
 }) => {
-  const memoizedRenderIngredientRow = React.useCallback(
-    ({ item, index }: { item: StructuredIngredient; index: number }) => {
-      return (
-        <IngredientRow
-          ingredient={item}
-          index={index}
-          isChecked={!!checkedIngredients[index]}
-          appliedChanges={appliedChanges}
-          toggleCheckIngredient={toggleCheckIngredient}
-          openSubstitutionModal={openSubstitutionModal}
-          undoIngredientRemoval={undoIngredientRemoval}
-          undoSubstitution={undoSubstitution}
-        />
-      );
-    },
-    [
-      checkedIngredients,
-      appliedChanges,
-      toggleCheckIngredient,
-      openSubstitutionModal,
-      undoIngredientRemoval,
-      undoSubstitution,
-    ],
-  );
+  const renderIngredientGroup = ({ item: group, index: groupIndex }: { item: IngredientGroup; index: number }) => {
+    if (!group.ingredients || group.ingredients.length === 0) {
+      return null;
+    }
+
+    return (
+      <View key={`group-${groupIndex}`} style={styles.groupContainer}>
+        {/* Only show group name if it exists and it's not "Main" (default group) */}
+        {group.name && group.name !== 'Main' && (
+          <Text style={styles.groupHeader}>{group.name}</Text>
+        )}
+        
+        {group.ingredients.map((ingredient, ingredientIndex) => {
+          // Calculate global index for ingredient checking
+          let globalIndex = 0;
+          for (let i = 0; i < groupIndex; i++) {
+            globalIndex += ingredientGroups[i].ingredients?.length || 0;
+          }
+          globalIndex += ingredientIndex;
+
+          return (
+            <IngredientRow
+              key={`${ingredient.name}-${globalIndex}`}
+              ingredient={ingredient}
+              index={globalIndex}
+              isChecked={!!checkedIngredients[globalIndex]}
+              appliedChanges={appliedChanges}
+              toggleCheckIngredient={toggleCheckIngredient}
+              openSubstitutionModal={openSubstitutionModal}
+              undoIngredientRemoval={undoIngredientRemoval}
+              undoSubstitution={undoSubstitution}
+            />
+          );
+        })}
+      </View>
+    );
+  };
 
   return (
-    <FlatList
-      data={scaledIngredients}
-      keyExtractor={(item: StructuredIngredient, index: number) =>
-        `${item.name}-${index}`
-      }
-      scrollEnabled={false}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: 20 }}
-      ListHeaderComponent={
-        selectedScaleFactor !== 1 ? (
-          <View style={styles.scaleInfoBanner}>
-            <Text
-              style={styles.scaleInfoText}
-            >{`Showing ${selectedScaleFactor}x scaled up ingredients`}</Text>
-          </View>
-        ) : undefined
-      }
-      ListEmptyComponent={
+    <View style={styles.container}>
+      {selectedScaleFactor !== 1 && (
+        <View style={styles.scaleInfoBanner}>
+          <Text style={styles.scaleInfoText}>
+            {`Showing ${selectedScaleFactor}x scaled up ingredients`}
+          </Text>
+        </View>
+      )}
+      
+      {ingredientGroups.length === 0 ? (
         <Text style={styles.placeholderText}>No ingredients found.</Text>
-      }
-      extraData={
-        appliedChanges.length + Object.keys(checkedIngredients).length
-      }
-      renderItem={memoizedRenderIngredientRow}
-    />
+      ) : (
+        <FlatList
+          data={ingredientGroups}
+          keyExtractor={(item: IngredientGroup, index: number) => `group-${index}-${item.name || 'unnamed'}`}
+          scrollEnabled={false}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 20 }}
+          extraData={appliedChanges.length + Object.keys(checkedIngredients).length}
+          renderItem={renderIngredientGroup}
+        />
+      )}
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  groupContainer: {
+    marginBottom: SPACING.base,
+  },
+  groupHeader: {
+    ...bodyStrongText,
+    fontSize: FONT.size.lg,
+    color: COLORS.textDark,
+    marginBottom: SPACING.sm,
+    marginTop: SPACING.base,
+    paddingLeft: SPACING.xs,
+  },
   placeholderText: {
     ...captionText,
     fontStyle: 'italic',

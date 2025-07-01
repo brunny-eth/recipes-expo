@@ -1,12 +1,27 @@
 import { Router, Request, Response } from 'express'
 import { Content } from "@google/generative-ai"; // For type only, no initialization
+import { v4 as uuidv4 } from 'uuid';
 import { scraperClient, scraperApiKey } from '../lib/scraper';
+import { supabaseAdmin } from '../lib/supabaseAdmin';
 import { parseAndCacheRecipe } from '../services/parseRecipe';
 import { rewriteForSubstitution } from '../services/substitutionRewriter';
 import { scaleInstructions } from '../services/instructionScaling';
 import { getAllRecipes, getRecipeById } from '../services/recipeDB';
+import { generateAndSaveEmbedding } from '../../utils/recipeEmbeddings';
+import { CombinedParsedRecipe } from '../../common/types';
+import { IngredientChange } from '../llm/substitutionPrompts';
 import logger from '../lib/logger'; 
 import { ParseErrorCode } from '../../common/types/errors';
+
+interface SaveModifiedRecipeRequestBody {
+  originalRecipeId: number;
+  userId: string;
+  modifiedRecipeData: CombinedParsedRecipe;
+  appliedChanges: { // Ensure this matches the exact structure from frontend
+    ingredientChanges: IngredientChange[];
+    scalingFactor: number;
+  };
+}
 
 const router = Router()
 
@@ -136,7 +151,7 @@ router.post('/rewrite-instructions', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Missing or invalid substitutions array' });
     }
 
-    const { rewrittenInstructions, error: rewriteError, usage, timeMs } = await rewriteForSubstitution(
+    const { rewrittenInstructions, newTitle, error: rewriteError, usage, timeMs } = await rewriteForSubstitution(
       originalInstructions,
       substitutions,
       requestId
@@ -148,7 +163,7 @@ router.post('/rewrite-instructions', async (req: Request, res: Response) => {
       return res.status(500).json({ error: `Failed to rewrite instructions: ${rewriteError || 'Unknown error'}` });
     } else {
       logger.info({ requestId, route: req.originalUrl, method: req.method, usage, timeMs }, 'Successfully rewrote instructions.');
-      res.json({ rewrittenInstructions, usage, timeMs });
+      res.json({ rewrittenInstructions, newTitle, usage, timeMs });
     }
 
   } catch (err) {
@@ -195,6 +210,106 @@ router.post('/scale-instructions', async (req: Request, res: Response) => {
     const error = err as Error;
     logger.error({ requestId: (req as any).id, err: error, route: req.originalUrl, method: req.method, body: req.body }, 'Error in /scale-instructions route processing');
     res.status(500).json({ error: error.message || 'Internal server error processing instruction scaling request.' });
+  }
+});
+
+// POST /api/recipes/save-modified
+router.post('/save-modified', async (req: Request<any, any, SaveModifiedRecipeRequestBody>, res: Response) => {
+  const requestId = (req as any).id;
+
+  try {
+    const { originalRecipeId, userId, modifiedRecipeData, appliedChanges } = req.body;
+
+    logger.info({ requestId, originalRecipeId, userId, appliedChanges }, 'Received request to save modified recipe');
+
+    // --- Data Validation (basic, extend as needed) ---
+    if (!originalRecipeId || !userId || !modifiedRecipeData || !appliedChanges) {
+      logger.error({ requestId, body: req.body }, 'Missing required fields for saving modified recipe.');
+      return res.status(400).json({ error: 'Missing required fields.' });
+    }
+    if (!modifiedRecipeData.title || !modifiedRecipeData.instructions || modifiedRecipeData.instructions.length === 0 || !modifiedRecipeData.ingredientGroups || modifiedRecipeData.ingredientGroups.length === 0) {
+        logger.error({ requestId, modifiedRecipeData }, 'Modified recipe data is incomplete or invalid.');
+        return res.status(400).json({ error: 'Incomplete modified recipe data provided.' });
+    }
+
+    // --- 1. Generate a new unique URL (UUID) for the modified recipe ---
+    const newRecipeUrl = uuidv4(); // Generates a Version 4 UUID
+
+    // --- 2. Insert the modified recipe into processed_recipes_cache ---
+    // The 'recipe_data' column is jsonb, so we can directly store the CombinedParsedRecipe object.
+    const { data: newModifiedRecipeRows, error: insertRecipeError } = await supabaseAdmin
+      .from('processed_recipes_cache')
+      .insert({
+        url: newRecipeUrl,
+        recipe_data: modifiedRecipeData, // Store the full reconstructed recipe here
+        parent_recipe_id: originalRecipeId,
+        source_type: 'user_modified', // Add a source type to distinguish modified recipes
+      })
+      .select('id, url') // Select the new id and url to return them
+      .single(); // Expect a single row back
+
+    if (insertRecipeError || !newModifiedRecipeRows) {
+      logger.error({ requestId, originalRecipeId, newRecipeUrl, err: insertRecipeError }, 'Failed to insert modified recipe into processed_recipes_cache.');
+      return res.status(500).json({ error: 'Failed to save modified recipe content.' });
+    }
+
+    const newModifiedRecipeId = newModifiedRecipeRows.id;
+    const savedRecipeUrl = newModifiedRecipeRows.url;
+
+    logger.info({ requestId, newModifiedRecipeId, savedRecipeUrl }, 'Modified recipe inserted into processed_recipes_cache.');
+
+    // --- 3. Generate and Save Embedding for the New Modified Recipe ---
+    // Prepare text inputs for embedding from the modifiedRecipeData
+    const ingredientsText = modifiedRecipeData.ingredientGroups
+      ?.flatMap(group => group.ingredients.map(ing => `${ing.amount || ''} ${ing.unit || ''} ${ing.name}`.trim()))
+      .join('\n');
+    const instructionsText = modifiedRecipeData.instructions?.join('\n');
+
+    await generateAndSaveEmbedding(newModifiedRecipeId, {
+      title: modifiedRecipeData.title,
+      ingredientsText: ingredientsText,
+      instructionsText: instructionsText,
+    });
+    // Note: The embedding is saved asynchronously, but we proceed with user_saved_recipes insert.
+    // You might want to add more robust error handling or retry logic for embedding if it's critical path.
+
+    // --- 4. Insert into user_saved_recipes ---
+    // This links the user to their newly saved modified recipe in the cache
+    const { data: userSavedEntry, error: insertUserSavedError } = await supabaseAdmin
+      .from('user_saved_recipes')
+      .insert({
+        user_id: userId,
+        base_recipe_id: newModifiedRecipeId, // Link to the newly created modified recipe
+        title_override: modifiedRecipeData.title, // Use the (potentially LLM-suggested) title
+        applied_changes: appliedChanges, // Store the explicit changes metadata
+        // notes: null, // As per plan, leave notes as null unless user input is added
+      })
+      .select('id')
+      .single(); // Expect a single row back
+
+    if (insertUserSavedError || !userSavedEntry) {
+      // IMPORTANT: If this fails, consider rolling back the processed_recipes_cache insert
+      // For now, we'll log an error. A transaction would be ideal here if supported directly.
+      logger.error({ requestId, newModifiedRecipeId, userId, err: insertUserSavedError }, 'Failed to insert into user_saved_recipes.');
+      // You might want to delete the entry from processed_recipes_cache here
+      // await supabaseAdmin.from('processed_recipes_cache').delete().eq('id', newModifiedRecipeId);
+      return res.status(500).json({ error: 'Failed to record saved recipe for user.' });
+    }
+
+    logger.info({ requestId, userSavedEntryId: userSavedEntry.id }, 'User saved recipe entry created.');
+
+    // --- 5. Send Success Response ---
+    res.status(201).json({
+      message: 'Modified recipe saved successfully!',
+      newRecipeId: newModifiedRecipeId,
+      newRecipeUrl: savedRecipeUrl,
+      userSavedRecordId: userSavedEntry.id,
+    });
+
+  } catch (err) {
+    const error = err as Error;
+    logger.error({ requestId, err: error, route: req.originalUrl, method: req.method, body: req.body }, 'Critical error in /save-modified route processing');
+    res.status(500).json({ error: error.message || 'Internal server error processing save modified recipe request.' });
   }
 });
 

@@ -17,7 +17,7 @@ export async function rewriteForSubstitution(
     originalInstructions: string[],
     substitutions: IngredientChange[],
     requestId: string
-): Promise<LLMResponse<{ rewrittenInstructions: string[] | null }>> {
+): Promise<LLMResponse<{ rewrittenInstructions: string[] | null; newTitle: string | null }>> {
 
     const removalCount = substitutions.filter(s => !s.to || s.to.trim() === '').length;
 
@@ -31,7 +31,7 @@ export async function rewriteForSubstitution(
     // ---- Early validation ----
     if (!originalInstructions || originalInstructions.length === 0) {
         logger.error({ phase: 'validation_failed', reason: 'No instructions provided' }, '[REWRITE] No instructions to rewrite — aborting');
-        return { rewrittenInstructions: null, error: 'No instructions provided to rewrite.', usage: { inputTokens: 0, outputTokens: 0 }, timeMs: null };
+        return { rewrittenInstructions: null, newTitle: null, error: 'No instructions provided to rewrite.', usage: { inputTokens: 0, outputTokens: 0 }, timeMs: null };
     }
 
     if (removalCount > 0) {
@@ -53,7 +53,7 @@ export async function rewriteForSubstitution(
 
         if (modelResponse.error || !modelResponse.output) {
             logger.error({ requestId, error: modelResponse.error }, 'Error from LLM in substitution rewriter');
-            return { rewrittenInstructions: null, error: modelResponse.error || 'LLM error', usage: modelResponse.usage, timeMs };
+            return { rewrittenInstructions: null, newTitle: null, error: modelResponse.error || 'LLM error', usage: modelResponse.usage, timeMs };
         }
 
         try {
@@ -68,6 +68,7 @@ export async function rewriteForSubstitution(
                 logger.debug('[REWRITE] Rewritten instructions', { instructions: parsedResult.rewrittenInstructions });
                 return {
                     rewrittenInstructions: parsedResult.rewrittenInstructions.filter((step: any) => typeof step === 'string'),
+                    newTitle: parsedResult.newTitle || null,
                     error: null,
                     usage: modelResponse.usage,
                     timeMs
@@ -84,6 +85,6 @@ export async function rewriteForSubstitution(
     } catch (err) {
         const error = err as Error;
         logger.error({ action: 'llm_rewrite_substitution', err: error }, 'Error during substitution rewrite.');
-        return { rewrittenInstructions: null, error: error.message, usage: {inputTokens: 0, outputTokens: 0}, timeMs: null };
+        return { rewrittenInstructions: null, newTitle: null, error: error.message, usage: {inputTokens: 0, outputTokens: 0}, timeMs: null };
     }
 } 

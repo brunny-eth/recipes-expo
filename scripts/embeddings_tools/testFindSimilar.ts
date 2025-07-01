@@ -1,17 +1,19 @@
 import 'dotenv/config'
-import { embedText } from '../embedText'
-import { findSimilarRecipe } from '../findSimilarRecipe'
+import { embedText } from '../../utils/embedText'
+import { findSimilarRecipe } from '../../utils/findSimilarRecipe'
 
 async function run() {
   const query = "chicken chili"
   const embedding = await embedText(query)
 
-  const { recipe, similarity } = await findSimilarRecipe(embedding, 0.55)
+  const match = await findSimilarRecipe(embedding, 0.55)
 
-  if (!recipe) {
+  if (!match) {
     console.log("No recipe found.")
     return
   }
+  
+  const { recipe, similarity } = match
 
   // Confirm what fields exist on the matched recipe
   console.log("Similarity:", similarity)

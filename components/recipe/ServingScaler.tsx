@@ -15,7 +15,7 @@ import {
   FONT,
 } from '@/constants/typography';
 import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
-import { getScaledYieldText } from '@/utils/recipeUtils';
+import { getScaledYieldText, formatRecipeYield } from '@/utils/recipeUtils';
 
 const screenWidth = Dimensions.get('window').width;
 const contentHorizontalPadding = SPACING.pageHorizontal;
@@ -51,8 +51,9 @@ const ServingScaler: React.FC<ServingScalerProps> = ({
       <Text style={styles.helperText}>
         {(() => {
           if (selectedScaleFactor === 1.0) {
-            return recipeYield
-              ? `This recipe makes ${recipeYield}. We make it easy to scale it up or down.`
+            const formattedYield = formatRecipeYield(recipeYield);
+            return formattedYield
+              ? `This recipe makes ${formattedYield}. We make it easy to scale it up or down.`
               : `This recipe doesn't specify servings amount, but we can still scale amounts up or down if you'd like.`;
           }
 
