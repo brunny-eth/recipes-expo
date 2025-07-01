@@ -1,4 +1,4 @@
-import { StructuredIngredient } from '../common/types/recipes';
+import { StructuredIngredient, IngredientGroup } from '../common/types/recipes';
 
 /**
  * Coerces an array of mixed ingredient types (string or StructuredIngredient objects)
@@ -50,6 +50,40 @@ export const coerceToStructuredIngredients = (
   }
 
   return processedIngredients;
+};
+
+/**
+ * Validates and processes ingredient groups to ensure they have the correct structure.
+ * - Ensures each group has a name and ingredients array
+ * - Processes ingredients within each group using coerceToStructuredIngredients
+ * - Filters out empty groups
+ */
+export const coerceToIngredientGroups = (
+  ingredientGroups: any[] | null | undefined
+): IngredientGroup[] => {
+  if (!ingredientGroups || !Array.isArray(ingredientGroups)) {
+    return [];
+  }
+
+  const processedGroups: IngredientGroup[] = [];
+
+  for (const group of ingredientGroups) {
+    if (!group || typeof group !== 'object') {
+      continue;
+    }
+
+    const groupName = group.name || 'Main';
+    const groupIngredients = coerceToStructuredIngredients(group.ingredients);
+
+    if (groupIngredients.length > 0) {
+      processedGroups.push({
+        name: groupName,
+        ingredients: groupIngredients,
+      });
+    }
+  }
+
+  return processedGroups;
 };
 
 export function parseIngredientDisplayName(name: string): {

@@ -5,21 +5,26 @@ const COMMON_SYSTEM_PROMPT = `You are an expert recipe parsing AI. Parse the pro
 Expected JSON format:
 {
   "title": "string | null",
-  "ingredients": [
+  "ingredientGroups": [ 
     {
-      "name": "string",
-      "amount": "string | null",
-      "unit": "string | null",
-      "suggested_substitutions": [
+      "name": "string", 
+      "ingredients": [
         {
           "name": "string",
-          "amount": "string | number | null",
+          "amount": "string | null",
           "unit": "string | null",
-          "description": "string | null"
+          "suggested_substitutions": [
+            {
+              "name": "string",
+              "amount": "string | number | null",
+              "unit": "string | null",
+              "description": "string | null"
+            }
+          ] | null
         }
-      ] | null
+      ]
     }
-  ] | null,
+  ] | null, 
   "instructions": "array of strings, each a single step without numbering | null",
   "substitutions_text": "string | null",
   "recipeYield": "string | null",
@@ -33,14 +38,15 @@ Expected JSON format:
 }
 
 Parsing Rules:
-- If a value is not found, use null (not "N/A" or empty string).
-- Exclude ingredients like "salt", "black pepper", "pepper", "sea salt".
-- Extract prepTime, cookTime, totalTime from explicit mentions.
-- Extract recipeYield from terms like "Serves 4", "Yield: 12 cookies".
-- Extract nutrition info if available.
-- Suggest 1-2 sensible substitutions for each ingredient.
-- Convert fractional amounts to decimals.
-- Output ONLY the JSON object.`;
+- If a value is not found or is not explicitly mentioned in the recipe text, use null (do not infer or generate).
+- **Time Extraction (prepTime, cookTime, totalTime):** Extract durations from the recipe text (e.g., "PT15M", "30 minutes", "1 hour") and convert them into a concise, human-readable string format (e.g., "15 minutes", "30 minutes", "1 hour"). ONLY extract if explicitly stated. Ensure 'totalTime' represents the full duration including both prep and cook time, or the explicitly stated total duration if available. If a time range is given (e.g., "30-45 minutes"), capture the range as is.
+- **Yield Extraction (recipeYield):** Extract the yield as a concise string (e.g., "4 servings", "12 cookies") from phrases like "Serves 4", "Yield: 12", "Makes 12 servings", "Serves 4-6". If a range, capture it as a range (e.g., "4-6 servings").
+- **Ingredient Grouping:** When a recipe has distinct logical sections for ingredients (e.g., "For the Sauce", "Salad Dressing", "Meatball Mixture", "Tzatziki", "Garnish"), group ingredients appropriately under a concise, descriptive "ingredientGroup" name. If no distinct sections are present, use a single group named "Main".
+-  If an instruction step contains a vague phrase like "all ingredients" or "all sauce ingredients," expand the instruction by including a comma-separated list of the relevant ingredients from the corresponding ingredientGroup's ingredients array.
+- **Ingredient Substitutions:** For each individual ingredient, suggest 1-2 sensible and common substitutions. If no suitable or obvious substitution exists for an ingredient, set its suggested_substitutions array to null.
+- **Amount Conversion:** Convert all fractional amounts (e.g., "1/2", "3/4", "1 1/2") to their decimal equivalents (e.g., "0.5", "0.75", "1.5").
+- **Content Filtering:** Exclude all brand names, product names, or any other promotional/non-recipe specific text from all extracted fields.
+- Output ONLY the JSON object, with no additional text or explanations.`;
 
 export function buildTextParsePrompt(input: string): PromptPayload {
   return {
@@ -50,9 +56,21 @@ export function buildTextParsePrompt(input: string): PromptPayload {
   };
 }
 
-export function buildUrlParsePrompt(title: string, ingredients: string, instructions: string): PromptPayload {
+export function buildUrlParsePrompt(
+  title: string,
+  ingredients: string,
+  instructions: string,
+  prepTimeExtracted: string | null = null,
+  cookTimeExtracted: string | null = null,
+  totalTimeExtracted: string | null = null,
+  recipeYieldExtracted: string | null = null
+): PromptPayload {
   const combinedText = `
 Title: ${title}
+Prep Time: ${prepTimeExtracted || 'N/A'}
+Cook Time: ${cookTimeExtracted || 'N/A'}
+Total Time: ${totalTimeExtracted || 'N/A'}
+Yield: ${recipeYieldExtracted || 'N/A'}
 Ingredients:
 ${ingredients}
 

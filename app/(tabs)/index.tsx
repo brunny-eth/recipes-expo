@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
   inputSection: {
     flex: 1,
     justifyContent: 'flex-end',
-    paddingBottom: 220,
+    paddingBottom: 240,
   },
   mainFeatureText: {
     fontFamily: FONT.family.interSemiBold,

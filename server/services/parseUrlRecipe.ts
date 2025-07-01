@@ -59,7 +59,7 @@ export async function parseUrlRecipe(
         const dbCheckStartTime = Date.now();
         try {
             const { data: cachedRecipe, error: dbError } = await supabase
-                .from('processed_recipes_cache')
+                .from('processed_recipes_cache_test')
                 .select('id, recipe_data')
                 .eq('url', cacheKey)
                 .maybeSingle();
@@ -124,7 +124,11 @@ export async function parseUrlRecipe(
             const prompt = buildUrlParsePrompt(
               extractedContent.title || '',
               extractedContent.ingredientsText || '',
-              extractedContent.instructionsText || ''
+              extractedContent.instructionsText || '',
+              extractedContent.prepTime || null,
+              extractedContent.cookTime || null,
+              extractedContent.totalTime || null,
+              extractedContent.recipeYieldText || null
             );
             prompt.metadata = { requestId };
 
@@ -165,7 +169,8 @@ export async function parseUrlRecipe(
             logger.warn({ requestId, reasons: validationResult.reasons }, "Final validation failed for URL recipe, rejecting.");
             const isThinRecipe = (
                 !finalRecipeData?.title &&
-                (!finalRecipeData?.ingredients || finalRecipeData.ingredients.length === 0) &&
+                (!(finalRecipeData as any)?.ingredientGroups || (finalRecipeData as any).ingredientGroups.length === 0 || 
+                 (finalRecipeData as any).ingredientGroups.every((group: any) => !group.ingredients || group.ingredients.length === 0)) &&
                 (!finalRecipeData?.instructions || finalRecipeData.instructions.length === 0)
             );
             if (isFallback && isThinRecipe) {
@@ -208,42 +213,62 @@ export async function parseUrlRecipe(
                 : '(No title found)';
             logger.info({ requestId, preview }, `Successfully parsed recipe.`);
 
-            let insertData: { id: number } | null = null;
+            let insertData: { id: number; created_at: string; last_processed_at: string } | null = null;
             const dbInsertStartTime = Date.now();
             try {
                 console.log('[parseUrlRecipe] attempting insert with cacheKey:', cacheKey);
-                const { data, error: insertError } = await supabase
-                    .from('processed_recipes_cache')
+                
+                // First, do the insert without trying to get the ID back
+                const { error: insertError } = await supabase
+                    .from('processed_recipes_cache_test')
                     .insert({
                         url: cacheKey,
                         recipe_data: finalRecipeData,
                         source_type: inputType
-                    })
-                    .select('id')
-                    .single();
+                    });
                 
-                console.log('[parseUrlRecipe] insertData:', data);
                 console.log('[parseUrlRecipe] insertError:', insertError);
 
-                insertData = data;
-                overallTimings.dbInsert = Date.now() - dbInsertStartTime;
-
-                if (insertError || !insertData?.id) {
+                if (insertError) {
                     logger.error({ requestId, cacheKey, err: insertError }, `Error saving recipe to cache.`);
                 } else {
-                    insertedId = insertData.id; // ✅ store the ID
-                    logger.info({ requestId, cacheKey, id: insertedId, dbInsertMs: overallTimings.dbInsert }, `Successfully cached new recipe.`);
-                    console.log('[parseUrlRecipe] Inserted recipe with ID:', insertedId);
+                    // Now query for the inserted record to get the ID
+                    const { data: queryData, error: queryError } = await supabase
+                        .from('processed_recipes_cache_test')
+                        .select('id, created_at, last_processed_at')
+                        .eq('url', cacheKey)
+                        .order('created_at', { ascending: false })
+                        .limit(1)
+                        .single();
+                    
+                    console.log('[parseUrlRecipe] queryData:', queryData);
+                    console.log('[parseUrlRecipe] queryError:', queryError);
+                    
+                    if (queryData && queryData.id) {
+                        insertData = queryData;
+                        insertedId = queryData.id;
+                        logger.info({ requestId, cacheKey, id: insertedId, dbInsertMs: Date.now() - dbInsertStartTime }, `Successfully cached new recipe.`);
+                        console.log('[parseUrlRecipe] Found inserted recipe with ID:', insertedId);
 
-                    if (insertedId && process.env.ENABLE_EMBEDDING === 'true') {
-                        logger.info({ recipeId: insertedId }, 'Embedding queued after successful URL parse');
-                        await generateAndSaveEmbedding(insertedId, {
-                            title: finalRecipeData.title,
-                            ingredientsText: finalRecipeData.ingredients?.map(i => i.name).join('\n'),
-                            instructionsText: finalRecipeData.instructions?.join('\n'),
-                        });
+                        if (insertedId && process.env.ENABLE_EMBEDDING === 'true') {
+                            logger.info({ recipeId: insertedId }, 'Embedding queued after successful URL parse');
+                            // Extract all ingredients from ingredient groups
+                            const allIngredients = (finalRecipeData as any).ingredientGroups?.flatMap((group: any) => 
+                                group.ingredients?.map((ingredient: any) => ingredient.name) || []
+                            ) || [];
+                            
+                            await generateAndSaveEmbedding(insertedId, {
+                                title: finalRecipeData.title,
+                                ingredientsText: allIngredients.join('\n'),
+                                instructionsText: finalRecipeData.instructions?.join('\n'),
+                            });
+                        }
+                    } else {
+                        logger.warn({ requestId, cacheKey, queryError }, `Could not retrieve inserted recipe ID.`);
                     }
                 }
+                
+                overallTimings.dbInsert = Date.now() - dbInsertStartTime;
             } catch (cacheInsertError) {
                 overallTimings.dbInsert = Date.now() - dbInsertStartTime;
                 logger.error({ requestId, cacheKey, err: cacheInsertError }, `Exception during cache insertion.`);
@@ -258,6 +283,8 @@ export async function parseUrlRecipe(
             parsedRecipe = {
                 ...finalRecipeData,
                 id: insertedId ?? undefined,
+                created_at: insertData?.created_at ?? undefined,
+                last_processed_at: insertData?.last_processed_at ?? undefined,
             };
         } else {
             logger.warn({ requestId, inputType }, `Processing finished without error, but no final recipe data was produced.`);
@@ -281,7 +308,7 @@ export async function parseUrlRecipe(
         logger.debug({
           requestId,
           finalRecipeTitle: finalRecipeData?.title,
-          ingredients: finalRecipeData?.ingredients,
+          ingredientGroups: (finalRecipeData as any)?.ingredientGroups,
           instructions: finalRecipeData?.instructions,
           servings: finalRecipeData?.recipeYield
         }, "Final structured recipe returned to client");

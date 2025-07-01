@@ -28,7 +28,7 @@
     "@types/pino": "^7.0.4",
     "@vercel/node": "^2.3.0",
     "cheerio": "^1.0.0",
-    "dotenv": "^16.5.0",
+    "dotenv": "^16.6.1",
     "expo": "^53.0.12",
     "expo-apple-authentication": "~7.2.4",
     "expo-auth-session": "~6.2.0",

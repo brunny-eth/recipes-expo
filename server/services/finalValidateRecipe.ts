@@ -15,9 +15,17 @@ export function finalValidateRecipe(recipe: CombinedParsedRecipe | null, request
 
   logger.info({ requestId, title: recipe.title }, 'Performing final validation on parsed recipe data.');
 
-  if (!recipe.ingredients || recipe.ingredients.length < 1) {
-    logger.warn({ requestId, count: recipe.ingredients?.length || 0 }, 'Final validation: Ingredients are missing or too few.');
-    reasons.push('Missing or too few ingredients');
+  // Validate ingredient groups
+  if (!recipe.ingredientGroups || recipe.ingredientGroups.length < 1) {
+    logger.warn({ requestId, count: recipe.ingredientGroups?.length || 0 }, 'Final validation: Ingredient groups are missing or empty.');
+    reasons.push('Missing or empty ingredient groups');
+  } else {
+    // Check if at least one group has ingredients
+    const totalIngredients = recipe.ingredientGroups.reduce((total, group) => total + (group.ingredients?.length || 0), 0);
+    if (totalIngredients < 1) {
+      logger.warn({ requestId, totalIngredients }, 'Final validation: No ingredients found in any group.');
+      reasons.push('No ingredients found in ingredient groups');
+    }
   }
 
   if (!recipe.instructions || recipe.instructions.length < 1) {
