@@ -1,5 +1,7 @@
+console.log('--- server/lib/scraper.ts: Start ---');
 import scraperapiClient from 'scraperapi-sdk';
 import logger from './logger';
+console.log('--- server/lib/scraper.ts: End ---');
 
 const scraperApiKey = process.env.SCRAPERAPI_KEY;
 
