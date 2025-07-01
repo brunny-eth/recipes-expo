@@ -147,7 +147,7 @@ export async function parseTextRecipe(
         const dbCheckStartTime = Date.now();
         try {
             const { data: cachedRecipe, error: dbError } = await supabase
-                .from('processed_recipes_cache_test')
+                .from('processed_recipes_cache')
                 .select('id, recipe_data')
                 .eq('url', cacheKey)
                 .maybeSingle();
@@ -280,13 +280,13 @@ export async function parseTextRecipe(
             const preview = finalRecipeData.title
                 ? finalRecipeData.title.substring(0, MAX_PREVIEW_LENGTH) + (finalRecipeData.title.length > MAX_PREVIEW_LENGTH ? '...' : '')
                 : '(No title found)';
-            logger.info({ requestId, preview }, `Successfully parsed recipe from raw text.`);
+            logger.info({ requestId, preview }, `Successfully parsed recipe.`);
 
+            let insertData: { id: number; created_at: string; last_processed_at: string } | null = null;
             const dbInsertStartTime = Date.now();
             try {
-                // First, do the insert without trying to get the ID back
                 const { error: insertError } = await supabase
-                    .from('processed_recipes_cache_test')
+                    .from('processed_recipes_cache')
                     .insert({
                         url: cacheKey,
                         recipe_data: finalRecipeData,
@@ -296,9 +296,8 @@ export async function parseTextRecipe(
                 if (insertError) {
                     logger.error({ requestId, cacheKey, err: insertError }, `Error saving recipe to cache.`);
                 } else {
-                    // Now query for the inserted record to get the ID
                     const { data: queryData, error: queryError } = await supabase
-                        .from('processed_recipes_cache_test')
+                        .from('processed_recipes_cache')
                         .select('id, created_at, last_processed_at')
                         .eq('url', cacheKey)
                         .order('created_at', { ascending: false })
