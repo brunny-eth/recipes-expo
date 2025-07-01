@@ -3,7 +3,7 @@ import { supabase } from '../server/lib/supabase';
 import logger from '../server/lib/logger';
 
 /**
- * Embeds a recipe and stores it in processed_recipes_cache.
+ * Embeds a recipe and stores it in processed_recipes_cache_test.
  */
 export const generateAndSaveEmbedding = async (
   recipeId: number,
@@ -24,7 +24,7 @@ export const generateAndSaveEmbedding = async (
     }
 
     const { error } = await supabase
-      .from('processed_recipes_cache')
+      .from('processed_recipes_cache_test')
       .update({ embedding })
       .eq('id', recipeId);
 

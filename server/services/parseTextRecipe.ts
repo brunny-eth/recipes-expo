@@ -14,6 +14,7 @@ import { buildTextParsePrompt } from '../llm/parsingPrompts';
 import { ParseErrorCode, StructuredError } from '../../common/types/errors';
 import { embedText } from '../../utils/embedText';
 import { findSimilarRecipe } from '../../utils/findSimilarRecipe';
+import { generateAndSaveEmbedding } from '../../utils/recipeEmbeddings';
 
 const MAX_PREVIEW_LENGTH = 100;
 const SIMILARITY_THRESHOLD = 0.55;
@@ -146,7 +147,7 @@ export async function parseTextRecipe(
         const dbCheckStartTime = Date.now();
         try {
             const { data: cachedRecipe, error: dbError } = await supabase
-                .from('processed_recipes_cache')
+                .from('processed_recipes_cache_test')
                 .select('id, recipe_data')
                 .eq('url', cacheKey)
                 .maybeSingle();
@@ -229,7 +230,8 @@ export async function parseTextRecipe(
 
         const isEmptyRecipe = (
             !finalRecipeData?.title &&
-            (!finalRecipeData?.ingredients || finalRecipeData.ingredients.length === 0) &&
+            (!finalRecipeData?.ingredientGroups || finalRecipeData.ingredientGroups.length === 0 || 
+             finalRecipeData.ingredientGroups.every(group => !group.ingredients || group.ingredients.length === 0)) &&
             (!finalRecipeData?.instructions || finalRecipeData.instructions.length === 0)
         );
 
@@ -282,24 +284,36 @@ export async function parseTextRecipe(
 
             const dbInsertStartTime = Date.now();
             try {
-                const { data: insertData, error: insertError } = await supabase
-                    .from('processed_recipes_cache')
+                // First, do the insert without trying to get the ID back
+                const { error: insertError } = await supabase
+                    .from('processed_recipes_cache_test')
                     .insert({
                         url: cacheKey,
                         recipe_data: finalRecipeData,
                         source_type: inputType
-                    })
-                    .select('id')
-                    .single();
+                    });
 
-                overallTimings.dbInsert = Date.now() - dbInsertStartTime;
-
-                if (insertError || !insertData?.id) {
+                if (insertError) {
                     logger.error({ requestId, cacheKey, err: insertError }, `Error saving recipe to cache.`);
                 } else {
-                    insertedId = insertData.id;
-                    logger.info({ requestId, cacheKey, id: insertedId, dbInsertMs: overallTimings.dbInsert }, `Successfully cached new recipe from raw text.`);
+                    // Now query for the inserted record to get the ID
+                    const { data: queryData, error: queryError } = await supabase
+                        .from('processed_recipes_cache_test')
+                        .select('id, created_at, last_processed_at')
+                        .eq('url', cacheKey)
+                        .order('created_at', { ascending: false })
+                        .limit(1)
+                        .single();
+                    
+                    if (queryData && queryData.id) {
+                        insertedId = queryData.id;
+                        logger.info({ requestId, cacheKey, id: insertedId, dbInsertMs: Date.now() - dbInsertStartTime }, `Successfully cached new recipe from raw text.`);
+                    } else {
+                        logger.warn({ requestId, cacheKey, queryError }, `Could not retrieve inserted recipe ID from text parse.`);
+                    }
                 }
+                
+                overallTimings.dbInsert = Date.now() - dbInsertStartTime;
             } catch (cacheInsertError) {
                 overallTimings.dbInsert = Date.now() - dbInsertStartTime;
                 logger.error({ requestId, cacheKey, err: cacheInsertError }, `Exception during cache insertion.`);
@@ -334,7 +348,7 @@ export async function parseTextRecipe(
         logger.debug({
           requestId,
           finalRecipeTitle: parsedRecipe?.title,
-          ingredients: parsedRecipe?.ingredients,
+          ingredientGroups: parsedRecipe?.ingredientGroups,
           instructions: parsedRecipe?.instructions,
           servings: parsedRecipe?.recipeYield
         }, "Final structured recipe returned to client");

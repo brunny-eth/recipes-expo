@@ -71,6 +71,72 @@ const isValidInstruction = (text: string): boolean => {
 };
 
 /**
+ * Attempts to extract grouped ingredients using CSS selectors.
+ * @param $ Cheerio instance
+ * @param requestId Request ID for logging
+ * @returns Grouped ingredients text or null if not found
+ */
+function tryExtractGroupedIngredients($: cheerio.Root, requestId: string): string | null {
+  const ingredientGroupSelectors = [
+    '.wprm-recipe-ingredient-group',
+    '.tasty-recipes-ingredients-group', 
+    '.easyrecipe-ingredients-group',
+    'div[class*="ingredient-group"]',
+    'div[class*="ingredient-section"]',
+    '.mv-create-ingredients-list-item'
+  ];
+  
+  const tempIngredientGroups: string[] = [];
+  let foundGroupedIngredients = false;
+
+  logger.debug({ requestId, selectors: ingredientGroupSelectors.length }, 'Starting CSS selector search for ingredient groups');
+  
+  for (const groupSelector of ingredientGroupSelectors) {
+    const groupElements = $(groupSelector);
+    
+    if (groupElements.length > 0) {
+      logger.debug({ requestId, selector: groupSelector, elementCount: groupElements.length }, 'Found potential ingredient group elements');
+      groupElements.each((_, groupEl) => {
+        const $groupEl = $(groupEl);
+        const groupNameEl = $groupEl.find('h2, h3, h4, h5, .wprm-recipe-ingredient-group-name, .tasty-recipes-ingredients-header').first();
+        const groupName = groupNameEl.length > 0 ? groupNameEl.text().trim() : null;
+        
+        const ingredientItems = $groupEl.find('li, .wprm-recipe-ingredient, .tasty-recipes-ingredients li, .mv-create-ingredient');
+        
+        if (ingredientItems.length > 0) {
+          const ingredientsList: string[] = [];
+          ingredientItems.each((_, itemEl) => {
+            const text = $(itemEl).text().trim();
+            if (text) {
+              ingredientsList.push(text);
+            }
+          });
+
+          if (ingredientsList.length > 0) {
+            if (groupName) {
+              tempIngredientGroups.push(`\n**${groupName}**\n${ingredientsList.join('\n')}`);
+              foundGroupedIngredients = true;
+              logger.debug({ requestId, groupName, ingredientCount: ingredientsList.length }, 'Found ingredient group with name');
+            } else {
+              tempIngredientGroups.push(ingredientsList.join('\n'));
+              logger.debug({ requestId, ingredientCount: ingredientsList.length }, 'Found ingredient group without name');
+            }
+          }
+        }
+      });
+    }
+  }
+
+  if (foundGroupedIngredients && tempIngredientGroups.length > 0) {
+    logger.debug({ requestId, groupCount: tempIngredientGroups.length }, 'Found grouped ingredients via CSS selectors');
+    return tempIngredientGroups.join('\n\n').trim();
+  }
+  
+  logger.debug({ requestId }, 'No ingredient groups found via CSS selectors');
+  return null;
+}
+
+/**
  * Extracts recipe content (title, ingredients, instructions) from HTML.
  * Tries JSON-LD first, then falls back to common CSS selectors.
  * @param html The HTML content string.
@@ -160,9 +226,47 @@ export function extractRecipeContent(html: string, requestId: string, sourceUrl?
     }
     thumbnailUrl = ensureAbsoluteUrl(recipeJson.thumbnailUrl || null);
 
-    // Ingredients can be string[]
+    // Ingredients can be string[] or structured ingredient groups
     if (Array.isArray(recipeJson.recipeIngredient)) {
-       ingredientsText = recipeJson.recipeIngredient.join('\n');
+       // Check if ingredients are structured with groups (similar to HowToSection pattern)
+       if (recipeJson.recipeIngredient.some((item: any) => typeof item === 'object' && (item['@type'] === 'IngredientSection' || item.name || item.ingredients))) {
+         // Handle structured ingredient groups
+         const groupedIngredients: string[] = [];
+         
+         recipeJson.recipeIngredient.forEach((item: any) => {
+           if (typeof item === 'object' && (item['@type'] === 'IngredientSection' || item.name || item.ingredients)) {
+             const groupName = item.name || item.title || 'Ingredients';
+             const ingredients = item.ingredients || item.itemListElement || [];
+             
+             if (Array.isArray(ingredients) && ingredients.length > 0) {
+               const ingredientsList = ingredients.map((ing: any) => 
+                 typeof ing === 'string' ? ing : (ing.text || ing.name || String(ing))
+               );
+               groupedIngredients.push(`\n**${groupName}**\n${ingredientsList.join('\n')}`);
+             }
+           } else if (typeof item === 'string') {
+             // Handle mixed case where some items are strings and some are structured
+             groupedIngredients.push(item);
+           }
+         });
+         
+         if (groupedIngredients.length > 0) {
+           ingredientsText = groupedIngredients.join('\n\n').trim();
+           logger.debug({ requestId, groupCount: groupedIngredients.length }, 'Found structured ingredient groups in JSON-LD');
+         }
+               } else {
+          // Simple string array - but first try to find grouped ingredients via CSS selectors
+          logger.debug({ requestId, ingredientCount: recipeJson.recipeIngredient.length }, 'JSON-LD has flat ingredient array, attempting CSS selector grouping supplement');
+          const groupedIngredientsFromHTML = tryExtractGroupedIngredients($, requestId);
+          if (groupedIngredientsFromHTML) {
+            ingredientsText = groupedIngredientsFromHTML;
+            logger.info({ requestId, preview: groupedIngredientsFromHTML.slice(0, 200) }, 'Successfully used CSS selector grouping to supplement JSON-LD ingredients');
+          } else {
+            // Fall back to simple join if no groups found in HTML
+            ingredientsText = recipeJson.recipeIngredient.join('\n');
+            logger.debug({ requestId, preview: ingredientsText?.slice(0, 200) || 'null' }, 'No CSS grouping found, using flat JSON-LD ingredient list');
+          }
+        }
     }
     // Instructions can be string, string[], or array of HowToStep objects
     if (typeof recipeJson.recipeInstructions === 'string') {
@@ -215,8 +319,23 @@ export function extractRecipeContent(html: string, requestId: string, sourceUrl?
       cook: !!cookTime,
       total: !!totalTime
     }, 'Extracted from JSON-LD');
+    
+    // ADD THESE LINES TO LOG THE SPECIFIC VALUES FOR JSON-LD PATH
+    logger.debug({
+      requestId,
+      extractedRecipeTimesYield: {
+        prepTime: prepTime,
+        cookTime: cookTime,
+        totalTime: totalTime,
+        recipeYieldText: recipeYieldText
+      }
+    }, '[extractRecipeContent] Detailed times and yield extracted by JSON-LD logic');
+    
     // If JSON-LD provides the essentials (ingredients AND instructions), return it (including times)
     if (ingredientsText && instructionsText) {
+        // Preview ingredientsText that will be passed to the LLM
+        logger.debug({ requestId, ingredientsTextPreview: ingredientsText.slice(0, 300) }, '[extractRecipeContent] Final ingredientsText preview (JSON-LD path)');
+        
         const payloadSizeKb = Buffer.byteLength(JSON.stringify({
           title, description, image, thumbnailUrl, sourceUrl, ingredientsText, instructionsText, recipeYieldText, prepTime, cookTime, totalTime
         }), 'utf8') / 1024;
@@ -302,6 +421,69 @@ export function extractRecipeContent(html: string, requestId: string, sourceUrl?
  
   // Ingredient Selectors
   if (!ingredientsText) {
+
+    const collectedIngredients = new Set<string>();
+    let foundGroupedIngredients = false;
+
+    // --- NEW LOGIC: Attempt to find structured ingredient groups first ---
+    const ingredientGroupSelectors = [
+        // Common selectors for ingredient group containers (e.g., a div with a heading and a list)
+        '.wprm-recipe-ingredient-group', // This seems like a common pattern based on the previous file.
+        '.tasty-recipes-ingredients-group',
+        '.easyrecipe-ingredients-group',
+        'div[class*="ingredient-group"]',
+        'div[class*="ingredient-section"]',
+        '.mv-create-ingredients-list-item'
+    ];
+    
+    const tempIngredientGroups: string[] = [];
+
+    for (const groupSelector of ingredientGroupSelectors) {
+        // Find all group containers that match the selector
+        const groupElements = $(groupSelector);
+        
+        if (groupElements.length > 0) {
+            groupElements.each((_, groupEl) => {
+                const $groupEl = $(groupEl);
+                // Find the heading within this group
+                const groupNameEl = $groupEl.find('h2, h3, h4, h5, .wprm-recipe-ingredient-group-name, .tasty-recipes-ingredients-header').first();
+                const groupName = groupNameEl.length > 0 ? groupNameEl.text().trim() : null;
+                
+                // Find the ingredients list within this group
+                const ingredientItems = $groupEl.find('li, .wprm-recipe-ingredient, .tasty-recipes-ingredients li, .mv-create-ingredient');
+                
+                if (ingredientItems.length > 0) {
+                    const ingredientsList: string[] = [];
+                    ingredientItems.each((_, itemEl) => {
+                        const text = $(itemEl).text().trim();
+                        if (text) {
+                            ingredientsList.push(text);
+                        }
+                    });
+
+                    if (ingredientsList.length > 0) {
+                        // Format the group name and its ingredients
+                        if (groupName) {
+                            tempIngredientGroups.push(`\n**${groupName}**\n${ingredientsList.join('\n')}`);
+                            foundGroupedIngredients = true;
+                        } else {
+                            // If no group name is found, just add the ingredients
+                            tempIngredientGroups.push(ingredientsList.join('\n'));
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    if (foundGroupedIngredients && tempIngredientGroups.length > 0) {
+        ingredientsText = tempIngredientGroups.join('\n\n').trim();
+        logger.debug({ requestId, ingredientsTextPreview: ingredientsText.slice(0, 300) }, 'Extracted grouped ingredients from container.');
+    }
+
+    // --- End New Ingredient Grouping Logic ---
+
+    // --- OLD INGREDIENT SELECTOR LOGIC ---
       const ingredientSelectors = [
         '[itemprop="recipeIngredient"]',
         '.wprm-recipe-ingredient', 
@@ -313,7 +495,7 @@ export function extractRecipeContent(html: string, requestId: string, sourceUrl?
         // Create by Mediavine
         '.mv-create-ingredients li'
       ];
-      const collectedIngredients = new Set<string>();
+      // Reuse the collectedIngredients variable declared earlier
       for (const selector of ingredientSelectors) {
           $(selector).each((_, el) => {
               const text = $(el).text().trim();
@@ -677,6 +859,17 @@ export function extractRecipeContent(html: string, requestId: string, sourceUrl?
     fallbackType: fallbackType
   }, 'Final extracted content stats');
 
+  // ADD THESE LINES TO LOG THE SPECIFIC VALUES
+  logger.debug({
+    requestId,
+    extractedRecipeTimesYield: {
+      prepTime: prepTime,
+      cookTime: cookTime,
+      totalTime: totalTime,
+      recipeYieldText: recipeYieldText
+    }
+  }, '[extractRecipeContent] Detailed times and yield extracted by Cheerio/parsing logic');
+
   // Add logging for instructionsText
   logger.debug({ requestId, instructionsPreview: instructionsText?.slice(0, 200) }, "[extractRecipeContent] Final instructionsText preview");
 
@@ -685,6 +878,10 @@ export function extractRecipeContent(html: string, requestId: string, sourceUrl?
   }), 'utf8') / 1024;
   
   logger.info({ requestId, sizeKb: payloadSizeKb.toFixed(2), isFallback, fallbackType, event: 'extraction_complete' }, '[extractRecipeContent] Final recipe JSON size');
+  
+  // Preview ingredientsText that will be passed to the LLM
+  logger.debug({ requestId, ingredientsTextPreview: ingredientsText?.slice(0, 300) || 'null' }, '[extractRecipeContent] Final ingredientsText preview (fallback path)');
+  
   // Return structure includes the fallback flag again
   return { title, description, image, thumbnailUrl, sourceUrl: sourceUrl ?? null, ingredientsText, instructionsText, recipeYieldText, isFallback, prepTime, cookTime, totalTime, fallbackType };
 }

@@ -8,6 +8,11 @@ export type StructuredIngredient = {
   preparation?: string | null;
 };
 
+export type IngredientGroup = {
+  name: string;
+  ingredients: StructuredIngredient[];
+};
+
 export type CombinedParsedRecipe = {
   id?: number;
   title: string | null;
@@ -15,7 +20,7 @@ export type CombinedParsedRecipe = {
   image?: string | null;
   thumbnailUrl?: string | null;
   sourceUrl?: string | null;
-  ingredients: StructuredIngredient[] | null;
+  ingredientGroups: IngredientGroup[] | null;
   instructions: string[] | null;
   substitutions_text: string | null;
   recipeYield?: string | null;
@@ -27,6 +32,8 @@ export type CombinedParsedRecipe = {
     protein?: string | null;
     [key: string]: any;
   } | null;
+  created_at?: string;
+  last_processed_at?: string;
 };
 
 export type SubstitutionSuggestion = {
