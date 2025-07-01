@@ -3,7 +3,6 @@ import pinoHttp from 'pino-http'
 import logger from './lib/logger'
 import { recipeRouter } from './routes/recipes'
 import { aiRouter } from './routes/ai'
-console.log('--- server/index.ts: Imports loaded ---');
 
 const app = express()
 

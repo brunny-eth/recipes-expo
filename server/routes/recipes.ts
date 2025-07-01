@@ -1,4 +1,3 @@
-console.log('--- server/routes/recipes.ts: Start ---');
 import { Router, Request, Response } from 'express'
 import { Content } from "@google/generative-ai"; // For type only, no initialization
 import { scraperClient, scraperApiKey } from '../lib/scraper';
@@ -8,7 +7,6 @@ import { scaleInstructions } from '../services/instructionScaling';
 import { getAllRecipes, getRecipeById } from '../services/recipeDB';
 import logger from '../lib/logger'; 
 import { ParseErrorCode } from '../../common/types/errors';
-console.log('--- server/routes/recipes.ts: Imports loaded ---');
 
 const router = Router()
 

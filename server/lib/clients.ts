@@ -1,8 +1,6 @@
-console.log('--- server/lib/clients.ts: Start ---');
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold, GenerationConfig } from "@google/generative-ai";
 import OpenAI from 'openai';
 import logger from './logger';
-console.log('--- server/lib/clients.ts: Imports loaded ---');
 
 // --- Model Initialization ---
 
