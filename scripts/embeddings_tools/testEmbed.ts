@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import { embedText } from '../embedText'
+import { embedText } from '../../utils/embedText'
 
 async function run() {
   const vector = await embedText("blueberry pancakes")
