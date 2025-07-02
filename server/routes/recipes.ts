@@ -143,11 +143,7 @@ router.get('/explore-random', async (req: Request, res: Response) => {
     logger.info({ requestId, route: req.originalUrl, method: req.method }, 'Received request for explore-random recipes');
 
     const { data, error } = await supabase
-      .from('processed_recipes_cache')
-      .select('id, recipe_data')
-      .eq('is_user_modified', false) // Only get original recipes, not user-modified ones
-      .order('random')
-      .limit(15);
+      .rpc('get_random_recipes');
 
     if (error) {
       logger.error({ requestId, err: error, route: req.originalUrl, method: req.method }, 'Error fetching random recipes for explore');
@@ -158,7 +154,7 @@ router.get('/explore-random', async (req: Request, res: Response) => {
     logger.info({ requestId, recipeCount, route: req.originalUrl, method: req.method }, `Successfully fetched ${recipeCount} random recipes for explore`);
 
     // Transform data to return just the recipe_data with ids
-    const recipes = data?.map(item => ({
+    const recipes = data?.map((item: any) => ({
       ...item.recipe_data,
       id: item.id
     })) || [];
