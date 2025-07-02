@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -45,85 +45,161 @@ export default function SavedScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Stable fetchSavedRecipes function
+  const fetchSavedRecipes = useCallback(async () => {
+    const startTime = performance.now();
+    console.log(`[PERF: SavedScreen] Start fetchSavedRecipes at ${startTime.toFixed(2)}ms`);
+
+    if (!session?.user) {
+      console.warn('[SavedScreen] No user session found. Skipping fetch.');
+      setIsLoading(false);
+      setSavedRecipes([]); // Clear recipes if user logs out
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    
+    const dbQueryStart = performance.now();
+    console.log(`[PERF: SavedScreen] Starting Supabase query at ${dbQueryStart.toFixed(2)}ms`);
+
+    const { data, error: fetchError } = await supabase
+      .from('user_saved_recipes')
+      .select(
+        `
+        base_recipe_id,
+        title_override,
+        applied_changes,
+        processed_recipes_cache (
+          id,
+          recipe_data,
+          source_type,
+          parent_recipe_id
+        )
+      `,
+      )
+      .eq('user_id', session.user.id)
+      .order('created_at', { ascending: false }); // Show newest saves first
+
+    const dbQueryEnd = performance.now();
+    console.log(`[PERF: SavedScreen] Supabase query finished in ${(dbQueryEnd - dbQueryStart).toFixed(2)}ms`);
+    
+    if (fetchError) {
+      console.error(
+        '[SavedScreen] Error fetching saved recipes:',
+        fetchError,
+      );
+      setError('Could not load saved recipes. Please try again.');
+    } else {
+      const processingStart = performance.now();
+      console.log(`[PERF: SavedScreen] Starting data processing at ${processingStart.toFixed(2)}ms`);
+      console.log(
+        `[SavedScreen] Fetched ${data?.length || 0} saved recipes from DB.`,
+      );
+      console.log('Fetched recipes:', data?.length || 0, 'items'); // DEBUG: Track fetch results
+
+      // The linter is struggling with the joined type. We cast to 'any' and then to our expected type.
+      // This is safe as long as the RLS and DB schema are correct.
+      const validRecipes =
+        ((data as any[])?.filter(
+          (r) => r.processed_recipes_cache?.recipe_data,
+        ) as SavedRecipe[]) || [];
+
+      setSavedRecipes(validRecipes);
+      const processingEnd = performance.now();
+      console.log(`[PERF: SavedScreen] Data processing and state update took ${(processingEnd - processingStart).toFixed(2)}ms`);
+    }
+
+    const finalStateUpdateStart = performance.now();
+    setIsLoading(false);
+    const finalStateUpdateEnd = performance.now();
+    console.log(`[PERF: SavedScreen] setIsLoading(false) took ${(finalStateUpdateEnd - finalStateUpdateStart).toFixed(2)}ms`);
+    
+    const totalTime = performance.now() - startTime;
+    console.log(`[PERF: SavedScreen] Total fetchSavedRecipes duration: ${totalTime.toFixed(2)}ms`);
+  }, [session?.user?.id]); // Only recreate when user ID changes
+
+  // Debounce mechanism to prevent rapid successive calls
+  const lastFetchTimeRef = useRef(0);
+  const DEBOUNCE_MS = 500; // Prevent calls within 500ms of each other
+
+  // Simplified useFocusEffect now that provider stability is fixed
   useFocusEffect(
     useCallback(() => {
-      const fetchSavedRecipes = async () => {
-        const startTime = performance.now();
-        console.log(`[PERF: SavedScreen] Start fetchSavedRecipes at ${startTime.toFixed(2)}ms`);
-
-        if (!session?.user) {
-          console.warn('[SavedScreen] No user session found. Skipping fetch.');
-          setIsLoading(false);
-          setSavedRecipes([]); // Clear recipes if user logs out
-          return;
-        }
-
-        setIsLoading(true);
-        setError(null);
-        
-        const dbQueryStart = performance.now();
-        console.log(`[PERF: SavedScreen] Starting Supabase query at ${dbQueryStart.toFixed(2)}ms`);
-
-        const { data, error: fetchError } = await supabase
-          .from('user_saved_recipes')
-          .select(
-            `
-            base_recipe_id,
-            title_override,
-            applied_changes,
-            processed_recipes_cache (
-              id,
-              recipe_data,
-              source_type,
-              parent_recipe_id
-            )
-          `,
-          )
-          .eq('user_id', session.user.id)
-          .order('created_at', { ascending: false }); // Show newest saves first
-
-        const dbQueryEnd = performance.now();
-        console.log(`[PERF: SavedScreen] Supabase query finished in ${(dbQueryEnd - dbQueryStart).toFixed(2)}ms`);
-        
-        if (fetchError) {
-          console.error(
-            '[SavedScreen] Error fetching saved recipes:',
-            fetchError,
-          );
-          setError('Could not load saved recipes. Please try again.');
-        } else {
-          const processingStart = performance.now();
-          console.log(`[PERF: SavedScreen] Starting data processing at ${processingStart.toFixed(2)}ms`);
-          console.log(
-            `[SavedScreen] Fetched ${data?.length || 0} saved recipes from DB.`,
-          );
-
-          // The linter is struggling with the joined type. We cast to 'any' and then to our expected type.
-          // This is safe as long as the RLS and DB schema are correct.
-          const validRecipes =
-            ((data as any[])?.filter(
-              (r) => r.processed_recipes_cache?.recipe_data,
-            ) as SavedRecipe[]) || [];
-
-          setSavedRecipes(validRecipes);
-          const processingEnd = performance.now();
-          console.log(`[PERF: SavedScreen] Data processing and state update took ${(processingEnd - processingStart).toFixed(2)}ms`);
-        }
-
-        const finalStateUpdateStart = performance.now();
+      const now = performance.now();
+      const timeSinceLastFetch = now - lastFetchTimeRef.current;
+      
+      console.log('🎯 useFocusEffect triggered for:', session?.user?.id || 'NONE');
+      
+      if (timeSinceLastFetch < DEBOUNCE_MS) {
+        console.log('🚫 DEBOUNCED: Ignoring rapid successive call');
+        return () => {
+          console.log('🌀 useFocusEffect cleanup (debounced)');
+        };
+      }
+      
+      lastFetchTimeRef.current = now;
+      
+      if (!session?.user?.id) {
+        console.warn('[SavedScreen] No user session found. Skipping fetch.');
         setIsLoading(false);
-        const finalStateUpdateEnd = performance.now();
-        console.log(`[PERF: SavedScreen] setIsLoading(false) took ${(finalStateUpdateEnd - finalStateUpdateStart).toFixed(2)}ms`);
-        
-        const totalTime = performance.now() - startTime;
-        console.log(`[PERF: SavedScreen] Total fetchSavedRecipes duration: ${totalTime.toFixed(2)}ms`);
-      };
+        setSavedRecipes([]);
+        return () => {
+          console.log('🌀 useFocusEffect cleanup (no session)');
+        };
+      }
 
-      fetchSavedRecipes();
-    }, [session]),
+              console.log('✅ Fetching saved recipes initiated...');
+        
+        // Inline async function to avoid dependencies
+        (async () => {
+          setIsLoading(true);
+          setError(null);
+
+                  const { data, error: fetchError } = await supabase
+            .from('user_saved_recipes')
+            .select(
+              `
+              base_recipe_id,
+              title_override,
+              applied_changes,
+              processed_recipes_cache (
+                id,
+                recipe_data,
+                source_type,
+                parent_recipe_id
+              )
+            `,
+            )
+            .eq('user_id', session!.user.id)
+            .order('created_at', { ascending: false });
+          
+          if (fetchError) {
+            console.error('[SavedScreen] Error fetching saved recipes:', fetchError);
+            setError('Could not load saved recipes. Please try again.');
+          } else {
+            console.log(`[SavedScreen] Fetched ${data?.length || 0} saved recipes from DB.`);
+
+            const validRecipes =
+              ((data as any[])?.filter(
+                (r) => r.processed_recipes_cache?.recipe_data,
+              ) as SavedRecipe[]) || [];
+
+            setSavedRecipes(validRecipes);
+          }
+
+          setIsLoading(false);
+      })();
+      
+      // Return cleanup function to log blur events
+      return () => {
+        console.log('🌀 useFocusEffect cleanup');
+        console.log('🌀 Screen is blurring/unmounting');
+      };
+    }, [session?.user?.id])
   );
 
-  const handleRecipePress = (item: SavedRecipe) => {
+  const handleRecipePress = useCallback((item: SavedRecipe) => {
     // Ensure data exists before proceeding
     if (!item.processed_recipes_cache?.recipe_data) {
         console.warn('[SavedScreen] Missing recipe data for navigation:', item);
@@ -159,10 +235,18 @@ export default function SavedScreen() {
         }),
       },
     });
-};
+  }, [router]);
 
+  // Stable callbacks for image loading to prevent re-renders
+  const handleImageLoad = useCallback((recipeName: string) => {
+    // Image loaded successfully
+  }, []);
 
-const renderRecipeItem = ({ item }: { item: SavedRecipe }) => {
+  const handleImageError = useCallback((recipeName: string) => {
+    console.error(`[SavedScreen] Image failed to load for recipe: ${recipeName}`);
+  }, []);
+
+const renderRecipeItem = useCallback(({ item }: { item: SavedRecipe }) => {
   if (!item.processed_recipes_cache?.recipe_data) {
       console.warn(
           '[SavedScreen] Rendering a saved recipe item without complete data:',
@@ -178,14 +262,7 @@ const renderRecipeItem = ({ item }: { item: SavedRecipe }) => {
   // Use title_override if available (for modified recipes), otherwise use original title
   const displayTitle = item.title_override || recipe_data.title;
 
-  // Log image data for modified recipes to debug image preservation
-  if (isModified) {
-    console.log(`[SavedScreen] Modified recipe image data for "${displayTitle}":`, {
-      hasImage: !!recipe_data.image,
-      hasThumbnail: !!recipe_data.thumbnailUrl,
-      finalImageUrl: imageUrl || 'NONE',
-    });
-  }
+  // Note: Removed excessive debug logging to improve performance
 
   return (
       <TouchableOpacity
@@ -196,13 +273,9 @@ const renderRecipeItem = ({ item }: { item: SavedRecipe }) => {
             <FastImage
               source={{ uri: imageUrl }}
               style={styles.cardImage}
-              onLoad={() => {
-                  console.log(`[PERF: SavedScreen] Image loaded for recipe: ${displayTitle}`);
-              }}
-              onError={() => {
-                  console.error(`[PERF: SavedScreen] Image failed to load for recipe: ${displayTitle}`);
-              }}
-          />
+              onLoad={() => handleImageLoad(displayTitle || 'Unknown Recipe')}
+              onError={() => handleImageError(displayTitle || 'Unknown Recipe')}
+            />
           )}
           <View style={styles.cardTextContainer}>
               <Text style={styles.cardTitle} numberOfLines={2}>
@@ -222,7 +295,7 @@ const renderRecipeItem = ({ item }: { item: SavedRecipe }) => {
           </View>
       </TouchableOpacity>
   );
-};
+}, [handleRecipePress, handleImageLoad, handleImageError]);
 
   const renderContent = () => {
     if (isLoading) {
@@ -281,8 +354,16 @@ const renderRecipeItem = ({ item }: { item: SavedRecipe }) => {
       <FlatList
         data={savedRecipes}
         renderItem={renderRecipeItem}
-        keyExtractor={(item) => item.base_recipe_id.toString()}
+        keyExtractor={(item) => item.processed_recipes_cache?.id.toString() || item.base_recipe_id.toString()}
         contentContainerStyle={styles.listContent}
+        initialNumToRender={10}
+        windowSize={21}
+        maxToRenderPerBatch={10}
+        updateCellsBatchingPeriod={50}
+        removeClippedSubviews={true}
+        getItemLayout={(data, index) => (
+          { length: 85, offset: 85 * index, index } // Approximate item height
+        )}
       />
     );
   };

@@ -6,6 +6,7 @@ import React, {
   useEffect,
   PropsWithChildren,
   useCallback,
+  useMemo,
 } from 'react';
 import {
   getHasUsedFreeRecipe,
@@ -102,13 +103,13 @@ export const FreeUsageProvider = ({ children }: PropsWithChildren) => {
     await fetchFreeUsage();
   }, [fetchFreeUsage]);
 
-  const value = {
+  const value = useMemo(() => ({
     hasUsedFreeRecipe,
     isLoadingFreeUsage,
     markFreeRecipeUsed,
     resetFreeRecipeUsage,
     refetchFreeUsage,
-  };
+  }), [hasUsedFreeRecipe, isLoadingFreeUsage, markFreeRecipeUsed, resetFreeRecipeUsage, refetchFreeUsage]);
 
   return (
     <FreeUsageContext.Provider value={value}>

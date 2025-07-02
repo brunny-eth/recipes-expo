@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
@@ -26,10 +26,18 @@ if (__DEV__) {
 }
 
 function RootLayoutNav() {
+  console.log('[RootLayoutNav] Rendered');
+  
   const { session, isLoading: isAuthLoading } = useAuth();
   const { hasUsedFreeRecipe, isLoadingFreeUsage } = useFreeUsage();
   const router = useRouter();
   const segments = useSegments();
+
+  // Track if initial navigation redirect has already occurred
+  const initialRedirectDone = useRef(false);
+
+  // Stabilize segments to prevent unnecessary re-renders
+  const stableSegments = useMemo(() => segments, [segments.join('/')]);
 
   // Define routes that are always accessible to unauthenticated users,
   // even if they have used their free recipe.
@@ -41,6 +49,17 @@ function RootLayoutNav() {
   ];
 
   useEffect(() => {
+    console.log('[RootLayoutNav] Main Navigation useEffect evaluating...');
+    console.log('[RootLayoutNav] Dependencies for navigation useEffect:', { 
+      session: !!session, 
+      sessionUserId: session?.user?.id, 
+      hasUsedFreeRecipe, 
+      isAuthLoading, 
+      isLoadingFreeUsage, 
+      segments: stableSegments.join('/') 
+    });
+    console.log('[RootLayoutNav] initialRedirectDone.current value:', initialRedirectDone.current);
+    
     // Wait for authentication and free usage contexts to finish loading
     if (isAuthLoading || isLoadingFreeUsage) {
       console.log(
@@ -49,16 +68,16 @@ function RootLayoutNav() {
       return;
     }
 
-    const currentPathSegments = segments.join('/'); // e.g., "login", "(tabs)/explore", "recipe/summary"
-    const inAuthFlow = segments[0] === 'login' || segments[0] === 'auth';
-    const inRecipeContentFlow = segments[0] === 'recipe';
+    const currentPathSegments = stableSegments.join('/'); // e.g., "login", "(tabs)/explore", "recipe/summary"
+    const inAuthFlow = stableSegments[0] === 'login' || stableSegments[0] === 'auth';
+    const inRecipeContentFlow = stableSegments[0] === 'recipe';
 
     // Check if the current route is one of the explicitly allowed public routes
     const isCurrentlyOnAllowedPublicRoute = PUBLIC_ALLOWED_ROUTES_PREFIXES.some(
       (prefix) => {
         // For '(tabs)', we check if the first segment is '(tabs)' to cover all tab routes
         if (prefix === '(tabs)') {
-          return segments[0] === '(tabs)';
+          return stableSegments[0] === '(tabs)';
         }
         // For other specific routes like 'login' or '+not-found', we check for exact match or startWith
         return (
@@ -68,6 +87,23 @@ function RootLayoutNav() {
       },
     );
 
+    // If initial redirect already happened, only run simplified navigation logic
+    if (initialRedirectDone.current) {
+      console.log(`[RootLayoutNav] Initial redirect already done - running simplified logic for: ${currentPathSegments}`);
+      // Only handle specific post-initial scenarios to prevent remounting
+      if (!session && !inAuthFlow && !isCurrentlyOnAllowedPublicRoute && hasUsedFreeRecipe) {
+        console.log(
+          `[RootLayoutNav] Post-initial: User logged out and needs login redirect: ${currentPathSegments}`,
+        );
+        router.replace('/login');
+      } else {
+        console.log(`[RootLayoutNav] Post-initial: No action needed for: ${currentPathSegments}`);
+      }
+      return;
+    }
+
+    // --- INITIAL REDIRECT LOGIC (runs only once) ---
+    console.log(`[RootLayoutNav] Running initial redirect logic for: ${currentPathSegments}`);
     if (!session) {
       // User is NOT authenticated
       if (hasUsedFreeRecipe) {
@@ -101,6 +137,8 @@ function RootLayoutNav() {
           console.log(
             `[RootLayoutNav] Unauthenticated, free recipe NOT used, attempting auth flow: ${currentPathSegments}. No redirect.`,
           );
+          // Mark initial redirect as done and return early
+          initialRedirectDone.current = true;
           return; // Stay on login/auth page if they are already there
         }
         // Implicitly allows navigation to (tabs) and initial recipe flow if not in auth group
@@ -118,12 +156,16 @@ function RootLayoutNav() {
         router.replace('/(tabs)');
       }
     }
+
+    // Mark initial redirect logic as complete
+    console.log(`[RootLayoutNav] Marking initial redirect as complete for: ${currentPathSegments}`);
+    initialRedirectDone.current = true;
   }, [
     session,
     hasUsedFreeRecipe,
     isAuthLoading,
     isLoadingFreeUsage,
-    segments,
+    stableSegments,
     router,
   ]);
 
@@ -149,6 +191,8 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
+  console.log('[RootLayout] Rendered');
+  
   useFrameworkReady();
 
   const [assetsLoaded, setAssetsLoaded] = useState(false);
@@ -180,11 +224,13 @@ export default function RootLayout() {
           console.log(
             '[RootLayout] First launch detected. Setting isFirstLaunch to true.',
           );
+          console.log('[RootLayout] isFirstLaunch state change:', true);
           setIsFirstLaunch(true);
         } else {
           console.log(
             '[RootLayout] Not first launch. Setting isFirstLaunch to false.',
           );
+          console.log('[RootLayout] isFirstLaunch state change:', false);
           setIsFirstLaunch(false);
         }
       } catch (e) {
@@ -216,7 +262,9 @@ export default function RootLayout() {
   );
 
   useEffect(() => {
+    console.log('[RootLayout] Dependencies for useEffect (ready state):', { fontsLoaded, assetsLoaded, isFirstLaunch, ready });
     if (ready) {
+      console.log('[RootLayout] Ready state achieved - hiding splash screen');
       SplashScreen.hideAsync();
     }
   }, [ready]);
@@ -224,10 +272,12 @@ export default function RootLayout() {
   const handleWelcomeDismiss = async () => {
     try {
       await AsyncStorage.setItem('hasLaunched', 'true');
+      console.log('[RootLayout] isFirstLaunch state change:', false);
       setIsFirstLaunch(false); // Hide the welcome screen immediately
     } catch (error) {
       console.error('Failed to set hasLaunched flag', error);
       // Still proceed to app
+      console.log('[RootLayout] isFirstLaunch state change (error fallback):', false);
       setIsFirstLaunch(false);
     }
   };

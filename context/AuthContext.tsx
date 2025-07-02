@@ -6,6 +6,7 @@ import React, {
   useEffect,
   PropsWithChildren,
   useCallback,
+  useMemo,
 } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
@@ -133,9 +134,18 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       (event, currentSession) => {
         if (__DEV__) {
           console.log(`[Auth] onAuthStateChange event: ${event}`);
+          console.log('[Auth] currentSession (before setSession):', currentSession ? { id: currentSession.user?.id, accessToken: currentSession.access_token?.substring(0, 10) + '...' } : 'null');
+          if (session === currentSession) {
+            console.log('[Auth] currentSession is referentially same as previous session state.');
+          } else {
+            console.log('[Auth] currentSession is referentially DIFFERENT from previous session state.');
+          }
         }
 
         setSession(currentSession);
+        if (__DEV__) {
+          console.log('[Auth] setSession called with:', currentSession ? { id: currentSession.user?.id, event } : 'null');
+        }
         setIsLoading(false);
 
         setTimeout(async () => {
@@ -395,7 +405,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     }
   };
 
-  const value = {
+  const value = useMemo(() => ({
     session,
     user: session?.user ?? null,
     isAuthenticated: !!session,
@@ -403,7 +413,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     isLoading,
     signIn,
     signOut,
-  };
+  }), [session, isLoading, signIn, signOut]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
