@@ -119,23 +119,34 @@ export default function SavedScreen() {
     console.log(`[PERF: SavedScreen] Total fetchSavedRecipes duration: ${totalTime.toFixed(2)}ms`);
   }, [session?.user?.id]); // Only recreate when user ID changes
 
+  // Mount stability detection to differentiate between focus and remount
+  const mountIdRef = useRef(Math.random());
+  const lastMountId = useRef(mountIdRef.current);
+  
   // Debounce mechanism to prevent rapid successive calls
   const lastFetchTimeRef = useRef(0);
   const DEBOUNCE_MS = 500; // Prevent calls within 500ms of each other
 
-  // Simplified useFocusEffect now that provider stability is fixed
+  // Optimized useFocusEffect with remount detection
   useFocusEffect(
     useCallback(() => {
       const now = performance.now();
       const timeSinceLastFetch = now - lastFetchTimeRef.current;
+      const currentMountId = mountIdRef.current;
       
       console.log('🎯 useFocusEffect triggered for:', session?.user?.id || 'NONE');
       
-      if (timeSinceLastFetch < DEBOUNCE_MS) {
-        console.log('🚫 DEBOUNCED: Ignoring rapid successive call');
+      // Check if this is a remount vs just a focus event
+      if (currentMountId !== lastMountId.current) {
+        console.log('🔄 Screen remounted - full refetch needed');
+        lastMountId.current = currentMountId;
+      } else if (timeSinceLastFetch < DEBOUNCE_MS) {
+        console.log('🚫 DEBOUNCED: Ignoring rapid successive focus without remount');
         return () => {
-          console.log('🌀 useFocusEffect cleanup (debounced)');
+          console.log('🌀 useFocusEffect cleanup (debounced focus)');
         };
+      } else {
+        console.log('👁️ Screen focused without remount - performing fetch');
       }
       
       lastFetchTimeRef.current = now;

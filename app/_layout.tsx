@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
@@ -13,6 +13,7 @@ import { FreeUsageProvider, useFreeUsage } from '@/context/FreeUsageContext';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import WelcomeScreen from '@/components/WelcomeScreen';
+import AppNavigators from '@/components/AppNavigators';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -169,25 +170,7 @@ function RootLayoutNav() {
     router,
   ]);
 
-  return (
-    <Stack>
-      <Stack.Screen name="recipe/summary" options={{ headerShown: false }} />
-      <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
-      <Stack.Screen name="+not-found" />
-      <Stack.Screen name="login" options={{ headerShown: false }} />
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen
-        name="loading"
-        options={{
-          headerShown: false,
-        }}
-      />
-      <Stack.Screen
-        name="recipe/steps"
-        options={{ presentation: 'card', headerShown: false }}
-      />
-    </Stack>
-  );
+  return <AppNavigators />;
 }
 
 export default function RootLayout() {

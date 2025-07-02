@@ -1,11 +1,31 @@
+import React from 'react';
 import { Tabs } from 'expo-router';
 import { StyleSheet, Platform } from 'react-native';
-// import { Bookmark as BookmarkIcon } from 'lucide-react-native'; // Removed import
-import { MaterialCommunityIcons } from '@expo/vector-icons'; // Added import
+import { MaterialCommunityIcons } from '@expo/vector-icons'; 
 import { COLORS } from '@/constants/theme';
 import { captionText } from '@/constants/typography';
 
-export default function TabLayout() {
+const styles = StyleSheet.create({
+  tabBar: {
+    borderTopWidth: 1,
+    borderTopColor: COLORS.lightGray,
+    height: 60,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 8,
+    paddingTop: 4,
+  },
+  tabBarLabel: {
+    ...captionText,
+    fontSize: 11,
+  },
+});
+
+/**
+ * Stable, memoized tabs navigator component that prevents remounting when parent re-renders.
+ * This is critical for maintaining individual tab screen state and preventing useFocusEffect remounts.
+ */
+const MemoizedTabsNavigator = React.memo(() => {
+  console.log('[MemoizedTabsNavigator] Rendered - this should only happen once after initial load');
+  
   return (
     <Tabs
       screenOptions={{
@@ -48,7 +68,6 @@ export default function TabLayout() {
         name="saved"
         options={{
           title: 'Favorites',
-          // tabBarIcon: ({ color, size }) => <BookmarkIcon size={size} color={color} />,
           tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <MaterialCommunityIcons
               name="heart-outline"
@@ -75,18 +94,10 @@ export default function TabLayout() {
       />
     </Tabs>
   );
-}
-
-const styles = StyleSheet.create({
-  tabBar: {
-    borderTopWidth: 1,
-    borderTopColor: COLORS.lightGray,
-    height: 60,
-    paddingBottom: Platform.OS === 'ios' ? 20 : 8,
-    paddingTop: 4,
-  },
-  tabBarLabel: {
-    ...captionText,
-    fontSize: 11,
-  },
 });
+
+MemoizedTabsNavigator.displayName = 'MemoizedTabsNavigator';
+
+export default function TabLayout() {
+  return <MemoizedTabsNavigator />;
+}
