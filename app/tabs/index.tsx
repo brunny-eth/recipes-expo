@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -133,8 +133,8 @@ export default function HomeScreen() {
     handleNavigation(recipeInput);
   };
 
-  // Animated logo component for home screen
-  const AnimatedLogo = () => (
+  // Memoized animated logo component to prevent recreation on re-renders
+  const animatedLogo = useMemo(() => (
     <Animated.View
       style={{
         opacity: logoOpacity,
@@ -152,10 +152,10 @@ export default function HomeScreen() {
         }}
       />
     </Animated.View>
-  );
+  ), [logoOpacity, logoTranslateY]); // Only recreate if animation values change
 
   return (
-    <LogoHeaderLayout animatedLogo={<AnimatedLogo />}>
+    <LogoHeaderLayout animatedLogo={animatedLogo}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
           <View>
