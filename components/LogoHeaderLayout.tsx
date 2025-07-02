@@ -4,15 +4,17 @@ import { COLORS, SPACING } from '@/constants/theme';
 
 export default function LogoHeaderLayout({
   children,
+  animatedLogo,
 }: {
   children: React.ReactNode;
+  animatedLogo?: React.ReactNode;
 }) {
   console.log(`[${new Date().toISOString()}] [LogoHeaderLayout] render`);
   
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        <MeezLogo />
+        {animatedLogo || <MeezLogo />}
         <View style={styles.content}>{children}</View>
       </View>
     </SafeAreaView>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   Platform,
   TouchableWithoutFeedback,
   ScrollView,
+  Animated,
+  Image,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -38,14 +40,49 @@ export default function HomeScreen() {
   const { showError } = useErrorModal();
   const { session } = useAuth();
   const { hasUsedFreeRecipe } = useFreeUsage();
+  
+  // Animation for smooth fade-in to mask layout jitter
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  
+  // Logo animation - slide down + fade in
+  const logoOpacity = useRef(new Animated.Value(0)).current;
+  const logoTranslateY = useRef(new Animated.Value(-30)).current;
 
   // Component Mount/Unmount logging
   useEffect(() => {
     console.log('[HomeScreen] Component DID MOUNT');
+    
+    // Stage 1: Logo slides down and fades in (starts immediately)
+    const logoTimer = setTimeout(() => {
+      Animated.parallel([
+        Animated.timing(logoOpacity, {
+          toValue: 1,
+          duration: 700, // Slower, more elegant logo animation
+          useNativeDriver: true,
+        }),
+        Animated.timing(logoTranslateY, {
+          toValue: 0,
+          duration: 700, // Slower, more elegant logo animation
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, 50); // Small delay for initial render
+    
+    // Stage 2: Content fades in after logo finishes
+    const contentTimer = setTimeout(() => {
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 900, // Slower, more luxurious content fade-in
+        useNativeDriver: true,
+      }).start();
+    }, 750); // Logo animation (700ms) + small gap (50ms)
+    
     return () => {
       console.log('[HomeScreen] Component WILL UNMOUNT');
+      clearTimeout(logoTimer);
+      clearTimeout(contentTimer);
     };
-  }, []);
+  }, [fadeAnim, logoOpacity, logoTranslateY]);
 
   // Focus effect logging
   useFocusEffect(
@@ -96,10 +133,31 @@ export default function HomeScreen() {
     handleNavigation(recipeInput);
   };
 
+  // Animated logo component for home screen
+  const AnimatedLogo = () => (
+    <Animated.View
+      style={{
+        opacity: logoOpacity,
+        transform: [{ translateY: logoTranslateY }],
+      }}
+    >
+      <Image
+        source={require('@/assets/images/meez_logo.webp')}
+        resizeMode="contain"
+        style={{
+          width: 220,
+          height: 120,
+          marginBottom: SPACING.md,
+          alignSelf: 'center',
+        }}
+      />
+    </Animated.View>
+  );
+
   return (
-    <LogoHeaderLayout>
+    <LogoHeaderLayout animatedLogo={<AnimatedLogo />}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-        <View style={styles.container}>
+        <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
           <View>
             <Text style={styles.mainFeatureText}>Recipes, refined.</Text>
             <Text style={styles.featureText}>Built for the home chef.</Text>
@@ -146,7 +204,7 @@ export default function HomeScreen() {
               </View>
             </View>
           </KeyboardAvoidingView>
-        </View>
+        </Animated.View>
       </TouchableWithoutFeedback>
     </LogoHeaderLayout>
   );

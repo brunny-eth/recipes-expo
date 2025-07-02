@@ -217,7 +217,7 @@ const buttonWidth = (availableWidth - buttonTotalGap) / numButtons;
 // --- End Types ---
 
 export default function RecipeSummaryScreen() {
-  const params = useLocalSearchParams<{ recipeData?: string; from?: string }>();
+  const params = useLocalSearchParams<{ recipeData?: string; from?: string; appliedChanges?: string; isModified?: string }>();
   const router = useRouter();
   const { showError } = useErrorModal();
   const { session } = useAuth();
@@ -254,6 +254,9 @@ export default function RecipeSummaryScreen() {
     to: string | null;
   } | null>(null);
 
+  // Determine if we're viewing a saved recipe (clean display) vs actively editing (show indicators)
+  const isViewingSavedRecipe = !!params.appliedChanges;
+
   const scaledIngredientGroups = React.useMemo<IngredientGroup[]>(() => {
     if (!recipe?.ingredientGroups) return [];
     
@@ -268,25 +271,50 @@ export default function RecipeSummaryScreen() {
 
       let finalIngredients = scaledIngredients;
       if (appliedChanges.length > 0) {
-        finalIngredients = scaledIngredients.map((baseIngredient) => {
-          const change = appliedChanges.find((c) => c.from === baseIngredient.name);
-          if (change) {
-            if (change.to === null) {
+        if (isViewingSavedRecipe) {
+          // Clean display for saved recipes: filter out removed, cleanly replace substituted
+          finalIngredients = scaledIngredients
+            .map((baseIngredient) => {
+              // Parse the display name to get the original name without "(removed)" or "(substituted for X)" text
+              const { baseName: originalName } = parseIngredientDisplayName(baseIngredient.name);
+              const change = appliedChanges.find((c) => c.from === originalName);
+              
+              if (change) {
+                if (change.to === null) {
+                  // Mark for removal (will be filtered out)
+                  return null;
+                }
+                // Replace with substituted ingredient (no visual indicators)
+                return {
+                  ...change.to,
+                  // Keep the substituted ingredient's name as-is
+                };
+              }
+              return baseIngredient;
+            })
+            .filter((ingredient): ingredient is StructuredIngredient => ingredient !== null);
+        } else {
+          // Active editing: show visual indicators for user feedback
+          finalIngredients = scaledIngredients.map((baseIngredient) => {
+            const change = appliedChanges.find((c) => c.from === baseIngredient.name);
+            if (change) {
+              if (change.to === null) {
+                return {
+                  ...baseIngredient,
+                  name: `${baseIngredient.name} (removed)`,
+                  amount: null,
+                  unit: null,
+                  suggested_substitutions: null,
+                };
+              }
               return {
-                ...baseIngredient,
-                name: `${baseIngredient.name} (removed)`,
-                amount: null,
-                unit: null,
-                suggested_substitutions: null,
+                ...change.to,
+                name: `${change.to.name} (substituted for ${change.from})`,
               };
             }
-            return {
-              ...change.to,
-              name: `${change.to.name} (substituted for ${change.from})`,
-            };
-          }
-          return baseIngredient;
-        });
+            return baseIngredient;
+          });
+        }
       }
 
       return {
@@ -294,7 +322,7 @@ export default function RecipeSummaryScreen() {
         ingredients: finalIngredients,
       };
     });
-  }, [recipe, selectedScaleFactor, appliedChanges]);
+  }, [recipe, selectedScaleFactor, appliedChanges, isViewingSavedRecipe]);
 
   // Keep scaledIngredients as a flat array for backward compatibility with existing code
   const scaledIngredients = React.useMemo<StructuredIngredient[]>(() => {
@@ -324,8 +352,42 @@ export default function RecipeSummaryScreen() {
         setRecipe(parsed);
         const yieldNum = parseServingsValue(parsed.recipeYield);
         setOriginalYieldValue(yieldNum);
-        setSelectedScaleFactor(1.0);
-        setAppliedChanges([]);
+        
+        // Check if this is a saved recipe with existing applied changes
+        if (params.appliedChanges) {
+          try {
+            const savedAppliedChanges = JSON.parse(params.appliedChanges as string);
+            // Convert saved format to internal format
+            if (savedAppliedChanges.ingredientChanges) {
+              const convertedChanges: AppliedChange[] = savedAppliedChanges.ingredientChanges.map((change: any) => ({
+                from: change.from,
+                to: change.to ? { 
+                  name: change.to, 
+                  amount: null, 
+                  unit: null, 
+                  preparation: null, 
+                  suggested_substitutions: null 
+                } : null,
+              }));
+              setAppliedChanges(convertedChanges);
+            }
+            // Set scaling factor from saved changes
+            if (savedAppliedChanges.scalingFactor) {
+              setSelectedScaleFactor(savedAppliedChanges.scalingFactor);
+            } else {
+              setSelectedScaleFactor(1.0);
+            }
+          } catch (appliedChangesError: any) {
+            console.error('Error parsing applied changes:', appliedChangesError);
+            setSelectedScaleFactor(1.0);
+            setAppliedChanges([]);
+          }
+        } else {
+          // New recipe, no existing changes
+          setSelectedScaleFactor(1.0);
+          setAppliedChanges([]);
+        }
+        
         setCheckedIngredients({});
       } catch (e: any) {
         showError('Error Loading Summary', `Could not load recipe details: ${e.message}.`);
@@ -334,7 +396,7 @@ export default function RecipeSummaryScreen() {
       showError('Error Loading Summary', 'Recipe data not provided.');
     }
     setIsLoading(false);
-  }, [params.recipeData, showError]);
+  }, [params.recipeData, params.appliedChanges, showError]);
 
   const detectedAllergens = React.useMemo(() => {
     if (!recipe) return [];
