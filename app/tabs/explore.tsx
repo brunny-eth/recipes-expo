@@ -325,6 +325,8 @@ const styles = StyleSheet.create({
   cardTitle: {
     ...bodyStrongText,
     color: COLORS.textDark,
+    lineHeight: 20,
+    flexWrap: 'wrap',
   } as TextStyle,
   devToolsContainer: {
     backgroundColor: COLORS.surface,
