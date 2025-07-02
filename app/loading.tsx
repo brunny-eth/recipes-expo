@@ -27,7 +27,7 @@ export default function LoadingRoute() {
   }
 
   const handleClose = () => {
-    router.replace('/(tabs)');
+    router.replace('/tabs');
   };
 
   return (

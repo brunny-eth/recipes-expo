@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   TextStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from 'expo-router';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import RecipeCard from '@/components/RecipeCard';
 import { useFreeUsage } from '@/context/FreeUsageContext';
@@ -88,6 +89,27 @@ const ExploreScreen = () => {
     useFreeUsage();
   const { session, isAuthenticated } = useAuth();
   const { showError } = useErrorModal();
+
+  // Component Mount/Unmount logging
+  useEffect(() => {
+    console.log('[ExploreScreen] Component DID MOUNT');
+    return () => {
+      console.log('[ExploreScreen] Component WILL UNMOUNT');
+    };
+  }, []);
+
+  // Focus effect logging
+  useFocusEffect(
+    useCallback(() => {
+      console.log('[ExploreScreen] 🎯 useFocusEffect triggered');
+      console.log('[ExploreScreen] 👁️ Screen focused');
+
+      return () => {
+        console.log('[ExploreScreen] 🌀 useFocusEffect cleanup');
+        console.log('[ExploreScreen] 🌀 Screen is blurring (not necessarily unmounting)');
+      };
+    }, [])
+  );
 
   const handleResetFreeUsage = async () => {
     console.log('[Dev Tools] Attempting to reset free recipe usage...');

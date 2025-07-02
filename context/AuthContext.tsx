@@ -384,7 +384,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       setSession(null);
       setIsLoading(false);
       resetFreeRecipeUsage();
-      router.replace('/explore');
+      router.replace('/tabs/explore');
     } catch (err: any) {
       console.error(
         '[Auth] Sign Out Error: Caught an error or timeout:',
@@ -401,7 +401,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       setSession(null);
       setIsLoading(false);
       resetFreeRecipeUsage();
-      router.replace('/explore');
+      router.replace('/tabs/explore');
     }
   };
 

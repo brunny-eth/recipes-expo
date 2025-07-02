@@ -36,7 +36,7 @@ const InlineErrorBanner: React.FC<InlineErrorBannerProps> = ({
     } else if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace('/'); // Fallback to home
+      router.replace('/tabs'); // Fallback to home
     }
   };
 

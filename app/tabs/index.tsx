@@ -1,5 +1,4 @@
-import React from 'react';
-import { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,7 +11,7 @@ import {
   TouchableWithoutFeedback,
   ScrollView,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import {
   COLORS,
@@ -34,11 +33,32 @@ import { useFreeUsage } from '@/context/FreeUsageContext';
 import LogoHeaderLayout from '@/components/LogoHeaderLayout';
 
 export default function HomeScreen() {
-  const [recipeUrl, setRecipeUrl] = React.useState('');
+  const [recipeUrl, setRecipeUrl] = useState('');
   const router = useRouter();
   const { showError } = useErrorModal();
   const { session } = useAuth();
   const { hasUsedFreeRecipe } = useFreeUsage();
+
+  // Component Mount/Unmount logging
+  useEffect(() => {
+    console.log('[HomeScreen] Component DID MOUNT');
+    return () => {
+      console.log('[HomeScreen] Component WILL UNMOUNT');
+    };
+  }, []);
+
+  // Focus effect logging
+  useFocusEffect(
+    useCallback(() => {
+      console.log('[HomeScreen] 🎯 useFocusEffect triggered');
+      console.log('[HomeScreen] 👁️ Screen focused');
+
+      return () => {
+        console.log('[HomeScreen] 🌀 useFocusEffect cleanup');
+        console.log('[HomeScreen] 🌀 Screen is blurring (not necessarily unmounting)');
+      };
+    }, [])
+  );
 
   const handleNavigation = (recipeInput: string) => {
     Keyboard.dismiss();

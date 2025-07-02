@@ -1,3 +1,4 @@
+import React, { useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,7 +8,7 @@ import {
   ViewStyle,
   TextStyle,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -35,6 +36,27 @@ function AuthStatus() {
 export default function SettingsScreen() {
   const { signOut, isAuthenticated } = useAuth();
   const insets = useSafeAreaInsets();
+
+  // Component Mount/Unmount logging
+  useEffect(() => {
+    console.log('[SettingsScreen] Component DID MOUNT');
+    return () => {
+      console.log('[SettingsScreen] Component WILL UNMOUNT');
+    };
+  }, []);
+
+  // Focus effect logging
+  useFocusEffect(
+    useCallback(() => {
+      console.log('[SettingsScreen] 🎯 useFocusEffect triggered');
+      console.log('[SettingsScreen] 👁️ Screen focused');
+
+      return () => {
+        console.log('[SettingsScreen] 🌀 useFocusEffect cleanup');
+        console.log('[SettingsScreen] 🌀 Screen is blurring (not necessarily unmounting)');
+      };
+    }, [])
+  );
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>

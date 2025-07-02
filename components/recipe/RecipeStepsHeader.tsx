@@ -27,7 +27,7 @@ const RecipeStepsHeader: React.FC<RecipeStepsHeaderProps> = ({
   const router = useRouter();
 
   const handleExitPress = () => {
-    router.replace('/');
+    router.replace('/tabs');
   };
 
   return (

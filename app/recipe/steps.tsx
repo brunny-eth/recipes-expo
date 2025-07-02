@@ -273,7 +273,7 @@ export default function StepsScreen() {
       showError('Recipe Saved!', `${modifiedRecipe.title} has been saved to your collection.`);
 
       // Navigate to the saved recipes screen
-      router.push('/saved');
+      router.push('/tabs/saved');
 
     } catch (error) {
       const errMsg = (error as Error).message || 'An unexpected error occurred while saving the recipe.';

@@ -45,6 +45,14 @@ export default function SavedScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Component Mount/Unmount logging
+  useEffect(() => {
+    console.log('[SavedScreen] Component DID MOUNT');
+    return () => {
+      console.log('[SavedScreen] Component WILL UNMOUNT');
+    };
+  }, []);
+
   // Stable fetchSavedRecipes function
   const fetchSavedRecipes = useCallback(async () => {
     const startTime = performance.now();
@@ -123,91 +131,110 @@ export default function SavedScreen() {
   const mountIdRef = useRef(Math.random());
   const lastMountId = useRef(mountIdRef.current);
   
-  // Debounce mechanism to prevent rapid successive calls
+  // Improved caching strategy
   const lastFetchTimeRef = useRef(0);
+  const lastSessionIdRef = useRef<string | null>(null);
+  const CACHE_DURATION_MS = 30000; // Cache data for 30 seconds
   const DEBOUNCE_MS = 500; // Prevent calls within 500ms of each other
 
-  // Optimized useFocusEffect with remount detection
+  // Optimized useFocusEffect with smart caching
   useFocusEffect(
     useCallback(() => {
       const now = performance.now();
       const timeSinceLastFetch = now - lastFetchTimeRef.current;
       const currentMountId = mountIdRef.current;
+      const currentSessionId = session?.user?.id || null;
       
-      console.log('🎯 useFocusEffect triggered for:', session?.user?.id || 'NONE');
+      console.log('[SavedScreen] 🎯 useFocusEffect triggered for:', currentSessionId);
       
       // Check if this is a remount vs just a focus event
-      if (currentMountId !== lastMountId.current) {
-        console.log('🔄 Screen remounted - full refetch needed');
+      const isRemount = currentMountId !== lastMountId.current;
+      const isSessionChange = currentSessionId !== lastSessionIdRef.current;
+      const isCacheExpired = timeSinceLastFetch > CACHE_DURATION_MS;
+      const isDebounced = timeSinceLastFetch < DEBOUNCE_MS;
+      
+      if (isRemount) {
+        console.log('[SavedScreen] 🔄 Screen remounted - full refetch needed');
         lastMountId.current = currentMountId;
-      } else if (timeSinceLastFetch < DEBOUNCE_MS) {
-        console.log('🚫 DEBOUNCED: Ignoring rapid successive focus without remount');
+      } else if (isDebounced && !isSessionChange) {
+        console.log('[SavedScreen] 🚫 DEBOUNCED: Ignoring rapid successive focus without significant changes');
         return () => {
-          console.log('🌀 useFocusEffect cleanup (debounced focus)');
+          console.log('[SavedScreen] 🌀 useFocusEffect cleanup (debounced focus)');
         };
+      } else if (isSessionChange) {
+        console.log('[SavedScreen] 👤 Session changed - refetch needed');
+      } else if (isCacheExpired) {
+        console.log('[SavedScreen] ⏰ Cache expired - refetch needed');
+      } else if (savedRecipes.length === 0) {
+        console.log('[SavedScreen] 💾 No cached data - initial fetch needed');
       } else {
-        console.log('👁️ Screen focused without remount - performing fetch');
+        console.log('[SavedScreen] ✅ Using cached data - no refetch needed');
+        return () => {
+          console.log('[SavedScreen] 🌀 useFocusEffect cleanup (cached data used)');
+        };
       }
       
+      // Update tracking variables
       lastFetchTimeRef.current = now;
+      lastSessionIdRef.current = currentSessionId;
       
-      if (!session?.user?.id) {
+      if (!currentSessionId) {
         console.warn('[SavedScreen] No user session found. Skipping fetch.');
         setIsLoading(false);
         setSavedRecipes([]);
         return () => {
-          console.log('🌀 useFocusEffect cleanup (no session)');
+          console.log('[SavedScreen] 🌀 useFocusEffect cleanup (no session)');
         };
       }
 
-              console.log('✅ Fetching saved recipes initiated...');
+      console.log('✅ Fetching saved recipes initiated...');
         
-        // Inline async function to avoid dependencies
-        (async () => {
-          setIsLoading(true);
-          setError(null);
+      // Inline async function to avoid dependencies
+      (async () => {
+        setIsLoading(true);
+        setError(null);
 
-                  const { data, error: fetchError } = await supabase
-            .from('user_saved_recipes')
-            .select(
-              `
-              base_recipe_id,
-              title_override,
-              applied_changes,
-              processed_recipes_cache (
-                id,
-                recipe_data,
-                source_type,
-                parent_recipe_id
-              )
-            `,
+        const { data, error: fetchError } = await supabase
+          .from('user_saved_recipes')
+          .select(
+            `
+            base_recipe_id,
+            title_override,
+            applied_changes,
+            processed_recipes_cache (
+              id,
+              recipe_data,
+              source_type,
+              parent_recipe_id
             )
-            .eq('user_id', session!.user.id)
-            .order('created_at', { ascending: false });
-          
-          if (fetchError) {
-            console.error('[SavedScreen] Error fetching saved recipes:', fetchError);
-            setError('Could not load saved recipes. Please try again.');
-          } else {
-            console.log(`[SavedScreen] Fetched ${data?.length || 0} saved recipes from DB.`);
+          `,
+          )
+          .eq('user_id', currentSessionId)
+          .order('created_at', { ascending: false });
+        
+        if (fetchError) {
+          console.error('[SavedScreen] Error fetching saved recipes:', fetchError);
+          setError('Could not load saved recipes. Please try again.');
+        } else {
+          console.log(`[SavedScreen] Fetched ${data?.length || 0} saved recipes from DB.`);
 
-            const validRecipes =
-              ((data as any[])?.filter(
-                (r) => r.processed_recipes_cache?.recipe_data,
-              ) as SavedRecipe[]) || [];
+          const validRecipes =
+            ((data as any[])?.filter(
+              (r) => r.processed_recipes_cache?.recipe_data,
+            ) as SavedRecipe[]) || [];
 
-            setSavedRecipes(validRecipes);
-          }
+          setSavedRecipes(validRecipes);
+        }
 
-          setIsLoading(false);
+        setIsLoading(false);
       })();
       
       // Return cleanup function to log blur events
       return () => {
-        console.log('🌀 useFocusEffect cleanup');
-        console.log('🌀 Screen is blurring/unmounting');
+        console.log('[SavedScreen] 🌀 useFocusEffect cleanup');
+        console.log('[SavedScreen] 🌀 Screen is blurring (not necessarily unmounting)');
       };
-    }, [session?.user?.id])
+    }, [session?.user?.id, savedRecipes.length]) // Add savedRecipes.length to prevent unnecessary fetches when data exists
   );
 
   const handleRecipePress = useCallback((item: SavedRecipe) => {
@@ -333,7 +360,7 @@ const renderRecipeItem = useCallback(({ item }: { item: SavedRecipe }) => {
           </Text>
           <TouchableOpacity
             style={styles.loginButton}
-            onPress={() => router.push('/(tabs)/settings')}
+            onPress={() => router.push('/tabs/settings')}
           >
             <Text style={styles.loginButtonText}>Go to Settings</Text>
           </TouchableOpacity>

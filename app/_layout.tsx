@@ -1,9 +1,9 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View, ActivityIndicator } from 'react-native';
 import * as Font from 'expo-font';
 import { Asset } from 'expo-asset';
 
@@ -14,6 +14,7 @@ import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import WelcomeScreen from '@/components/WelcomeScreen';
 import AppNavigators from '@/components/AppNavigators';
+import { COLORS } from '@/constants/theme';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -40,10 +41,13 @@ function RootLayoutNav() {
   // Stabilize segments to prevent unnecessary re-renders
   const stableSegments = useMemo(() => segments, [segments.join('/')]);
 
+  // NEW STATE: Control when the main AppNavigators should render
+  const [shouldRenderNavigators, setShouldRenderNavigators] = useState(false);
+
   // Define routes that are always accessible to unauthenticated users,
   // even if they have used their free recipe.
   const PUBLIC_ALLOWED_ROUTES_PREFIXES = [
-    '(tabs)', // Covers / (index), /explore, /settings, /saved
+    'tabs', // Covers /tabs (index), /explore, /settings, /saved
     'login',
     'auth', // Covers auth/callback
     '+not-found', // For the 404 page
@@ -66,21 +70,23 @@ function RootLayoutNav() {
       console.log(
         `[RootLayoutNav] Waiting for contexts to load. isAuthLoading: ${isAuthLoading}, isLoadingFreeUsage: ${isLoadingFreeUsage}`,
       );
+      // Ensure navigators are not rendered until contexts are ready
+      setShouldRenderNavigators(false); 
       return;
     }
 
-    const currentPathSegments = stableSegments.join('/'); // e.g., "login", "(tabs)/explore", "recipe/summary"
+    // --- INITIAL REDIRECT LOGIC (runs only once, and when contexts are loaded) ---
+    // This block should handle the very first navigation decision.
+
+    const currentPathSegments = stableSegments.join('/');
     const inAuthFlow = stableSegments[0] === 'login' || stableSegments[0] === 'auth';
     const inRecipeContentFlow = stableSegments[0] === 'recipe';
 
-    // Check if the current route is one of the explicitly allowed public routes
     const isCurrentlyOnAllowedPublicRoute = PUBLIC_ALLOWED_ROUTES_PREFIXES.some(
       (prefix) => {
-        // For '(tabs)', we check if the first segment is '(tabs)' to cover all tab routes
-        if (prefix === '(tabs)') {
-          return stableSegments[0] === '(tabs)';
+        if (prefix === 'tabs') {
+          return stableSegments[0] === 'tabs';
         }
-        // For other specific routes like 'login' or '+not-found', we check for exact match or startWith
         return (
           currentPathSegments === prefix ||
           currentPathSegments.startsWith(prefix + '/')
@@ -88,22 +94,45 @@ function RootLayoutNav() {
       },
     );
 
-    // If initial redirect already happened, only run simplified navigation logic
+    // If initial redirect already happened, just allow rendering and potentially handle post-initial auth changes
     if (initialRedirectDone.current) {
-      console.log(`[RootLayoutNav] Initial redirect already done - running simplified logic for: ${currentPathSegments}`);
-      // Only handle specific post-initial scenarios to prevent remounting
-      if (!session && !inAuthFlow && !isCurrentlyOnAllowedPublicRoute && hasUsedFreeRecipe) {
-        console.log(
-          `[RootLayoutNav] Post-initial: User logged out and needs login redirect: ${currentPathSegments}`,
-        );
-        router.replace('/login');
-      } else {
+        console.log(`[RootLayoutNav] Initial redirect already done - running simplified logic for: ${currentPathSegments}`);
+        
+        // Handle authenticated user on login/auth page (e.g., after successful sign-in)
+        if (session && inAuthFlow) {
+            console.log(
+                `[RootLayoutNav] Post-initial: Authenticated user on auth page, redirecting to main app: ${currentPathSegments}`,
+            );
+            router.replace('/tabs');
+            return; // Don't render navigators yet, let redirect happen
+        }
+        
+        // Handle unauthenticated user needing login redirect
+        if (!session && !inAuthFlow && !isCurrentlyOnAllowedPublicRoute && hasUsedFreeRecipe) {
+            console.log(
+                `[RootLayoutNav] Post-initial: User logged out and needs login redirect: ${currentPathSegments}`,
+            );
+            router.replace('/login');
+            return; // Don't render navigators yet, let redirect happen
+        }
+        
         console.log(`[RootLayoutNav] Post-initial: No action needed for: ${currentPathSegments}`);
-      }
+        // Always render navigators if initial redirect is done and no redirects needed
+        setShouldRenderNavigators(true);
+        return;
+    }
+
+    // Handle initial +not-found explicitly before other initial redirects
+    if (stableSegments[0] === '+not-found') {
+      const targetRoute = session ? '/tabs' : '/tabs/explore'; // Redirect to tabs index or explore if not authenticated
+      console.log(`[RootLayoutNav] Initial '+not-found' detected, redirecting to: ${targetRoute}`);
+      router.replace(targetRoute);
+      initialRedirectDone.current = true;
+      // Don't immediately render navigators - let the redirect settle first
       return;
     }
 
-    // --- INITIAL REDIRECT LOGIC (runs only once) ---
+    
     console.log(`[RootLayoutNav] Running initial redirect logic for: ${currentPathSegments}`);
     if (!session) {
       // User is NOT authenticated
@@ -138,14 +167,11 @@ function RootLayoutNav() {
           console.log(
             `[RootLayoutNav] Unauthenticated, free recipe NOT used, attempting auth flow: ${currentPathSegments}. No redirect.`,
           );
-          // Mark initial redirect as done and return early
-          initialRedirectDone.current = true;
-          return; // Stay on login/auth page if they are already there
+        } else {
+          console.log(
+            `[RootLayoutNav] Unauthenticated, free recipe NOT used, allowing access to: ${currentPathSegments}.`,
+          );
         }
-        // Implicitly allows navigation to (tabs) and initial recipe flow if not in auth group
-        console.log(
-          `[RootLayoutNav] Unauthenticated, free recipe NOT used, allowing access to: ${currentPathSegments}.`,
-        );
       }
     } else {
       // User IS authenticated
@@ -154,13 +180,14 @@ function RootLayoutNav() {
         console.log(
           `[RootLayoutNav] Authenticated user on auth page: ${currentPathSegments}. Redirecting to main app.`,
         );
-        router.replace('/(tabs)');
+        router.replace('/tabs');
       }
     }
 
-    // Mark initial redirect logic as complete
+    // Mark initial redirect logic as complete and allow rendering AppNavigators
     console.log(`[RootLayoutNav] Marking initial redirect as complete for: ${currentPathSegments}`);
     initialRedirectDone.current = true;
+    setShouldRenderNavigators(true);
   }, [
     session,
     hasUsedFreeRecipe,
@@ -170,7 +197,23 @@ function RootLayoutNav() {
     router,
   ]);
 
-  return <AppNavigators />;
+  // Conditionally render AppNavigators only when shouldRenderNavigators is true
+  if (!shouldRenderNavigators) {
+    // You can return null, or a simple loading spinner here
+    // return null; 
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' }}>
+        {/* <ActivityIndicator size="large" color={COLORS.primary} /> */}
+      </View>
+    );
+  }
+
+  return (
+    <>
+      <StatusBar style="dark" />
+      <AppNavigators />
+    </>
+  );
 }
 
 export default function RootLayout() {

@@ -48,7 +48,7 @@ const LoginScreen = () => {
     <SafeAreaView style={styles.container}>
       <TouchableOpacity
         style={[styles.exitButton, { top: insets.top + SPACING.md }]}
-        onPress={() => router.replace('/(tabs)')}
+        onPress={() => router.replace('/tabs')}
       >
         <MaterialCommunityIcons
           name="close"
