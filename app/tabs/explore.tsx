@@ -33,23 +33,17 @@ const DevTools = () => {
 
   const { resetFreeRecipeUsage, hasUsedFreeRecipe } = useFreeUsage();
 
-  const handleFullReset = async () => {
-    await supabase.auth.signOut();
-    await resetFreeRecipeUsage();
-    router.replace('/login');
-  };
-
   return (
-    <View style={styles.devToolsContainer}>
-      <Text style={styles.devToolsTitle}>Dev Tools</Text>
-      <Text>Has Used Free Recipe: {String(hasUsedFreeRecipe)}</Text>
-      <TouchableOpacity style={styles.devButton} onPress={resetFreeRecipeUsage}>
-        <Text style={styles.devButtonText}>Reset Free Usage</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.devButton} onPress={handleFullReset}>
-        <Text style={styles.devButtonText}>Start Fresh (Sign Out & Reset)</Text>
-      </TouchableOpacity>
-    </View>
+    <>
+      <View style={styles.devToolsContainer}>
+        <Text style={styles.devToolsTitle}>Dev Tools</Text>
+        <Text>Has Used Free Recipe: {String(hasUsedFreeRecipe)}</Text>
+        <TouchableOpacity style={styles.devButton} onPress={resetFreeRecipeUsage}>
+          <Text style={styles.devButtonText}>Reset Free Usage</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.divider} />
+    </>
   );
 };
 
@@ -180,12 +174,7 @@ const ExploreScreen = () => {
     );
   }, [handleRecipePress, handleImageLoad, handleImageError]);
 
-  const handleResetFreeUsage = async () => {
-    console.log('[Dev Tools] Attempting to reset free recipe usage...');
-    await resetFreeRecipeUsage();
-    console.log('[Dev Tools] Free recipe usage has been reset.');
-    alert('Free recipe usage has been reset!');
-  };
+
 
   const renderContent = () => {
     if (isLoading) {
@@ -344,6 +333,12 @@ const styles = StyleSheet.create({
     marginVertical: SPACING.smMd,
     borderRadius: 5,
     alignItems: 'center',
+  } as ViewStyle,
+  divider: {
+    height: 1,
+    backgroundColor: COLORS.lightGray,
+    marginHorizontal: SPACING.pageHorizontal,
+    marginBottom: SPACING.md,
   } as ViewStyle,
   devToolsTitle: {
     fontWeight: FONT.weight.semiBold,

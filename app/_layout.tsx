@@ -27,7 +27,11 @@ if (__DEV__) {
   });
 }
 
-function RootLayoutNav() {
+interface RootLayoutNavProps {
+  isFirstLaunch: boolean | null;
+}
+
+function RootLayoutNav({ isFirstLaunch }: RootLayoutNavProps) {
   console.log('[RootLayoutNav] Rendered');
   
   const { session, isLoading: isAuthLoading } = useAuth();
@@ -61,17 +65,25 @@ function RootLayoutNav() {
       hasUsedFreeRecipe, 
       isAuthLoading, 
       isLoadingFreeUsage, 
-      segments: stableSegments.join('/') 
+      segments: stableSegments.join('/'),
+      isFirstLaunch
     });
     console.log('[RootLayoutNav] initialRedirectDone.current value:', initialRedirectDone.current);
     
-    // Wait for authentication and free usage contexts to finish loading
-    if (isAuthLoading || isLoadingFreeUsage) {
+    // Wait for authentication, free usage contexts, and first launch detection to finish loading
+    if (isAuthLoading || isLoadingFreeUsage || isFirstLaunch === null) {
       console.log(
-        `[RootLayoutNav] Waiting for contexts to load. isAuthLoading: ${isAuthLoading}, isLoadingFreeUsage: ${isLoadingFreeUsage}`,
+        `[RootLayoutNav] Waiting for contexts to load. isAuthLoading: ${isAuthLoading}, isLoadingFreeUsage: ${isLoadingFreeUsage}, isFirstLaunch: ${isFirstLaunch}`,
       );
       // Ensure navigators are not rendered until contexts are ready
       setShouldRenderNavigators(false); 
+      return;
+    }
+
+    // If this is a first launch, don't run navigation logic - let WelcomeScreen handle it
+    if (isFirstLaunch) {
+      console.log('[RootLayoutNav] First launch detected - deferring navigation to WelcomeScreen');
+      setShouldRenderNavigators(false);
       return;
     }
 
@@ -195,6 +207,7 @@ function RootLayoutNav() {
     isLoadingFreeUsage,
     stableSegments,
     router,
+    isFirstLaunch,
   ]);
 
   // Conditionally render AppNavigators only when shouldRenderNavigators is true
@@ -220,6 +233,7 @@ export default function RootLayout() {
   console.log('[RootLayout] Rendered');
   
   useFrameworkReady();
+  const router = useRouter();
 
   const [assetsLoaded, setAssetsLoaded] = useState(false);
   const [fontsLoaded] = useFonts({
@@ -295,18 +309,25 @@ export default function RootLayout() {
     }
   }, [ready]);
 
-  const handleWelcomeDismiss = async () => {
+  const handleWelcomeDismiss = useCallback(async () => {
     try {
       await AsyncStorage.setItem('hasLaunched', 'true');
+      console.log('[RootLayout] Welcome dismissed - navigating to home tab');
       console.log('[RootLayout] isFirstLaunch state change:', false);
       setIsFirstLaunch(false); // Hide the welcome screen immediately
+      
+      // Navigate to home tab after dismissing welcome screen
+      router.replace('/tabs'); // Navigate to home tab (index)
     } catch (error) {
       console.error('Failed to set hasLaunched flag', error);
       // Still proceed to app
       console.log('[RootLayout] isFirstLaunch state change (error fallback):', false);
       setIsFirstLaunch(false);
+      
+      // Still try to navigate even if AsyncStorage failed
+      router.replace('/tabs');
     }
-  };
+  }, [router]);
 
   // 1. Show nothing (splash screen) while loading fonts/assets/state
   if (!ready) {
@@ -318,7 +339,7 @@ export default function RootLayout() {
     <ErrorModalProvider>
       <FreeUsageProvider>
         <AuthProvider>
-          <RootLayoutNav />
+          <RootLayoutNav isFirstLaunch={isFirstLaunch} />
         </AuthProvider>
       </FreeUsageProvider>
 

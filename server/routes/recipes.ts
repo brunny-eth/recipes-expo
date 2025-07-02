@@ -145,7 +145,7 @@ router.get('/explore-random', async (req: Request, res: Response) => {
     const { data, error } = await supabase
       .from('processed_recipes_cache')
       .select('id, recipe_data')
-      .eq('user_modified', false)
+      .eq('is_user_modified', false) // Only get original recipes, not user-modified ones
       .order('random')
       .limit(15);
 
