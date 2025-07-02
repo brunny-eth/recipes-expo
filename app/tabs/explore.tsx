@@ -77,11 +77,22 @@ const ExploreScreen = () => {
     const startTime = performance.now();
     console.log(`[PERF: ExploreScreen] Start fetchExploreRecipes at ${startTime.toFixed(2)}ms`);
 
+    const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+    if (!backendUrl) {
+      console.error('[ExploreScreen] EXPO_PUBLIC_API_URL is not set.');
+      setError('API configuration error. Please check your environment variables.');
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
     try {
-      const response = await fetch('/api/recipes/explore-random');
+      const apiUrl = `${backendUrl}/api/recipes/explore-random`;
+      console.log(`[ExploreScreen] Fetching from: ${apiUrl}`);
+      
+      const response = await fetch(apiUrl);
       if (!response.ok) {
         throw new Error(`Failed to fetch explore recipes: ${response.statusText}`);
       }
