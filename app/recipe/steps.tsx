@@ -288,7 +288,7 @@ export default function StepsScreen() {
   // Helper function to check if recipe has been modified
   const hasModifications = () => {
     if (!appliedChanges) return false;
-    return appliedChanges.ingredientChanges.length > 0 || appliedChanges.scalingFactor !== 1;
+    return appliedChanges.ingredientChanges.length > 0; // Only allow saving if ingredients were substituted/removed
   };
 
   // --- Lifted Timer Logic ---

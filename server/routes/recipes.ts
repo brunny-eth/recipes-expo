@@ -3,6 +3,7 @@ import { Content } from "@google/generative-ai"; // For type only, no initializa
 import { v4 as uuidv4 } from 'uuid';
 import { scraperClient, scraperApiKey } from '../lib/scraper';
 import { supabaseAdmin } from '../lib/supabaseAdmin';
+import { supabase } from '../lib/supabase';
 import { parseAndCacheRecipe } from '../services/parseRecipe';
 import { rewriteForSubstitution } from '../services/substitutionRewriter';
 import { scaleInstructions } from '../services/instructionScaling';
@@ -130,6 +131,42 @@ router.get('/:id(\\d+)', async (req: Request, res: Response) => {
   } catch (err) {
     const error = err as Error;
     logger.error({ requestId: (req as any).id, err: error, route: req.originalUrl, method: req.method, params: req.params }, 'Error fetching single recipe');
+    res.status(500).json({ error: error.message || 'An unknown error occurred' });
+  }
+})
+
+// Get random recipes for explore page
+router.get('/explore-random', async (req: Request, res: Response) => {
+  const requestId = (req as any).id;
+  
+  try {
+    logger.info({ requestId, route: req.originalUrl, method: req.method }, 'Received request for explore-random recipes');
+
+    const { data, error } = await supabase
+      .from('processed_recipes_cache')
+      .select('id, recipe_data')
+      .eq('user_modified', false)
+      .order('random')
+      .limit(15);
+
+    if (error) {
+      logger.error({ requestId, err: error, route: req.originalUrl, method: req.method }, 'Error fetching random recipes for explore');
+      throw error;
+    }
+
+    const recipeCount = data?.length || 0;
+    logger.info({ requestId, recipeCount, route: req.originalUrl, method: req.method }, `Successfully fetched ${recipeCount} random recipes for explore`);
+
+    // Transform data to return just the recipe_data with ids
+    const recipes = data?.map(item => ({
+      ...item.recipe_data,
+      id: item.id
+    })) || [];
+
+    res.json(recipes);
+  } catch (err) {
+    const error = err as Error;
+    logger.error({ requestId, err: error, route: req.originalUrl, method: req.method }, 'Error in /explore-random route processing');
     res.status(500).json({ error: error.message || 'An unknown error occurred' });
   }
 })
