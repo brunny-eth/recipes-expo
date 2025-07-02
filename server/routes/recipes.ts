@@ -220,7 +220,15 @@ router.post('/save-modified', async (req: Request<any, any, SaveModifiedRecipeRe
   try {
     const { originalRecipeId, userId, modifiedRecipeData, appliedChanges } = req.body;
 
-    logger.info({ requestId, originalRecipeId, userId, appliedChanges }, 'Received request to save modified recipe');
+    logger.info({ 
+      requestId, 
+      originalRecipeId, 
+      userId, 
+      appliedChanges,
+      hasImage: !!modifiedRecipeData?.image,
+      hasThumbnail: !!modifiedRecipeData?.thumbnailUrl,
+      title: modifiedRecipeData?.title
+    }, 'Received request to save modified recipe');
 
     // --- Data Validation (basic, extend as needed) ---
     if (!originalRecipeId || !userId || !modifiedRecipeData || !appliedChanges) {
@@ -244,6 +252,7 @@ router.post('/save-modified', async (req: Request<any, any, SaveModifiedRecipeRe
         recipe_data: modifiedRecipeData, // Store the full reconstructed recipe here
         parent_recipe_id: originalRecipeId,
         source_type: 'user_modified', // Add a source type to distinguish modified recipes
+        is_user_modified: true, // Explicitly set the boolean flag for modified recipes
       })
       .select('id, url') // Select the new id and url to return them
       .single(); // Expect a single row back
@@ -256,7 +265,15 @@ router.post('/save-modified', async (req: Request<any, any, SaveModifiedRecipeRe
     const newModifiedRecipeId = newModifiedRecipeRows.id;
     const savedRecipeUrl = newModifiedRecipeRows.url;
 
-    logger.info({ requestId, newModifiedRecipeId, savedRecipeUrl }, 'Modified recipe inserted into processed_recipes_cache.');
+    logger.info({ 
+      requestId, 
+      newModifiedRecipeId, 
+      savedRecipeUrl,
+      parentRecipeId: originalRecipeId,
+      sourceType: 'user_modified',
+      isUserModified: true,
+      hasImagePreserved: !!modifiedRecipeData?.image
+    }, 'Modified recipe inserted into processed_recipes_cache.');
 
     // --- 3. Generate and Save Embedding for the New Modified Recipe ---
     // Prepare text inputs for embedding from the modifiedRecipeData

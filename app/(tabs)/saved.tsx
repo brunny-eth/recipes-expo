@@ -178,13 +178,14 @@ const renderRecipeItem = ({ item }: { item: SavedRecipe }) => {
   // Use title_override if available (for modified recipes), otherwise use original title
   const displayTitle = item.title_override || recipe_data.title;
 
-  // DEBUGGING: Log image URL information
-  console.log(`[DEBUG: SavedScreen] Image data for "${displayTitle}":`, {
-    hasImage: !!recipe_data.image,
-    hasThumbnail: !!recipe_data.thumbnailUrl,
-    imageUrl: imageUrl,
-    imageUrlLength: imageUrl?.length || 0
-  });
+  // Log image data for modified recipes to debug image preservation
+  if (isModified) {
+    console.log(`[SavedScreen] Modified recipe image data for "${displayTitle}":`, {
+      hasImage: !!recipe_data.image,
+      hasThumbnail: !!recipe_data.thumbnailUrl,
+      finalImageUrl: imageUrl || 'NONE',
+    });
+  }
 
   return (
       <TouchableOpacity

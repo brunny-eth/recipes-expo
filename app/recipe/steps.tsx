@@ -245,6 +245,9 @@ export default function StepsScreen() {
         title: modifiedRecipe.title,
         changesCount: appliedChanges.ingredientChanges.length,
         scalingFactor: appliedChanges.scalingFactor,
+        hasImage: !!modifiedRecipe.image,
+        hasThumbnail: !!modifiedRecipe.thumbnailUrl,
+        imageUrl: modifiedRecipe.image || 'MISSING',
       });
 
       const response = await fetch(`${backendUrl}/api/recipes/save-modified`, {
