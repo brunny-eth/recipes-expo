@@ -228,7 +228,6 @@ export default function RecipeSummaryScreen() {
   const [isAllergensExpanded, setIsAllergensExpanded] = useState(false);
   const [isSourceExpanded, setIsSourceExpanded] = useState(false);
   const [isRecipeSizeExpanded, setIsRecipeSizeExpanded] = useState(true);
-  const [isIngredientsExpanded, setIsIngredientsExpanded] = useState(true);
 
   const [originalYieldValue, setOriginalYieldValue] = useState<number | null>(
     null,
@@ -683,22 +682,21 @@ export default function RecipeSummaryScreen() {
 
         <View style={styles.divider} />
 
-        <CollapsibleSection
-          title="Ingredients"
-          isExpanded={isIngredientsExpanded}
-          onToggle={() => setIsIngredientsExpanded(!isIngredientsExpanded)}
-        >
-          <IngredientList
-            ingredientGroups={scaledIngredientGroups}
-            selectedScaleFactor={selectedScaleFactor}
-            appliedChanges={appliedChanges}
-            checkedIngredients={checkedIngredients}
-            toggleCheckIngredient={toggleCheckIngredient}
-            openSubstitutionModal={openSubstitutionModal}
-            undoIngredientRemoval={undoIngredientRemoval}
-            undoSubstitution={undoSubstitution}
-          />
-        </CollapsibleSection>
+        {/* Main Ingredients Heading (no toggle) */}
+        <View style={styles.mainIngredientsHeader}>
+          <Text style={styles.mainIngredientsTitle}>Ingredients</Text>
+        </View>
+
+        <IngredientList
+          ingredientGroups={scaledIngredientGroups}
+          selectedScaleFactor={selectedScaleFactor}
+          appliedChanges={appliedChanges}
+          checkedIngredients={checkedIngredients}
+          toggleCheckIngredient={toggleCheckIngredient}
+          openSubstitutionModal={openSubstitutionModal}
+          undoIngredientRemoval={undoIngredientRemoval}
+          undoSubstitution={undoSubstitution}
+        />
       </ScrollView>
 
       <RecipeFooterButtons
@@ -759,6 +757,14 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.divider,
     marginVertical: SPACING.lg,
   },
+  mainIngredientsHeader: {
+    marginBottom: SPACING.sm,
+  } as ViewStyle,
+  mainIngredientsTitle: {
+    ...sectionHeaderText,
+    color: COLORS.textDark,
+    textAlign: 'left',
+  } as TextStyle,
   centeredStatusContainer: {
     flex: 1,
     justifyContent: 'center',

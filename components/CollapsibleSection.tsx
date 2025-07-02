@@ -17,6 +17,7 @@ type CollapsibleSectionProps = {
   children: React.ReactNode;
   isExpanded: boolean;
   onToggle: () => void;
+  titleStyle?: TextStyle;
 };
 
 const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
@@ -24,11 +25,12 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   children,
   isExpanded,
   onToggle,
+  titleStyle,
 }) => {
   return (
     <View>
       <TouchableOpacity onPress={onToggle} style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>{title}</Text>
+        <Text style={[styles.sectionTitle, titleStyle]}>{title}</Text>
         <MaterialCommunityIcons
           name={isExpanded ? 'chevron-up' : 'chevron-down'}
           size={24}

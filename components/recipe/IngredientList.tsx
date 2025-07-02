@@ -1,7 +1,8 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, ViewStyle } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, FlatList, ViewStyle, TextStyle } from 'react-native';
 import { StructuredIngredient, IngredientGroup } from '@/common/types';
 import IngredientRow from '@/app/recipe/IngredientRow';
+import CollapsibleSection from '@/components/CollapsibleSection';
 import {
   captionText,
   bodyStrongText,
@@ -36,40 +37,73 @@ const IngredientList: React.FC<IngredientListProps> = ({
   undoIngredientRemoval,
   undoSubstitution,
 }) => {
+  // State to track which groups are expanded (default: all collapsed = false)
+  const [expandedGroups, setExpandedGroups] = useState<{ [key: number]: boolean }>({});
+
+  const toggleGroupExpanded = (groupIndex: number) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [groupIndex]: !prev[groupIndex]
+    }));
+  };
+
+  // Determine if we should show group toggles (only if multiple groups)
+  const shouldShowGroupToggles = ingredientGroups.length > 1;
   const renderIngredientGroup = ({ item: group, index: groupIndex }: { item: IngredientGroup; index: number }) => {
     if (!group.ingredients || group.ingredients.length === 0) {
       return null;
     }
 
+    const renderIngredients = () => {
+      return group.ingredients!.map((ingredient, ingredientIndex) => {
+        // Calculate global index for ingredient checking
+        let globalIndex = 0;
+        for (let i = 0; i < groupIndex; i++) {
+          globalIndex += ingredientGroups[i].ingredients?.length || 0;
+        }
+        globalIndex += ingredientIndex;
+
+        return (
+          <IngredientRow
+            key={`${ingredient.name}-${globalIndex}`}
+            ingredient={ingredient}
+            index={globalIndex}
+            isChecked={!!checkedIngredients[globalIndex]}
+            appliedChanges={appliedChanges}
+            toggleCheckIngredient={toggleCheckIngredient}
+            openSubstitutionModal={openSubstitutionModal}
+            undoIngredientRemoval={undoIngredientRemoval}
+            undoSubstitution={undoSubstitution}
+          />
+        );
+      });
+    };
+
+    // If there's only 1 group, don't show group headings - just show ingredients
+    if (!shouldShowGroupToggles) {
+      return (
+        <View key={`group-${groupIndex}`} style={styles.groupContainer}>
+          {renderIngredients()}
+        </View>
+      );
+    }
+
+    // If there are multiple groups, show each group with a toggle
+    // Use group name or a default title
+    const groupTitle = group.name === 'Main' ? 'Main Ingredients' : 
+                      (group.name || `Group ${groupIndex + 1}`);
+    const isExpanded = !!expandedGroups[groupIndex];
+
     return (
       <View key={`group-${groupIndex}`} style={styles.groupContainer}>
-        {/* Only show group name if it exists and it's not "Main" (default group) */}
-        {group.name && group.name !== 'Main' && (
-          <Text style={styles.groupHeader}>{group.name}</Text>
-        )}
-        
-        {group.ingredients.map((ingredient, ingredientIndex) => {
-          // Calculate global index for ingredient checking
-          let globalIndex = 0;
-          for (let i = 0; i < groupIndex; i++) {
-            globalIndex += ingredientGroups[i].ingredients?.length || 0;
-          }
-          globalIndex += ingredientIndex;
-
-          return (
-            <IngredientRow
-              key={`${ingredient.name}-${globalIndex}`}
-              ingredient={ingredient}
-              index={globalIndex}
-              isChecked={!!checkedIngredients[globalIndex]}
-              appliedChanges={appliedChanges}
-              toggleCheckIngredient={toggleCheckIngredient}
-              openSubstitutionModal={openSubstitutionModal}
-              undoIngredientRemoval={undoIngredientRemoval}
-              undoSubstitution={undoSubstitution}
-            />
-          );
-        })}
+        <CollapsibleSection
+          title={groupTitle}
+          isExpanded={isExpanded}
+          onToggle={() => toggleGroupExpanded(groupIndex)}
+          titleStyle={styles.groupToggleTitle}
+        >
+          {renderIngredients()}
+        </CollapsibleSection>
       </View>
     );
   };
@@ -116,6 +150,9 @@ const styles = StyleSheet.create({
     marginTop: SPACING.base,
     paddingLeft: SPACING.xs,
   },
+  groupToggleTitle: {
+    fontSize: FONT.size.bodyMedium, // Smaller than main Ingredients heading (which uses sectionHeaderText)
+  } as TextStyle,
   placeholderText: {
     ...captionText,
     fontStyle: 'italic',

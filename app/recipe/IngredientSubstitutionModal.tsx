@@ -84,13 +84,19 @@ export default function IngredientSubstitutionModal({
   };
 
   const options = useMemo<SubstitutionSuggestion[]>(() => {
-    if (!substitutions || substitutions.length === 0) {
+    // Filter out invalid substitutions (empty names, null, undefined)
+    const validSubstitutions = substitutions?.filter(
+      (sub) => sub && sub.name && sub.name.trim() !== ''
+    ) || [];
+    
+    if (validSubstitutions.length === 0) {
       return [removalOption];
     }
-    const hasRemoval = substitutions.some(
+    
+    const hasRemoval = validSubstitutions.some(
       (opt) => opt.name === removalOption.name,
     );
-    return hasRemoval ? substitutions : [...substitutions, removalOption];
+    return hasRemoval ? validSubstitutions : [...validSubstitutions, removalOption];
   }, [substitutions]);
 
   const handleApply = () => {
@@ -140,16 +146,6 @@ export default function IngredientSubstitutionModal({
         >
           <View style={styles.header}>
             <Text style={styles.title}>Substitute {ingredientName}</Text>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={handleCloseWithLog}
-            >
-              <MaterialCommunityIcons
-                name="close"
-                size={ICON_SIZE.md}
-                color={COLORS.textDark}
-              />
-            </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.optionsList}>
@@ -246,17 +242,12 @@ const styles = StyleSheet.create({
     maxHeight: '80%',
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: SPACING.pageHorizontal,
   },
   title: {
     ...sectionHeaderText,
     color: COLORS.textDark,
-  },
-  closeButton: {
-    padding: SPACING.sm,
   },
   optionsList: {
     marginBottom: SPACING.pageHorizontal,
