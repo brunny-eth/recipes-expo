@@ -10,6 +10,7 @@ import {
   TextStyle,
 } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -33,6 +34,20 @@ const DevTools = () => {
 
   const { resetFreeRecipeUsage, hasUsedFreeRecipe } = useFreeUsage();
 
+  const clearExploreCache = async () => {
+    try {
+      await Promise.all([
+        AsyncStorage.removeItem('exploreLastFetched'),
+        AsyncStorage.removeItem('exploreRecipes')
+      ]);
+      console.log('[DevTools] Cleared explore cache (timestamp and recipes)');
+      alert('Explore cache cleared! Next tab switch will fetch fresh recipes.');
+    } catch (error) {
+      console.error('[DevTools] Failed to clear explore cache:', error);
+      alert('Failed to clear cache');
+    }
+  };
+
   return (
     <>
       <View style={styles.devToolsContainer}>
@@ -40,6 +55,9 @@ const DevTools = () => {
         <Text>Has Used Free Recipe: {String(hasUsedFreeRecipe)}</Text>
         <TouchableOpacity style={styles.devButton} onPress={resetFreeRecipeUsage}>
           <Text style={styles.devButtonText}>Reset Free Usage</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.devButton} onPress={clearExploreCache}>
+          <Text style={styles.devButtonText}>Clear Explore Cache</Text>
         </TouchableOpacity>
       </View>
       <View style={styles.divider} />
@@ -66,10 +84,51 @@ const ExploreScreen = () => {
     };
   }, []);
 
-  // Fetch explore recipes on mount
-  const fetchExploreRecipes = useCallback(async () => {
+  // Load cached recipes from AsyncStorage
+  const loadCachedRecipes = useCallback(async (): Promise<{ recipes: ParsedRecipe[] | null; shouldFetch: boolean }> => {
+    try {
+      const [lastFetchedStr, cachedRecipesStr] = await Promise.all([
+        AsyncStorage.getItem('exploreLastFetched'),
+        AsyncStorage.getItem('exploreRecipes')
+      ]);
+
+      // No cached data at all
+      if (!lastFetchedStr || !cachedRecipesStr) {
+        console.log('[ExploreScreen] No cached data found - will fetch');
+        return { recipes: null, shouldFetch: true };
+      }
+
+      // Check if cache is fresh
+      const lastFetched = parseInt(lastFetchedStr, 10);
+      const now = Date.now();
+      const sixHours = 6 * 60 * 60 * 1000; // 6 hours in milliseconds
+      const timeSinceLastFetch = now - lastFetched;
+
+      if (timeSinceLastFetch >= sixHours) {
+        console.log(`[ExploreScreen] Cache expired (${Math.round(timeSinceLastFetch / (60 * 60 * 1000))}h old) - will fetch`);
+        return { recipes: null, shouldFetch: true };
+      }
+
+      // Cache is fresh, parse and return recipes
+      try {
+        const recipes = JSON.parse(cachedRecipesStr) as ParsedRecipe[];
+        const hoursLeft = Math.round((sixHours - timeSinceLastFetch) / (60 * 60 * 1000) * 10) / 10;
+        console.log(`[ExploreScreen] Using cached recipes (${recipes.length} recipes, ${hoursLeft}h left)`);
+        return { recipes, shouldFetch: false };
+      } catch (parseError) {
+        console.error('[ExploreScreen] Error parsing cached recipes - will fetch:', parseError);
+        return { recipes: null, shouldFetch: true };
+      }
+    } catch (error) {
+      console.error('[ExploreScreen] Error loading cached recipes - will fetch as fallback:', error);
+      return { recipes: null, shouldFetch: true };
+    }
+  }, []);
+
+  // Fetch explore recipes from API
+  const fetchExploreRecipesFromAPI = useCallback(async () => {
     const startTime = performance.now();
-    console.log(`[PERF: ExploreScreen] Start fetchExploreRecipes at ${startTime.toFixed(2)}ms`);
+    console.log(`[PERF: ExploreScreen] Start fetchExploreRecipesFromAPI at ${startTime.toFixed(2)}ms`);
 
     const backendUrl = process.env.EXPO_PUBLIC_API_URL;
     if (!backendUrl) {
@@ -95,6 +154,19 @@ const ExploreScreen = () => {
       console.log(`[ExploreScreen] Fetched ${recipes?.length || 0} explore recipes from API.`);
       
       setExploreRecipes(recipes || []);
+      
+      // Store both timestamp and recipe data
+      try {
+        const now = Date.now().toString();
+        await Promise.all([
+          AsyncStorage.setItem('exploreLastFetched', now),
+          AsyncStorage.setItem('exploreRecipes', JSON.stringify(recipes || []))
+        ]);
+        console.log('[ExploreScreen] Stored fetch timestamp and recipe data');
+      } catch (storageError) {
+        console.warn('[ExploreScreen] Failed to store cache data:', storageError);
+        // Don't throw - this is not critical
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load explore recipes';
       console.error('[ExploreScreen] Error fetching explore recipes:', err);
@@ -102,21 +174,43 @@ const ExploreScreen = () => {
     } finally {
       setIsLoading(false);
       const totalTime = performance.now() - startTime;
-      console.log(`[PERF: ExploreScreen] Total fetchExploreRecipes duration: ${totalTime.toFixed(2)}ms`);
+      console.log(`[PERF: ExploreScreen] Total fetchExploreRecipesFromAPI duration: ${totalTime.toFixed(2)}ms`);
     }
   }, []);
 
-  // Fetch recipes on component mount
+  // Main fetch function with AsyncStorage caching
+  const fetchExploreRecipes = useCallback(async () => {
+    console.log('[ExploreScreen] fetchExploreRecipes called - checking cache');
+    
+    const { recipes, shouldFetch } = await loadCachedRecipes();
+    
+    if (!shouldFetch && recipes) {
+      // Use cached recipes immediately
+      console.log('[ExploreScreen] Using cached recipes - no fetch needed');
+      setExploreRecipes(recipes);
+      setIsLoading(false);
+      return;
+    }
+
+    // Need to fetch fresh data
+    console.log('[ExploreScreen] Cache miss or expired - fetching fresh data');
+    await fetchExploreRecipesFromAPI();
+  }, [loadCachedRecipes, fetchExploreRecipesFromAPI]);
+
+  // Fetch recipes on component mount and focus
   useEffect(() => {
     fetchExploreRecipes();
   }, [fetchExploreRecipes]);
 
-  // Focus effect logging
+  // Focus effect for navigation-aware caching
   useFocusEffect(
     useCallback(() => {
       console.log('[ExploreScreen] 🎯 useFocusEffect triggered');
       console.log('[ExploreScreen] 👁️ Screen focused');
 
+      // Check cache when screen comes into focus (but don't double-fetch on mount)
+      // The useEffect above handles the initial mount
+      
       return () => {
         console.log('[ExploreScreen] 🌀 useFocusEffect cleanup');
         console.log('[ExploreScreen] 🌀 Screen is blurring (not necessarily unmounting)');
@@ -199,7 +293,7 @@ const ExploreScreen = () => {
           <Text style={styles.emptySubtext}>{error}</Text>
           <TouchableOpacity
             style={styles.retryButton}
-            onPress={fetchExploreRecipes}
+            onPress={fetchExploreRecipesFromAPI}
           >
             <Text style={styles.retryButtonText}>Try Again</Text>
           </TouchableOpacity>

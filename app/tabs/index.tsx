@@ -33,9 +33,13 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { useFreeUsage } from '@/context/FreeUsageContext';
 import LogoHeaderLayout from '@/components/LogoHeaderLayout';
+import RecipeMatchSelectionModal from '@/components/RecipeMatchSelectionModal';
+import { CombinedParsedRecipe } from '@/common/types';
 
 export default function HomeScreen() {
   const [recipeUrl, setRecipeUrl] = useState('');
+  const [showMatchSelectionModal, setShowMatchSelectionModal] = useState(false);
+  const [potentialMatches, setPotentialMatches] = useState<{ recipe: CombinedParsedRecipe; similarity: number; }[]>([]);
   const router = useRouter();
   const { showError } = useErrorModal();
   const { session } = useAuth();
@@ -106,6 +110,23 @@ export default function HomeScreen() {
     setRecipeUrl(''); // Clear input after submission
   };
 
+  const handleMatchSelectionAction = useCallback((action: 'select' | 'createNew' | 'returnHome', selectedRecipeId?: string) => {
+    setShowMatchSelectionModal(false); // Always dismiss the modal first
+
+    if (action === 'select' && selectedRecipeId) {
+      router.push(`/recipe/summary?id=${selectedRecipeId}`);
+      console.log('[HomeScreen] User selected from modal, routing to recipe ID:', selectedRecipeId);
+    } else if (action === 'createNew') {
+      // Trigger the full LLM parsing flow with the original input
+      handleNavigation(recipeUrl);
+      console.log('[HomeScreen] User opted to create new recipe, triggering LLM parse for:', recipeUrl);
+    } else if (action === 'returnHome') {
+      // Clear input and stay on home screen
+      setRecipeUrl('');
+      console.log('[HomeScreen] User opted to return to home, clearing input.');
+    }
+  }, [router, recipeUrl]);
+
   const handleSubmit = async () => {
     if (!recipeUrl || recipeUrl.trim() === '') {
       showError('Input Required', 'Please paste a recipe URL or recipe text.');
@@ -129,8 +150,62 @@ export default function HomeScreen() {
       }
     }
 
-    // Proceed with navigation
-    handleNavigation(recipeInput);
+    // Check if input looks like a URL - if so, proceed with normal flow
+    const isUrl = recipeInput.startsWith('http://') || recipeInput.startsWith('https://');
+    if (isUrl) {
+      console.log('[HomeScreen] URL detected, proceeding with standard flow.');
+      handleNavigation(recipeInput);
+      return;
+    }
+
+    // For text input, try to get potential matches from the backend
+    try {
+      console.log('[HomeScreen] Text input detected, checking for cached matches.');
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+      if (!backendUrl) {
+        console.error('[HomeScreen] EXPO_PUBLIC_API_URL is not set.');
+        handleNavigation(recipeInput); // Fallback to normal flow
+        return;
+      }
+
+      const response = await fetch(`${backendUrl}/api/ai/parse`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ input: recipeInput }),
+      });
+
+      if (!response.ok) {
+        console.error('[HomeScreen] API request failed:', response.statusText);
+        handleNavigation(recipeInput); // Fallback to normal flow
+        return;
+      }
+
+      const parseResult = await response.json();
+      console.log('[HomeScreen] Parse result:', parseResult);
+
+      // Handle different response cases
+      if (parseResult.cachedMatches && parseResult.cachedMatches.length > 1) {
+        // Multiple matches: show modal
+        setPotentialMatches(parseResult.cachedMatches);
+        setShowMatchSelectionModal(true);
+        console.log('[HomeScreen] Multiple cached matches found, showing selection modal.');
+      } else if (parseResult.cachedMatches && parseResult.cachedMatches.length === 1) {
+        // Single match: auto-route directly
+        const matchId = parseResult.cachedMatches[0].recipe.id;
+        router.push(`/recipe/summary?id=${matchId}`);
+        console.log('[HomeScreen] Single cached match found, auto-routing to:', parseResult.cachedMatches[0].recipe.title);
+      } else {
+        // No fuzzy matches or parsing result ready: proceed with existing flow
+        console.log('[HomeScreen] No relevant cached matches found for text input. Proceeding with standard flow.');
+        handleNavigation(recipeInput);
+      }
+    } catch (error) {
+      console.error('[HomeScreen] Error checking for cached matches:', error);
+      // Fallback to normal flow on error
+      handleNavigation(recipeInput);
+    }
   };
 
   // Memoized animated logo component to prevent recreation on re-renders
@@ -206,6 +281,15 @@ export default function HomeScreen() {
           </KeyboardAvoidingView>
         </Animated.View>
       </TouchableWithoutFeedback>
+      
+      {/* Recipe Match Selection Modal */}
+      {showMatchSelectionModal && (
+        <RecipeMatchSelectionModal
+          visible={showMatchSelectionModal}
+          matches={potentialMatches}
+          onAction={handleMatchSelectionAction}
+        />
+      )}
     </LogoHeaderLayout>
   );
 }

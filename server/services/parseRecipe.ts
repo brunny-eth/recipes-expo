@@ -25,6 +25,7 @@ export type ParseResult = {
     };
     usage: StandardizedUsage;
     fetchMethodUsed?: string;
+    cachedMatches?: { recipe: CombinedParsedRecipe; similarity: number; }[]; // NEW FIELD
 };
 
 export async function parseAndCacheRecipe(

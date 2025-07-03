@@ -1,10 +1,11 @@
 import { supabaseAdmin } from '../server/lib/supabaseAdmin';
 import logger from '../server/lib/logger';
+import { CombinedParsedRecipe } from '../common/types';
 
 export async function findSimilarRecipe(
   embedding: number[],
-  threshold = 0.55
-): Promise<{ recipe: any | null; similarity: number } | null> {
+  threshold = 0.50
+): Promise<{ recipe: CombinedParsedRecipe; similarity: number }[] | null> {
   try {
     if (!embedding || embedding.length === 0) {
       logger.warn({ function: 'findSimilarRecipe' }, "findSimilarRecipe called with an empty or null embedding.");
@@ -16,14 +17,15 @@ export async function findSimilarRecipe(
 
     logger.debug({
       function: 'findSimilarRecipe',
-      embeddingLength: embedding.length, // Your DB vector column should match this dimension (e.g., vector(1536))
+      queryEmbeddingLength: embedding.length,
       threshold,
-    }, "Executing RPC 'match_recipes_by_embedding'");
+      requestedMatchCount: 5
+    }, "Calling RPC with increased match_count.");
 
     const { data, error } = await supabaseAdmin.rpc('match_recipes_by_embedding', {
       query_embedding: vectorString,
       match_threshold: threshold,
-      match_count: 1,
+      match_count: 5,
     });
 
     if (error) {
@@ -35,30 +37,43 @@ export async function findSimilarRecipe(
       return null; 
     }
 
-    logger.debug({ function: 'findSimilarRecipe', data }, "Raw data from RPC");
+    logger.debug({ function: 'findSimilarRecipe', rawRpcData: data }, "Raw data from RPC.");
 
     if (!data || data.length === 0) {
       logger.info({ function: 'findSimilarRecipe' }, "No similar recipes found from RPC call.");
       return null;
     }
 
-    const match = data[0];
+    // Filter by threshold, sort by similarity descending, and take top 3
+    const filteredMatches = data
+      .filter((match: any) => match.similarity >= threshold)
+      .sort((a: any, b: any) => b.similarity - a.similarity)
+      .slice(0, 3);
 
-    // The raw match data contains the nested recipe_data and the similarity score.
-    // The recipe_data is what we want to return, flattened with its ID.
-    const flatRecipe = match.recipe_data
-      ? { ...match.recipe_data, id: match.id ?? match.recipe_id }
-      : null;
-
-    if (!flatRecipe) {
-      logger.warn({ function: 'findSimilarRecipe', match }, "Match found but recipe_data was null or missing.");
+    if (filteredMatches.length === 0) {
+      logger.info({ function: 'findSimilarRecipe', threshold }, "No matches found above threshold.");
       return null;
     }
 
-    return {
-      recipe: flatRecipe,
-      similarity: match.similarity,
-    };
+    // Transform the matches to include the flattened recipe data
+    const finalMatches = filteredMatches.map((match: any) => {
+      const flatRecipe = match.recipe_data
+        ? { ...match.recipe_data, id: match.id ?? match.recipe_id }
+        : null;
+
+      return {
+        recipe: flatRecipe,
+        similarity: match.similarity,
+      };
+    }).filter((match: any) => match.recipe !== null); // Remove any matches with null recipe data
+
+    logger.info({ 
+      function: 'findSimilarRecipe', 
+      foundMatchesCount: finalMatches.length, 
+      thresholdUsed: threshold 
+    }, "Returning final similar recipes array.");
+
+    return finalMatches.length > 0 ? finalMatches : null;
   } catch (e: any) {
     logger.error({
         function: 'findSimilarRecipe',
