@@ -69,6 +69,9 @@ export const ErrorModalProvider: React.FC<{ children: ReactNode }> = ({
 
   const showError = useCallback(
     (title: string, message: string, onDismissCallback?: () => void) => {
+      // Add granular logging for useCallback recreation
+      console.log('[ErrorModalContext] showError useCallback recreated. Empty dependencies array - should be stable.');
+      
       // Use ref.current to access latest visible and modalData state
       if (visibleRef.current && modalDataRef.current) {
         // Prevent duplicate flashes if the same error is shown rapidly
@@ -95,13 +98,18 @@ export const ErrorModalProvider: React.FC<{ children: ReactNode }> = ({
         onDismissCallback: !!onDismissCallback,
       });
       console.trace('[DEBUG] Trace for showError');
+      console.log('[ErrorModalContext] State update: setModalData() called with new modal data');
       setModalData({ title, message, onDismissCallback });
     },
     [], // Empty dependency array - function is now truly stable
   );
 
   const hideError = useCallback(() => {
+    // Add granular logging for useCallback recreation
+    console.log('[ErrorModalContext] hideError useCallback recreated. Empty dependencies array - should be stable.');
+    
     requestAnimationFrame(() => {
+      console.log('[ErrorModalContext] State update: setVisible(false)');
       setVisible(false);
       // Use ref.current to access the latest modalData
       if (modalDataRef.current?.onDismissCallback) {
@@ -111,6 +119,7 @@ export const ErrorModalProvider: React.FC<{ children: ReactNode }> = ({
 
       // Safely clear data after the hide animation is complete
       setTimeout(() => {
+        console.log('[ErrorModalContext] State update: setModalData(null) - clearing modal data');
         setModalData(null);
       }, 500);
     });

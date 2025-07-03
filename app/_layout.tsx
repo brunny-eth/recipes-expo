@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { useRouter, useSegments } from 'expo-router';
+import { useRouter, useSegments, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
@@ -27,11 +27,7 @@ if (__DEV__) {
   });
 }
 
-interface RootLayoutNavProps {
-  isFirstLaunch: boolean | null;
-}
-
-function RootLayoutNav({ isFirstLaunch }: RootLayoutNavProps) {
+function RootLayoutNav() {
   console.log('[RootLayoutNav] Rendered');
   
   const { session, isLoading: isAuthLoading } = useAuth();
@@ -39,17 +35,119 @@ function RootLayoutNav({ isFirstLaunch }: RootLayoutNavProps) {
   const router = useRouter();
   const segments = useSegments();
 
-  // Track if initial navigation redirect has already occurred
-  const initialRedirectDone = useRef(false);
+  // === INITIALIZATION STATE (moved from RootLayout) ===
+  const [assetsLoaded, setAssetsLoaded] = useState(false);
+  const [fontsLoaded] = useFonts({
+    'Recoleta-Medium': require('../assets/fonts/Recoleta-Medium.otf'),
+    'Inter-Regular': require('../assets/fonts/Inter-Regular.ttf'),
+    'Inter-SemiBold': require('../assets/fonts/Inter-SemiBold.ttf'),
+  });
+  const [isFirstLaunch, setIsFirstLaunch] = useState<boolean | null>(null);
 
-  // Stabilize segments to prevent unnecessary re-renders
+  // === NAVIGATION STATE ===
+  const routerRef = useRef(router);
+  const initialNavigationHandled = useRef(false);
   const stableSegments = useMemo(() => segments, [segments.join('/')]);
 
-  // NEW STATE: Control when the main AppNavigators should render
-  const [shouldRenderNavigators, setShouldRenderNavigators] = useState(false);
+  // Update router ref when it changes
+  useEffect(() => {
+    routerRef.current = router;
+  }, [router]);
 
-  // Define routes that are always accessible to unauthenticated users,
-  // even if they have used their free recipe.
+  // === INITIALIZATION LOGIC (moved from RootLayout) ===
+  useEffect(() => {
+    async function prepareInitialAppLoad() {
+      console.log('[RootLayoutNav] Starting prepareInitialAppLoad function...');
+      try {
+        // Load assets
+        await Asset.loadAsync(require('@/assets/images/meez_logo.webp'));
+        console.log('[RootLayoutNav] Assets loaded successfully.');
+
+        // Check first launch
+        const hasLaunched = await AsyncStorage.getItem('hasLaunched');
+        console.log(`[RootLayoutNav] AsyncStorage 'hasLaunched' value: ${hasLaunched}`);
+
+        if (hasLaunched === null) {
+          console.log('[RootLayoutNav] First launch detected. Setting isFirstLaunch to true.');
+          console.log('[RootLayoutNav] State update: setIsFirstLaunch(true)');
+          setIsFirstLaunch(true);
+        } else {
+          console.log('[RootLayoutNav] Not first launch. Setting isFirstLaunch to false.');
+          console.log('[RootLayoutNav] State update: setIsFirstLaunch(false)');
+          setIsFirstLaunch(false);
+        }
+      } catch (e) {
+        console.warn('[RootLayoutNav] Failed to load assets or check first launch', e);
+        console.log('[RootLayoutNav] State update: setIsFirstLaunch(false) - error fallback');
+        setIsFirstLaunch(false); // Default to not first launch on error
+      } finally {
+        console.log('[RootLayoutNav] prepareInitialAppLoad finished. Setting assetsLoaded to true.');
+        console.log('[RootLayoutNav] State update: setAssetsLoaded(true)');
+        setAssetsLoaded(true);
+      }
+    }
+
+    console.log(`[RootLayoutNav] useFonts hook state: fontsLoaded = ${fontsLoaded}`);
+    if (fontsLoaded) {
+      console.log('[RootLayoutNav] Fonts are now loaded via useFonts.');
+    }
+
+    prepareInitialAppLoad();
+  }, [fontsLoaded]);
+
+  // === READY STATE CALCULATION ===
+  const isReadyForNavigation = fontsLoaded && assetsLoaded && isFirstLaunch !== null && !isAuthLoading && !isLoadingFreeUsage;
+  
+  console.log('[RootLayoutNav] Ready state calculation:', {
+    fontsLoaded,
+    assetsLoaded,
+    isFirstLaunch,
+    isAuthLoading,
+    isLoadingFreeUsage,
+    isReadyForNavigation,
+    // Detailed breakdown of each condition
+    conditions: {
+      'fontsLoaded': fontsLoaded ? '✅' : '❌',
+      'assetsLoaded': assetsLoaded ? '✅' : '❌', 
+      'isFirstLaunch !== null': isFirstLaunch !== null ? '✅' : '❌',
+      '!isAuthLoading': !isAuthLoading ? '✅' : '❌',
+      '!isLoadingFreeUsage': !isLoadingFreeUsage ? '✅' : '❌',
+    }
+  });
+
+  // === SPLASH SCREEN MANAGEMENT ===
+  // Splash screen is now hidden in the navigation logic once initial navigation is complete
+  // This ensures it only hides after all redirects are settled
+
+  // === WELCOME SCREEN DISMISS HANDLER ===
+  const handleWelcomeDismiss = useCallback(async () => {
+    try {
+      await AsyncStorage.setItem('hasLaunched', 'true');
+      console.log('[RootLayoutNav] Welcome dismissed - navigating to home tab');
+      console.log('[RootLayoutNav] State update: setIsFirstLaunch(false) - welcome dismissed');
+      setIsFirstLaunch(false); // Hide the welcome screen immediately
+      
+      // Navigate to home tab after dismissing welcome screen
+      router.replace('/tabs'); // Navigate to home tab (index)
+      
+      // Hide splash screen after welcome screen is dismissed
+      console.log('[RootLayoutNav] Welcome dismissed - hiding splash screen');
+      SplashScreen.hideAsync();
+    } catch (error) {
+      console.error('Failed to set hasLaunched flag', error);
+      // Still proceed to app
+      console.log('[RootLayoutNav] State update: setIsFirstLaunch(false) - welcome dismiss error fallback');
+      setIsFirstLaunch(false);
+      
+      // Still try to navigate even if AsyncStorage failed
+      router.replace('/tabs');
+      
+      // Still hide splash screen on error
+      SplashScreen.hideAsync();
+    }
+  }, [router]);
+
+  // === PUBLIC ROUTES CONFIGURATION ===
   const PUBLIC_ALLOWED_ROUTES_PREFIXES = [
     'tabs', // Covers /tabs (index), /explore, /settings, /saved
     'login',
@@ -57,38 +155,32 @@ function RootLayoutNav({ isFirstLaunch }: RootLayoutNavProps) {
     '+not-found', // For the 404 page
   ];
 
-  useEffect(() => {
-    console.log('[RootLayoutNav] Main Navigation useEffect evaluating...');
-    console.log('[RootLayoutNav] Dependencies for navigation useEffect:', { 
+  // === MAIN NAVIGATION LOGIC ===
+  const handleNavigation = useCallback(() => {
+    console.log('[RootLayoutNav] Main Navigation logic evaluating...');
+    console.log('[RootLayoutNav] Dependencies for navigation logic:', { 
       session: !!session, 
       sessionUserId: session?.user?.id, 
       hasUsedFreeRecipe, 
       isAuthLoading, 
       isLoadingFreeUsage, 
       segments: stableSegments.join('/'),
-      isFirstLaunch
+      isFirstLaunch,
+      isReadyForNavigation,
+      initialNavigationHandled: initialNavigationHandled.current
     });
-    console.log('[RootLayoutNav] initialRedirectDone.current value:', initialRedirectDone.current);
     
-    // Wait for authentication, free usage contexts, and first launch detection to finish loading
-    if (isAuthLoading || isLoadingFreeUsage || isFirstLaunch === null) {
-      console.log(
-        `[RootLayoutNav] Waiting for contexts to load. isAuthLoading: ${isAuthLoading}, isLoadingFreeUsage: ${isLoadingFreeUsage}, isFirstLaunch: ${isFirstLaunch}`,
-      );
-      // Ensure navigators are not rendered until contexts are ready
-      setShouldRenderNavigators(false); 
+    // Only proceed if framework is ready and initial navigation hasn't been handled
+    if (!isReadyForNavigation || initialNavigationHandled.current || isFirstLaunch === null) {
+      console.log('[RootLayoutNav] Not ready for navigation yet, waiting...');
       return;
     }
 
     // If this is a first launch, don't run navigation logic - let WelcomeScreen handle it
     if (isFirstLaunch) {
       console.log('[RootLayoutNav] First launch detected - deferring navigation to WelcomeScreen');
-      setShouldRenderNavigators(false);
       return;
     }
-
-    // --- INITIAL REDIRECT LOGIC (runs only once, and when contexts are loaded) ---
-    // This block should handle the very first navigation decision.
 
     const currentPathSegments = stableSegments.join('/');
     const inAuthFlow = stableSegments[0] === 'login' || stableSegments[0] === 'auth';
@@ -106,121 +198,87 @@ function RootLayoutNav({ isFirstLaunch }: RootLayoutNavProps) {
       },
     );
 
-    // If initial redirect already happened, just allow rendering and potentially handle post-initial auth changes
-    if (initialRedirectDone.current) {
-        console.log(`[RootLayoutNav] Initial redirect already done - running simplified logic for: ${currentPathSegments}`);
-        
-        // Handle authenticated user on login/auth page (e.g., after successful sign-in)
-        if (session && inAuthFlow) {
-            console.log(
-                `[RootLayoutNav] Post-initial: Authenticated user on auth page, redirecting to main app: ${currentPathSegments}`,
-            );
-            router.replace('/tabs');
-            return; // Don't render navigators yet, let redirect happen
-        }
-        
-        // Handle unauthenticated user needing login redirect
-        if (!session && !inAuthFlow && !isCurrentlyOnAllowedPublicRoute && hasUsedFreeRecipe) {
-            console.log(
-                `[RootLayoutNav] Post-initial: User logged out and needs login redirect: ${currentPathSegments}`,
-            );
-            router.replace('/login');
-            return; // Don't render navigators yet, let redirect happen
-        }
-        
-        console.log(`[RootLayoutNav] Post-initial: No action needed for: ${currentPathSegments}`);
-        // Always render navigators if initial redirect is done and no redirects needed
-        setShouldRenderNavigators(true);
-        return;
+    // === CRITICAL FIX: Handle +not-found or empty segments FIRST ===
+    // Always mark navigation as handled *before* attempting redirect to prevent re-entry
+    if (stableSegments[0] === '+not-found' || currentPathSegments === '') {
+      console.log(`[RootLayoutNav] Initial '+not-found' or empty segment detected, redirecting to /tabs`);
+      initialNavigationHandled.current = true; // Mark handled IMMEDIATELY
+      routerRef.current.replace('/tabs');
+      return; // Exit to prevent further evaluation in this cycle
     }
 
-    // Handle initial +not-found explicitly before other initial redirects
-    if (stableSegments[0] === '+not-found') {
-      const targetRoute = session ? '/tabs' : '/tabs/explore'; // Redirect to tabs index or explore if not authenticated
-      console.log(`[RootLayoutNav] Initial '+not-found' detected, redirecting to: ${targetRoute}`);
-      router.replace(targetRoute);
-      initialRedirectDone.current = true;
-      // Don't immediately render navigators - let the redirect settle first
-      return;
-    }
-
-    
-    console.log(`[RootLayoutNav] Running initial redirect logic for: ${currentPathSegments}`);
-    if (!session) {
-      // User is NOT authenticated
-      if (hasUsedFreeRecipe) {
-        // And has used their free recipe
-        if (inAuthFlow || isCurrentlyOnAllowedPublicRoute) {
-          // Allow navigation if already in the authentication flow,
-          // or if on a route explicitly allowed for unauthenticated users
-          // (e.g., home, explore, settings, or returning from a recipe page via 'X' button).
-          console.log(
-            `[RootLayoutNav] Unauthenticated, free recipe used, but on allowed route: ${currentPathSegments}. No redirect.`,
-          );
-        } else if (inRecipeContentFlow) {
-          // If unauthenticated and free recipe used, and trying to access
-          // recipe content (loading, summary, steps), redirect to login.
-          console.log(
-            `[RootLayoutNav] Unauthenticated, free recipe used, trying to access restricted recipe content: ${currentPathSegments}. Redirecting to login.`,
-          );
-          router.replace('/login');
-        } else {
-          // Fallback for any other unexpected restricted routes that aren't explicit public or auth routes.
-          console.warn(
-            `[RootLayoutNav] Unauthenticated, free recipe used, accessing unexpected restricted route: ${currentPathSegments}. Redirecting to login.`,
-          );
-          router.replace('/login');
-        }
-      } else {
-        // User is NOT authenticated AND has NOT used their free recipe
-        // They are allowed to browse most of the app freely, including starting a recipe,
-        // but prevent direct bypass of login if they somehow land there.
-        if (inAuthFlow) {
-          console.log(
-            `[RootLayoutNav] Unauthenticated, free recipe NOT used, attempting auth flow: ${currentPathSegments}. No redirect.`,
-          );
-        } else {
-          console.log(
-            `[RootLayoutNav] Unauthenticated, free recipe NOT used, allowing access to: ${currentPathSegments}.`,
-          );
-        }
-      }
-    } else {
-      // User IS authenticated
+    // === AUTHENTICATION LOGIC ===
+    // Handle authenticated users
+    if (session) {
       // If authenticated, prevent them from accessing login/auth pages directly
       if (inAuthFlow) {
-        console.log(
-          `[RootLayoutNav] Authenticated user on auth page: ${currentPathSegments}. Redirecting to main app.`,
-        );
-        router.replace('/tabs');
+        console.log(`[RootLayoutNav] Authenticated user on auth page: ${currentPathSegments}. Redirecting to main app.`);
+        initialNavigationHandled.current = true; // Mark handled
+        routerRef.current.replace('/tabs');
+        return;
+      } else {
+        console.log(`[RootLayoutNav] Authenticated user on valid route: ${currentPathSegments}. No redirect needed.`);
+      }
+    } else {
+      // Handle unauthenticated users
+      if (hasUsedFreeRecipe) {
+        // User has used their free recipe
+        if (inAuthFlow || isCurrentlyOnAllowedPublicRoute) {
+          console.log(`[RootLayoutNav] Unauthenticated, free recipe used, but on allowed route: ${currentPathSegments}. No redirect.`);
+        } else if (inRecipeContentFlow) {
+          console.log(`[RootLayoutNav] Unauthenticated, free recipe used, trying to access restricted recipe content: ${currentPathSegments}. Redirecting to login.`);
+          initialNavigationHandled.current = true; // Mark handled
+          routerRef.current.replace('/login');
+          return;
+        } else {
+          console.warn(`[RootLayoutNav] Unauthenticated, free recipe used, accessing unexpected restricted route: ${currentPathSegments}. Redirecting to login.`);
+          initialNavigationHandled.current = true; // Mark handled
+          routerRef.current.replace('/login');
+          return;
+        }
+      } else {
+        // User has NOT used their free recipe - allow most access
+        if (inAuthFlow) {
+          console.log(`[RootLayoutNav] Unauthenticated, free recipe NOT used, attempting auth flow: ${currentPathSegments}. No redirect.`);
+        } else {
+          console.log(`[RootLayoutNav] Unauthenticated, free recipe NOT used, allowing access to: ${currentPathSegments}.`);
+        }
       }
     }
 
-    // Mark initial redirect logic as complete and allow rendering AppNavigators
-    console.log(`[RootLayoutNav] Marking initial redirect as complete for: ${currentPathSegments}`);
-    initialRedirectDone.current = true;
-    setShouldRenderNavigators(true);
-  }, [
-    session,
-    hasUsedFreeRecipe,
-    isAuthLoading,
-    isLoadingFreeUsage,
-    stableSegments,
-    router,
-    isFirstLaunch,
-  ]);
+    // If we've reached here, initial navigation has been processed for a stable state
+    console.log(`[RootLayoutNav] User on valid route: ${currentPathSegments}. No redirect needed.`);
+    initialNavigationHandled.current = true; // Mark as handled if no redirects were needed but conditions were met
+    
+    // Hide splash screen once all initial navigation logic is settled
+    console.log('[RootLayoutNav] Initial navigation complete - hiding splash screen');
+    SplashScreen.hideAsync();
+  }, [session, hasUsedFreeRecipe, isReadyForNavigation, isFirstLaunch, stableSegments]);
 
-  // Conditionally render AppNavigators only when shouldRenderNavigators is true
-  if (!shouldRenderNavigators) {
-    // You can return null, or a simple loading spinner here
-    // return null; 
+  useEffect(() => {
+    handleNavigation();
+  }, [handleNavigation]);
+
+  // === RENDER LOGIC ===
+  
+  // Show loading indicator while not ready for navigation
+  if (!isReadyForNavigation) {
+    console.log('[RootLayoutNav] Not ready for navigation - showing loading indicator');
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' }}>
-        {/* <ActivityIndicator size="large" color={COLORS.primary} /> */}
+        <ActivityIndicator size="large" color={COLORS.primary} />
       </View>
     );
   }
 
+  // Show WelcomeScreen if first launch
+  if (isFirstLaunch) {
+    console.log('[RootLayoutNav] First launch - showing WelcomeScreen');
+    return <WelcomeScreen onDismiss={handleWelcomeDismiss} />;
+  }
+
+  // Show main app
+  console.log('[RootLayoutNav] Ready and not first launch - showing main app');
   return (
     <>
       <StatusBar style="dark" />
@@ -232,119 +290,27 @@ function RootLayoutNav({ isFirstLaunch }: RootLayoutNavProps) {
 export default function RootLayout() {
   console.log('[RootLayout] Rendered');
   
-  useFrameworkReady();
-  const router = useRouter();
+  useFrameworkReady(); // Keep framework-level readiness in RootLayout
 
-  const [assetsLoaded, setAssetsLoaded] = useState(false);
-  const [fontsLoaded] = useFonts({
-    'Recoleta-Medium': require('../assets/fonts/Recoleta-Medium.otf'),
-    'Inter-Regular': require('../assets/fonts/Inter-Regular.ttf'),
-    'Inter-SemiBold': require('../assets/fonts/Inter-SemiBold.ttf'),
-  });
-  const [isFirstLaunch, setIsFirstLaunch] = useState<boolean | null>(null);
-
+  // Add logging to track mount/unmount cycles
   useEffect(() => {
-    async function prepare() {
-      console.log('[RootLayout] Starting prepare function...');
-      try {
-        // You have a duplicated loadAsync call. Let's make sure it's not causing issues.
-        // It's already handled by useFonts. You can remove this or keep it for pre-loading,
-        // but it's redundant.
-        // await Font.loadAsync({ ... });
+    console.log('[RootLayout] 🟢 MOUNTED');
+    return () => {
+      console.log('[RootLayout] 🔴 UNMOUNTED - Component is being destroyed');
+    };
+  }, []);
 
-        await Asset.loadAsync(require('@/assets/images/meez_logo.webp'));
-        console.log('[RootLayout] Assets loaded successfully.');
-
-        const hasLaunched = await AsyncStorage.getItem('hasLaunched');
-        console.log(
-          `[RootLayout] AsyncStorage 'hasLaunched' value: ${hasLaunched}`,
-        );
-
-        if (hasLaunched === null) {
-          console.log(
-            '[RootLayout] First launch detected. Setting isFirstLaunch to true.',
-          );
-          console.log('[RootLayout] isFirstLaunch state change:', true);
-          setIsFirstLaunch(true);
-        } else {
-          console.log(
-            '[RootLayout] Not first launch. Setting isFirstLaunch to false.',
-          );
-          console.log('[RootLayout] isFirstLaunch state change:', false);
-          setIsFirstLaunch(false);
-        }
-      } catch (e) {
-        console.warn(
-          '[RootLayout] Failed to load assets or check first launch',
-          e,
-        );
-        setIsFirstLaunch(false); // Default to not first launch on error
-      } finally {
-        console.log(
-          '[RootLayout] Prepare function finished. Setting assetsLoaded to true.',
-        );
-        setAssetsLoaded(true);
-      }
-    }
-    // Let's log the fontsLoaded status when it changes
-    console.log(`[RootLayout] useFonts hook state: fontsLoaded = ${fontsLoaded}`);
-    if (fontsLoaded) {
-        console.log('[RootLayout] Fonts are now loaded via useFonts.');
-    }
-
-    // Call prepare only once
-    prepare();
-  }, [fontsLoaded]); // Add fontsLoaded to the dependency array to see when it changes
+  // RootLayout now always renders context providers and RootLayoutNav
+  // This ensures the root of the application tree remains stable
+  console.log('[RootLayout] Rendering stable context providers and RootLayoutNav');
   
-  const ready = fontsLoaded && assetsLoaded && isFirstLaunch !== null;
-  console.log(
-    `[RootLayout] ready state: ${ready} (fontsLoaded: ${fontsLoaded}, assetsLoaded: ${assetsLoaded}, isFirstLaunch: ${isFirstLaunch})`,
-  );
-
-  useEffect(() => {
-    console.log('[RootLayout] Dependencies for useEffect (ready state):', { fontsLoaded, assetsLoaded, isFirstLaunch, ready });
-    if (ready) {
-      console.log('[RootLayout] Ready state achieved - hiding splash screen');
-      SplashScreen.hideAsync();
-    }
-  }, [ready]);
-
-  const handleWelcomeDismiss = useCallback(async () => {
-    try {
-      await AsyncStorage.setItem('hasLaunched', 'true');
-      console.log('[RootLayout] Welcome dismissed - navigating to home tab');
-      console.log('[RootLayout] isFirstLaunch state change:', false);
-      setIsFirstLaunch(false); // Hide the welcome screen immediately
-      
-      // Navigate to home tab after dismissing welcome screen
-      router.replace('/tabs'); // Navigate to home tab (index)
-    } catch (error) {
-      console.error('Failed to set hasLaunched flag', error);
-      // Still proceed to app
-      console.log('[RootLayout] isFirstLaunch state change (error fallback):', false);
-      setIsFirstLaunch(false);
-      
-      // Still try to navigate even if AsyncStorage failed
-      router.replace('/tabs');
-    }
-  }, [router]);
-
-  // 1. Show nothing (splash screen) while loading fonts/assets/state
-  if (!ready) {
-    return null;
-  }
-
-  // 2. Always render the main app structure first
   return (
     <ErrorModalProvider>
       <FreeUsageProvider>
         <AuthProvider>
-          <RootLayoutNav isFirstLaunch={isFirstLaunch} />
+          <RootLayoutNav />
         </AuthProvider>
       </FreeUsageProvider>
-
-      {/* 3. Conditionally render the WelcomeScreen as an overlay on top */}
-      {isFirstLaunch && <WelcomeScreen onDismiss={handleWelcomeDismiss} />}
     </ErrorModalProvider>
   );
 }

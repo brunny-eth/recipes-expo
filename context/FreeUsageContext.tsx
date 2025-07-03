@@ -7,6 +7,7 @@ import React, {
   PropsWithChildren,
   useCallback,
   useMemo,
+  useRef,
 } from 'react';
 import {
   getHasUsedFreeRecipe,
@@ -35,6 +36,10 @@ export const FreeUsageProvider = ({ children }: PropsWithChildren) => {
   const [isLoadingFreeUsage, setIsLoadingFreeUsage] = useState(true);
 
   const fetchFreeUsage = useCallback(async () => {
+    // Add granular logging for useCallback recreation
+    console.log('[FreeUsageContext] fetchFreeUsage useCallback recreated. Empty dependencies array - should be stable.');
+    
+    console.log('[FreeUsageContext] State update: setIsLoadingFreeUsage(true)');
     setIsLoadingFreeUsage(true);
     try {
       const used = await getHasUsedFreeRecipe();
@@ -42,28 +47,38 @@ export const FreeUsageProvider = ({ children }: PropsWithChildren) => {
         '[FreeUsageContext] IMMEDIATE FETCH: hasUsedFreeRecipe value is',
         used,
       );
+      console.log('[FreeUsageContext] State update: setHasUsedFreeRecipeState(' + used + ')');
       setHasUsedFreeRecipeState(used);
     } catch (error) {
       console.error('[FreeUsageContext] Error fetching free usage:', error);
+      console.log('[FreeUsageContext] State update: setHasUsedFreeRecipeState(false) - error fallback');
       setHasUsedFreeRecipeState(false); // Default to false on error to not block
     } finally {
+      console.log('[FreeUsageContext] State update: setIsLoadingFreeUsage(false)');
       setIsLoadingFreeUsage(false);
     }
-  }, []);
+  }, []); // Empty dependency array - function is now truly stable
 
   useEffect(() => {
     fetchFreeUsage(); // Initial fetch on mount
   }, [fetchFreeUsage]);
 
   const markFreeRecipeUsed = useCallback(async () => {
+    // Add granular logging for useCallback recreation
+    console.log('[FreeUsageContext] markFreeRecipeUsed useCallback recreated. Empty dependencies array - should be stable.');
+    
     await setFreeUsageInStorage(); // Update AsyncStorage
+    console.log('[FreeUsageContext] State update: setHasUsedFreeRecipeState(true)');
     setHasUsedFreeRecipeState(true); // Update React state
     console.log(
       '[FreeUsageContext] Free recipe marked as used in state and storage.',
     );
-  }, []);
+  }, []); // Empty dependency array - function is now truly stable
 
   const resetFreeRecipeUsage = useCallback(async () => {
+    // Add granular logging for useCallback recreation
+    console.log('[FreeUsageContext] resetFreeRecipeUsage useCallback recreated. Empty dependencies array - should be stable.');
+    
     console.log(
       '[FreeUsageContext] Attempting to reset free recipe usage locally and in Supabase.',
     );
@@ -93,15 +108,21 @@ export const FreeUsageProvider = ({ children }: PropsWithChildren) => {
     }
 
     await clearFreeRecipeFlag(); // Clear in AsyncStorage
+    console.log('[FreeUsageContext] State update: setHasUsedFreeRecipeState(false)');
     setHasUsedFreeRecipeState(false); // Update React state
     console.log(
       '[FreeUsageContext] Free recipe usage reset in state and storage.',
     );
-  }, []);
+  }, []); // Empty dependency array - function is now truly stable
 
   const refetchFreeUsage = useCallback(async () => {
+    // Add granular logging for useCallback recreation
+    console.log('[FreeUsageContext] refetchFreeUsage useCallback recreated. Dependencies:', {
+      fetchFreeUsageDep: fetchFreeUsage,
+    });
+    
     await fetchFreeUsage();
-  }, [fetchFreeUsage]);
+  }, [fetchFreeUsage]); // Only depend on fetchFreeUsage, which is now stable
 
   const value = useMemo(() => {
     // Strategic logging: Track when useMemo recalculates

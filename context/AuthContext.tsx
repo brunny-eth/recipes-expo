@@ -7,6 +7,7 @@ import React, {
   PropsWithChildren,
   useCallback,
   useMemo,
+  useRef,
 } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
@@ -48,26 +49,7 @@ const isFirstLogin = (session: Session) => {
   return isNewUser;
 };
 
-// Helper function to compare sessions by meaningful data to prevent redundant updates
-const isEqualSession = (prevSession: Session | null, newSession: Session | null): boolean => {
-  // Both null or undefined
-  if (!prevSession && !newSession) return true;
-  
-  // One is null, the other isn't
-  if (!prevSession || !newSession) return false;
-  
-  // Compare key properties that matter for our app
-  const prevUser = prevSession.user;
-  const newUser = newSession.user;
-  
-  return (
-    prevSession.access_token === newSession.access_token &&
-    prevSession.refresh_token === newSession.refresh_token &&
-    prevUser?.id === newUser?.id &&
-    prevUser?.email === newUser?.email &&
-    JSON.stringify(prevUser?.user_metadata) === JSON.stringify(newUser?.user_metadata)
-  );
-};
+
 
 export const AuthProvider = ({ children }: PropsWithChildren) => {
   const [session, setSession] = useState<Session | null>(null);
@@ -79,6 +61,24 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     resetFreeRecipeUsage,
     isLoadingFreeUsage,
   } = useFreeUsage();
+
+  // Use refs to access the latest values without causing function re-creation
+  const showErrorRef = useRef(showError);
+  const resetFreeRecipeUsageRef = useRef(resetFreeRecipeUsage);
+  const refetchFreeUsageRef = useRef(refetchFreeUsage);
+
+  // Update refs whenever the values change
+  useEffect(() => {
+    showErrorRef.current = showError;
+  }, [showError]);
+
+  useEffect(() => {
+    resetFreeRecipeUsageRef.current = resetFreeRecipeUsage;
+  }, [resetFreeRecipeUsage]);
+
+  useEffect(() => {
+    refetchFreeUsageRef.current = refetchFreeUsage;
+  }, [refetchFreeUsage]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -93,6 +93,9 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
 
   const handleUrl = useCallback(
     async (url: string | null) => {
+      // Add granular logging for useCallback recreation
+      console.log('[AuthContext] handleUrl useCallback recreated. Empty dependencies array - should be stable.');
+      
       if (!url) {
         return;
       }
@@ -123,7 +126,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           });
 
           if (sessionError) {
-            showError(
+            showErrorRef.current(
               'Authentication Error',
               `Failed to set session: ${sessionError.message}`,
             );
@@ -133,14 +136,14 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
             }
           }
         } catch (e: any) {
-          showError(
+          showErrorRef.current(
             'Authentication Error',
             `Unexpected error setting session: ${e.message}`,
           );
         }
       }
     },
-    [showError],
+    [], // Empty dependency array - function is now truly stable
   );
 
   // Effect to set up auth state change listener and deep link listener
@@ -152,45 +155,66 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     });
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      (event, currentSession) => {
-        if (__DEV__) {
-          console.log(`[Auth] onAuthStateChange event: ${event}`);
-          console.log('[Auth] currentSession (before setSession):', currentSession ? { id: currentSession.user?.id, accessToken: currentSession.access_token?.substring(0, 10) + '...' } : 'null');
-          if (session === currentSession) {
-            console.log('[Auth] currentSession is referentially same as previous session state.');
-          } else {
-            console.log('[Auth] currentSession is referentially DIFFERENT from previous session state.');
-          }
-        }
+      async (event, sessionData) => {
+        console.log(`[Auth] onAuthStateChange event: ${event}`);
+        console.log('[Auth] Incoming sessionData:', sessionData);
 
-        // Check if the session content has meaningfully changed before calling setSession
-        if (!isEqualSession(session, currentSession)) {
-          if (__DEV__) {
-            console.log('[Auth] Session content has changed, updating state.');
+        const newSession = sessionData;
+        // Determine the new isLoading state based on the event.
+        // If signed in, initial session, or signed out, it's not loading. Otherwise, it might be.
+        const newIsLoading = (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'SIGNED_OUT') ? false : true;
+
+        // --- Compare and Update Session State ---
+        let shouldUpdateSession = false;
+        if (newSession && session) {
+          // Both exist, compare key properties for meaningful change
+          // Only update if user ID, access token, or refresh token actually differ.
+          if (newSession.user?.id !== session.user?.id ||
+              newSession.access_token !== session.access_token ||
+              newSession.refresh_token !== session.refresh_token) {
+            shouldUpdateSession = true;
+            console.log('[Auth] Session content (user ID, access/refresh tokens) is DIFFERENT.');
+          } else {
+            console.log('[Auth] Session content is IDENTICAL, skipping setSession.');
           }
-          setSession(currentSession);
-          if (__DEV__) {
-            console.log('[Auth] setSession called with:', currentSession ? { id: currentSession.user?.id, event } : 'null');
+        } else if (newSession !== session) {
+          // One is null/undefined and the other isn't, or both are null/undefined but different references.
+          // We want to update if it's truly a change from null to session or vice versa.
+          // If both are null, we don't need to update.
+          if (newSession === null && session === null) {
+              console.log('[Auth] Both sessions are null, skipping setSession.');
+          } else {
+              shouldUpdateSession = true;
+              console.log('[Auth] Session object reference is DIFFERENT (e.g., null to session or vice versa).');
           }
         } else {
-          if (__DEV__) {
-            console.log('[Auth] Session content unchanged, skipping setSession to prevent unnecessary re-renders.');
-          }
+            console.log('[Auth] Session object reference is the SAME (no change detected).');
         }
-        
-        setIsLoading(false);
+
+        if (shouldUpdateSession) {
+          console.log('[Auth] State update: setSession() called with session change');
+          setSession(newSession);
+        }
+
+        // --- Compare and Update Loading State ---
+        if (newIsLoading !== isLoading) {
+          console.log(`[Auth] State update: setIsLoading(${newIsLoading})`);
+          setIsLoading(newIsLoading);
+        } else {
+          console.log('[Auth] isLoading value is the SAME, skipping setIsLoading.');
+        }
 
         setTimeout(async () => {
-          if (currentSession && event === 'SIGNED_IN') {
+          if (newSession && event === 'SIGNED_IN') {
             if (__DEV__) {
               console.log(
-                `[Auth] Rehydrated session for user: ${currentSession.user.id}`,
+                `[Auth] Rehydrated session for user: ${newSession.user.id}`,
               );
             }
             await new Promise((res) => setTimeout(res, 300));
 
             if (!isLoadingFreeUsage) {
-              if (isFirstLogin(currentSession)) {
+              if (isFirstLogin(newSession)) {
                 if (localHasUsedFreeRecipe !== null) {
                   const { error: updateError } = await supabase.auth.updateUser(
                     {
@@ -209,8 +233,8 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
                 }
               }
             }
-          } else if (!currentSession && event === 'SIGNED_OUT') {
-            resetFreeRecipeUsage();
+          } else if (!newSession && event === 'SIGNED_OUT') {
+            resetFreeRecipeUsageRef.current();
           }
         }, 0);
       },
@@ -224,15 +248,19 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     };
   }, [
     localHasUsedFreeRecipe,
-    refetchFreeUsage,
     handleUrl,
-    showError,
-    resetFreeRecipeUsage,
     isLoadingFreeUsage,
+    // Removed session dependency since we now do inline comparison
   ]);
 
   const signIn = useCallback(async (provider: AuthProvider) => {
+    // Add granular logging for useCallback recreation
+    console.log('[AuthContext] signIn useCallback recreated. Current dependencies:', {
+      handleUrlDep: handleUrl,
+    });
+    
     console.log(`[Auth] Attempting to sign in with ${provider}...`);
+    console.log('[Auth] State update: setIsLoading(true)');
     setIsLoading(true);
 
     if (provider === 'apple') {
@@ -295,7 +323,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         }
       } catch (err: any) {
         console.error('[Apple] Native Sign-In Error:', err.message);
-        showError(
+        showErrorRef.current(
           'Sign In Error',
           err.message || 'An unknown error occurred during Apple sign-in.',
         );
@@ -310,7 +338,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       const errorMsg =
         'Missing EXPO_PUBLIC_AUTH_URL environment variable. Cannot proceed with authentication.';
       console.error(`[Auth] ${errorMsg}`);
-      showError('Configuration Error', errorMsg);
+      showErrorRef.current('Configuration Error', errorMsg);
       return;
     }
 
@@ -338,33 +366,36 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           await handleUrl(result.url);
         } else {
           if (result.type === 'cancel') {
-            showError(
+            showErrorRef.current(
               'Sign In Cancelled',
               'You cancelled the sign-in process.',
             );
           } else {
-            showError(
+            showErrorRef.current(
               'Sign In Error',
               `Sign-in was not completed. Reason: ${result.type}`,
             );
           }
         }
       } else {
-        showError(
+        showErrorRef.current(
           'Sign In Error',
           'No redirect URL received. Please try again.',
         );
       }
     } catch (err: any) {
       console.error('[Auth] Google Sign-In Error:', err.message);
-      showError(
+      showErrorRef.current(
         'Sign In Error',
         err.message || 'An unknown error occurred during sign-in.',
       );
     }
-  }, [handleUrl, showError]);
+  }, [handleUrl]); // Only depend on handleUrl, which is now stable
 
   const signOut = useCallback(async () => {
+    // Add granular logging for useCallback recreation
+    console.log('[AuthContext] signOut useCallback recreated. Empty dependencies array - should be stable.');
+    
     console.log('[Auth] Attempting to sign out.');
 
     try {
@@ -411,16 +442,18 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       console.log('[Auth] User signed out successfully via Supabase call.');
 
       // ✅ App-level session cleanup
+      console.log('[Auth] State update: setSession(null) - clearing session');
       setSession(null);
+      console.log('[Auth] State update: setIsLoading(false) - setting loading to false');
       setIsLoading(false);
-      resetFreeRecipeUsage();
+      resetFreeRecipeUsageRef.current();
       router.replace('/tabs/explore');
     } catch (err: any) {
       console.error(
         '[Auth] Sign Out Error: Caught an error or timeout:',
         err.message,
       );
-      showError(
+      showErrorRef.current(
         'Sign Out Error',
         err.message || 'An unknown error occurred during sign-out.',
       );
@@ -428,12 +461,14 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       console.log(
         '[Auth] Forcing local session clear due to sign out error/timeout.',
       );
+      console.log('[Auth] State update: setSession(null) - forcing session clear');
       setSession(null);
+      console.log('[Auth] State update: setIsLoading(false) - forcing loading to false');
       setIsLoading(false);
-      resetFreeRecipeUsage();
+      resetFreeRecipeUsageRef.current();
       router.replace('/tabs/explore');
     }
-  }, [resetFreeRecipeUsage, showError]);
+  }, []); // Empty dependency array - function is now truly stable
 
   const value = useMemo(() => {
     // Strategic logging: Track when useMemo recalculates
