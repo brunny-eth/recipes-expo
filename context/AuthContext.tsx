@@ -48,6 +48,27 @@ const isFirstLogin = (session: Session) => {
   return isNewUser;
 };
 
+// Helper function to compare sessions by meaningful data to prevent redundant updates
+const isEqualSession = (prevSession: Session | null, newSession: Session | null): boolean => {
+  // Both null or undefined
+  if (!prevSession && !newSession) return true;
+  
+  // One is null, the other isn't
+  if (!prevSession || !newSession) return false;
+  
+  // Compare key properties that matter for our app
+  const prevUser = prevSession.user;
+  const newUser = newSession.user;
+  
+  return (
+    prevSession.access_token === newSession.access_token &&
+    prevSession.refresh_token === newSession.refresh_token &&
+    prevUser?.id === newUser?.id &&
+    prevUser?.email === newUser?.email &&
+    JSON.stringify(prevUser?.user_metadata) === JSON.stringify(newUser?.user_metadata)
+  );
+};
+
 export const AuthProvider = ({ children }: PropsWithChildren) => {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -142,10 +163,21 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           }
         }
 
-        setSession(currentSession);
-        if (__DEV__) {
-          console.log('[Auth] setSession called with:', currentSession ? { id: currentSession.user?.id, event } : 'null');
+        // Check if the session content has meaningfully changed before calling setSession
+        if (!isEqualSession(session, currentSession)) {
+          if (__DEV__) {
+            console.log('[Auth] Session content has changed, updating state.');
+          }
+          setSession(currentSession);
+          if (__DEV__) {
+            console.log('[Auth] setSession called with:', currentSession ? { id: currentSession.user?.id, event } : 'null');
+          }
+        } else {
+          if (__DEV__) {
+            console.log('[Auth] Session content unchanged, skipping setSession to prevent unnecessary re-renders.');
+          }
         }
+        
         setIsLoading(false);
 
         setTimeout(async () => {
@@ -199,19 +231,18 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     isLoadingFreeUsage,
   ]);
 
-  const signIn = async (provider: AuthProvider) => {
-    if (provider !== 'apple' && provider !== 'google') {
-      console.error(
-        `[Auth] Unsupported provider "${provider}" passed to signIn.`,
-      );
-      showError(
-        'Sign In Error',
-        `Authentication with ${provider} is not supported.`,
-      );
-      return;
-    }
+  const signIn = useCallback(async (provider: AuthProvider) => {
+    console.log(`[Auth] Attempting to sign in with ${provider}...`);
+    setIsLoading(true);
+
     if (provider === 'apple') {
+      // Apple Native Sign-In
       try {
+        const isAvailable = await AppleAuthentication.isAvailableAsync();
+        if (!isAvailable) {
+          throw new Error('Apple authentication is not available on this device');
+        }
+
         const credential = await AppleAuthentication.signInAsync({
           requestedScopes: [
             AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
@@ -220,12 +251,11 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         });
 
         const { identityToken, email, fullName } = credential;
-
         if (!identityToken) {
-          throw new Error('No identity token returned by Apple');
+          throw new Error('No identity token returned from Apple');
         }
 
-        console.log('[Apple] Received identityToken, signing in with Supabase');
+        console.log('[Apple] Identity token received, signing in with Supabase...');
 
         const { data, error } = await supabase.auth.signInWithIdToken({
           provider: 'apple',
@@ -332,9 +362,9 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         err.message || 'An unknown error occurred during sign-in.',
       );
     }
-  };
+  }, [handleUrl, showError]);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     console.log('[Auth] Attempting to sign out.');
 
     try {
@@ -403,17 +433,39 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       resetFreeRecipeUsage();
       router.replace('/tabs/explore');
     }
-  };
+  }, [resetFreeRecipeUsage, showError]);
 
-  const value = useMemo(() => ({
-    session,
-    user: session?.user ?? null,
-    isAuthenticated: !!session,
-    userMetadata: (session?.user?.user_metadata as UserMetadata) ?? null,
-    isLoading,
-    signIn,
-    signOut,
-  }), [session?.user?.id, session?.access_token, session?.refresh_token, isLoading, signIn, signOut]);
+  const value = useMemo(() => {
+    // Strategic logging: Track when useMemo recalculates
+    console.log('[AuthContext] 🔄 useMemo RECALCULATING. Dependencies changed:', {
+      'session?.user?.id': session?.user?.id,
+      'session?.access_token': session?.access_token ? `${session.access_token.substring(0, 10)}...` : null,
+      'session?.refresh_token': session?.refresh_token ? `${session.refresh_token.substring(0, 10)}...` : null,
+      'isLoading': isLoading,
+      'signIn reference': signIn,
+      'signOut reference': signOut,
+    });
+
+    const contextValue = {
+      session,
+      user: session?.user ?? null,
+      isAuthenticated: !!session,
+      userMetadata: (session?.user?.user_metadata as UserMetadata) ?? null,
+      isLoading,
+      signIn,
+      signOut,
+    };
+
+    // Log the final value object reference
+    console.log('[AuthContext] 📦 Provider value object created:', {
+      reference: contextValue,
+      sessionExists: !!contextValue.session,
+      isAuthenticated: contextValue.isAuthenticated,
+      isLoading: contextValue.isLoading,
+    });
+
+    return contextValue;
+  }, [session?.user?.id, session?.access_token, session?.refresh_token, isLoading, signIn, signOut]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

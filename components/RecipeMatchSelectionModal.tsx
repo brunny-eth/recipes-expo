@@ -29,6 +29,8 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
   onAction,
 }) => {
   console.log('[RecipeMatchSelectionModal] Modal rendered with', matches.length, 'matches.');
+  console.log('[RecipeMatchSelectionModal] Matches data:', matches);
+  console.log('[RecipeMatchSelectionModal] First match sample:', matches[0]);
 
   const handleRecipeSelect = (recipeId: string | number) => {
     const selectedRecipeId = recipeId.toString();
@@ -47,8 +49,10 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
   };
 
   const renderRecipeItem = ({ item }: { item: { recipe: CombinedParsedRecipe; similarity: number; } }) => {
+    console.log('[RecipeMatchSelectionModal] Rendering item:', item);
     const recipe = item.recipe;
     const imageUrl = recipe.image || null;
+    console.log('[RecipeMatchSelectionModal] Recipe title:', recipe.title, 'Image URL:', imageUrl);
     
     return (
       <TouchableOpacity
@@ -129,7 +133,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderTopLeftRadius: RADIUS.lg,
     borderTopRightRadius: RADIUS.lg,
-    maxHeight: '80%',
+    height: '80%', // Changed from maxHeight to height
     paddingHorizontal: SPACING.lg,
     paddingBottom: SPACING.lg,
   } as ViewStyle,
@@ -152,6 +156,8 @@ const styles = StyleSheet.create({
   recipeList: {
     flex: 1,
     paddingVertical: SPACING.md,
+    backgroundColor: '#f0f0f0', // Temporary: to see if FlatList is rendering
+    minHeight: 200, // Temporary: ensure minimum height
   } as ViewStyle,
   recipeCard: {
     flexDirection: 'row',

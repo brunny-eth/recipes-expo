@@ -9,7 +9,13 @@ export default function LogoHeaderLayout({
   children: React.ReactNode;
   animatedLogo?: React.ReactNode;
 }) {
-  console.log(`[${new Date().toISOString()}] [LogoHeaderLayout] render`);
+  console.log(`[${new Date().toISOString()}] [LogoHeaderLayout] 🎨 RENDER TRIGGERED`);
+  console.log('[LogoHeaderLayout] Props analysis:', {
+    hasChildren: !!children,
+    hasAnimatedLogo: !!animatedLogo,
+    childrenReference: children,
+    animatedLogoReference: animatedLogo,
+  });
   
   return (
     <SafeAreaView style={styles.safeArea}>

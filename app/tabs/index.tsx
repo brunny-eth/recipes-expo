@@ -12,6 +12,7 @@ import {
   ScrollView,
   Animated,
   Image,
+  SafeAreaView,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -32,7 +33,7 @@ import {
 } from '@/constants/typography';
 import { useAuth } from '@/context/AuthContext';
 import { useFreeUsage } from '@/context/FreeUsageContext';
-import LogoHeaderLayout from '@/components/LogoHeaderLayout';
+import LogoHeader from '@/components/LogoHeader';
 import RecipeMatchSelectionModal from '@/components/RecipeMatchSelectionModal';
 import { CombinedParsedRecipe } from '@/common/types';
 
@@ -114,8 +115,24 @@ export default function HomeScreen() {
     setShowMatchSelectionModal(false); // Always dismiss the modal first
 
     if (action === 'select' && selectedRecipeId) {
-      router.push(`/recipe/summary?id=${selectedRecipeId}`);
-      console.log('[HomeScreen] User selected from modal, routing to recipe ID:', selectedRecipeId);
+      // Find the selected recipe from potentialMatches using the selectedRecipeId
+      const selectedMatch = potentialMatches.find(match => 
+        match.recipe.id?.toString() === selectedRecipeId
+      );
+      
+      if (selectedMatch) {
+        router.push({
+          pathname: '/recipe/summary',
+          params: {
+            recipeData: JSON.stringify(selectedMatch.recipe),
+            from: '/tabs',
+          },
+        });
+        console.log('[HomeScreen] User selected from modal, routing to recipe:', selectedMatch.recipe.title);
+      } else {
+        console.error('[HomeScreen] Could not find selected recipe in potentialMatches:', selectedRecipeId);
+        showError('Navigation Error', 'Could not load the selected recipe. Please try again.');
+      }
     } else if (action === 'createNew') {
       // Trigger the full LLM parsing flow with the original input
       handleNavigation(recipeUrl);
@@ -125,7 +142,7 @@ export default function HomeScreen() {
       setRecipeUrl('');
       console.log('[HomeScreen] User opted to return to home, clearing input.');
     }
-  }, [router, recipeUrl]);
+  }, [router, recipeUrl, potentialMatches, showError]);
 
   const handleSubmit = async () => {
     if (!recipeUrl || recipeUrl.trim() === '') {
@@ -202,10 +219,16 @@ export default function HomeScreen() {
         setShowMatchSelectionModal(true);
         console.log('[HomeScreen] Multiple cached matches found, showing selection modal.');
       } else if (parseResult.cachedMatches && parseResult.cachedMatches.length === 1) {
-        // Single match: auto-route directly
-        const matchId = parseResult.cachedMatches[0].recipe.id;
-        router.push(`/recipe/summary?id=${matchId}`);
-        console.log('[HomeScreen] Single cached match found, auto-routing to:', parseResult.cachedMatches[0].recipe.title);
+        // Single match: auto-route directly using the full recipe object
+        const singleMatch = parseResult.cachedMatches[0];
+        router.push({
+          pathname: '/recipe/summary',
+          params: {
+            recipeData: JSON.stringify(singleMatch.recipe),
+            from: '/tabs',
+          },
+        });
+        console.log('[HomeScreen] Single cached match found, auto-routing to:', singleMatch.recipe.title);
       } else {
         // No fuzzy matches or parsing result ready: proceed with existing flow
         console.log('[HomeScreen] No relevant cached matches found for text input. Proceeding with standard flow.');
@@ -236,7 +259,6 @@ export default function HomeScreen() {
         style={{
           width: 220,
           height: 120,
-          marginBottom: SPACING.md,
           alignSelf: 'center',
         }}
       />
@@ -244,10 +266,14 @@ export default function HomeScreen() {
   ), [logoOpacity, logoTranslateY]); // Only recreate if animation values change
 
   return (
-    <LogoHeaderLayout animatedLogo={animatedLogo}>
+    <SafeAreaView style={styles.safeArea}>
+      {/* Static logo header - memoized to prevent re-renders on input changes */}
+      <LogoHeader animatedLogo={animatedLogo} />
+      
+      {/* Dynamic content that can re-render without affecting the logo */}
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
-          <View>
+          <View style={styles.contentContainer}>
             <Text style={styles.mainFeatureText}>Recipes, refined.</Text>
             <Text style={styles.featureText}>Built for the home chef.</Text>
           </View>
@@ -304,15 +330,23 @@ export default function HomeScreen() {
           onAction={handleMatchSelectionAction}
         />
       )}
-    </LogoHeaderLayout>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
   container: {
     flex: 1,
     width: '100%',
     alignItems: 'center',
+  },
+  contentContainer: {
+    alignItems: 'center',
+    marginTop: SPACING.lg,
   },
   keyboardAvoidingView: {
     flex: 1,

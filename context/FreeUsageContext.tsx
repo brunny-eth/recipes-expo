@@ -103,13 +103,33 @@ export const FreeUsageProvider = ({ children }: PropsWithChildren) => {
     await fetchFreeUsage();
   }, [fetchFreeUsage]);
 
-  const value = useMemo(() => ({
-    hasUsedFreeRecipe,
-    isLoadingFreeUsage,
-    markFreeRecipeUsed,
-    resetFreeRecipeUsage,
-    refetchFreeUsage,
-  }), [hasUsedFreeRecipe, isLoadingFreeUsage, markFreeRecipeUsed, resetFreeRecipeUsage, refetchFreeUsage]);
+  const value = useMemo(() => {
+    // Strategic logging: Track when useMemo recalculates
+    console.log('[FreeUsageContext] 🔄 useMemo RECALCULATING. Dependencies changed:', {
+      'hasUsedFreeRecipe': hasUsedFreeRecipe,
+      'isLoadingFreeUsage': isLoadingFreeUsage,
+      'markFreeRecipeUsed reference': markFreeRecipeUsed,
+      'resetFreeRecipeUsage reference': resetFreeRecipeUsage,
+      'refetchFreeUsage reference': refetchFreeUsage,
+    });
+
+    const contextValue = {
+      hasUsedFreeRecipe,
+      isLoadingFreeUsage,
+      markFreeRecipeUsed,
+      resetFreeRecipeUsage,
+      refetchFreeUsage,
+    };
+
+    // Log the final value object reference
+    console.log('[FreeUsageContext] 📦 Provider value object created:', {
+      reference: contextValue,
+      hasUsedFreeRecipe: contextValue.hasUsedFreeRecipe,
+      isLoadingFreeUsage: contextValue.isLoadingFreeUsage,
+    });
+
+    return contextValue;
+  }, [hasUsedFreeRecipe, isLoadingFreeUsage, markFreeRecipeUsed, resetFreeRecipeUsage, refetchFreeUsage]);
 
   return (
     <FreeUsageContext.Provider value={value}>
