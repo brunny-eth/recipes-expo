@@ -74,7 +74,7 @@ router.post('/parse', async (req: Request, res: Response) => {
       return res.status(500).json({ error: 'Server configuration error: Missing ScraperAPI key.' });
     }
 
-    const { recipe, error: parseError, fromCache, inputType, cacheKey, timings, usage, fetchMethodUsed } = await parseAndCacheRecipe(input);
+    const { recipe, error: parseError, fromCache, inputType, cacheKey, timings, usage, fetchMethodUsed, cachedMatches } = await parseAndCacheRecipe(input);
 
     if (parseError) {
       switch (parseError.code) {
@@ -96,7 +96,8 @@ router.post('/parse', async (req: Request, res: Response) => {
       timings,
       usage,
       fetchMethodUsed,
-      recipe
+      recipe,
+      cachedMatches
     });
     
   } catch (err) {

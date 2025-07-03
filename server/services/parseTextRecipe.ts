@@ -56,6 +56,7 @@ export async function parseTextRecipe(
     let isFallback = false;
 
     // --- Start Fuzzy Match Logic ---
+    logger.info({ requestId, enableFuzzyMatch: process.env.ENABLE_FUZZY_MATCH }, "Checking fuzzy match environment variable");
     if (process.env.ENABLE_FUZZY_MATCH === 'true') {
         logger.info({ requestId }, "Fuzzy match enabled, attempting to find similar recipes.");
         const fuzzyMatchStartTime = Date.now();
@@ -71,7 +72,7 @@ export async function parseTextRecipe(
             const searchStartTime = Date.now();
             logger.info({ requestId }, "[FuzzyMatch] Searching for similar recipes...");
             const matches = await findSimilarRecipe(embedding, SIMILARITY_THRESHOLD);
-            logger.info({ requestId, matches }, "[FuzzyMatch] Raw matches result");
+            logger.info({ requestId, event: 'findSimilarRecipe_result', matchesIsNull: matches === null, matchesLength: matches?.length || 0 }, "[FuzzyMatch] Raw matches result");
             const searchTime = Date.now() - searchStartTime;
             logger.info({ requestId, timeMs: searchTime, matchesFound: matches?.length || 0 }, "[FuzzyMatch] Search complete.");
 
@@ -87,7 +88,7 @@ export async function parseTextRecipe(
 
                 // If exactly one match, return it directly (existing behavior)
                 if (matches.length === 1) {
-                    logger.info({ requestId, matchedRecipeId: matches[0].recipe.id }, "Single match found, returning directly.");
+                    logger.info({ requestId, matchedRecipeId: matches[0].recipe.id, event: 'single_match_return' }, "Single match found, returning directly.");
                     return {
                         recipe: matches[0].recipe,
                         error: null,
@@ -100,7 +101,7 @@ export async function parseTextRecipe(
                     };
                 } else {
                     // Multiple matches - pass them to frontend for user selection
-                    logger.info({ requestId, matchesCount: matches.length }, "Multiple matches found, passing to frontend for selection.");
+                    logger.info({ requestId, matchesCount: matches.length, event: 'multiple_matches_return' }, "Multiple matches found, passing to frontend for selection.");
                     return {
                         recipe: null, // No single recipe
                         error: null,
@@ -119,7 +120,8 @@ export async function parseTextRecipe(
                         requestId,
                         threshold: SIMILARITY_THRESHOLD,
                         llm_skipped: false,
-                        totalFuzzyMatchTime: Date.now() - fuzzyMatchStartTime
+                        totalFuzzyMatchTime: Date.now() - fuzzyMatchStartTime,
+                        event: 'no_matches_found'
                     }, 
                     "No suitable fuzzy matches found above threshold. Proceeding with LLM."
                 );
@@ -367,7 +369,7 @@ export async function parseTextRecipe(
 
         console.log('[parseTextRecipe] Returning parsedRecipe with ID:', parsedRecipe?.id);
 
-        return {
+        const finalResult: ParseResult = {
             recipe: parsedRecipe,
             error: null,
             fromCache: false,
@@ -377,6 +379,10 @@ export async function parseTextRecipe(
             usage: handlerUsage,
             fetchMethodUsed: 'N/A'
         };
+
+        logger.info({ requestId, event: 'final_return', hasCachedMatches: !!(finalResult as any).cachedMatches, hasRecipe: !!finalResult.recipe }, "Final result being returned from parseTextRecipe");
+
+        return finalResult;
 
     } catch (err) {
         const error = err as Error;

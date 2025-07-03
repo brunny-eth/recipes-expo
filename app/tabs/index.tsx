@@ -168,7 +168,7 @@ export default function HomeScreen() {
         return;
       }
 
-      const response = await fetch(`${backendUrl}/api/ai/parse`, {
+      const response = await fetch(`${backendUrl}/api/recipes/parse`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -177,13 +177,23 @@ export default function HomeScreen() {
       });
 
       if (!response.ok) {
-        console.error('[HomeScreen] API request failed:', response.statusText);
+        const errorText = await response.text();
+        console.error('[HomeScreen] API request failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorBody: errorText
+        });
         handleNavigation(recipeInput); // Fallback to normal flow
         return;
       }
 
       const parseResult = await response.json();
-      console.log('[HomeScreen] Parse result:', parseResult);
+      console.log('[HomeScreen] Parse result received:', {
+        hasCachedMatches: !!parseResult.cachedMatches,
+        cachedMatchesLength: parseResult.cachedMatches?.length || 0,
+        hasRecipe: !!parseResult.recipe,
+        fetchMethodUsed: parseResult.fetchMethodUsed
+      });
 
       // Handle different response cases
       if (parseResult.cachedMatches && parseResult.cachedMatches.length > 1) {
@@ -202,7 +212,11 @@ export default function HomeScreen() {
         handleNavigation(recipeInput);
       }
     } catch (error) {
-      console.error('[HomeScreen] Error checking for cached matches:', error);
+      console.error('[HomeScreen] Error checking for cached matches:', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        type: typeof error
+      });
       // Fallback to normal flow on error
       handleNavigation(recipeInput);
     }
