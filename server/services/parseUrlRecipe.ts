@@ -14,6 +14,7 @@ import { geminiAdapter, openaiAdapter, PromptPayload, runDefaultLLM } from '../l
 import { buildUrlParsePrompt } from '../llm/parsingPrompts';
 import { ParseErrorCode, StructuredError } from '../../common/types/errors';
 import { generateAndSaveEmbedding } from '../../utils/recipeEmbeddings';
+import { normalizeUrl } from '../../utils/normalizeUrl';
 
 const MAX_PREVIEW_LENGTH = 100;
 
@@ -51,7 +52,8 @@ export async function parseUrlRecipe(
     let fallbackType: string | null = null;
     const inputType = 'url';
     const trimmedInput = input.trim();
-    const cacheKey = trimmedInput;
+    const normalizedUrl = normalizeUrl(trimmedInput);
+    const cacheKey = normalizedUrl;
 
     try {
         logger.info({ requestId, inputType, inputLength: trimmedInput.length, cacheKey }, `Received parse request.`);
@@ -61,7 +63,7 @@ export async function parseUrlRecipe(
             const { data: cachedRecipe, error: dbError } = await supabase
                 .from('processed_recipes_cache')
                 .select('id, recipe_data')
-                .eq('url', cacheKey)
+                .eq('normalized_url', cacheKey)
                 .maybeSingle();
             
             logger.debug({ cachedRecipe }, '[debug] Supabase returned cachedRecipe');
@@ -222,7 +224,8 @@ export async function parseUrlRecipe(
                 const { error: insertError } = await supabase
                     .from('processed_recipes_cache')
                     .insert({
-                        url: cacheKey,
+                        url: trimmedInput, // Store original URL for reference
+                        normalized_url: cacheKey, // Store normalized URL for cache lookups
                         recipe_data: finalRecipeData,
                         source_type: inputType
                     });
@@ -236,7 +239,7 @@ export async function parseUrlRecipe(
                     const { data: queryData, error: queryError } = await supabase
                         .from('processed_recipes_cache')
                         .select('id, created_at, last_processed_at')
-                        .eq('url', cacheKey)
+                        .eq('normalized_url', cacheKey)
                         .order('created_at', { ascending: false })
                         .limit(1)
                         .single();

@@ -13,6 +13,7 @@ import {
   Animated,
   Image,
   SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -36,6 +37,7 @@ import { useFreeUsage } from '@/context/FreeUsageContext';
 import LogoHeader from '@/components/LogoHeader';
 import RecipeMatchSelectionModal from '@/components/RecipeMatchSelectionModal';
 import { CombinedParsedRecipe } from '@/common/types';
+import { useRecipeSubmission } from '@/hooks/useRecipeSubmission';
 
 export default function HomeScreen() {
   const [recipeUrl, setRecipeUrl] = useState('');
@@ -45,6 +47,14 @@ export default function HomeScreen() {
   const { showError } = useErrorModal();
   const { session } = useAuth();
   const { hasUsedFreeRecipe } = useFreeUsage();
+  
+  // Use the new submission hook
+  const {
+    submitRecipe,
+    isSubmitting,
+    submissionState,
+    clearState
+  } = useRecipeSubmission();
   
   // Animation for smooth fade-in to mask layout jitter
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -98,18 +108,11 @@ export default function HomeScreen() {
       return () => {
         console.log('[HomeScreen] 🌀 useFocusEffect cleanup');
         console.log('[HomeScreen] 🌀 Screen is blurring (not necessarily unmounting)');
+        // Clear submission state when leaving screen
+        clearState();
       };
-    }, [])
+    }, [clearState])
   );
-
-  const handleNavigation = (recipeInput: string) => {
-    Keyboard.dismiss();
-    router.push({
-      pathname: '/loading',
-      params: { recipeInput },
-    });
-    setRecipeUrl(''); // Clear input after submission
-  };
 
   const handleMatchSelectionAction = useCallback((action: 'select' | 'createNew' | 'returnHome', selectedRecipeId?: string) => {
     setShowMatchSelectionModal(false); // Always dismiss the modal first
@@ -134,9 +137,9 @@ export default function HomeScreen() {
         showError('Navigation Error', 'Could not load the selected recipe. Please try again.');
       }
     } else if (action === 'createNew') {
-      // Trigger the full LLM parsing flow with the original input
-      handleNavigation(recipeUrl);
-      console.log('[HomeScreen] User opted to create new recipe, triggering LLM parse for:', recipeUrl);
+      // Use the submission hook to trigger full parsing
+      handleSubmit();
+      console.log('[HomeScreen] User opted to create new recipe, triggering full parse for:', recipeUrl);
     } else if (action === 'returnHome') {
       // Clear input and stay on home screen
       setRecipeUrl('');
@@ -167,81 +170,36 @@ export default function HomeScreen() {
       }
     }
 
-    // Check if input looks like a URL - if so, proceed with normal flow
-    const isUrl = recipeInput.startsWith('http://') || recipeInput.startsWith('https://');
-    if (isUrl) {
-      console.log('[HomeScreen] URL detected, proceeding with standard flow.');
-      handleNavigation(recipeInput);
-      return;
-    }
-
-    // For text input, try to get potential matches from the backend
     try {
-      console.log('[HomeScreen] Text input detected, checking for cached matches.');
-      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
-      if (!backendUrl) {
-        console.error('[HomeScreen] EXPO_PUBLIC_API_URL is not set.');
-        handleNavigation(recipeInput); // Fallback to normal flow
+      console.log('[HomeScreen] Starting submission with:', {
+        inputLength: recipeInput.length,
+        inputType: recipeInput.startsWith('http') ? 'url' : 'text'
+      });
+
+      const result = await submitRecipe(recipeInput);
+      
+      if (!result.success) {
+        if (result.action === 'show_validation_error' && result.error) {
+          showError('Validation Error', result.error);
+        }
         return;
       }
 
-      const response = await fetch(`${backendUrl}/api/recipes/parse`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ input: recipeInput }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('[HomeScreen] API request failed:', {
-          status: response.status,
-          statusText: response.statusText,
-          errorBody: errorText
-        });
-        handleNavigation(recipeInput); // Fallback to normal flow
-        return;
-      }
-
-      const parseResult = await response.json();
-      console.log('[HomeScreen] Parse result received:', {
-        hasCachedMatches: !!parseResult.cachedMatches,
-        cachedMatchesLength: parseResult.cachedMatches?.length || 0,
-        hasRecipe: !!parseResult.recipe,
-        fetchMethodUsed: parseResult.fetchMethodUsed
-      });
-
-      // Handle different response cases
-      if (parseResult.cachedMatches && parseResult.cachedMatches.length > 1) {
-        // Multiple matches: show modal
-        setPotentialMatches(parseResult.cachedMatches);
+      if (result.action === 'show_match_modal' && result.matches) {
+        // Show the match selection modal
+        setPotentialMatches(result.matches);
         setShowMatchSelectionModal(true);
-        console.log('[HomeScreen] Multiple cached matches found, showing selection modal.');
-      } else if (parseResult.cachedMatches && parseResult.cachedMatches.length === 1) {
-        // Single match: auto-route directly using the full recipe object
-        const singleMatch = parseResult.cachedMatches[0];
-        router.push({
-          pathname: '/recipe/summary',
-          params: {
-            recipeData: JSON.stringify(singleMatch.recipe),
-            from: '/tabs',
-          },
-        });
-        console.log('[HomeScreen] Single cached match found, auto-routing to:', singleMatch.recipe.title);
-      } else {
-        // No fuzzy matches or parsing result ready: proceed with existing flow
-        console.log('[HomeScreen] No relevant cached matches found for text input. Proceeding with standard flow.');
-        handleNavigation(recipeInput);
+        console.log('[HomeScreen] Multiple matches found, showing selection modal.');
+      } else if (result.action === 'navigate_to_summary') {
+        console.log('[HomeScreen] Recipe submitted successfully - navigated to summary');
+        setRecipeUrl(''); // Clear input after successful submission
+      } else if (result.action === 'navigate_to_loading') {
+        console.log('[HomeScreen] Recipe submitted successfully - navigated to loading');
+        setRecipeUrl(''); // Clear input after successful submission
       }
     } catch (error) {
-      console.error('[HomeScreen] Error checking for cached matches:', {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        type: typeof error
-      });
-      // Fallback to normal flow on error
-      handleNavigation(recipeInput);
+      console.error('[HomeScreen] Submission error:', error);
+      showError('Recipe Submission Failed', 'Something went wrong while submitting your recipe. Please try again, and if the problem continues, try pasting the recipe text instead of a URL.');
     }
   };
 
@@ -264,6 +222,21 @@ export default function HomeScreen() {
       />
     </Animated.View>
   ), [logoOpacity, logoTranslateY]); // Only recreate if animation values change
+
+  // Get appropriate button text based on submission state
+  const getSubmitButtonContent = () => {
+    if (submissionState === 'validating') {
+      return <ActivityIndicator size="small" color={COLORS.white} />;
+    } else if (submissionState === 'checking_cache') {
+      return <ActivityIndicator size="small" color={COLORS.white} />;
+    } else if (submissionState === 'parsing') {
+      return <ActivityIndicator size="small" color={COLORS.white} />;
+    } else if (submissionState === 'navigating') {
+      return <ActivityIndicator size="small" color={COLORS.white} />;
+    } else {
+      return <Text style={styles.submitButtonText}>Go</Text>;
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -308,13 +281,15 @@ export default function HomeScreen() {
                     autoCapitalize="none"
                     autoCorrect={false}
                     onSubmitEditing={handleSubmit}
+                    editable={!isSubmitting}
                   />
                 </View>
                 <TouchableOpacity
-                  style={styles.submitButton}
+                  style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
                   onPress={handleSubmit}
+                  disabled={isSubmitting}
                 >
-                  <Text style={styles.submitButtonText}>Go</Text>
+                  {getSubmitButtonContent()}
                 </TouchableOpacity>
               </View>
             </View>

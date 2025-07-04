@@ -38,9 +38,27 @@ describe('detectInputType', () => {
     expect(detectInputType('not a url . com')).toBe<InputType>('raw_text'); // Contains spaces
   });
 
-  it('should handle empty or whitespace-only strings as raw_text', () => {
-    expect(detectInputType('')).toBe<InputType>('raw_text');
-    expect(detectInputType('   ')).toBe<InputType>('raw_text');
+  // Test cases for invalid inputs
+  it('should handle empty or whitespace-only strings as invalid', () => {
+    expect(detectInputType('')).toBe<InputType>('invalid');
+    expect(detectInputType('   ')).toBe<InputType>('invalid');
+    expect(detectInputType('\n\n')).toBe<InputType>('invalid');
+    expect(detectInputType('\t \n ')).toBe<InputType>('invalid');
+  });
+
+  it('should handle inputs that are too short to be meaningful as invalid', () => {
+    expect(detectInputType('a')).toBe<InputType>('invalid');
+    expect(detectInputType('1')).toBe<InputType>('invalid');
+    expect(detectInputType('.')).toBe<InputType>('invalid');
+    expect(detectInputType('?')).toBe<InputType>('invalid');
+  });
+
+  it('should handle inputs with only special characters as invalid', () => {
+    expect(detectInputType('!!!')).toBe<InputType>('invalid');
+    expect(detectInputType('...')).toBe<InputType>('invalid');
+    expect(detectInputType('###')).toBe<InputType>('invalid');
+    expect(detectInputType('---')).toBe<InputType>('invalid');
+    expect(detectInputType('???')).toBe<InputType>('invalid');
   });
 
   // Test cases from original isProbablyUrl logic (if any specific examples are known)

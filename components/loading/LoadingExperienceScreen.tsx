@@ -24,6 +24,8 @@ import GlobalErrorModal from '../GlobalErrorModal';
 import { CombinedParsedRecipe as ParsedRecipe } from '../../common/types';
 import { FONT } from '@/constants/typography';
 import LogoHeaderLayout from '../LogoHeaderLayout';
+import { getErrorMessage, getNetworkErrorMessage } from '../../utils/errorMessages';
+import { ParseErrorCode } from '../../common/types/errors';
 
 interface LoadingExperienceScreenProps {
   recipeInput: string;
@@ -80,6 +82,49 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
   useEffect(() => {
     console.log(`[${new Date().toISOString()}] [STATE] hideChecklist changed to: ${hideChecklist}`);
   }, [hideChecklist]);
+
+  // Helper function to process backend error responses
+  const processBackendError = (errorResponse: any): string => {
+    try {
+      // Check if it's a structured error response with ParseErrorCode
+      if (errorResponse && typeof errorResponse === 'object') {
+        if (errorResponse.error && errorResponse.error.code) {
+          const code = errorResponse.error.code as ParseErrorCode;
+          const inputType = recipeInput.startsWith('http') ? 'url' : 'text';
+          return getErrorMessage(code, inputType);
+        }
+        
+        // Check for error message in response
+        if (errorResponse.error && errorResponse.error.message) {
+          return getNetworkErrorMessage(errorResponse.error.message);
+        }
+        
+        if (errorResponse.message) {
+          return getNetworkErrorMessage(errorResponse.message);
+        }
+      }
+      
+      // Handle string responses
+      if (typeof errorResponse === 'string') {
+        try {
+          const parsed = JSON.parse(errorResponse);
+          if (parsed.error && parsed.error.code) {
+            const code = parsed.error.code as ParseErrorCode;
+            const inputType = recipeInput.startsWith('http') ? 'url' : 'text';
+            return getErrorMessage(code, inputType);
+          }
+        } catch {
+          // Not JSON, treat as plain string
+          return getNetworkErrorMessage(errorResponse);
+        }
+      }
+      
+      return getNetworkErrorMessage('Unknown error');
+    } catch (error) {
+      console.error('[LoadingExperienceScreen] Error processing backend error:', error);
+      return "We're having trouble processing your recipe. Please try again.";
+    }
+  };
 
   const handleSpinComplete = () => {
     if (!isMountedRef.current) return;
@@ -141,17 +186,28 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
         if (result.recipe) {
           setRecipeData(result.recipe);
         } else {
-          setError(
-            normalizeError('Received incomplete recipe data from the server.'),
-          );
+          // Handle successful response but no recipe data
+          const userMessage = result.error 
+            ? processBackendError(result)
+            : "We received an incomplete response from the server. Please try again.";
+          setError(userMessage);
         }
       } else {
-        const responseText = await response.text();
-        setError(normalizeError(responseText));
+        // Handle HTTP error responses
+        try {
+          const errorResponse = await response.json();
+          console.log('[parseRecipe] Error response JSON:', errorResponse);
+          setError(processBackendError(errorResponse));
+        } catch {
+          // If JSON parsing fails, fall back to status-based message
+          const statusMessage = getNetworkErrorMessage(`HTTP ${response.status}`, response.status);
+          setError(statusMessage);
+        }
       }
     } catch (e: any) {
       console.error('[parseRecipe] Fetch Error:', e);
-      setError(normalizeError(e));
+      // Handle network/connection errors
+      setError(getNetworkErrorMessage(e));
     } finally {
       setIsParsingFinished(true);
     }

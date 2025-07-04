@@ -10,7 +10,8 @@
     "test": "jest",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "start": "expo start --dev-client"
+    "start": "expo start --dev-client",
+    "update-normalized-urls": "npx ts-node scripts/updateNormalizedUrls.ts"
   },
   "dependencies": {
     "@d11/react-native-fast-image": "^8.9.2",
