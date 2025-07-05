@@ -30,14 +30,12 @@ const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
   message,
   onClose,
 }) => {
-  console.log('[GlobalErrorModal] Rendered. visible:', visible);
   const [isRendered, setIsRendered] = useState(visible);
   const scale = useSharedValue(0.7);
   const opacity = useSharedValue(0);
 
   useEffect(() => {
     try {
-      console.log('[GlobalErrorModal] useEffect triggered. visible:', visible);
       if (visible) {
         setIsRendered(true);
         scale.value = withSpring(1, { damping: 15, stiffness: 200 });

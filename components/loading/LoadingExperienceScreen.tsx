@@ -20,7 +20,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useHandleError } from '@/hooks/useHandleError';
 import { normalizeError } from '@/utils/normalizeError';
-import GlobalErrorModal from '../GlobalErrorModal';
+import { useErrorModal } from '@/context/ErrorModalContext';
 import { CombinedParsedRecipe as ParsedRecipe } from '../../common/types';
 import { FONT } from '@/constants/typography';
 import LogoHeaderLayout from '../LogoHeaderLayout';
@@ -45,12 +45,12 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
   const alreadyNavigated = useRef(false);
   const [isParsingFinished, setIsParsingFinished] = useState(false);
   const [recipeData, setRecipeData] = useState<ParsedRecipe | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [componentKey, setComponentKey] = useState(0);
   const [checkmarkShown, setCheckmarkShown] = useState(false);
   const [showSpinner, setShowSpinner] = useState(false);
   const [hideChecklist, setHideChecklist] = useState(false);
   const handleError = useHandleError();
+  const { showError } = useErrorModal();
   const isMountedRef = useRef(true);
   
   // Animation values
@@ -186,28 +186,23 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
         if (result.recipe) {
           setRecipeData(result.recipe);
         } else {
-          // Handle successful response but no recipe data
+          // Show error modal globally
           const userMessage = result.error 
             ? processBackendError(result)
             : "We received an incomplete response from the server. Please try again.";
-          setError(userMessage);
+          showError('Oops!', userMessage, handleBack);
         }
       } else {
-        // Handle HTTP error responses
         try {
           const errorResponse = await response.json();
-          console.log('[parseRecipe] Error response JSON:', errorResponse);
-          setError(processBackendError(errorResponse));
+          showError('Oops!', processBackendError(errorResponse), handleBack);
         } catch {
-          // If JSON parsing fails, fall back to status-based message
           const statusMessage = getNetworkErrorMessage(`HTTP ${response.status}`, response.status);
-          setError(statusMessage);
+          showError('Oops!', statusMessage, handleBack);
         }
       }
     } catch (e: any) {
-      console.error('[parseRecipe] Fetch Error:', e);
-      // Handle network/connection errors
-      setError(getNetworkErrorMessage(e));
+      showError('Oops!', getNetworkErrorMessage(e), handleBack);
     } finally {
       setIsParsingFinished(true);
     }
@@ -220,8 +215,6 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
   useEffect(() => {
     if (
       isParsingFinished &&
-      !error &&
-      recipeData &&
       !alreadyNavigated.current
     ) {
       alreadyNavigated.current = true;
@@ -243,10 +236,9 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
         }
       });
     }
-  }, [isParsingFinished, recipeData, error, router]);
+  }, [isParsingFinished, recipeData, router]);
 
   const handleRetry = () => {
-    setError(null);
     setIsParsingFinished(false);
     setComponentKey((prevKey: number) => prevKey + 1);
   };
@@ -259,12 +251,6 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
     return (
       <View style={{ flex: 1 }}>
         <LogoHeaderLayout>
-          <GlobalErrorModal
-            visible={!!error}
-            message={error ?? ''}
-            title="Oops!"
-            onClose={handleBack}
-          />
           {!hideChecklist && (
             <View style={styles.contentWrapper}>
               <Text style={styles.tagline}>Working on our mise en place...</Text>
@@ -274,7 +260,6 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
             </View>
           )}
         </LogoHeaderLayout>
-
         {(showSpinner || checkmarkShown) && (
           <View 
             style={styles.overlayContainer}
@@ -314,12 +299,6 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
 
   return (
     <LogoHeaderLayout>
-      <GlobalErrorModal
-        visible={!!error}
-        message={error ?? ''}
-        title="Oops!"
-        onClose={handleBack}
-      />
       <View style={styles.logoContainer}>
         <Text style={styles.loadingText}>Loading....</Text>
         <View style={styles.loadingIndicator} />
@@ -427,7 +406,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 1000,
+    zIndex: 1000, // Reduced from 1000 to ensure GlobalErrorModal (zIndex: 9999) appears above
     pointerEvents: 'none',
   } as ViewStyle,
   spinnerContent: {

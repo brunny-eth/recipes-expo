@@ -1,4 +1,3 @@
-// app/loading.tsx
 import React from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import LoadingExperienceScreen from '@/components/loading/LoadingExperienceScreen';
@@ -8,6 +7,7 @@ import {
   View,
   TouchableOpacity,
   ViewStyle,
+  Platform,
 } from 'react-native';
 import { COLORS, SPACING, ICON_SIZE } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
@@ -27,17 +27,20 @@ export default function LoadingRoute() {
   }
 
   const handleClose = () => {
-    router.replace('/tabs');
+    // Current navigation is to /tabs. This is the desired "home" screen for exit.
+    console.log('[LoadingRoute] Close button pressed. Navigating to /tabs.'); // Added for debugging
+    router.replace('/tabs'); 
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
+      {/* Top navigation bar - copied exactly from RecipeStepsHeader */}
+      <View style={styles.mainHeader}>
+        <TouchableOpacity style={styles.button} onPress={handleClose}>
           <MaterialCommunityIcons
             name="close"
-            size={ICON_SIZE.lg}
-            color={COLORS.darkGray}
+            size={24}
+            color={COLORS.textDark}
           />
         </TouchableOpacity>
       </View>
@@ -62,19 +65,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   } as ViewStyle,
-  header: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: SPACING.xxl,
+  mainHeader: {
+    flexDirection: 'row',
     justifyContent: 'flex-end',
-    alignItems: 'flex-end',
-    paddingRight: SPACING.pageHorizontal,
-    paddingBottom: SPACING.smMd,
-    zIndex: 10,
+    paddingHorizontal: SPACING.md,
+    paddingTop: Platform.OS === 'ios' ? 0 : SPACING.sm,
+    paddingBottom: SPACING.sm,
   } as ViewStyle,
-  closeButton: {
+  button: {
     padding: SPACING.sm,
   } as ViewStyle,
 });

@@ -55,9 +55,9 @@ export function detectInputType(input: string): InputType {
   } catch (e) {
       // If the URL constructor throws an error, the string is not a valid URL.
       const errorMessage = e instanceof Error ? e.message : String(e);
-      console.log(`[detectInputType] URL parsing failed for input '${trimmed}': ${errorMessage}. Classifying as 'invalid'.`);
-      console.log(`[detectInputType] Classification result: 'invalid' for input: '${input}' (URL parsing failed)`);
-      return 'invalid';
+      console.log(`[detectInputType] URL parsing failed for input '${trimmed}': ${errorMessage}. Classifying as 'raw_text'.`);
+      console.log(`[detectInputType] Classification result: 'raw_text' for input: '${input}' (URL parsing failed)`);
+      return 'raw_text';
   }
 
   // If it didn't pass as a URL, and already passed basic text checks, classify as raw_text.
