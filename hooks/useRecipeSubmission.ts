@@ -1,10 +1,7 @@
 import { useState, useCallback } from 'react';
-import { useRouter } from 'expo-router';
-import { InteractionManager } from 'react-native';
 import { detectInputType } from '../server/utils/detectInputType';
 import { normalizeUrl } from '../utils/normalizeUrl';
 import { supabase } from '../lib/supabaseClient';
-import { useErrorModal } from '../context/ErrorModalContext';
 import { useAuth } from '../context/AuthContext';
 import { useFreeUsage } from '../context/FreeUsageContext';
 import { getNetworkErrorMessage, getSubmissionErrorMessage } from '../utils/errorMessages';
@@ -28,15 +25,15 @@ export interface UseRecipeSubmissionReturn {
 export function useRecipeSubmission(): UseRecipeSubmissionReturn {
   const [submissionState, setSubmissionState] = useState<SubmissionState>('idle');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const router = useRouter();
-  const { showError } = useErrorModal();
   const { session } = useAuth();
   const { hasUsedFreeRecipe } = useFreeUsage();
 
   const validateInput = useCallback((input: string): ValidationResult => {
     const trimmedInput = input.trim();
+    console.log(`[useRecipeSubmission] validateInput: Validating input: '${trimmedInput}'`); // NEW LOG
     
     if (!trimmedInput) {
+      console.log('[useRecipeSubmission] validateInput: Input is empty, returning invalid.'); // NEW LOG
       return {
         isValid: false,
         inputType: 'invalid',
@@ -45,8 +42,10 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
     }
 
     const detectedType = detectInputType(trimmedInput);
+    console.log(`[useRecipeSubmission] validateInput: Detected type by detectInputType: ${detectedType}`); // NEW LOG
     
     if (detectedType === 'invalid') {
+      console.log('[useRecipeSubmission] validateInput: Input classified as invalid, returning error.'); // NEW LOG
       return {
         isValid: false,
         inputType: 'invalid',
@@ -58,7 +57,9 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
     if (detectedType === 'url') {
       try {
         normalizedInput = normalizeUrl(trimmedInput);
+        console.log(`[useRecipeSubmission] validateInput: URL normalized to: ${normalizedInput}`); // NEW LOG
       } catch (error) {
+        console.log('[useRecipeSubmission] validateInput: URL normalization failed, returning invalid.', error); // NEW LOG
         return {
           isValid: false,
           inputType: 'invalid',
@@ -67,6 +68,7 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
       }
     }
 
+    console.log('[useRecipeSubmission] validateInput: Returning valid result.'); // NEW LOG
     return {
       isValid: true,
       inputType: detectedType,
@@ -75,6 +77,7 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
   }, []);
 
   const checkCache = useCallback(async (normalizedUrl: string): Promise<CacheCheckResult> => {
+    console.log(`[useRecipeSubmission] checkCache: Checking cache for URL: ${normalizedUrl}`);
     try {
       const { data, error } = await supabase.rpc('get_cached_recipe_by_url', {
         p_normalized_url: normalizedUrl
@@ -85,7 +88,45 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
         return null;
       }
 
-      return data;
+      // Debug logging to understand what RPC returns
+      console.log('[useRecipeSubmission] Cache check result:', {
+        hasData: !!data,
+        dataType: typeof data,
+        hasRecipeData: !!(data?.recipe_data),
+        hasId: !!(data?.id),
+        dataKeys: data ? Object.keys(data) : 'no data'
+      });
+
+      if (data) {
+        console.log('[useRecipeSubmission] checkCache: Cache hit! Raw data found:', JSON.stringify(data));
+
+        // MODIFICATION START
+        // Extract recipe content from the 'recipe_data' column (JSONB type)
+        const extractedRecipeContent = data.recipe_data;
+        const cachedRecipeId = data.id; // Get the ID from the top-level row data
+
+        if (extractedRecipeContent && typeof extractedRecipeContent === 'object' && cachedRecipeId) {
+          // Reconstruct the CombinedParsedRecipe, ensuring 'id' is included at the top level
+          const fullCachedRecipe: CombinedParsedRecipe = {
+            ...(extractedRecipeContent as CombinedParsedRecipe), // Cast nested content
+            id: cachedRecipeId, // Override or add the correct ID
+          };
+          console.log('[useRecipeSubmission] checkCache: Successfully extracted recipe from cache:', JSON.stringify(fullCachedRecipe));
+
+          return fullCachedRecipe;
+        } else {
+          // Fallback: Data was found but 'recipe_data' was missing, null, or malformed,
+          // or ID was missing. Treat as a cache miss to force re-parsing.
+          console.warn('[useRecipeSubmission] checkCache: Data found but could not extract valid CombinedParsedRecipe, treating as cache miss.');
+          console.log('[useRecipeSubmission] checkCache: Returning null (fallback)');
+          return null;
+        }
+        // MODIFICATION END
+
+      } else {
+        console.log('[useRecipeSubmission] checkCache: Cache miss for URL.');
+        return null;
+      }
     } catch (error) {
       console.error('[useRecipeSubmission] Cache check exception:', error);
       return null;
@@ -126,56 +167,37 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
         // Check cache for URL
         const cacheResult = await checkCache(normalizedInput!);
         
-        if (cacheResult) {
-          // Cache hit - navigate directly to summary
-          setSubmissionState('navigating');
+        // Validate cache result has complete recipe data
+        if (cacheResult && cacheResult.id) {
+          // Cache hit - return recipe for navigation to summary
+          setSubmissionState('idle');
           
-          const recipe: CombinedParsedRecipe = {
-            ...cacheResult.recipe_data,
-            id: cacheResult.id
-          };
+          const recipe: CombinedParsedRecipe = cacheResult;
 
-          return new Promise((resolve) => {
-            InteractionManager.runAfterInteractions(() => {
-              router.push({
-                pathname: '/recipe/summary',
-                params: {
-                  recipeData: JSON.stringify(recipe),
-                  from: '/tabs',
-                },
-              });
-              
-              resolve({
-                success: true,
-                action: 'navigate_to_summary',
-                recipe,
-                normalizedUrl: normalizedInput!
-              });
-            });
-          });
+          const submissionResult = {
+            success: true,
+            action: 'navigate_to_summary' as const,
+            recipe,
+            normalizedUrl: normalizedInput!
+          };
+          console.log('[useRecipeSubmission] submitRecipe: Final SubmissionResult before return (cache hit):', JSON.stringify(submissionResult)); // NEW LOG
+          return submissionResult;
         } else {
-          // Cache miss - navigate to loading screen
-          setSubmissionState('navigating');
+          // Cache miss - return normalized URL for navigation to loading
+          setSubmissionState('idle');
           
-          return new Promise((resolve) => {
-            InteractionManager.runAfterInteractions(() => {
-              router.push({
-                pathname: '/loading',
-                params: { recipeInput: normalizedInput! },
-              });
-              
-              resolve({
-                success: true,
-                action: 'navigate_to_loading',
-                normalizedUrl: normalizedInput!
-              });
-            });
-          });
+          const submissionResult = {
+            success: true,
+            action: 'navigate_to_loading' as const,
+            normalizedUrl: normalizedInput!
+          };
+          console.log('[useRecipeSubmission] submitRecipe: Final SubmissionResult before return (cache miss):', JSON.stringify(submissionResult)); // NEW LOG
+          return submissionResult;
         }
       } else if (inputType === 'raw_text') {
         setSubmissionState('parsing');
         
-        // For text input, make backend call to check for fuzzy matches
+        // For text input, make backend call to get intelligent response
         const backendUrl = process.env.EXPO_PUBLIC_API_URL;
         if (!backendUrl) {
           throw new Error('Backend URL not configured');
@@ -196,54 +218,58 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
 
         const parseResult = await response.json();
         
-        if (parseResult.cachedMatches && parseResult.cachedMatches.length > 1) {
-          // Multiple matches - show selection modal
+        // Debug logging to understand what the backend returns
+        console.log('[useRecipeSubmission] Parse result:', {
+          hasRecipe: !!parseResult.recipe,
+          hasCachedMatches: !!parseResult.cachedMatches,
+          cachedMatchesLength: parseResult.cachedMatches?.length || 0,
+          fromCache: parseResult.fromCache,
+          fetchMethodUsed: parseResult.fetchMethodUsed
+        });
+        
+        // Handle error responses
+        if (parseResult.error) {
           setSubmissionState('idle');
+          return {
+            success: false,
+            action: 'show_validation_error',
+            error: parseResult.error.message || 'Failed to process recipe'
+          };
+        }
+        
+        // Priority 1: Direct recipe hit (either new parse OR single fuzzy match)
+        if (parseResult.recipe) {
+          setSubmissionState('idle');
+          console.log('[useRecipeSubmission] Direct recipe hit - returning for navigation to summary');
+          
+          return {
+            success: true,
+            action: 'navigate_to_summary',
+            recipe: parseResult.recipe
+          };
+        }
+        
+        // Priority 2: Multiple matches - show selection modal
+        if (parseResult.cachedMatches && parseResult.cachedMatches.length > 1) {
+          setSubmissionState('idle');
+          console.log('[useRecipeSubmission] Multiple matches - showing modal');
+          
           return {
             success: true,
             action: 'show_match_modal',
             matches: parseResult.cachedMatches
           };
-        } else if (parseResult.cachedMatches && parseResult.cachedMatches.length === 1) {
-          // Single match - navigate directly
-          setSubmissionState('navigating');
-          const singleMatch = parseResult.cachedMatches[0];
-          
-          return new Promise((resolve) => {
-            InteractionManager.runAfterInteractions(() => {
-              router.push({
-                pathname: '/recipe/summary',
-                params: {
-                  recipeData: JSON.stringify(singleMatch.recipe),
-                  from: '/tabs',
-                },
-              });
-              
-              resolve({
-                success: true,
-                action: 'navigate_to_summary',
-                recipe: singleMatch.recipe
-              });
-            });
-          });
-        } else {
-          // No matches - navigate to loading screen for full parsing
-          setSubmissionState('navigating');
-          
-          return new Promise((resolve) => {
-            InteractionManager.runAfterInteractions(() => {
-              router.push({
-                pathname: '/loading',
-                params: { recipeInput: normalizedInput! },
-              });
-              
-              resolve({
-                success: true,
-                action: 'navigate_to_loading'
-              });
-            });
-          });
         }
+        
+        // Priority 3: No matches or unclear result - proceed to full parsing
+        setSubmissionState('idle');
+        console.log('[useRecipeSubmission] No clear matches - returning for navigation to loading');
+        
+        return {
+          success: true,
+          action: 'navigate_to_loading',
+          normalizedUrl: normalizedInput!
+        };
       } else {
         throw new Error('Unsupported input type');
       }
@@ -263,7 +289,7 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
     } finally {
       setIsSubmitting(false);
     }
-  }, [session, hasUsedFreeRecipe, validateInput, checkCache, router]);
+  }, [session, hasUsedFreeRecipe, validateInput, checkCache]);
 
   const clearState = useCallback(() => {
     setSubmissionState('idle');

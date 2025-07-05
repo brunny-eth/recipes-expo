@@ -14,6 +14,7 @@ import {
   Image,
   SafeAreaView,
   ActivityIndicator,
+  InteractionManager,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -177,6 +178,7 @@ export default function HomeScreen() {
       });
 
       const result = await submitRecipe(recipeInput);
+      console.log('[HomeScreen] handleSubmit: Result from submitRecipe:', JSON.stringify(result)); // NEW LOG
       
       if (!result.success) {
         if (result.action === 'show_validation_error' && result.error) {
@@ -190,11 +192,28 @@ export default function HomeScreen() {
         setPotentialMatches(result.matches);
         setShowMatchSelectionModal(true);
         console.log('[HomeScreen] Multiple matches found, showing selection modal.');
-      } else if (result.action === 'navigate_to_summary') {
-        console.log('[HomeScreen] Recipe submitted successfully - navigated to summary');
+      } else if (result.action === 'navigate_to_summary' && result.recipe) {
+        // Navigate to summary with cached recipe
+        console.log('[HomeScreen] Recipe submitted successfully - navigating to summary');
+        InteractionManager.runAfterInteractions(() => {
+          router.push({
+            pathname: '/recipe/summary',
+            params: {
+              recipeData: JSON.stringify(result.recipe),
+              from: '/tabs',
+            },
+          });
+        });
         setRecipeUrl(''); // Clear input after successful submission
-      } else if (result.action === 'navigate_to_loading') {
-        console.log('[HomeScreen] Recipe submitted successfully - navigated to loading');
+      } else if (result.action === 'navigate_to_loading' && result.normalizedUrl) {
+        // Navigate to loading with normalized URL
+        console.log('[HomeScreen] Recipe submitted successfully - navigating to loading with normalized URL');
+        InteractionManager.runAfterInteractions(() => {
+          router.push({
+            pathname: '/loading',
+            params: { recipeInput: result.normalizedUrl },
+          });
+        });
         setRecipeUrl(''); // Clear input after successful submission
       }
     } catch (error) {

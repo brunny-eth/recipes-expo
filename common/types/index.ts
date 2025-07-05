@@ -8,14 +8,9 @@ import { CombinedParsedRecipe } from './recipes';
 
 /**
  * Result from a quick cache check using the get_cached_recipe_by_url RPC
+ * Returns the complete recipe if found, or null if not found/error
  */
-export type CacheCheckResult = {
-  id: number;
-  recipe_data: CombinedParsedRecipe;
-  title: string;
-  original_url: string;
-  created_at: string;
-} | null;
+export type CacheCheckResult = CombinedParsedRecipe | null;
 
 /**
  * State management for recipe submission flow
