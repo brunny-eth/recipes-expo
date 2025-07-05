@@ -38,7 +38,8 @@ function normalizeServings(servingRaw: string | null): string | null {
 
 export async function parseTextRecipe(
     input: string,
-    requestId: string
+    requestId: string,
+    forceNewParse?: boolean
 ): Promise<ParseResult> {
     logger.info({ requestId }, "🚨🚨🚨 parseTextRecipe was called! 🚨🚨🚨");
     logger.info({ env: process.env.ENABLE_FUZZY_MATCH }, "Env variable ENABLE_FUZZY_MATCH value");
@@ -56,8 +57,8 @@ export async function parseTextRecipe(
     let isFallback = false;
 
     // --- Start Fuzzy Match Logic ---
-    logger.info({ requestId, enableFuzzyMatch: process.env.ENABLE_FUZZY_MATCH }, "Checking fuzzy match environment variable");
-    if (process.env.ENABLE_FUZZY_MATCH === 'true') {
+    logger.info({ requestId, enableFuzzyMatch: process.env.ENABLE_FUZZY_MATCH, forceNewParse }, "Checking fuzzy match environment variable and forceNewParse");
+    if (!forceNewParse && process.env.ENABLE_FUZZY_MATCH === 'true') {
         logger.info({ requestId }, "Fuzzy match enabled, attempting to find similar recipes.");
         const fuzzyMatchStartTime = Date.now();
         try {

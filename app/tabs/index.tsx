@@ -138,9 +138,14 @@ export default function HomeScreen() {
         showError('Navigation Error', 'Could not load the selected recipe. Please try again.');
       }
     } else if (action === 'createNew') {
-      // Use the submission hook to trigger full parsing
-      handleSubmit();
-      console.log('[HomeScreen] User opted to create new recipe, triggering full parse for:', recipeUrl);
+      console.log('[Home] User chose to create new. Navigating to loading for new parse.');
+      router.push({
+        pathname: '/loading',
+        params: {
+          recipeUrl: recipeUrl,
+          forceNewParse: 'true',
+        },
+      });
     } else if (action === 'returnHome') {
       // Clear input and stay on home screen
       setRecipeUrl('');

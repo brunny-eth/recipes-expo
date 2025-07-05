@@ -32,6 +32,7 @@ interface LoadingExperienceScreenProps {
   onComplete: () => void;
   onFailure: () => void;
   loadingMode: 'checklist' | 'default';
+  forceNewParse?: boolean;
 }
 
 const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
@@ -39,6 +40,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
   onComplete,
   onFailure,
   loadingMode,
+  forceNewParse,
 }) => {
   console.log(`[${new Date().toISOString()}] [LoadingExperienceScreen] render/mount with input: ${recipeInput}`);
   const router = useRouter();
@@ -160,7 +162,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
 
     try {
       console.log(`[parseRecipe] Preparing to send request to: ${backendUrl}`);
-      const requestBody = { input: recipeInput };
+      const requestBody = { input: recipeInput, forceNewParse };
       console.log(
         '[parseRecipe] Request Body:',
         JSON.stringify(requestBody, null, 2),

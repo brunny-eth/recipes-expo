@@ -30,6 +30,7 @@ export type ParseResult = {
 
 export async function parseAndCacheRecipe(
     input: string,
+    forceNewParse?: boolean
 ): Promise<ParseResult> {
     const requestId = createHash('sha256').update(Date.now().toString() + Math.random().toString()).digest('hex').substring(0, 12);
     const requestStartTime = Date.now();
@@ -77,7 +78,7 @@ export async function parseAndCacheRecipe(
         if (inputType === 'url') {
             return await parseUrlRecipe(trimmedInput);
         } else { // 'raw_text'
-            return await parseTextRecipe(trimmedInput, requestId);
+            return await parseTextRecipe(trimmedInput, requestId, forceNewParse);
         }
 
     } catch (err) {

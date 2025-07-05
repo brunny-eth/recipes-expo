@@ -16,12 +16,12 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function LoadingRoute() {
   const router = useRouter();
-  const { recipeInput } = useLocalSearchParams<{ recipeInput?: string }>();
+  const { recipeUrl, forceNewParse } = useLocalSearchParams<{ recipeUrl?: string; forceNewParse?: string }>();
   const { isAuthenticated } = useAuth();
   const { markFreeRecipeUsed } = useFreeUsage();
 
-  if (!recipeInput) {
-    console.error('[LoadingRoute] No recipe input provided.');
+  if (!recipeUrl) {
+    console.error('[LoadingRoute] No recipe URL provided.');
     router.back();
     return null;
   }
@@ -46,8 +46,9 @@ export default function LoadingRoute() {
       </View>
 
       <LoadingExperienceScreen
-        recipeInput={recipeInput}
+        recipeInput={recipeUrl}
         loadingMode="checklist"
+        forceNewParse={forceNewParse === 'true'}
         onComplete={() => {
           console.log('[LoadingRoute] Recipe parsing complete callback.');
         }}
