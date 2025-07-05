@@ -59,10 +59,10 @@ router.post('/parse', async (req: Request, res: Response) => {
   // Add logging for incoming request body
   logger.info({ body: req.body, requestId: (req as any).id, route: req.originalUrl, method: req.method }, '[parse] Incoming request');
   try {
-    const { input } = req.body;
+    const { input, forceNewParse } = req.body;
     const requestId = (req as any).id;
 
-    logger.info({ input, requestId }, '[parse] Processing');
+    logger.info({ input, forceNewParse, requestId }, '[parse] Processing');
 
     if (!input || typeof input !== 'string' || input.trim() === '') {
       logger.warn({ requestId, route: req.originalUrl, method: req.method, inputReceived: input }, 'Missing or empty "input" in request body for /parse');
@@ -74,7 +74,7 @@ router.post('/parse', async (req: Request, res: Response) => {
       return res.status(500).json({ error: 'Server configuration error: Missing ScraperAPI key.' });
     }
 
-    const { recipe, error: parseError, fromCache, inputType, cacheKey, timings, usage, fetchMethodUsed, cachedMatches } = await parseAndCacheRecipe(input);
+    const { recipe, error: parseError, fromCache, inputType, cacheKey, timings, usage, fetchMethodUsed, cachedMatches } = await parseAndCacheRecipe(input, forceNewParse);
 
     if (parseError) {
       switch (parseError.code) {
