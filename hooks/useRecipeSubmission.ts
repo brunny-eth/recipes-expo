@@ -83,27 +83,34 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
         p_normalized_url: normalizedUrl
       });
 
+      // ------------------- DIAGNOSTIC LOGS (KEEP FOR CONFIRMATION, CAN BE REMOVED LATER) -------------------
+      console.log(`[useRecipeSubmission] checkCache: Type of 'data' from Supabase query: ${typeof data}`);
+      console.log(`[useRecipeSubmission] checkCache: Is 'data' an Array from Supabase query? ${Array.isArray(data)}`);
+      console.log(`[useRecipeSubmission] checkCache: Raw 'data' content (full) from Supabase query:`, data);
+      // ------------------- DIAGNOSTIC LOGS END -------------------
+
       if (error) {
         console.error('[useRecipeSubmission] Cache check error:', error);
         return null;
       }
 
-      // Debug logging to understand what RPC returns
-      console.log('[useRecipeSubmission] Cache check result:', {
-        hasData: !!data,
-        dataType: typeof data,
-        hasRecipeData: !!(data?.recipe_data),
-        hasId: !!(data?.id),
-        dataKeys: data ? Object.keys(data) : 'no data'
-      });
+      // --- REVISED MODIFICATION START ---
+      // Check if data is an array and has at least one element, or if it's already an object (ideal .single() behavior)
+      let actualRowData: any = null;
+      if (Array.isArray(data) && data.length > 0) {
+        actualRowData = data[0]; // Get the single object from the array
+        console.log('[useRecipeSubmission] checkCache: Data was array, extracted first element.');
+      } else if (data && typeof data === 'object' && !Array.isArray(data)) {
+        actualRowData = data; // Data is already the single object
+        console.log('[useRecipeSubmission] checkCache: Data was already a single object (expected .single() behavior).');
+      }
 
-      if (data) {
-        console.log('[useRecipeSubmission] checkCache: Cache hit! Raw data found:', JSON.stringify(data));
+      if (actualRowData) {
+        console.log('[useRecipeSubmission] checkCache: Cache hit! Raw row data found:', JSON.stringify(actualRowData));
 
-        // MODIFICATION START
-        // Extract recipe content from the 'recipe_data' column (JSONB type)
-        const extractedRecipeContent = data.recipe_data;
-        const cachedRecipeId = data.id; // Get the ID from the top-level row data
+        // Assume recipe content is in a 'recipe_data' column (JSONB type) within the actualRowData
+        const extractedRecipeContent = actualRowData.recipe_data;
+        const cachedRecipeId = actualRowData.id; // Get the ID from the top-level actualRowData
 
         if (extractedRecipeContent && typeof extractedRecipeContent === 'object' && cachedRecipeId) {
           // Reconstruct the CombinedParsedRecipe, ensuring 'id' is included at the top level
@@ -115,18 +122,17 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
 
           return fullCachedRecipe;
         } else {
-          // Fallback: Data was found but 'recipe_data' was missing, null, or malformed,
-          // or ID was missing. Treat as a cache miss to force re-parsing.
-          console.warn('[useRecipeSubmission] checkCache: Data found but could not extract valid CombinedParsedRecipe, treating as cache miss.');
+          // Fallback: Data was found but 'recipe_data' was missing/malformed or ID was missing.
+          console.warn('[useRecipeSubmission] checkCache: Valid row data found, but could not extract valid CombinedParsedRecipe from element, treating as cache miss.');
           console.log('[useRecipeSubmission] checkCache: Returning null (fallback)');
           return null;
         }
-        // MODIFICATION END
-
       } else {
-        console.log('[useRecipeSubmission] checkCache: Cache miss for URL.');
+        // This covers cases where data is null, undefined, or an empty array
+        console.log('[useRecipeSubmission] checkCache: Cache miss for URL (no data, null, or empty array).');
         return null;
       }
+      // --- REVISED MODIFICATION END ---
     } catch (error) {
       console.error('[useRecipeSubmission] Cache check exception:', error);
       return null;
