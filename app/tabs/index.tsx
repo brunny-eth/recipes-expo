@@ -214,10 +214,10 @@ export default function HomeScreen() {
         // Navigate to loading with normalized URL
         console.log('[HomeScreen] Recipe submitted successfully - navigating to loading with normalized URL');
         InteractionManager.runAfterInteractions(() => {
-          router.push({
-            pathname: '/loading',
-            params: { recipeInput: result.normalizedUrl },
-          });
+                  router.push({
+          pathname: '/loading',
+          params: { recipeUrl: result.normalizedUrl },
+        });
         });
         setRecipeUrl(''); // Clear input after successful submission
       }

@@ -20,9 +20,15 @@ export default function LoadingRoute() {
   const { isAuthenticated } = useAuth();
   const { markFreeRecipeUsed } = useFreeUsage();
 
+  // Move navigation to useEffect to avoid setState during render
+  React.useEffect(() => {
+    if (!recipeUrl) {
+      console.error('[LoadingRoute] No recipe URL provided.');
+      router.back();
+    }
+  }, [recipeUrl, router]);
+
   if (!recipeUrl) {
-    console.error('[LoadingRoute] No recipe URL provided.');
-    router.back();
     return null;
   }
 

@@ -80,7 +80,7 @@ export function getNetworkErrorMessage(error: Error | string, statusCode?: numbe
   
   // URL parsing/normalization errors
   if (errorMessage.includes('URL') || errorMessage.includes('normalize')) {
-    return "That doesn't look like a valid recipe URL. Please check your input and try again.";
+    return "That doesn't look like a valid recipe. Please check your input and try again.";
   }
   
   // Generic fallback
