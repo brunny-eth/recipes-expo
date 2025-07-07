@@ -68,6 +68,7 @@ export default function StepsScreen() {
     editedIngredients?: string; // Scaled/substituted ingredients (stringified array of IngredientGroup)
     newTitle?: string; // LLM-suggested new title
     appliedChanges?: string; // The AppliedRecipeChanges object (stringified)
+    miseRecipeId?: string; // New parameter for mise integration
   }>();
   const router = useRouter();
   const { showError } = useErrorModal();
@@ -77,6 +78,7 @@ export default function StepsScreen() {
   // State for save modified recipe functionality
   const [isLoadingSave, setIsLoadingSave] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [isLoadingComplete, setIsLoadingComplete] = useState(false);
 
   // State to hold the original recipe data (if needed for reference)
   const [originalRecipe, setOriginalRecipe] = useState<ParsedRecipe | null>(null);
@@ -514,6 +516,43 @@ export default function StepsScreen() {
   const activeStepIndex =
     firstUncompletedIndex === -1 ? null : firstUncompletedIndex;
 
+  // Handle marking mise recipe as complete
+  const handleMarkMiseComplete = async () => {
+    if (!params.miseRecipeId || !session?.access_token) return;
+
+    setIsLoadingComplete(true);
+    try {
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+      if (!backendUrl) {
+        throw new Error('API configuration error');
+      }
+
+      const response = await fetch(`${backendUrl}/api/mise/recipes/${params.miseRecipeId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          userId: session.user?.id,
+          isCompleted: true 
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to mark recipe as complete');
+      }
+
+      // Navigate back to mise tab
+      router.replace('/tabs/mise' as any);
+    } catch (err) {
+      console.error('Error marking recipe complete:', err);
+      showError('Error', 'Failed to mark recipe as complete. Please try again.');
+    } finally {
+      setIsLoadingComplete(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <RecipeStepsHeader title={recipeTitle} imageUrl={recipeImageUrl} />
@@ -648,6 +687,31 @@ export default function StepsScreen() {
             <View style={styles.completionContent}>
               <Text style={styles.completionTitle}>Recipe Completed</Text>
               <Text style={styles.completionText}>Enjoy!</Text>
+              
+              {/* Mark as Complete button for mise recipes */}
+              {params.miseRecipeId && (
+                <TouchableOpacity
+                  style={[
+                    styles.completeButton,
+                    isLoadingComplete && styles.completeButtonDisabled
+                  ]}
+                  onPress={handleMarkMiseComplete}
+                  disabled={isLoadingComplete}
+                >
+                  {isLoadingComplete ? (
+                    <ActivityIndicator color={COLORS.white} />
+                  ) : (
+                    <>
+                      <MaterialCommunityIcons
+                        name="check-circle"
+                        size={20}
+                        color={COLORS.white}
+                      />
+                      <Text style={styles.completeButtonText}>Mark as Complete</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
             </View>
           </Animated.View>
         )}
@@ -982,5 +1046,22 @@ const styles = StyleSheet.create({
     color: COLORS.error,
     marginTop: SPACING.xs,
     textAlign: 'center',
+  } as TextStyle,
+  completeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.success,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.sm,
+    marginTop: SPACING.md,
+    gap: SPACING.sm,
+  } as ViewStyle,
+  completeButtonDisabled: {
+    backgroundColor: COLORS.lightGray,
+  } as ViewStyle,
+  completeButtonText: {
+    color: COLORS.white,
+    fontWeight: 'bold',
   } as TextStyle,
 });

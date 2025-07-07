@@ -68,8 +68,7 @@ import CollapsibleSection from '@/components/CollapsibleSection';
 import IngredientList from '@/components/recipe/IngredientList';
 import ServingScaler from '@/components/recipe/ServingScaler';
 import RecipeFooterButtons from '@/components/recipe/RecipeFooterButtons';
-import SaveButton from '@/components/SaveButton';
-import ShareButton from '@/components/recipe/ShareButton';
+
 import RecipeStepsHeader from '@/components/recipe/RecipeStepsHeader';
 
 // Type for a change (substitution or removal)
@@ -234,9 +233,6 @@ export default function RecipeSummaryScreen() {
   );
   const [selectedScaleFactor, setSelectedScaleFactor] = useState<number>(1.0);
 
-  const [checkedIngredients, setCheckedIngredients] = useState<{
-    [key: number]: boolean;
-  }>({});
   const [substitutionModalVisible, setSubstitutionModalVisible] =
     useState(false);
   const [selectedIngredient, setSelectedIngredient] =
@@ -245,6 +241,8 @@ export default function RecipeSummaryScreen() {
   const [isRewriting, setIsRewriting] = useState(false);
   const [isScalingInstructions, setIsScalingInstructions] = useState(false);
   const [isHelpModalVisible, setIsHelpModalVisible] = useState(false);
+  const [preparationComplete, setPreparationComplete] = useState(false);
+  const [preparedRecipeData, setPreparedRecipeData] = useState<any>(null);
   const [selectedIngredientOriginalData, setSelectedIngredientOriginalData] =
     useState<StructuredIngredient | null>(null);
   const [processedSubstitutionsForModal, setProcessedSubstitutionsForModal] =
@@ -335,11 +333,6 @@ export default function RecipeSummaryScreen() {
     return allIngredients;
   }, [scaledIngredientGroups]);
 
-  const handleExitPress = () => {
-    const exitPath = params.from || '/';
-    router.replace(exitPath as any);
-  };
-
   useEffect(() => {
     if (params.recipeData) {
       try {
@@ -388,7 +381,7 @@ export default function RecipeSummaryScreen() {
           setAppliedChanges([]);
         }
         
-        setCheckedIngredients({});
+
       } catch (e: any) {
         showError('Error Loading Summary', `Could not load recipe details: ${e.message}.`);
       }
@@ -405,9 +398,7 @@ export default function RecipeSummaryScreen() {
 
   const handleScaleFactorChange = (factor: number) => setSelectedScaleFactor(factor);
 
-  const toggleCheckIngredient = React.useCallback((index: number) => {
-    setCheckedIngredients((prev) => ({ ...prev, [index]: !prev[index] }));
-  }, []);
+
 
   const openSubstitutionModal = React.useCallback(
     (ingredient: StructuredIngredient) => {
@@ -584,33 +575,93 @@ export default function RecipeSummaryScreen() {
       }
     }
 
-    // --- 3. Navigate to Steps Screen ---
+    // --- 3. Save Prepared Recipe to Mise Table ---
+    const finalRecipeData = {
+      // Pass the ORIGINAL recipe data with all metadata intact
+      ...recipe,
+      // Update the yield text and instructions for the prepared version
+      recipeYield: getScaledYieldText(recipe.recipeYield, selectedScaleFactor),
+      instructions: finalInstructions,
+      ingredientGroups: scaledIngredientGroups,
+    };
+
+    const appliedChangesData = {
+      ingredientChanges: appliedChanges.map((change) => ({
+        from: change.from,
+        to: change.to ? change.to.name : null, // Convert StructuredIngredient to string
+      })),
+      scalingFactor: selectedScaleFactor,
+    };
+
+    // Check authentication before saving
+    if (!session?.user?.id) {
+      showError('Account Required', 'You need an account to prepare your mise en place. Sign up to save your recipes!');
+      return;
+    }
+
+    // Save to mise table
+    try {
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL!;
+      const response = await fetch(`${backendUrl}/api/mise/save-recipe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: session?.user?.id,
+          originalRecipeId: recipe.id,
+          preparedRecipeData: finalRecipeData,
+          appliedChanges: appliedChangesData,
+          finalYield: getScaledYieldText(recipe.recipeYield, selectedScaleFactor),
+          titleOverride: newTitle || null,
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || `Save failed (Status: ${response.status})`);
+
+      // Store the mise recipe ID for navigation
+      setPreparedRecipeData({ miseRecipeId: result.miseRecipe.id, ...finalRecipeData });
+      setPreparationComplete(true);
+
+    } catch (saveError: any) {
+      showError('Save Failed', `Couldn't save recipe to mise: ${saveError.message}`);
+      return; // Stop execution on failure
+    }
+  }, [recipe, scaledIngredients, scaledIngredientGroups, appliedChanges, router, showError, selectedScaleFactor, session]);
+
+  const handleGoToSteps = () => InteractionManager.runAfterInteractions(navigateToNextScreen);
+
+  const handleGoToRecipeSteps = () => {
+    if (!preparedRecipeData) return;
+    
+    setPreparationComplete(false);
     router.push({
       pathname: '/recipe/steps',
       params: {
-        originalId: recipe.id?.toString() || '', // Pass the ID of the original recipe
-        recipeData: JSON.stringify({
-          // Pass the ORIGINAL recipe data with all metadata intact
-          ...recipe,
-          // Update only the scaled yield text for display
-          recipeYield: getScaledYieldText(recipe.recipeYield, selectedScaleFactor),
-        }),
-        // Pass the edited instructions and ingredients for steps.tsx to apply
-        editedInstructions: JSON.stringify(finalInstructions),
-        editedIngredients: JSON.stringify(scaledIngredientGroups),
-        newTitle: newTitle || 'null', // Pass newTitle from LLM, or 'null' string
+        originalId: recipe?.id?.toString() || '',
+        recipeData: JSON.stringify(preparedRecipeData),
+        editedInstructions: JSON.stringify(preparedRecipeData.instructions || []),
+        editedIngredients: JSON.stringify(preparedRecipeData.ingredientGroups || []),
+        newTitle: 'null', // Title is already in preparedRecipeData
         appliedChanges: JSON.stringify({
           ingredientChanges: appliedChanges.map((change) => ({
             from: change.from,
-            to: change.to ? change.to.name : null, // Convert StructuredIngredient to string
+            to: change.to ? change.to.name : null,
           })),
           scalingFactor: selectedScaleFactor,
         }),
       },
     });
-  }, [recipe, scaledIngredients, scaledIngredientGroups, appliedChanges, router, showError, selectedScaleFactor]);
+  };
 
-  const handleGoToSteps = () => InteractionManager.runAfterInteractions(navigateToNextScreen);
+  const handleGoToMise = () => {
+    setPreparationComplete(false);
+    router.replace('/tabs/mise' as any);
+  };
+
+  const handleGoHome = () => {
+    setPreparationComplete(false);
+    router.replace('/tabs' as any);
+  };
 
   if (isLoading) {
     return (
@@ -641,6 +692,67 @@ export default function RecipeSummaryScreen() {
         />
       )}
       
+      {/* Success Modal */}
+      <Modal
+        visible={preparationComplete}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setPreparationComplete(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <MaterialCommunityIcons
+              name="check-circle"
+              size={48}
+              color={COLORS.success}
+              style={styles.successIcon}
+            />
+            <Text style={styles.modalTitle}>Added to Mise!</Text>
+            <Text style={styles.modalMessage}>
+              Recipe has been prepared and saved to your mise en place. Ready for cooking!
+            </Text>
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.primaryButton]}
+                onPress={handleGoToMise}
+              >
+                <MaterialCommunityIcons
+                  name="chef-hat"
+                  size={20}
+                  color={COLORS.white}
+                />
+                <Text style={styles.primaryButtonText}>Go to Mise</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.modalButton, styles.primaryButton]}
+                onPress={handleGoToRecipeSteps}
+              >
+                <MaterialCommunityIcons
+                  name="play"
+                  size={20}
+                  color={COLORS.white}
+                />
+                <Text style={styles.primaryButtonText}>Cook This Now</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.modalButton, styles.secondaryButton]}
+                onPress={handleGoHome}
+              >
+                <MaterialCommunityIcons
+                  name="home"
+                  size={20}
+                  color={COLORS.primary}
+                />
+                <Text style={styles.secondaryButtonText}>Go Back to Home</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      
       <RecipeStepsHeader
         title={cleanTitle}
         imageUrl={recipe.image || recipe.thumbnailUrl}
@@ -650,10 +762,7 @@ export default function RecipeSummaryScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.actionsContainer}>
-          {recipe.id && <SaveButton recipeId={recipe.id} />}
-          <ShareButton />
-        </View>
+
 
         <View style={styles.infoTable}>
           {recipe.description && (
@@ -753,11 +862,10 @@ export default function RecipeSummaryScreen() {
           ingredientGroups={scaledIngredientGroups}
           selectedScaleFactor={selectedScaleFactor}
           appliedChanges={appliedChanges}
-          checkedIngredients={checkedIngredients}
-          toggleCheckIngredient={toggleCheckIngredient}
           openSubstitutionModal={openSubstitutionModal}
           undoIngredientRemoval={undoIngredientRemoval}
           undoSubstitution={undoSubstitution}
+          showCheckboxes={false}
         />
       </ScrollView>
 
@@ -777,12 +885,7 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.md,
     paddingBottom: 100,
   },
-  actionsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: SPACING.md,
-    marginBottom: SPACING.lg,
-  },
+
   infoTable: {
     borderRadius: RADIUS.md,
     borderWidth: 1.5,
@@ -833,5 +936,64 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     backgroundColor: COLORS.background,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.pageHorizontal,
+  },
+  modalContent: {
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.xl,
+    alignItems: 'center',
+    maxWidth: '90%',
+    width: '100%',
+  },
+  successIcon: {
+    marginBottom: SPACING.md,
+  },
+  modalTitle: {
+    ...sectionHeaderText,
+    color: COLORS.textDark,
+    textAlign: 'center',
+    marginBottom: SPACING.sm,
+  },
+  modalMessage: {
+    ...bodyText,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    marginBottom: SPACING.xl,
+  },
+  modalButtons: {
+    gap: SPACING.md,
+    width: '100%',
+  },
+  modalButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.sm,
+    gap: SPACING.sm,
+  },
+  primaryButton: {
+    backgroundColor: COLORS.primary,
+  },
+  secondaryButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  primaryButtonText: {
+    ...bodyStrongText,
+    color: COLORS.white,
+  },
+  secondaryButtonText: {
+    ...bodyStrongText,
+    color: COLORS.primary,
   },
 });

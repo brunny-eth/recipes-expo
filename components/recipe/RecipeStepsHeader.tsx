@@ -41,13 +41,6 @@ const RecipeStepsHeader: React.FC<RecipeStepsHeaderProps> = ({
             color={COLORS.textDark}
           />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.button} onPress={handleExitPress}>
-          <MaterialCommunityIcons
-            name="close"
-            size={24}
-            color={COLORS.textDark}
-          />
-        </TouchableOpacity>
       </View>
 
       {/* Recipe-specific header */}

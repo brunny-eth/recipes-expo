@@ -20,22 +20,24 @@ type IngredientListProps = {
   ingredientGroups: IngredientGroup[];
   selectedScaleFactor: number;
   appliedChanges: AppliedChange[];
-  checkedIngredients: { [key: number]: boolean };
-  toggleCheckIngredient: (index: number) => void;
+  checkedIngredients?: { [key: number]: boolean };
+  toggleCheckIngredient?: (index: number) => void;
   openSubstitutionModal: (ingredient: StructuredIngredient) => void;
   undoIngredientRemoval: (fullName: string) => void;
   undoSubstitution: (originalName: string) => void;
+  showCheckboxes?: boolean; // New prop to control checkbox visibility
 };
 
 const IngredientList: React.FC<IngredientListProps> = ({
   ingredientGroups,
   selectedScaleFactor,
   appliedChanges,
-  checkedIngredients,
-  toggleCheckIngredient,
+  checkedIngredients = {},
+  toggleCheckIngredient = () => {},
   openSubstitutionModal,
   undoIngredientRemoval,
   undoSubstitution,
+  showCheckboxes = true,
 }) => {
   // State to track which groups are expanded (default: all collapsed = false)
   const [expandedGroups, setExpandedGroups] = useState<{ [key: number]: boolean }>({});
@@ -63,6 +65,7 @@ const IngredientList: React.FC<IngredientListProps> = ({
         }
         globalIndex += ingredientIndex;
 
+        console.log(`IngredientList - Rendering ingredient: ${ingredient.name}`);
         return (
           <IngredientRow
             key={`${ingredient.name}-${globalIndex}`}
@@ -74,6 +77,7 @@ const IngredientList: React.FC<IngredientListProps> = ({
             openSubstitutionModal={openSubstitutionModal}
             undoIngredientRemoval={undoIngredientRemoval}
             undoSubstitution={undoSubstitution}
+            showCheckboxes={showCheckboxes}
           />
         );
       });

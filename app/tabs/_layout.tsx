@@ -65,9 +65,23 @@ const MemoizedTabsNavigator = React.memo(() => {
         }}
       />
       <Tabs.Screen
+        name="mise"
+        options={{
+          title: 'Mise',
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
+            <MaterialCommunityIcons
+              name="chef-hat"
+              size={size}
+              color={color}
+            />
+          ),
+          unmountOnBlur: false,
+        }}
+      />
+      <Tabs.Screen
         name="saved"
         options={{
-          title: 'Favorites',
+          title: 'Saved',
           tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <MaterialCommunityIcons
               name="heart-outline"

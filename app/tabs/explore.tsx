@@ -27,43 +27,44 @@ import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
 
 
 
-const DevTools = () => {
-  if (!__DEV__) {
-    return null;
-  }
+// Remove the DevTools component and the divider
+// const DevTools = () => {
+//   if (!__DEV__) {
+//     return null;
+//   }
 
-  const { resetFreeRecipeUsage, hasUsedFreeRecipe } = useFreeUsage();
+//   const { resetFreeRecipeUsage, hasUsedFreeRecipe } = useFreeUsage();
 
-  const clearExploreCache = async () => {
-    try {
-      await Promise.all([
-        AsyncStorage.removeItem('exploreLastFetched'),
-        AsyncStorage.removeItem('exploreRecipes')
-      ]);
-      console.log('[DevTools] Cleared explore cache (timestamp and recipes)');
-      alert('Explore cache cleared! Next tab switch will fetch fresh recipes.');
-    } catch (error) {
-      console.error('[DevTools] Failed to clear explore cache:', error);
-      alert('Failed to clear cache');
-    }
-  };
+//   const clearExploreCache = async () => {
+//     try {
+//       await Promise.all([
+//         AsyncStorage.removeItem('exploreLastFetched'),
+//         AsyncStorage.removeItem('exploreRecipes')
+//       ]);
+//       console.log('[DevTools] Cleared explore cache (timestamp and recipes)');
+//       alert('Explore cache cleared! Next tab switch will fetch fresh recipes.');
+//     } catch (error) {
+//       console.error('[DevTools] Failed to clear explore cache:', error);
+//       alert('Failed to clear cache');
+//     }
+//   };
 
-  return (
-    <>
-      <View style={styles.devToolsContainer}>
-        <Text style={styles.devToolsTitle}>Dev Tools</Text>
-        <Text>Has Used Free Recipe: {String(hasUsedFreeRecipe)}</Text>
-        <TouchableOpacity style={styles.devButton} onPress={resetFreeRecipeUsage}>
-          <Text style={styles.devButtonText}>Reset Free Usage</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.devButton} onPress={clearExploreCache}>
-          <Text style={styles.devButtonText}>Clear Explore Cache</Text>
-        </TouchableOpacity>
-      </View>
-      <View style={styles.divider} />
-    </>
-  );
-};
+//   return (
+//     <>
+//       <View style={styles.devToolsContainer}>
+//         <Text style={styles.devToolsTitle}>Dev Tools</Text>
+//         <Text>Has Used Free Recipe: {String(hasUsedFreeRecipe)}</Text>
+//         <TouchableOpacity style={styles.devButton} onPress={resetFreeRecipeUsage}>
+//           <Text style={styles.devButtonText}>Reset Free Usage</Text>
+//         </TouchableOpacity>
+//         <TouchableOpacity style={styles.devButton} onPress={clearExploreCache}>
+//           <Text style={styles.devButtonText}>Clear Explore Cache</Text>
+//         </TouchableOpacity>
+//       </View>
+//       <View style={styles.divider} />
+//     </>
+//   );
+// };
 
 const ExploreScreen = () => {
   const insets = useSafeAreaInsets();
@@ -337,9 +338,7 @@ const ExploreScreen = () => {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScreenHeader title="Explore Recipes" />
-
-      <DevTools />
+      <ScreenHeader title="Find new recipes" />
 
       {renderContent()}
     </View>
@@ -408,20 +407,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   } as ViewStyle,
   cardImage: {
-    width: SPACING.xxl,
-    height: SPACING.xxl,
-    borderRadius: 6,
-    marginRight: SPACING.md,
+    width: '100%',
+    height: 200, // Increase the height to make images slightly bigger
+    borderTopLeftRadius: RADIUS.md, // Use a valid radius value
+    borderTopRightRadius: RADIUS.md, // Use a valid radius value
   },
   cardTextContainer: {
-    flex: 1,
-  } as ViewStyle,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: COLORS.primary, // Use burnt orange color
+    padding: SPACING.sm,
+  },
   cardTitle: {
+    color: COLORS.white,
     ...bodyStrongText,
-    color: COLORS.textDark,
-    lineHeight: 20,
-    flexWrap: 'wrap',
-  } as TextStyle,
+    fontSize: FONT.size.body - 2, // Make the text slightly smaller
+  },
   devToolsContainer: {
     backgroundColor: COLORS.surface,
     padding: SPACING.smMd,

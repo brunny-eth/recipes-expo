@@ -45,11 +45,11 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
             ? 'Customizing instructions...'
             : isScalingInstructions
             ? 'Making sure everything lines up...'
-            : 'Go to Steps'}
+            : 'Prepare mise en place'}
         </Text>
         {!(isRewriting || isScalingInstructions) && (
           <MaterialCommunityIcons
-            name="chevron-right"
+            name="chef-hat"
             size={20}
             color={COLORS.white}
           />

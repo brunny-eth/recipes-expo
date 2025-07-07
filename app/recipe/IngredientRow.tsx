@@ -40,6 +40,7 @@ type IngredientRowProps = {
   openSubstitutionModal: (ing: StructuredIngredient) => void;
   undoIngredientRemoval: (name: string) => void;
   undoSubstitution: (originalName: string) => void;
+  showCheckboxes?: boolean;
 };
 
 /**
@@ -64,11 +65,13 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
   openSubstitutionModal,
   undoIngredientRemoval,
   undoSubstitution,
+  showCheckboxes = true,
 }) => {
   console.log(`[Render] Rendering IngredientRow: ${ingredient.name}`);
   const { baseName, isRemoved, substitutedFor } = parseIngredientDisplayName(
     ingredient.name,
   );
+  console.log(`IngredientRow - Parsed baseName: ${baseName}`);
   const originalNameForSub = getOriginalIngredientNameFromAppliedChanges(
     appliedChanges,
     ingredient.name,
@@ -77,18 +80,24 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
   return (
     <TouchableOpacity
       style={[styles.ingredientItemContainer]}
-      onPress={() => !isRemoved && toggleCheckIngredient(index)}
-      activeOpacity={0.7}
+      onPress={() => !isRemoved && showCheckboxes && toggleCheckIngredient(index)}
+      activeOpacity={showCheckboxes ? 0.7 : 1}
     >
-      {/* Checkbox Visual */}
-      {isRemoved ? (
-        <View style={styles.checkboxPlaceholder} />
+      {/* Checkbox Visual or Bullet */}
+      {showCheckboxes ? (
+        isRemoved ? (
+          <View style={styles.checkboxPlaceholder} />
+        ) : (
+          <View
+            style={[styles.checkboxBase, isChecked && styles.checkboxChecked]}
+            testID={`checkbox-${ingredient.name}`}
+          >
+            {isChecked && <View style={styles.checkboxInnerCheck} />}
+          </View>
+        )
       ) : (
-        <View
-          style={[styles.checkboxBase, isChecked && styles.checkboxChecked]}
-          testID={`checkbox-${ingredient.name}`}
-        >
-          {isChecked && <View style={styles.checkboxInnerCheck} />}
+        <View style={styles.bulletContainer}>
+          <View style={styles.bullet} />
         </View>
       )}
 
@@ -265,6 +274,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: SPACING.sm,
+  } as ViewStyle,
+  bulletContainer: {
+    width: ICON_SIZE.md,
+    height: ICON_SIZE.md,
+    marginRight: SPACING.smLg,
+    justifyContent: 'center',
+    alignItems: 'center',
+  } as ViewStyle,
+  bullet: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.primary,
   } as ViewStyle,
 });
 

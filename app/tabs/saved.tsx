@@ -327,7 +327,7 @@ const renderRecipeItem = useCallback(({ item }: { item: SavedRecipe }) => {
                     color={COLORS.primary}
                     style={styles.modifiedIcon}
                   />
-                  <Text style={styles.modifiedText}>Modified by You</Text>
+                  <Text style={styles.modifiedText}>Modified by you</Text>
                 </View>
               )}
           </View>
@@ -408,7 +408,7 @@ const renderRecipeItem = useCallback(({ item }: { item: SavedRecipe }) => {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScreenHeader title="Favorites" />
+      <ScreenHeader title="Your saved recipes" />
       {renderContent()}
     </View>
   );
