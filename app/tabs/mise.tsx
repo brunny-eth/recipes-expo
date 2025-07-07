@@ -569,7 +569,7 @@ export default function MiseScreen() {
               </Text>
             )}
             <Text style={styles.recipeYield}>
-              Serves {item.final_yield}
+              Makes {item.final_yield}
             </Text>
             {item.applied_changes && (
               <Text style={styles.recipeChanges}>
@@ -710,7 +710,7 @@ export default function MiseScreen() {
       return (
         <View style={styles.groceryContainer}>
           <View style={styles.groceryHeader}>
-            <Text style={styles.groceryTitle}>Combined Grocery List</Text>
+            <Text style={styles.groceryTitle}>All the groceries for your mise</Text>
             <TouchableOpacity
               style={styles.shareButton}
               onPress={handleShareGrocery}

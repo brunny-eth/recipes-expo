@@ -275,6 +275,31 @@ export default function SavedScreen() {
     });
   }, [router]);
 
+  const handleDeleteRecipe = useCallback(async (baseRecipeId: number) => {
+    if (!session?.user) {
+      console.warn('[SavedScreen] No user session found. Cannot delete recipe.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    const { error: deleteError } = await supabase
+      .from('user_saved_recipes')
+      .delete()
+      .eq('user_id', session.user.id)
+      .eq('base_recipe_id', baseRecipeId);
+
+    if (deleteError) {
+      console.error('[SavedScreen] Error deleting saved recipe:', deleteError);
+      setError('Failed to unsave recipe. Please try again.');
+    } else {
+      console.log(`[SavedScreen] Recipe with base_recipe_id ${baseRecipeId} unsaved.`);
+      setSavedRecipes(prev => prev.filter(recipe => recipe.base_recipe_id !== baseRecipeId));
+    }
+    setIsLoading(false);
+  }, [session?.user]);
+
   // Stable callbacks for image loading to prevent re-renders
   const handleImageLoad = useCallback((recipeName: string) => {
     // Image loaded successfully
@@ -304,7 +329,7 @@ const renderRecipeItem = useCallback(({ item }: { item: SavedRecipe }) => {
 
   return (
       <TouchableOpacity
-          style={styles.card}
+          style={[styles.card, styles.cardWithMinHeight]} // Add min height style
           onPress={() => handleRecipePress(item)}
       >
           {imageUrl && (
@@ -331,9 +356,12 @@ const renderRecipeItem = useCallback(({ item }: { item: SavedRecipe }) => {
                 </View>
               )}
           </View>
+          <TouchableOpacity style={styles.deleteButton} onPress={() => handleDeleteRecipe(item.base_recipe_id)}>
+            <MaterialCommunityIcons name="delete-outline" size={20} color={COLORS.error} />
+          </TouchableOpacity>
       </TouchableOpacity>
   );
-}, [handleRecipePress, handleImageLoad, handleImageError]);
+}, [handleRecipePress, handleImageLoad, handleImageError, handleDeleteRecipe]);
 
   const renderContent = () => {
     if (isLoading) {
@@ -476,6 +504,9 @@ const styles = StyleSheet.create({
     elevation: 2,
     alignItems: 'center',
   },
+  cardWithMinHeight: {
+    minHeight: 75, // Adjust this value based on the image
+  },
   cardImage: {
     width: SPACING.xxl,
     height: SPACING.xxl,
@@ -510,5 +541,11 @@ const styles = StyleSheet.create({
     color: COLORS.error,
     textAlign: 'center',
     marginTop: SPACING.lg,
+  },
+  deleteButton: {
+    position: 'absolute',
+    bottom: SPACING.md, // Move further down
+    right: SPACING.md, // Keep it in the corner
+    padding: SPACING.xs,
   },
 });

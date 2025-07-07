@@ -76,6 +76,7 @@ const ExploreScreen = () => {
   const [exploreRecipes, setExploreRecipes] = useState<ParsedRecipe[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [imageErrors, setImageErrors] = useState<{ [key: string]: boolean }>({});
 
   // Component Mount/Unmount logging
   useEffect(() => {
@@ -246,20 +247,23 @@ const ExploreScreen = () => {
   // Render recipe item - same pattern as saved.tsx
   const renderRecipeItem = useCallback(({ item }: { item: ParsedRecipe }) => {
     const imageUrl = item.image || item.thumbnailUrl;
+    const itemId = item.id || 'unknown'; // Use a fallback key if item.id is undefined
+    const hasImageError = imageErrors[itemId];
 
     return (
       <TouchableOpacity
         style={styles.card}
         onPress={() => handleRecipePress(item)}
       >
-        {imageUrl && (
-          <FastImage
-            source={{ uri: imageUrl }}
-            style={styles.cardImage}
-            onLoad={() => handleImageLoad(item.title || 'Unknown Recipe')}
-            onError={() => handleImageError(item.title || 'Unknown Recipe')}
-          />
-        )}
+        <FastImage
+          source={{ uri: hasImageError ? require('@/assets/images/meez_logo.webp') : imageUrl }}
+          style={styles.cardImage}
+          onLoad={() => setImageErrors((prev) => ({ ...prev, [itemId]: false }))}
+          onError={() => {
+            setImageErrors((prev) => ({ ...prev, [itemId]: true }));
+            handleImageError(item.title || 'Unknown Recipe');
+          }}
+        />
         <View style={styles.cardTextContainer}>
           <Text style={styles.cardTitle} numberOfLines={2}>
             {item.title}
@@ -267,7 +271,7 @@ const ExploreScreen = () => {
         </View>
       </TouchableOpacity>
     );
-  }, [handleRecipePress, handleImageLoad, handleImageError]);
+  }, [handleRecipePress, handleImageError, imageErrors]);
 
 
 
@@ -395,7 +399,7 @@ const styles = StyleSheet.create({
   } as TextStyle,
   card: {
     flexDirection: 'row',
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.primary, // Set the entire card background to burnt orange
     borderRadius: RADIUS.sm,
     padding: 12,
     marginBottom: SPACING.md,

@@ -45,7 +45,7 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
             ? 'Customizing instructions...'
             : isScalingInstructions
             ? 'Making sure everything lines up...'
-            : 'Prepare mise en place'}
+            : 'Start your mise en place'}
         </Text>
         {!(isRewriting || isScalingInstructions) && (
           <MaterialCommunityIcons

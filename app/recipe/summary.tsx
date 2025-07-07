@@ -764,23 +764,15 @@ export default function RecipeSummaryScreen() {
       >
 
 
-        <View style={styles.infoTable}>
+        <CollapsibleSection
+          title="More About This Recipe"
+          isExpanded={isDescriptionExpanded} // Use state to control expansion
+          onToggle={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+        >
           {recipe.description && (
             <View style={styles.infoRow}>
-              <TouchableOpacity
-                style={styles.infoRowTouchable}
-                onPress={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
-              >
-                <Text style={styles.infoRowLabel}>Description</Text>
-                <MaterialCommunityIcons
-                  name={isDescriptionExpanded ? 'chevron-up' : 'chevron-down'}
-                  size={20}
-                  color={COLORS.textSubtle}
-                />
-              </TouchableOpacity>
-              {isDescriptionExpanded && (
-                <Text style={styles.infoRowContent}>{decode(recipe.description)}</Text>
-              )}
+              <Text style={styles.infoRowLabel}>Description</Text>
+              <Text style={styles.infoRowContent}>{decode(recipe.description)}</Text>
             </View>
           )}
           {(recipe.prepTime || recipe.cookTime) && (
@@ -795,48 +787,26 @@ export default function RecipeSummaryScreen() {
           )}
           {detectedAllergens.length > 0 && (
             <View style={styles.infoRow}>
-              <TouchableOpacity
-                style={styles.infoRowTouchable}
-                onPress={() => setIsAllergensExpanded(!isAllergensExpanded)}
-              >
-                <Text style={styles.infoRowLabel}>Allergens</Text>
-                <MaterialCommunityIcons
-                  name={isAllergensExpanded ? 'chevron-up' : 'chevron-down'}
-                  size={20}
-                  color={COLORS.textSubtle}
-                />
-              </TouchableOpacity>
-              {isAllergensExpanded && (
-                <Text style={styles.infoRowContent}>
-                  {detectedAllergens.join(', ')}
-                </Text>
-              )}
+              <Text style={styles.infoRowLabel}>Allergens</Text>
+              <Text style={styles.infoRowContent}>
+                {detectedAllergens.join(', ')}
+              </Text>
             </View>
           )}
           {recipe.sourceUrl && (
             <View style={styles.infoRow}>
-              <TouchableOpacity
-                style={styles.infoRowTouchable}
-                onPress={() => setIsSourceExpanded(!isSourceExpanded)}
+              <Text style={styles.infoRowLabel}>Original Source</Text>
+              <Text
+                style={[styles.infoRowContent, styles.link]}
+                onPress={() => Linking.openURL(recipe.sourceUrl!)}
               >
-                <Text style={styles.infoRowLabel}>Original Source</Text>
-                <MaterialCommunityIcons
-                  name={isSourceExpanded ? 'chevron-up' : 'chevron-down'}
-                  size={20}
-                  color={COLORS.textSubtle}
-                />
-              </TouchableOpacity>
-              {isSourceExpanded && (
-                <Text
-                  style={[styles.infoRowContent, styles.link]}
-                  onPress={() => Linking.openURL(recipe.sourceUrl!)}
-                >
-                  Visit Source ↗︎
-                </Text>
-              )}
+                Visit Source ↗︎
+              </Text>
             </View>
           )}
-        </View>
+        </CollapsibleSection>
+
+        <View style={styles.divider} />
 
         <CollapsibleSection
           title="Adjust Recipe Size"

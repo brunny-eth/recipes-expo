@@ -405,7 +405,7 @@ export default function StepsScreen() {
 
         return Array.from(finalTerms).map((term) => ({
           ingredient: ing,
-          searchTerm: term,
+          searchTerm: `\\b${escapeRegex(term)}\\b`, // Use word boundaries
         }));
       })
       .filter((item) => item.searchTerm);
@@ -434,7 +434,7 @@ export default function StepsScreen() {
     }
 
     const regex = new RegExp(
-      `(${uniqueSearchTermItems.map((item) => escapeRegex(item.searchTerm)).join('|')})`,
+      `(${uniqueSearchTermItems.map((item) => item.searchTerm).join('|')})`,
       'gi',
     );
     const parts = step.split(regex);
@@ -451,7 +451,7 @@ export default function StepsScreen() {
           .filter((part) => part)
           .map((part, index) => {
             const matchedItem = uniqueSearchTermItems.find(
-              (item) => item.searchTerm.toLowerCase() === part.toLowerCase(),
+              (item) => new RegExp(item.searchTerm, 'i').test(part),
             );
             if (matchedItem) {
               return (
