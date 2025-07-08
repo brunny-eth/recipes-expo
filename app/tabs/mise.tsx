@@ -679,6 +679,28 @@ export default function MiseScreen() {
       );
     }
 
+    if (!session) {
+      return (
+        <View style={styles.emptyContainer}>
+          <MaterialCommunityIcons
+            name="login"
+            size={48}
+            color={COLORS.lightGray}
+          />
+          <Text style={styles.emptyText}>Log in to see your mise en place</Text>
+          <Text style={styles.emptySubtext}>
+            Your mise recipes and shopping list will appear here once you're logged in.
+          </Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => router.push('/tabs/settings')}
+          >
+            <Text style={styles.retryButtonText}>Go to Settings</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
     if (error) {
       return (
         <View style={styles.emptyContainer}>
@@ -795,7 +817,7 @@ export default function MiseScreen() {
       {renderContent()}
       
       {/* Floating Action Button for sharing grocery list */}
-      {selectedTab === 'grocery' && groceryList.length > 0 && (
+      {selectedTab === 'grocery' && session && groceryList.length > 0 && (
         <TouchableOpacity
           style={styles.floatingActionButton}
           onPress={handleShareGrocery}

@@ -21,7 +21,8 @@ interface GlobalErrorModalProps {
   visible: boolean;
   title?: string | null;
   message: string;
-  onClose: () => void;
+  onClose: () => void; // overlay tap
+  onButtonPress?: () => void; // button action (defaults to onClose)
 }
 
 const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
@@ -29,6 +30,7 @@ const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
   title,
   message,
   onClose,
+  onButtonPress,
 }) => {
   const [isRendered, setIsRendered] = useState(visible);
   const scale = useSharedValue(0.7);
@@ -65,20 +67,26 @@ const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
   const safeMessage =
     typeof message === 'string' ? message : String(message ?? '');
 
+  const isAccountRequired = safeTitle === 'Account Required';
+
   if (!isRendered) {
     return null;
   }
 
   return (
-    <View style={styles.container}>
-      <Animated.View style={[styles.modalContent, animatedStyle]}>
+    <Pressable style={styles.container} onPress={onClose}>
+      <Animated.View
+        style={[styles.modalContent, animatedStyle]}
+        onStartShouldSetResponder={() => true}
+        onResponderStart={e => e.stopPropagation()}
+      >
         <Text style={styles.title}>{safeTitle}</Text>
         <Text style={styles.message}>{safeMessage}</Text>
-        <Pressable style={styles.button} onPress={onClose}>
-          <Text style={styles.buttonText}>OK</Text>
+        <Pressable style={styles.button} onPress={onButtonPress || onClose}>
+          <Text style={styles.buttonText}>{isAccountRequired ? 'Go to Login' : 'OK'}</Text>
         </Pressable>
       </Animated.View>
-    </View>
+    </Pressable>
   );
 };
 

@@ -14,6 +14,7 @@ interface ModalData {
   message: string;
   title: string | null;
   onDismissCallback?: () => void;
+  onButtonPress?: () => void;
 }
 
 interface ErrorModalContextType {
@@ -21,6 +22,7 @@ interface ErrorModalContextType {
     title: string,
     message: string,
     onDismissCallback?: () => void,
+    onButtonPress?: () => void,
   ) => void;
   hideError: () => void;
 }
@@ -68,7 +70,7 @@ export const ErrorModalProvider: React.FC<{ children: ReactNode }> = ({
   }, [modalData]);
 
   const showError = useCallback(
-    (title: string, message: string, onDismissCallback?: () => void) => {
+    (title: string, message: string, onDismissCallback?: () => void, onButtonPress?: () => void) => {
       // Add granular logging for useCallback recreation
       console.log('[ErrorModalContext] showError useCallback recreated. Empty dependencies array - should be stable.');
       
@@ -99,7 +101,7 @@ export const ErrorModalProvider: React.FC<{ children: ReactNode }> = ({
       });
       console.trace('[DEBUG] Trace for showError');
       console.log('[ErrorModalContext] State update: setModalData() called with new modal data');
-      setModalData({ title, message, onDismissCallback });
+      setModalData({ title, message, onDismissCallback, onButtonPress });
     },
     [], // Empty dependency array - function is now truly stable
   );
@@ -155,6 +157,7 @@ export const ErrorModalProvider: React.FC<{ children: ReactNode }> = ({
         title={modalData?.title ?? null}
         message={modalData?.message ?? ''}
         onClose={hideError}
+        onButtonPress={modalData?.onButtonPress}
       />
     </ErrorModalContext.Provider>
   );

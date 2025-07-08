@@ -219,7 +219,7 @@ const buttonWidth = (availableWidth - buttonTotalGap) / numButtons;
 export default function RecipeSummaryScreen() {
   const params = useLocalSearchParams<{ recipeData?: string; from?: string; appliedChanges?: string; isModified?: string }>();
   const router = useRouter();
-  const { showError } = useErrorModal();
+  const { showError, hideError } = useErrorModal();
   const { session } = useAuth();
 
   const [recipe, setRecipe] = useState<ParsedRecipe | null>(null);
@@ -617,7 +617,15 @@ export default function RecipeSummaryScreen() {
 
     // Check authentication before saving
     if (!session?.user?.id) {
-      showError('Account Required', 'You need an account to prepare your mise en place. Sign up to save your recipes!');
+      showError(
+        'Account Required',
+        'You need an account to prepare your mise en place. Sign up to save your recipes!',
+        undefined,
+        () => {
+          hideError();
+          router.push('/login');
+        }
+      );
       return;
     }
 
@@ -687,7 +695,15 @@ export default function RecipeSummaryScreen() {
 
   const handleSaveForLater = async () => {
     if (!recipe?.id || !session?.user) {
-      showError('Account Required', 'You need an account to save recipes. Sign up to save your recipes!');
+      showError(
+        'Account Required',
+        'You need an account to save recipes. Sign up to save your recipes!',
+        undefined,
+        () => {
+          hideError();
+          router.push('/login');
+        }
+      );
       return;
     }
 
@@ -889,6 +905,11 @@ export default function RecipeSummaryScreen() {
           isExpanded={isIngredientsExpanded}
           onToggle={() => setIsIngredientsExpanded(!isIngredientsExpanded)}
         >
+          {selectedScaleFactor !== 1 && (
+            <Text style={styles.ingredientsSubtext}>
+              {`Now scaled up by ${selectedScaleFactor}x (${getScaledYieldText(recipe.recipeYield, selectedScaleFactor)})`}
+            </Text>
+          )}
           <IngredientList
             ingredientGroups={scaledIngredientGroups}
             selectedScaleFactor={selectedScaleFactor}
@@ -913,12 +934,12 @@ export default function RecipeSummaryScreen() {
           style={styles.saveButton}
           onPress={handleSaveForLater}
         >
+          <Text style={styles.saveButtonText}>Save for later</Text>
           <MaterialCommunityIcons
             name="bookmark-outline"
             size={20}
             color={COLORS.primary}
           />
-          <Text style={styles.saveButtonText}>Save for later</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -1082,5 +1103,10 @@ const styles = StyleSheet.create({
     height: BORDER_WIDTH.default,
     backgroundColor: COLORS.divider,
     marginHorizontal: 0,
+  },
+  ingredientsSubtext: {
+    ...bodyText,
+    color: COLORS.textMuted,
+    marginBottom: SPACING.xs,
   },
 });

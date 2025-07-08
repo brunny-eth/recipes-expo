@@ -114,14 +114,6 @@ const IngredientList: React.FC<IngredientListProps> = ({
 
   return (
     <View style={styles.container}>
-      {selectedScaleFactor !== 1 && (
-        <View style={styles.scaleInfoBanner}>
-          <Text style={styles.scaleInfoText}>
-            {`Showing ${selectedScaleFactor}x scaled up ingredients`}
-          </Text>
-        </View>
-      )}
-      
       {ingredientGroups.length === 0 ? (
         <Text style={styles.placeholderText}>No ingredients found.</Text>
       ) : (
@@ -164,18 +156,6 @@ const styles = StyleSheet.create({
     marginTop: 5,
     textAlign: 'center',
     paddingVertical: SPACING.pageHorizontal,
-  },
-  scaleInfoBanner: {
-    backgroundColor: COLORS.darkGray,
-    padding: SPACING.base,
-    borderRadius: RADIUS.sm,
-    marginBottom: SPACING.smLg,
-  } as ViewStyle,
-  scaleInfoText: {
-    ...bodyStrongText,
-    fontSize: FONT.size.bodyMedium,
-    color: COLORS.white,
-    textAlign: 'center',
   },
 });
 
