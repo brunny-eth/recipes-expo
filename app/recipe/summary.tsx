@@ -18,6 +18,7 @@ import {
   Modal,
   Pressable,
 } from 'react-native';
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
 // Import FastImage from the new library
 import FastImage from '@d11/react-native-fast-image';
 
@@ -226,7 +227,9 @@ export default function RecipeSummaryScreen() {
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isAllergensExpanded, setIsAllergensExpanded] = useState(false);
   const [isSourceExpanded, setIsSourceExpanded] = useState(false);
-  const [isRecipeSizeExpanded, setIsRecipeSizeExpanded] = useState(true);
+  const [isRecipeSizeExpanded, setIsRecipeSizeExpanded] = useState(false);
+  const [isDescriptionTextExpanded, setIsDescriptionTextExpanded] = useState(false);
+  const [isIngredientsExpanded, setIsIngredientsExpanded] = useState(false);
 
   const [originalYieldValue, setOriginalYieldValue] = useState<number | null>(
     null,
@@ -490,6 +493,25 @@ export default function RecipeSummaryScreen() {
 
   const cleanTitle = recipe?.title?.replace(/\s*(?:[–-]\s*)?by\s+.*$/i, '').replace(/\s+recipe\s*$/i, '').trim();
 
+  // Swipe to go back gesture handler
+  const onSwipeGesture = (event: any) => {
+    if (event.nativeEvent.state === State.END) {
+      const { translationX, velocityX } = event.nativeEvent;
+      // Detect swipe from left edge with sufficient distance and velocity
+      // Right-to-left swipe: translationX > 100 means swipe toward the right (from left edge)
+      if (translationX > 100 && velocityX > 300) {
+        // Check if we can go back properly, otherwise navigate to home as fallback
+        if (router.canGoBack()) {
+          router.back();
+        } else {
+          // This shouldn't normally happen since users should always come from somewhere
+          console.warn('[Summary] No previous screen found, navigating to home as fallback');
+          router.navigate('/tabs' as any);
+        }
+      }
+    }
+  };
+
   const navigateToNextScreen = React.useCallback(async () => {
     const removalCount = appliedChanges.filter((c) => !c.to).length;
     if (removalCount > 2) {
@@ -663,6 +685,27 @@ export default function RecipeSummaryScreen() {
     router.replace('/tabs' as any);
   };
 
+  const handleSaveForLater = async () => {
+    if (!recipe?.id || !session?.user) {
+      showError('Account Required', 'You need an account to save recipes. Sign up to save your recipes!');
+      return;
+    }
+
+    try {
+      const { saveRecipe } = require('@/lib/savedRecipes');
+      const success = await saveRecipe(recipe.id);
+      if (success) {
+        setPreparationComplete(false);
+        router.replace('/tabs/saved' as any);
+      } else {
+        showError('Save Failed', 'Could not save recipe. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error saving recipe:', error);
+      showError('Save Failed', 'Could not save recipe. Please try again.');
+    }
+  };
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.centeredStatusContainer}>
@@ -680,7 +723,8 @@ export default function RecipeSummaryScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <PanGestureHandler onHandlerStateChange={onSwipeGesture}>
+      <SafeAreaView style={styles.container}>
       {/* Modals */}
       {substitutionModalVisible && selectedIngredientOriginalData && (
         <IngredientSubstitutionModal
@@ -699,64 +743,63 @@ export default function RecipeSummaryScreen() {
         animationType="fade"
         onRequestClose={() => setPreparationComplete(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setPreparationComplete(false)}
+        >
+          <TouchableOpacity 
+            style={styles.modalContent}
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+          >
             <MaterialCommunityIcons
               name="check-circle"
               size={48}
               color={COLORS.success}
               style={styles.successIcon}
             />
-            <Text style={styles.modalTitle}>Added to Mise!</Text>
+            <Text style={styles.modalTitle}>Added to Mise</Text>
             <Text style={styles.modalMessage}>
-              Recipe has been prepared and saved to your mise en place. Ready for cooking!
+              We've prepped your mise for you. This recipe is now ready for cooking.
             </Text>
             
             <View style={styles.modalButtons}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.primaryButton]}
+                style={[styles.modalButton, styles.secondaryButton]}
                 onPress={handleGoToMise}
               >
                 <MaterialCommunityIcons
                   name="chef-hat"
                   size={20}
-                  color={COLORS.white}
+                  color={COLORS.primary}
                 />
-                <Text style={styles.primaryButtonText}>Go to Mise</Text>
+                <Text style={styles.secondaryButtonText}>Go to Mise</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={[styles.modalButton, styles.primaryButton]}
+                style={[styles.modalButton, styles.secondaryButton]}
                 onPress={handleGoToRecipeSteps}
               >
                 <MaterialCommunityIcons
                   name="play"
                   size={20}
-                  color={COLORS.white}
-                />
-                <Text style={styles.primaryButtonText}>Cook This Now</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[styles.modalButton, styles.secondaryButton]}
-                onPress={handleGoHome}
-              >
-                <MaterialCommunityIcons
-                  name="home"
-                  size={20}
                   color={COLORS.primary}
                 />
-                <Text style={styles.secondaryButtonText}>Go Back to Home</Text>
+                <Text style={styles.secondaryButtonText}>Cook This Now</Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </Modal>
       
       <RecipeStepsHeader
         title={cleanTitle}
         imageUrl={recipe.image || recipe.thumbnailUrl}
       />
+
+      {/* Sharp divider to separate title from content */}
+      <View style={styles.titleDivider} />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -772,7 +815,25 @@ export default function RecipeSummaryScreen() {
           {recipe.description && (
             <View style={styles.infoRow}>
               <Text style={styles.infoRowLabel}>Description</Text>
-              <Text style={styles.infoRowContent}>{decode(recipe.description)}</Text>
+              <View style={styles.descriptionContainer}>
+                <Text 
+                  style={styles.infoRowContent}
+                  numberOfLines={isDescriptionTextExpanded ? undefined : 3}
+                  ellipsizeMode="tail"
+                >
+                  {decode(recipe.description)}
+                </Text>
+                {recipe.description.length > 150 && (
+                  <TouchableOpacity 
+                    onPress={() => setIsDescriptionTextExpanded(!isDescriptionTextExpanded)}
+                    style={styles.readMoreButton}
+                  >
+                    <Text style={styles.readMoreText}>
+                      {isDescriptionTextExpanded ? 'Read less' : 'Read more'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           )}
           {(recipe.prepTime || recipe.cookTime) && (
@@ -823,20 +884,21 @@ export default function RecipeSummaryScreen() {
 
         <View style={styles.divider} />
 
-        {/* Main Ingredients Heading (no toggle) */}
-        <View style={styles.mainIngredientsHeader}>
-          <Text style={styles.mainIngredientsTitle}>Ingredients</Text>
-        </View>
-
-        <IngredientList
-          ingredientGroups={scaledIngredientGroups}
-          selectedScaleFactor={selectedScaleFactor}
-          appliedChanges={appliedChanges}
-          openSubstitutionModal={openSubstitutionModal}
-          undoIngredientRemoval={undoIngredientRemoval}
-          undoSubstitution={undoSubstitution}
-          showCheckboxes={false}
-        />
+        <CollapsibleSection
+          title="Ingredients"
+          isExpanded={isIngredientsExpanded}
+          onToggle={() => setIsIngredientsExpanded(!isIngredientsExpanded)}
+        >
+          <IngredientList
+            ingredientGroups={scaledIngredientGroups}
+            selectedScaleFactor={selectedScaleFactor}
+            appliedChanges={appliedChanges}
+            openSubstitutionModal={openSubstitutionModal}
+            undoIngredientRemoval={undoIngredientRemoval}
+            undoSubstitution={undoSubstitution}
+            showCheckboxes={false}
+          />
+        </CollapsibleSection>
       </ScrollView>
 
       <RecipeFooterButtons
@@ -844,7 +906,23 @@ export default function RecipeSummaryScreen() {
         isRewriting={isRewriting}
         isScalingInstructions={isScalingInstructions}
       />
+      
+      {/* Save Recipe Button */}
+      <View style={styles.saveButtonContainer}>
+        <TouchableOpacity
+          style={styles.saveButton}
+          onPress={handleSaveForLater}
+        >
+          <MaterialCommunityIcons
+            name="bookmark-outline"
+            size={20}
+            color={COLORS.primary}
+          />
+          <Text style={styles.saveButtonText}>Save for later</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
+    </PanGestureHandler>
   );
 }
 
@@ -852,7 +930,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   scrollContent: {
     paddingHorizontal: SPACING.pageHorizontal,
-    paddingTop: SPACING.md,
+    paddingTop: SPACING.sm,
     paddingBottom: 100,
   },
 
@@ -965,5 +1043,44 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     ...bodyStrongText,
     color: COLORS.primary,
+  },
+  descriptionContainer: {
+    marginTop: SPACING.sm,
+  },
+  readMoreButton: {
+    marginTop: SPACING.sm,
+    alignSelf: 'flex-start',
+  },
+  readMoreText: {
+    ...bodyStrongText,
+    color: COLORS.primary,
+    fontSize: FONT.size.smBody,
+  },
+  saveButtonContainer: {
+    paddingHorizontal: SPACING.pageHorizontal,
+    paddingTop: SPACING.sm,
+    paddingBottom: SPACING.pageHorizontal,
+    backgroundColor: COLORS.white,
+  },
+  saveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.sm,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    gap: SPACING.sm,
+  },
+  saveButtonText: {
+    ...bodyStrongText,
+    color: COLORS.primary,
+  },
+  titleDivider: {
+    height: BORDER_WIDTH.default,
+    backgroundColor: COLORS.divider,
+    marginHorizontal: 0,
   },
 });

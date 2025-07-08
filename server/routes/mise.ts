@@ -1,9 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { supabaseAdmin } from '../lib/supabaseAdmin';
 import logger from '../lib/logger';
-import { CombinedParsedRecipe } from '../../common/types';
-import { formatIngredientsForGroceryList, categorizeIngredients } from '../../utils/groceryHelpers';
+import { CombinedParsedRecipe, IngredientGroup, StructuredIngredient } from '../../common/types';
+import { formatIngredientsForGroceryList, categorizeIngredients, getBasicGroceryCategory } from '../../utils/groceryHelpers';
+
 import { aggregateGroceryList } from '../../utils/ingredientAggregation';
+import { runDefaultLLM } from '../llm/adapters';
+import { stripMarkdownFences } from '../utils/stripMarkdownFences';
 
 const router = Router();
 
@@ -16,6 +19,111 @@ router.use((req, res, next) => {
   }, 'Incoming request to /api/mise router');
   next();
 });
+
+/**
+ * Server-side LLM categorization function
+ * Categorizes ingredients using LLM with fallback to basic categorization
+ */
+async function categorizeIngredientsWithServerLLM(
+  items: any[],
+  requestId: string
+): Promise<any[]> {
+  if (items.length === 0) {
+    return items;
+  }
+
+  // Extract unique ingredient names
+  const ingredientNames = [...new Set(items.map(item => item.item_name))];
+  
+  try {
+    // Build the categorization prompt (same as grocery.ts)
+    const ingredientList = ingredientNames.map(ing => `"${ing}"`).join(', ');
+    
+    const systemPrompt = `
+You are an expert grocery organizer. Categorize the following ingredients into appropriate grocery store sections.
+
+Available categories:
+- Produce
+- Dairy & Eggs  
+- Meat & Seafood
+- Pantry
+- Bakery
+- Frozen
+- Beverages
+- Condiments & Sauces
+- Spices & Herbs
+- Snacks
+- Health & Personal Care
+- Other
+
+Rules:
+1. Use the exact category names from the list above.
+2. Be consistent - same ingredients should always go to the same category.
+3. If an ingredient could fit multiple categories, choose the one where the ingredient is most commonly found in a grocery store.
+4. For prepared or processed items, categorize based on where they're typically found in stores (frozen, pantry, etc).
+5. Fresh ingredients, like fresh herbs or fresh produce, should be categorized as "Produce".
+6. Exclude all forms of salt and all forms of black pepper from the categories and simply ignore them. 
+
+Return your response as a JSON object where each ingredient name is a key and its category is the value.
+
+Example:
+{
+  "chicken breast": "Meat & Seafood",
+  "milk": "Dairy & Eggs",
+  "onions": "Produce",
+  "olive oil": "Pantry"
+}`;
+
+    const userPrompt = `Categorize these ingredients: ${ingredientList}`;
+    
+    logger.info({ requestId, ingredientCount: ingredientNames.length }, 'Sending categorization request to LLM');
+    
+    const { output, error } = await runDefaultLLM({
+      system: systemPrompt,
+      text: userPrompt,
+      isJson: true,
+      metadata: { requestId }
+    });
+    
+    if (error || !output) {
+      logger.warn({ requestId, error }, 'LLM categorization failed, falling back to basic categorization');
+      return items.map(item => ({
+        ...item,
+        grocery_category: getBasicGroceryCategory(item.item_name)
+      }));
+    }
+    
+    // Parse the LLM response
+    const cleanedResponse = stripMarkdownFences(output);
+    
+    let categories: { [ingredient: string]: string };
+    try {
+      categories = JSON.parse(cleanedResponse);
+    } catch (parseError) {
+      logger.error({ requestId, response: cleanedResponse, parseError }, 'Failed to parse LLM response as JSON, falling back to basic');
+      return items.map(item => ({
+        ...item,
+        grocery_category: getBasicGroceryCategory(item.item_name)
+      }));
+    }
+    
+    // Apply LLM categories to items
+    const categorizedItems = items.map(item => ({
+      ...item,
+      grocery_category: categories[item.item_name] || getBasicGroceryCategory(item.item_name)
+    }));
+    
+    logger.info({ requestId, categorizedCount: Object.keys(categories).length }, 'Successfully categorized ingredients with LLM');
+    return categorizedItems;
+
+  } catch (error) {
+    logger.warn({ requestId, error }, 'Error during LLM categorization, falling back to basic');
+    return items.map(item => ({
+      ...item,
+      grocery_category: getBasicGroceryCategory(item.item_name)
+    }));
+  }
+}
 
 // POST /api/mise/save-recipe - Save prepared recipe to mise table
 router.post('/save-recipe', async (req: Request, res: Response) => {
@@ -69,9 +177,60 @@ router.post('/save-recipe', async (req: Request, res: Response) => {
 
     logger.info({ requestId, miseRecipeId: miseRecipe.id }, 'Successfully saved recipe to mise');
 
+    // Respond immediately to user
     res.status(201).json({
       message: 'Recipe added to mise!',
       miseRecipe: miseRecipe
+    });
+
+    // Run LLM categorization in background to pre-categorize ingredients
+    setImmediate(async () => {
+      try {
+        logger.info({ requestId, miseRecipeId: miseRecipe.id }, 'Starting background LLM categorization');
+        
+        const groceryItems = formatIngredientsForGroceryList(
+          preparedRecipeData,
+          `mise_${miseRecipe.id}`,
+          undefined
+        );
+        
+        // Attempt LLM categorization (with automatic fallback to basic)
+        const categorizedItems = await categorizeIngredientsWithServerLLM(groceryItems, requestId);
+        
+        // Update the prepared recipe data with categorized ingredients
+        const updatedRecipeData = {
+          ...preparedRecipeData,
+          ingredientGroups: preparedRecipeData.ingredientGroups?.map((group: IngredientGroup) => ({
+            ...group,
+            ingredients: group.ingredients?.map((ingredient: StructuredIngredient) => {
+              const matchingItem = categorizedItems.find(item => 
+                item.item_name === ingredient.name || 
+                item.original_ingredient_text.includes(ingredient.name)
+              );
+              return {
+                ...ingredient,
+                grocery_category: matchingItem?.grocery_category || getBasicGroceryCategory(ingredient.name)
+              };
+            })
+          }))
+        };
+        
+        // Save the updated recipe data with categories
+        const { error: updateError } = await supabaseAdmin
+          .from('user_mise_recipes')
+          .update({ prepared_recipe_data: updatedRecipeData })
+          .eq('id', miseRecipe.id);
+          
+        if (updateError) {
+          logger.error({ requestId, miseRecipeId: miseRecipe.id, err: updateError }, 'Failed to update recipe with categorized ingredients');
+        } else {
+          logger.info({ requestId, miseRecipeId: miseRecipe.id, categorizedCount: categorizedItems.length }, 'Successfully updated recipe with LLM categorization');
+        }
+        
+      } catch (error) {
+        logger.warn({ requestId, miseRecipeId: miseRecipe.id, err: error }, 'Background LLM categorization failed - will use basic categorization when grocery list is viewed');
+        // Don't throw - this is background processing and shouldn't affect the user experience
+      }
     });
 
   } catch (err) {
@@ -207,6 +366,8 @@ router.delete('/recipes/:id', async (req: Request, res: Response) => {
 
     logger.info({ requestId, miseRecipeId: id }, 'Successfully removed recipe from mise');
 
+
+
     res.json({
       message: 'Recipe removed from mise'
     });
@@ -270,8 +431,11 @@ router.get('/grocery-list', async (req: Request, res: Response) => {
     // Aggregate the grocery list
     const aggregatedItems = aggregateGroceryList(allGroceryItems);
 
-    // Apply basic categorization
-    const categorizedItems = categorizeIngredients(aggregatedItems);
+    // Use pre-categorized data when available, with fallback to basic categorization
+    const categorizedItems = aggregatedItems.map((item: any) => ({
+      ...item,
+      grocery_category: item.grocery_category || getBasicGroceryCategory(item.item_name)
+    }));
 
     // --- NEW: Fetch persistent checked states ---
     const { data: checkedStates, error: checkedStatesError } = await supabaseAdmin
@@ -283,6 +447,28 @@ router.get('/grocery-list', async (req: Request, res: Response) => {
       logger.error({ requestId, err: checkedStatesError }, 'Failed to fetch checked states');
       // This is a critical failure. The user's list would appear incorrect.
       return res.status(500).json({ error: 'Failed to retrieve shopping list state.' });
+    }
+
+    // --- NEW: Clean up stale item states ---
+    const currentItemNames = new Set(categorizedItems.map(item => normalizeName(item.item_name)));
+    const staleItemNames = checkedStates
+      ?.filter(state => !currentItemNames.has(state.normalized_item_name))
+      .map(state => state.normalized_item_name) || [];
+
+    if (staleItemNames.length > 0) {
+      logger.info({ requestId, staleItemNames }, 'Cleaning up stale shopping list item states');
+      
+      const { error: cleanupError } = await supabaseAdmin
+        .from('user_shopping_list_item_states')
+        .delete()
+        .eq('user_id', userId)
+        .in('normalized_item_name', staleItemNames);
+
+      if (cleanupError) {
+        logger.error({ requestId, err: cleanupError }, 'Failed to cleanup stale item states');
+      } else {
+        logger.info({ requestId, cleanedCount: staleItemNames.length }, 'Successfully cleaned up stale item states');
+      }
     }
 
     // --- NEW: Merge checked states into the grocery list ---

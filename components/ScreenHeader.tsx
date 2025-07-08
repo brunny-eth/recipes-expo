@@ -25,5 +25,6 @@ const styles = StyleSheet.create({
   title: {
     ...screenTitleText,
     color: COLORS.textDark,
+    textAlign: 'center',
   } as TextStyle,
 }); 

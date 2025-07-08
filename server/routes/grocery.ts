@@ -71,8 +71,10 @@ Available categories:
 Rules:
 1. Use the exact category names from the list above.
 2. Be consistent - same ingredients should always go to the same category.
-3. If an ingredient could fit multiple categories, choose the most common/logical one.
-4. For prepared or processed items, categorize based on where they're typically found in stores.
+3. If an ingredient could fit multiple categories, choose the one where the ingredient is most commonly found in a grocery store.
+4. For prepared or processed items, categorize based on where they're typically found in stores (frozen, pantry, etc).
+5. Fresh ingredients, like fresh herbs or fresh produce, should be categorized as "Produce".
+6. Exclude all forms of salt and all forms of black pepper from the categories and simply ignore them. 
 
 Return your response as a JSON object where each ingredient name is a key and its category is the value.
 

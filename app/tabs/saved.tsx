@@ -436,7 +436,7 @@ const renderRecipeItem = useCallback(({ item }: { item: SavedRecipe }) => {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScreenHeader title="Your saved recipes" />
+      <ScreenHeader title="Saved recipes" />
       {renderContent()}
     </View>
   );
@@ -543,9 +543,11 @@ const styles = StyleSheet.create({
     marginTop: SPACING.lg,
   },
   deleteButton: {
-    position: 'absolute',
-    bottom: SPACING.md, // Move further down
-    right: SPACING.md, // Keep it in the corner
+    // Remove absolute positioning
+    // position: 'absolute',
+    // bottom: SPACING.md,
+    // right: SPACING.md,
     padding: SPACING.xs,
+    alignSelf: 'center', // Center vertically in row
   },
 });

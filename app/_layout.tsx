@@ -6,6 +6,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StyleSheet, View, ActivityIndicator } from 'react-native';
 import * as Font from 'expo-font';
 import { Asset } from 'expo-asset';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { ErrorModalProvider } from '@/context/ErrorModalContext';
@@ -305,12 +306,14 @@ export default function RootLayout() {
   console.log('[RootLayout] Rendering stable context providers and RootLayoutNav');
   
   return (
-    <ErrorModalProvider>
-      <FreeUsageProvider>
-        <AuthProvider>
-          <RootLayoutNav />
-        </AuthProvider>
-      </FreeUsageProvider>
-    </ErrorModalProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ErrorModalProvider>
+        <FreeUsageProvider>
+          <AuthProvider>
+            <RootLayoutNav />
+          </AuthProvider>
+        </FreeUsageProvider>
+      </ErrorModalProvider>
+    </GestureHandlerRootView>
   );
 }

@@ -255,15 +255,23 @@ const ExploreScreen = () => {
         style={styles.card}
         onPress={() => handleRecipePress(item)}
       >
-        <FastImage
-          source={{ uri: hasImageError ? require('@/assets/images/meez_logo.webp') : imageUrl }}
-          style={styles.cardImage}
-          onLoad={() => setImageErrors((prev) => ({ ...prev, [itemId]: false }))}
-          onError={() => {
-            setImageErrors((prev) => ({ ...prev, [itemId]: true }));
-            handleImageError(item.title || 'Unknown Recipe');
-          }}
-        />
+        {imageUrl && !hasImageError ? (
+          <FastImage
+            source={{ uri: imageUrl }}
+            style={styles.cardImage}
+            onLoad={() => handleImageLoad(item.title || 'Unknown Recipe')}
+            onError={() => {
+              setImageErrors((prev) => ({ ...prev, [itemId]: true }));
+              handleImageError(item.title || 'Unknown Recipe');
+            }}
+          />
+        ) : (
+          <FastImage
+            source={require('@/assets/images/meez_logo.webp')}
+            style={styles.cardImage}
+            onLoad={() => handleImageLoad(item.title || 'Unknown Recipe')}
+          />
+        )}
         <View style={styles.cardTextContainer}>
           <Text style={styles.cardTitle} numberOfLines={2}>
             {item.title}
@@ -271,7 +279,7 @@ const ExploreScreen = () => {
         </View>
       </TouchableOpacity>
     );
-  }, [handleRecipePress, handleImageError, imageErrors]);
+  }, [handleRecipePress, handleImageLoad, handleImageError, imageErrors]);
 
 
 

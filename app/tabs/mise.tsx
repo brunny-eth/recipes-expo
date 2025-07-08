@@ -10,24 +10,28 @@ import {
   ViewStyle,
   TextStyle,
   TextInput,
+  Share,
+  Modal,
 } from 'react-native';
-import FastImage from '@d11/react-native-fast-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { COLORS, SPACING, RADIUS } from '@/constants/theme';
+import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import {
   screenTitleText,
   bodyStrongText,
   bodyText,
   bodyTextLoose,
+  sectionHeaderText,
+  captionText,
   FONT,
 } from '@/constants/typography';
+import { SHADOWS } from '@/constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useErrorModal } from '@/context/ErrorModalContext';
-import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
 import ScreenHeader from '@/components/ScreenHeader';
+import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
 
 const MISE_CACHE_KEYS = {
   LAST_FETCHED: 'miseLastFetched',
@@ -103,6 +107,8 @@ export default function MiseScreen() {
   const [selectedTab, setSelectedTab] = useState<'recipes' | 'grocery'>('recipes');
   const [editingRecipeId, setEditingRecipeId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [selectedRecipeForMenu, setSelectedRecipeForMenu] = useState<string | null>(null);
 
   // --- Caching Strategy ---
   const lastSessionIdRef = useRef<string | null>(null);
@@ -438,31 +444,80 @@ export default function MiseScreen() {
   }, [groceryList, session?.user?.id, session?.access_token, showError]);
 
   // Handle grocery sharing
-  const handleShareGrocery = useCallback(() => {
-    // Generate markdown for sharing
-    const markdown = groceryList.map(category => {
-      const items = category.items.map(item => {
-        const checkbox = item.checked ? '☑️' : '☐';
-        const amount = item.amount ? `${item.amount}` : '';
-        const unit = item.unit ? ` ${item.unit}` : '';
-        return `${checkbox} ${amount}${unit} ${item.name}`;
-      }).join('\n');
-      return `## ${category.name}\n${items}`;
-    }).join('\n\n');
+  const handleShareGrocery = useCallback(async () => {
+    try {
+      // Generate plain text format with clear intent
+      let plainText = `GROCERY LIST\n\n`;
 
-    // On iOS, this will open the share sheet
-    const shareData = {
-      title: 'Grocery List',
-      text: markdown,
-    };
+      // Add recipe titles if there are any recipes
+      if (miseRecipes.length > 0) {
+        plainText += `For these recipes:\n`;
+        miseRecipes.forEach(recipe => {
+          const title = recipe.title_override || recipe.prepared_recipe_data.title || 'Unknown Recipe';
+          plainText += `- ${title}\n`;
+        });
+        plainText += '\n';
+      }
 
-    if (typeof navigator !== 'undefined' && navigator.share) {
-      navigator.share(shareData);
-    } else {
-      // Fallback for development
-      console.log('Grocery list markdown:', markdown);
+      groceryList.forEach(category => {
+        // Add category header
+        plainText += `${category.name.toUpperCase()}\n`;
+        
+        // Add items with clear checkbox intent
+        category.items.forEach(item => {
+          const checkbox = item.checked ? '✓' : '□';
+          const amount = item.amount ? `${item.amount}` : '';
+          const unit = item.unit ? ` ${item.unit}` : '';
+          const displayText = `${amount}${unit} ${item.name}`.trim();
+          
+          plainText += `${checkbox} ${displayText}\n`;
+        });
+        
+        plainText += '\n'; // Add spacing between categories
+      });
+
+      console.log('Attempting to share grocery list:', plainText);
+
+      await Share.share({
+        message: plainText,
+        title: 'Grocery List',
+      });
+      
+      console.log('Share successful');
+    } catch (error) {
+      console.error('Share failed:', error);
+      showError('Share Error', 'Failed to share grocery list');
     }
-  }, [groceryList]);
+  }, [groceryList, miseRecipes, showError]);
+
+  // Handle menu actions
+  const handleMenuOpen = useCallback((recipeId: string) => {
+    setSelectedRecipeForMenu(recipeId);
+    setMenuVisible(true);
+  }, []);
+
+  const handleMenuClose = useCallback(() => {
+    setMenuVisible(false);
+    setSelectedRecipeForMenu(null);
+  }, []);
+
+  const handleMenuRename = useCallback(() => {
+    if (selectedRecipeForMenu) {
+      const recipe = miseRecipes.find(r => r.id === selectedRecipeForMenu);
+      if (recipe) {
+        setEditingRecipeId(selectedRecipeForMenu);
+        setEditingTitle(recipe.title_override || recipe.prepared_recipe_data.title || '');
+      }
+    }
+    handleMenuClose();
+  }, [selectedRecipeForMenu, miseRecipes]);
+
+  const handleMenuDelete = useCallback(() => {
+    if (selectedRecipeForMenu) {
+      handleDeleteRecipe(selectedRecipeForMenu);
+    }
+    handleMenuClose();
+  }, [selectedRecipeForMenu, handleDeleteRecipe]);
 
   // Use focus effect to refresh data when tab becomes active
   // This useFocusEffect is now redundant as the caching strategy handles refetches
@@ -476,11 +531,6 @@ export default function MiseScreen() {
   // Render recipe item
   const renderRecipeItem = useCallback(({ item }: { item: MiseRecipe }) => {
     const isEditing = editingRecipeId === item.id;
-
-    const startEditing = () => {
-      setEditingRecipeId(item.id);
-      setEditingTitle(item.title_override || item.prepared_recipe_data.title || '');
-    };
 
     const cancelEditing = () => {
       setEditingRecipeId(null);
@@ -533,7 +583,7 @@ export default function MiseScreen() {
     return (
       <View style={styles.recipeCard}>
         <TouchableOpacity
-          style={styles.recipeCardContent}
+          style={styles.recipeItem}
           onPress={() => {
             if (isEditing) return; // Don't navigate while editing
             // Navigate to recipe steps with the prepared recipe data
@@ -548,35 +598,25 @@ export default function MiseScreen() {
           }}
           disabled={isEditing}
         >
-          {item.prepared_recipe_data.thumbnailUrl && (
-            <FastImage
-              source={{ uri: item.prepared_recipe_data.thumbnailUrl }}
-              style={styles.recipeImage}
-            />
-          )}
           <View style={styles.recipeInfo}>
-            {isEditing ? (
-              <TextInput
-                style={styles.recipeTitleInput}
-                value={editingTitle}
-                onChangeText={setEditingTitle}
-                autoFocus
-                onBlur={saveEditing} // Save when input loses focus
-              />
-            ) : (
-              <Text style={styles.recipeTitle} numberOfLines={1} ellipsizeMode="tail">
-                {item.title_override || item.prepared_recipe_data.title}
-              </Text>
-            )}
+            <View style={styles.titleContainer}>
+              {isEditing ? (
+                <TextInput
+                  style={styles.recipeTitleInput}
+                  value={editingTitle}
+                  onChangeText={setEditingTitle}
+                  autoFocus
+                  onBlur={saveEditing} // Save when input loses focus
+                />
+              ) : (
+                <Text style={styles.recipeTitle} numberOfLines={1} ellipsizeMode="tail">
+                  {item.title_override || item.prepared_recipe_data.title}
+                </Text>
+              )}
+            </View>
             <Text style={styles.recipeYield}>
-              Makes {item.final_yield}
+              Makes {item.final_yield} 
             </Text>
-            {item.applied_changes && (
-              <Text style={styles.recipeChanges}>
-                {item.applied_changes.ingredientChanges?.length > 0 && ''}
-                {item.applied_changes.scalingFactor !== 1 && `Scaled ${item.applied_changes.scalingFactor}x`}
-              </Text>
-            )}
           </View>
         </TouchableOpacity>
         <View style={styles.recipeActions}>
@@ -590,14 +630,9 @@ export default function MiseScreen() {
               </TouchableOpacity>
             </>
           ) : (
-            <>
-              <TouchableOpacity style={styles.actionButton} onPress={startEditing}>
-                <MaterialCommunityIcons name="pencil" size={20} color={COLORS.darkGray} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton} onPress={() => handleDeleteRecipe(item.id)}>
-                <MaterialCommunityIcons name="delete-outline" size={20} color={COLORS.error} />
-              </TouchableOpacity>
-            </>
+            <TouchableOpacity style={styles.menuButton} onPress={() => handleMenuOpen(item.id)}>
+              <MaterialCommunityIcons name="dots-vertical" size={20} color={COLORS.darkGray} />
+            </TouchableOpacity>
           )}
         </View>
       </View>
@@ -616,8 +651,8 @@ export default function MiseScreen() {
         >
           <MaterialCommunityIcons
             name={groceryItem.checked ? "checkbox-marked" : "checkbox-blank-outline"}
-            size={20}
-            color={groceryItem.checked ? COLORS.success : COLORS.darkGray}
+            size={24}
+            color={groceryItem.checked ? COLORS.success : COLORS.secondary}
           />
           <Text style={[
             styles.groceryItemText,
@@ -709,16 +744,6 @@ export default function MiseScreen() {
 
       return (
         <View style={styles.groceryContainer}>
-          <View style={styles.groceryHeader}>
-            <Text style={styles.groceryTitle}>All the groceries for your mise</Text>
-            <TouchableOpacity
-              style={styles.shareButton}
-              onPress={handleShareGrocery}
-            >
-              <MaterialCommunityIcons name="share" size={20} color={COLORS.primary} />
-              <Text style={styles.shareButtonText}>Share</Text>
-            </TouchableOpacity>
-          </View>
           <FlatList
             data={groceryList}
             renderItem={renderGroceryCategory}
@@ -733,7 +758,7 @@ export default function MiseScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScreenHeader title="Mise en Place" />
+      <ScreenHeader title="Mise en place" />
       
       {/* Tab selector */}
       <View style={styles.tabContainer}>
@@ -762,12 +787,53 @@ export default function MiseScreen() {
             styles.tabButtonText,
             selectedTab === 'grocery' && styles.tabButtonTextActive
           ]}>
-            Grocery List
+            Shopping List
           </Text>
         </TouchableOpacity>
       </View>
 
       {renderContent()}
+      
+      {/* Floating Action Button for sharing grocery list */}
+      {selectedTab === 'grocery' && groceryList.length > 0 && (
+        <TouchableOpacity
+          style={styles.floatingActionButton}
+          onPress={handleShareGrocery}
+        >
+          <MaterialCommunityIcons name="export" size={20} color={COLORS.white} />
+          <Text style={styles.floatingButtonText}>Share</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Recipe Actions Menu Modal */}
+      <Modal
+        visible={menuVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={handleMenuClose}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          onPress={handleMenuClose}
+          activeOpacity={1}
+        >
+          <TouchableOpacity 
+            style={styles.menuContainer} 
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <TouchableOpacity style={styles.menuItem} onPress={handleMenuRename}>
+              <MaterialCommunityIcons name="pencil" size={20} color={COLORS.textDark} />
+              <Text style={styles.menuItemText}>Rename</Text>
+            </TouchableOpacity>
+            <View style={styles.menuSeparator} />
+            <TouchableOpacity style={styles.menuItem} onPress={handleMenuDelete}>
+              <MaterialCommunityIcons name="delete-outline" size={20} color={COLORS.error} />
+              <Text style={[styles.menuItemText, { color: COLORS.error }]}>Delete</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -781,7 +847,7 @@ const styles = StyleSheet.create({
   tabContainer: {
     flexDirection: 'row',
     backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.sm,
+    borderRadius: 999, // Fully rounded pill shape
     padding: 4,
     marginBottom: SPACING.md,
   } as ViewStyle,
@@ -789,14 +855,20 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     alignItems: 'center',
-    borderRadius: RADIUS.sm,
+    borderRadius: 999, // Fully rounded pill shape
+    backgroundColor: COLORS.white, // White background for inactive tabs
   } as ViewStyle,
   tabButtonActive: {
     backgroundColor: COLORS.primary,
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3, // For Android shadow
   } as ViewStyle,
   tabButtonText: {
     ...bodyStrongText,
-    color: COLORS.darkGray,
+    color: COLORS.primary, // Burnt orange text for inactive tabs
   } as TextStyle,
   tabButtonTextActive: {
     color: COLORS.white,
@@ -844,28 +916,20 @@ const styles = StyleSheet.create({
   recipeCard: {
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.sm,
-    paddingVertical: SPACING.sm, // Reduced vertical padding
+    paddingVertical: SPACING.lg, // Consistent vertical padding
     paddingHorizontal: SPACING.md,
     marginBottom: SPACING.md,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
     flexDirection: 'row',
     alignItems: 'center',
+    borderWidth: BORDER_WIDTH.hairline,
+    borderColor: COLORS.primaryLight,
+    ...SHADOWS.small, // Add subtle elevation
   } as ViewStyle,
-  recipeCardContent: {
+  recipeItem: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
   } as ViewStyle,
-  recipeImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 6,
-    marginRight: SPACING.md,
-  },
   recipeInfo: {
     flex: 1,
     justifyContent: 'center', // Center content vertically
@@ -873,6 +937,7 @@ const styles = StyleSheet.create({
   recipeTitle: {
     ...bodyStrongText,
     color: COLORS.textDark,
+    marginBottom: SPACING.md, // Consistent spacing below title
   } as TextStyle,
   recipeTitleInput: {
     ...bodyStrongText,
@@ -881,28 +946,38 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
     paddingBottom: 2,
   } as TextStyle,
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.xs,
+  } as ViewStyle,
+
   titleActions: {
     flexDirection: 'row',
   },
   recipeYield: {
     ...bodyText,
-    color: COLORS.darkGray,
-    fontSize: 12, // smaller font for sub-text
-    marginTop: 2, // less space
-  } as TextStyle,
-  recipeChanges: {
-    ...bodyText,
     color: COLORS.primary,
-    fontSize: 12,
+    fontSize: FONT.size.body, // Increased font size for better visibility
     marginTop: 2, // less space
   } as TextStyle,
   recipeActions: {
     flexDirection: 'column', // Stack icons vertically
-    justifyContent: 'space-around', // Space them out
-    marginLeft: SPACING.md,
+    justifyContent: 'center', // Center them vertically
+    marginLeft: SPACING.lg, // More space from the content
+    paddingLeft: SPACING.sm, // Additional padding
   } as ViewStyle,
   actionButton: {
-    padding: SPACING.xs, // smaller touch target
+    padding: SPACING.sm, // Better touch target
+    marginVertical: SPACING.xs, // Space between buttons when editing
+  } as ViewStyle,
+  deleteButton: {
+    padding: SPACING.sm, // Better touch target
+    alignSelf: 'center', // Center the delete button
+  } as ViewStyle,
+  menuButton: {
+    padding: SPACING.sm, // Better touch target
+    alignSelf: 'center', // Center the menu button
   } as ViewStyle,
   groceryContainer: {
     flex: 1,
@@ -911,10 +986,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.sm,
   } as ViewStyle,
   groceryTitle: {
-    ...bodyStrongText,
+    ...sectionHeaderText,
+    fontSize: FONT.size.lg,
     color: COLORS.textDark,
   } as TextStyle,
   shareButton: {
@@ -933,32 +1009,82 @@ const styles = StyleSheet.create({
   groceryCategory: {
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.sm,
-    padding: SPACING.md,
+    paddingVertical: SPACING.lg, // Consistent vertical padding
+    paddingHorizontal: SPACING.lg,
     marginBottom: SPACING.md,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
+    borderWidth: BORDER_WIDTH.hairline,
+    borderColor: COLORS.primaryLight,
+    ...SHADOWS.small,
   } as ViewStyle,
   groceryCategoryTitle: {
     ...bodyStrongText,
     color: COLORS.textDark,
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.md, // Consistent spacing below header
+    fontSize: FONT.size.lg,
   } as TextStyle,
   groceryItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: SPACING.xs,
+    paddingVertical: SPACING.sm,
+    marginBottom: SPACING.xs, // Add 6-8px gap between items
   } as ViewStyle,
   groceryItemText: {
     ...bodyText,
+    fontSize: FONT.size.bodyMedium,
     color: COLORS.textDark,
-    marginLeft: SPACING.sm,
+    marginLeft: SPACING.md,
     flex: 1,
   } as TextStyle,
   groceryItemChecked: {
     textDecorationLine: 'line-through',
     color: COLORS.darkGray,
   } as TextStyle,
+  floatingActionButton: {
+    position: 'absolute',
+    bottom: SPACING.xl,
+    right: SPACING.xl,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.primary,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...SHADOWS.medium,
+  } as ViewStyle,
+  floatingButtonText: {
+    ...bodyStrongText,
+    color: COLORS.white,
+    fontSize: FONT.size.smBody,
+    marginLeft: SPACING.xs,
+  } as TextStyle,
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    justifyContent: 'flex-end',
+  } as ViewStyle,
+  menuContainer: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: RADIUS.lg,
+    borderTopRightRadius: RADIUS.lg,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.pageHorizontal,
+    ...SHADOWS.medium,
+  } as ViewStyle,
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: SPACING.md,
+  } as ViewStyle,
+  menuItemText: {
+    ...bodyStrongText,
+    fontSize: FONT.size.body,
+    color: COLORS.textDark,
+    marginLeft: SPACING.md,
+  } as TextStyle,
+  menuSeparator: {
+    height: BORDER_WIDTH.hairline,
+    backgroundColor: COLORS.divider,
+    marginHorizontal: 0,
+  } as ViewStyle,
 }); 

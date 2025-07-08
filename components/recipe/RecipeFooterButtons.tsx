@@ -45,7 +45,7 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
             ? 'Customizing instructions...'
             : isScalingInstructions
             ? 'Making sure everything lines up...'
-            : 'Start your mise en place'}
+            : 'Add this recipe to your mise'}
         </Text>
         {!(isRewriting || isScalingInstructions) && (
           <MaterialCommunityIcons
@@ -61,9 +61,9 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
 
 const styles = StyleSheet.create({
   footer: {
-    padding: SPACING.pageHorizontal,
-    borderTopWidth: BORDER_WIDTH.default,
-    borderTopColor: COLORS.lightGray,
+    paddingHorizontal: SPACING.pageHorizontal,
+    paddingTop: SPACING.md,
+    paddingBottom: 0,
     backgroundColor: COLORS.white,
   } as ViewStyle,
   nextButton: {
