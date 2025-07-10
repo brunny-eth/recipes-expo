@@ -167,10 +167,10 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
       const { inputType, normalizedInput } = validation;
 
       // Step 2: Handle different input types
-      if (inputType === 'url') {
+      if (inputType === 'url' || inputType === 'video') {
         setSubmissionState('checking_cache');
         
-        // Check cache for URL
+        // For URLs and Videos, we check the cache first.
         const cacheResult = await checkCache(normalizedInput!);
         
         // Validate cache result has complete recipe data

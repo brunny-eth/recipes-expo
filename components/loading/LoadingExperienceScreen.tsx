@@ -185,6 +185,22 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
       if (response.ok) {
         const result = await response.json();
         console.log('[parseRecipe] Response JSON:', result);
+
+        // Handle video recipe source
+        if (result.source === 'link') {
+          // This is a success case where a link was followed from a caption.
+          // The user gets the recipe they wanted, so we can proceed.
+          // The source URL in the recipe data will correctly point to the blog post.
+        } else if (result.source === null && !result.recipe) {
+          // This is a specific failure case for videos where no recipe or link was found.
+          showError(
+            'Could Not Find Recipe',
+            "We couldn't find a recipe in this video's caption or a link to one.",
+            handleBack
+          );
+          return; // Stop further processing
+        }
+
         if (result.recipe) {
           setRecipeData(result.recipe);
         } else {
