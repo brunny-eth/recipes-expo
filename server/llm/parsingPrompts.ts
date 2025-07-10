@@ -47,6 +47,8 @@ Parsing Rules:
 - **Ingredient Substitutions:** For each individual ingredient, suggest 1-2 sensible and common substitutions. If no suitable or obvious substitution exists for an ingredient, set its suggested_substitutions array to null.
 - **Amount Conversion:** Convert all fractional amounts (e.g., "1/2", "3/4", "1 1/2") to their decimal equivalents (e.g., "0.5", "0.75", "1.5").
 - **Content Filtering:** Exclude all brand names, product names, or any other promotional/non-recipe specific text from all extracted fields.
+- **Ingredient Extraction from Sentences**: Some ingredients may only be mentioned within the instruction text. You must extract these as standalone ingredients with a reasonable estimate for quantity and unit, and place them in the appropriate ingredient group. Preserve their order when possible.
+- **Ignore Social Media Content**: Explicitly ignore user handles (e.g., "@username") and hashtags (e.g., "#recipe") when parsing. Do not include them in any field.
 - Output ONLY the JSON object, with no additional text or explanations.`;
 
 export function buildTextParsePrompt(input: string): PromptPayload {
@@ -87,13 +89,24 @@ ${instructions}
 }
 
 export function buildVideoParsePrompt(caption: string, platform: string): PromptPayload {
-  const systemPrompt = `${COMMON_SYSTEM_PROMPT}
+  const userText = `
+The following text is a caption from a ${platform} video.
+Your task is to parse this caption into the standard recipe JSON format, following the rules provided in the system prompt.
 
-The user has provided a caption from a ${platform} video. It may contain recipe instructions, ingredients, or cooking tips. Your task is to parse it into the standard recipe JSON format. Pay special attention to hashtags, user handles, and other social media artifacts, and exclude them from the final recipe content.`;
+**Special Instructions for Video Captions:**
+- Video captions often contain irrelevant text (e.g., "Follow for more!", "link in bio!").
+- You MUST ignore user handles (e.g., "@username"), hashtags (e.g., "#recipe"), and any other promotional or non-recipe content.
+- Your focus is solely on extracting the recipe.
+
+---
+VIDEO CAPTION TO PARSE:
+---
+${caption}
+`;
 
   return {
-    system: systemPrompt,
-    text: `Video Caption from ${platform}:\n\n${caption}`,
+    system: COMMON_SYSTEM_PROMPT,
+    text: userText.trim(),
     isJson: true,
   };
 }

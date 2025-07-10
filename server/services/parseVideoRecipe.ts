@@ -290,6 +290,19 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
       try {
         parsedRecipe = JSON.parse(llmResponse.output);
         logger.info({ requestId, timeMs: overallTimings.geminiParse }, 'Successfully parsed video caption with LLM.');
+
+        if (parsedRecipe?.ingredientGroups?.length) {
+          console.log(`[${requestId}] [DEBUG] Parsed ingredient names:`);
+          parsedRecipe.ingredientGroups.forEach((group, i) => {
+            console.log(`  Group ${i + 1} (${group.name || 'no name'}):`);
+            group.ingredients.forEach((ingredient) => {
+              console.log(`    - ${ingredient.name}`);
+            });
+          });
+        } else {
+          console.warn(`[${requestId}] [DEBUG] No ingredientGroups returned in parsed recipe`);
+        }
+
       } catch (parseError) {
         const errorMessage = parseError instanceof Error ? parseError.message : 'JSON parse failed';
         logger.error({ requestId, error: errorMessage }, 'Failed to parse LLM response as JSON.');

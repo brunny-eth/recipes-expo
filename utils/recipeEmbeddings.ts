@@ -14,6 +14,7 @@ export const generateAndSaveEmbedding = async (
   }
 ): Promise<void> => {
   try {
+    logger.info({ recipeId }, '[Embedding] Starting embedding generation...');
     const { title = '', ingredientsText = '', instructionsText = '' } = recipe;
     const embeddingInput = `${title}\n\n${ingredientsText}\n\n${instructionsText}`.trim();
 
