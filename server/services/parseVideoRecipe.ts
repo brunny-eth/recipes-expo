@@ -181,11 +181,13 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
     logger.info({ requestId, videoUrl }, 'Starting video recipe parsing.');
 
     // Step 1: Fetch caption from video URL
+    console.time(`[${requestId}] scraper_call`);
     logger.info({ requestId, event: 'scraper_call_start' }, 'Calling scraper microservice.');
     const scrapingStartTime = Date.now();
     const scrapeResult = await fetchCaptionFromVideoUrl(videoUrl, requestId);
     overallTimings.scraperTime = Date.now() - scrapingStartTime;
     logger.info({ requestId, event: 'scraper_call_end', durationMs: overallTimings.scraperTime }, 'Scraper microservice call finished.');
+    console.timeEnd(`[${requestId}] scraper_call`);
     
     // Step 2: Handle scraping errors
     if (scrapeResult.error) {
@@ -228,8 +230,10 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
     }
 
     // Step 3: Score caption quality
+    console.time(`[${requestId}] caption_scoring`);
     logger.info({ requestId, event: 'caption_scoring_started' }, 'Attempting to score caption quality.');
     const captionQuality = scoreCaptionQuality(scrapeResult.caption);
+    console.timeEnd(`[${requestId}] caption_scoring`);
     logger.info({ 
       requestId, 
       captionQuality, 
@@ -252,12 +256,14 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
       const prompt = buildVideoParsePrompt(scrapeResult.caption, scrapeResult.platform);
       prompt.metadata = { requestId, route: 'video_caption' };
 
+      console.time(`[${requestId}] gemini_call`);
       logger.info({ requestId, event: 'llm_call_start' }, 'Calling LLM to parse caption.');
       const llmStartTime = Date.now();
       const llmResponse = await runDefaultLLM(prompt);
       overallTimings.geminiParse = Date.now() - llmStartTime;
       handlerUsage = llmResponse.usage;
       logger.info({ requestId, event: 'llm_call_end', durationMs: overallTimings.geminiParse }, 'LLM call finished.');
+      console.timeEnd(`[${requestId}] gemini_call`);
 
       if (llmResponse.error || !llmResponse.output) {
         const errorMessage = llmResponse.error || 'LLM returned no output';
@@ -332,6 +338,7 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
       // --- Database Insertion and Embedding ---
       let insertedId: number | null = null;
       if (parsedRecipe) {
+        console.time(`[${requestId}] supabase_insert`);
         const dbInsertStartTime = Date.now();
         try {
           const { data: insertData, error: insertError } = await supabase
@@ -365,6 +372,7 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
           overallTimings.dbInsert = Date.now() - dbInsertStartTime;
           logger.error({ requestId, cacheKey, err: dbError }, 'Exception during video recipe cache insert.');
         }
+        console.timeEnd(`[${requestId}] supabase_insert`);
       }
       // --- End Database Insertion and Embedding ---
 
