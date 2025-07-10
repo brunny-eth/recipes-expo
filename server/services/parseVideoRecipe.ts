@@ -265,13 +265,16 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
       };
     }
 
-    if (!scrapeResult.caption) {
-      logger.warn({ requestId }, 'No caption found in video.');
+    console.log(`[parseVideoRecipe] Scraper returned caption:`, scrapeResult.caption?.slice(0, 100));
+
+    // Add a strict check for the caption before proceeding
+    if (!scrapeResult.caption || typeof scrapeResult.caption !== 'string') {
+      logger.error({ requestId, caption: scrapeResult.caption }, 'Caption was missing or invalid from scraper response.');
       return {
         recipe: null,
         error: {
           code: ParseErrorCode.INVALID_INPUT,
-          message: 'No caption or text found in the video.'
+          message: 'Received an invalid caption from the video scraper.',
         },
         fromCache: false,
         inputType,
@@ -279,11 +282,12 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
         timings: { ...overallTimings, total: Date.now() - requestStartTime },
         usage: handlerUsage,
         fetchMethodUsed: 'video_scraper',
-        source: null
+        source: null,
       };
     }
 
     // Step 3: Score caption quality
+    logger.info({ requestId, event: 'caption_scoring_started' }, 'Attempting to score caption quality.');
     const captionQuality = scoreCaptionQuality(scrapeResult.caption);
     logger.info({ 
       requestId, 
@@ -466,27 +470,45 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
           event: 'url_extracted_from_caption'
         }, 'Found URL in caption, delegating to URL parser.');
         
-        // Parse the extracted URL
-        const urlParseStartTime = Date.now();
-        const urlParseResult = await parseUrlRecipe(extractedUrl);
-        const urlParseTime = Date.now() - urlParseStartTime;
-        
-        logger.info({ 
-          requestId, 
-          extractedUrl, 
-          platform: scrapeResult.platform,
-          urlParseTimeMs: urlParseTime,
-          success: !!urlParseResult.recipe,
-          event: 'url_parsing_completed'
-        }, 'URL parsing completed for extracted link.');
-        
-        // Return the URL parse result with video-specific metadata
-        return {
-          ...urlParseResult,
-          source: 'link',
-          fetchMethodUsed: 'video_scraper_url_extraction'
-        };
-        
+        try {
+          // Parse the extracted URL
+          const urlParseStartTime = Date.now();
+          const urlParseResult = await parseUrlRecipe(extractedUrl);
+          const urlParseTime = Date.now() - urlParseStartTime;
+
+          logger.info({
+            requestId,
+            extractedUrl,
+            platform: scrapeResult.platform,
+            urlParseTimeMs: urlParseTime,
+            success: !!urlParseResult.recipe,
+            event: 'url_parsing_completed',
+          }, 'URL parsing completed for extracted link.');
+
+          // Return the URL parse result with video-specific metadata
+          return {
+            ...urlParseResult,
+            source: 'link',
+            fetchMethodUsed: 'video_scraper_url_extraction',
+          };
+        } catch (fallbackError) {
+          const errorMessage = fallbackError instanceof Error ? fallbackError.message : 'Unknown fallback error';
+          logger.error({ requestId, extractedUrl, error: errorMessage }, 'Fallback to parseUrlRecipe failed.');
+          return {
+            recipe: null,
+            error: {
+              code: ParseErrorCode.GENERATION_FAILED,
+              message: `The linked recipe at ${extractedUrl} could not be parsed.`,
+            },
+            fromCache: false,
+            inputType,
+            cacheKey,
+            timings: { ...overallTimings, total: Date.now() - requestStartTime },
+            usage: handlerUsage,
+            fetchMethodUsed: 'video_scraper_url_extraction',
+            source: 'link',
+          };
+        }
       } else {
         logger.warn({ 
           requestId, 
