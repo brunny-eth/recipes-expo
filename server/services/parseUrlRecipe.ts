@@ -146,6 +146,11 @@ export async function parseUrlRecipe(
             } else {
                 try {
                     finalRecipeData = JSON.parse(modelResponse.output);
+
+                    console.log('[DEBUG] Gemini raw parsed recipe:\n', JSON.stringify(finalRecipeData, null, 2));
+                    console.log('[DEBUG] Gemini instruction count:', finalRecipeData?.instructions?.length ?? 'undefined');
+                    console.log('[DEBUG] Gemini recipe keys:', finalRecipeData ? Object.keys(finalRecipeData) : 'null');
+
                     if (finalRecipeData && extractedContent) {
                         finalRecipeData.description = extractedContent.description ?? null;
                         finalRecipeData.image = extractedContent.image ?? null;

@@ -268,33 +268,83 @@ export function extractRecipeContent(html: string, requestId: string, sourceUrl?
           }
         }
     }
-    // Instructions can be string, string[], or array of HowToStep objects
-    if (typeof recipeJson.recipeInstructions === 'string') {
-        instructionsText = recipeJson.recipeInstructions;
-    } else if (Array.isArray(recipeJson.recipeInstructions)) {
-        // Check if it's an array of strings or HowToStep objects
-        if (recipeJson.recipeInstructions.every((item: any) => typeof item === 'string')) {
-            instructionsText = recipeJson.recipeInstructions.join('\n');
-        } else if (recipeJson.recipeInstructions.every((item: any) => typeof item === 'object' && item.text)) {
-            // Array of HowToStep objects (common format)
-            instructionsText = recipeJson.recipeInstructions.map((step: any) => step.text).join('\n');
-        } else if (recipeJson.recipeInstructions.every((item: any) => typeof item === 'object' && item['@type'] === 'HowToSection')) {
-             // Handle sections containing steps
-             instructionsText = recipeJson.recipeInstructions
-                .flatMap((section: any) => section.itemListElement || [])
-                .map((step: any) => step.text)
-                .join('\n');
+    // Instructions can be string[] or HowToStep[]
+    if (Array.isArray(recipeJson.recipeInstructions)) {
+      const instructionsList: string[] = [];
+      recipeJson.recipeInstructions.forEach((step: any) => {
+        if (typeof step === 'string') {
+          instructionsList.push(step);
+        } else if (typeof step === 'object' && step['@type'] === 'HowToStep' && step.text) {
+          instructionsList.push(step.text);
+        } else if (typeof step === 'object' && step['@type'] === 'HowToSection') {
+          if (step.name) {
+            instructionsList.push(`**${step.name}**`);
+          }
+          if (Array.isArray(step.itemListElement)) {
+            step.itemListElement.forEach((subStep: any) => {
+              if (typeof subStep === 'string') {
+                instructionsList.push(subStep);
+              } else if (typeof subStep === 'object' && subStep['@type'] === 'HowToStep' && subStep.text) {
+                instructionsList.push(subStep.text);
+              }
+            });
+          }
         }
+      });
+      if (instructionsList.length > 0) {
+        instructionsText = instructionsList.join('\n');
+      }
     }
-    // Extract recipeYield from JSON-LD if available
-    if (recipeJson.recipeYield) {
-      if (Array.isArray(recipeJson.recipeYield)) {
-        // Handle cases where yield might be an array (e.g., "6 servings", "makes 12 cookies")
-        // We'll take the first one or try to make sense of it.
-        // For simplicity, join if it's an array of strings, or take first if complex.
-        recipeYieldText = recipeJson.recipeYield.join(', '); // Or more sophisticated joining
-      } else {
-        recipeYieldText = String(recipeJson.recipeYield);
+
+    // Yield Selectors (new section)
+    if (!recipeYieldText) { // Only run if JSON-LD didn't provide it
+      const yieldSelectors = [
+        '.wprm-recipe-servings', '.wprm-recipe-yield',
+        '.tasty-recipes-yield', '.tasty-recipes-details .recipe-yield',
+        '.easyrecipe-servings', '.mf-recipe-servings',
+        '[itemprop="recipeYield"]', '[data-mv-recipe-meta="servings"] .mv-value',
+        // Create by Mediavine
+        '.mv-create-yield',
+        '.mv-create-meta-serving',
+        // Generic selectors looking for keywords if specific classes fail
+        'div:contains("Servings:")', 'span:contains("Servings:")', 'p:contains("Servings:")',
+        'div:contains("Yield:")', 'span:contains("Yield:")', 'p:contains("Yield:")',
+        'div:contains("Makes:")', 'span:contains("Makes:")', 'p:contains("Makes:")'
+      ];
+      let foundYield = false;
+      for (const selector of yieldSelectors) {
+        if (foundYield) break;
+        // For keyword selectors, we need more careful extraction
+        if (selector.includes(':contains')) {
+          const keyword = selector.substring(selector.indexOf('"') + 1, selector.lastIndexOf('"'));
+          const tagName = selector.substring(0, selector.indexOf(':'));
+          $(tagName).each((_, el) => {
+            const elementText = $(el).text();
+            if (elementText.toLowerCase().includes(keyword.toLowerCase())) {
+              // Try to get the most specific text containing the keyword and its value
+              // This is a simple approach; might need refinement
+              const lines = elementText.split('\n').map(line => line.trim()).filter(line => line.toLowerCase().includes(keyword.toLowerCase()));
+              if (lines.length > 0) {
+                recipeYieldText = lines[0]; // Take the first line that contains the keyword
+                foundYield = true;
+                return false; // Break from .each()
+              }
+            }
+          });
+        } else {
+          // For class/attribute selectors
+          $(selector).each((_, el) => {
+            const text = $(el).text().trim();
+            if (text) {
+              recipeYieldText = text;
+              foundYield = true;
+              return false; // Break from .each()
+            }
+          });
+        }
+      }
+      if (recipeYieldText) {
+        logger.debug({ requestId, yield: recipeYieldText }, `Extracted recipeYieldText using selectors.`);
       }
     }
 
