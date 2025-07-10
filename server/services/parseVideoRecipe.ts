@@ -256,6 +256,9 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
       const prompt = buildVideoParsePrompt(scrapeResult.caption, scrapeResult.platform);
       prompt.metadata = { requestId, route: 'video_caption' };
 
+      console.log('[DEBUG] Gemini System Prompt:\n', prompt.system);
+      console.log('[DEBUG] Gemini Prompt Text Sent:\n', prompt.text);
+
       console.time(`[${requestId}] gemini_call`);
       logger.info({ requestId, event: 'llm_call_start' }, 'Calling LLM to parse caption.');
       const llmStartTime = Date.now();
