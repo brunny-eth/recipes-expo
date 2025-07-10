@@ -9,6 +9,7 @@ import { ParseResult } from './parseRecipe';
 import { parseUrlRecipe } from './parseUrlRecipe';
 import { parseTextRecipe } from './parseTextRecipe';
 import { runDefaultLLM, PromptPayload } from '../llm/adapters';
+import { buildVideoParsePrompt } from '../llm/parsingPrompts';
 import { ParseErrorCode, StructuredError } from '../../common/types/errors';
 import { normalizeUrl } from '../../utils/normalizeUrl';
 import { generateAndSaveEmbedding } from '../../utils/recipeEmbeddings';
@@ -153,69 +154,6 @@ function extractUrlFromText(text: string | null): string | null {
   }
   
   return matches ? matches[0] : null;
-}
-
-/**
- * Builds a prompt for parsing video recipe captions.
- * @param caption The caption text.
- * @param platform The video platform.
- * @returns The prompt payload.
- */
-function buildVideoParsePrompt(caption: string, platform: string): PromptPayload {
-  const systemPrompt = `You are an expert recipe parsing AI. Parse the provided video caption into a valid JSON object.
-
-The caption comes from a ${platform} video and may contain recipe instructions, ingredients, or cooking tips.
-
-Expected JSON format:
-{
-  "title": "string | null",
-  "ingredientGroups": [ 
-    {
-      "name": "string", 
-      "ingredients": [
-        {
-          "name": "string",
-          "amount": "string | null",
-          "unit": "string | null",
-          "suggested_substitutions": [
-            {
-              "name": "string",
-              "amount": "string | number | null",
-              "unit": "string | null",
-              "description": "string | null"
-            }
-          ] | null
-        }
-      ]
-    }
-  ] | null, 
-  "instructions": "array of strings, each a single step without numbering | null",
-  "substitutions_text": "string | null",
-  "recipeYield": "string | null",
-  "prepTime": "string | null",
-  "cookTime": "string | null",
-  "totalTime": "string | null",
-  "nutrition": {
-    "calories": "string | null",
-    "protein": "string | null"
-  } | null
-}
-
-Parsing Rules:
-- If a value is not found or is not explicitly mentioned in the caption, use null (do not infer or generate).
-- **Time Extraction:** Extract durations from the caption and convert them into a concise, human-readable string format.
-- **Yield Extraction:** Extract the yield as a concise string from phrases like "Serves 4", "Makes 12".
-- **Ingredient Grouping:** Use a single group named "Main" unless distinct sections are clearly indicated.
-- **Ingredient Substitutions:** Suggest 1-2 sensible substitutions for each ingredient where appropriate.
-- **Amount Conversion:** Convert fractional amounts to decimal equivalents.
-- **Content Filtering:** Exclude brand names, hashtags, and promotional content.
-- Output ONLY the JSON object, with no additional text or explanations.`;
-
-  return {
-    system: systemPrompt,
-    text: `Video Caption from ${platform}:\n\n${caption}`,
-    isJson: true
-  };
 }
 
 /**

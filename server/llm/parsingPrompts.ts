@@ -38,6 +38,7 @@ Expected JSON format:
 }
 
 Parsing Rules:
+- **Title Generation**: If a title is not explicitly mentioned, create a descriptive, human-readable title for the recipe based on its ingredients and instructions. The title should be concise and accurately represent the dish.
 - If a value is not found or is not explicitly mentioned in the recipe text, use null (do not infer or generate).
 - **Time Extraction (prepTime, cookTime, totalTime):** Extract durations from the recipe text (e.g., "PT15M", "30 minutes", "1 hour") and convert them into a concise, human-readable string format (e.g., "15 minutes", "30 minutes", "1 hour"). ONLY extract if explicitly stated. Ensure 'totalTime' represents the full duration including both prep and cook time, or the explicitly stated total duration if available. If a time range is given (e.g., "30-45 minutes"), capture the range as is.
 - **Yield Extraction (recipeYield):** Extract the yield as a concise string (e.g., "4 servings", "12 cookies") from phrases like "Serves 4", "Yield: 12", "Makes 12 servings", "Serves 4-6". If a range, capture it as a range (e.g., "4-6 servings").
@@ -82,5 +83,17 @@ ${instructions}
     system: COMMON_SYSTEM_PROMPT,
     text: combinedText,
     isJson: true
+  };
+}
+
+export function buildVideoParsePrompt(caption: string, platform: string): PromptPayload {
+  const systemPrompt = `${COMMON_SYSTEM_PROMPT}
+
+The user has provided a caption from a ${platform} video. It may contain recipe instructions, ingredients, or cooking tips. Your task is to parse it into the standard recipe JSON format. Pay special attention to hashtags, user handles, and other social media artifacts, and exclude them from the final recipe content.`;
+
+  return {
+    system: systemPrompt,
+    text: `Video Caption from ${platform}:\n\n${caption}`,
+    isJson: true,
   };
 }
