@@ -293,6 +293,14 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
       try {
         parsedRecipe = JSON.parse(llmResponse.output);
         console.log('[DEBUG] Gemini Raw Output:\n', JSON.stringify(parsedRecipe, null, 2));
+
+        // Fallback patch for flat ingredients list
+        if (parsedRecipe && !parsedRecipe.ingredientGroups && (parsedRecipe as any).ingredients) {
+          console.warn('[PATCH] Gemini returned flat ingredients list — wrapping into ingredientGroups.');
+          parsedRecipe.ingredientGroups = [{ name: 'Main Ingredients', ingredients: (parsedRecipe as any).ingredients }];
+          delete (parsedRecipe as any).ingredients;
+        }
+
         logger.info({ requestId, timeMs: overallTimings.geminiParse }, 'Successfully parsed video caption with LLM.');
 
         if (parsedRecipe?.ingredientGroups?.length) {
