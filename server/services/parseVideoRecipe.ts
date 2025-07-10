@@ -17,7 +17,7 @@ import { generateAndSaveEmbedding } from '../../utils/recipeEmbeddings';
 // Type definitions for the external scraper response
 export type ScrapeCaptionResponse = {
   caption: string | null;
-  source: 'caption' | null;
+  source: 'caption' | 'link' | null;
   platform: 'instagram' | 'tiktok' | 'youtube';
   error: {
     code: string;
@@ -257,7 +257,7 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
       prompt.metadata = { requestId, route: 'video_caption' };
 
       console.log('[DEBUG] Gemini System Prompt:\n', prompt.system);
-      console.log('[DEBUG] Gemini Prompt Text Sent:\n', prompt.text);
+      console.log('[DEBUG] Gemini Prompt Text:\n', prompt.text);
 
       console.time(`[${requestId}] gemini_call`);
       logger.info({ requestId, event: 'llm_call_start' }, 'Calling LLM to parse caption.');
@@ -292,6 +292,7 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
       
       try {
         parsedRecipe = JSON.parse(llmResponse.output);
+        console.log('[DEBUG] Gemini Raw Output:\n', JSON.stringify(parsedRecipe, null, 2));
         logger.info({ requestId, timeMs: overallTimings.geminiParse }, 'Successfully parsed video caption with LLM.');
 
         if (parsedRecipe?.ingredientGroups?.length) {

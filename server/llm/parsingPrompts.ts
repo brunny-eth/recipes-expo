@@ -1,55 +1,35 @@
 import { PromptPayload } from './adapters';
 
-const COMMON_SYSTEM_PROMPT = `You are an expert recipe parsing AI. Parse the provided recipe into a valid JSON object.
+export const COMMON_SYSTEM_PROMPT = `
+You are an expert recipe parsing AI. Your task is to extract recipe information from unstructured text and return it as a single, well-formed JSON object.
 
-Expected JSON format:
-{
-  "title": "string | null",
-  "ingredientGroups": [ 
-    {
-      "name": "string", 
-      "ingredients": [
-        {
-          "name": "string",
-          "amount": "string | null",
-          "unit": "string | null",
-          "suggested_substitutions": [
-            {
-              "name": "string",
-              "amount": "string | number | null",
-              "unit": "string | null",
-              "description": "string | null"
-            }
-          ] | null
-        }
-      ]
-    }
-  ] | null, 
-  "instructions": "array of strings, each a single step without numbering | null",
-  "substitutions_text": "string | null",
-  "recipeYield": "string | null",
-  "prepTime": "string | null",
-  "cookTime": "string | null",
-  "totalTime": "string | null",
-  "nutrition": {
-    "calories": "string | null",
-    "protein": "string | null"
-  } | null
-}
+**CRITICAL RULES:**
+1.  **Extract ALL Ingredients**: This is the most important rule. Some ingredients may only be mentioned within the instruction text (e.g., "drizzle with olive oil"). You **MUST** extract these as standalone ingredients in the ingredient list. Do not miss any.
+    - **Example 1**: "Add the chicken, 3oz sliced carrots, and 100g sweet potato..." must produce three separate ingredients: "chicken", "3oz sliced carrots", and "100g sweet potato".
+    - **Example 2**: "...and the juice from 1/2 a lime" should produce an ingredient like "juice from 1/2 lime" or "1/2 lime, juiced".
 
-Parsing Rules:
-- **Title Generation**: If a title is not explicitly mentioned, create a descriptive, human-readable title for the recipe based on its ingredients and instructions. The title should be concise and accurately represent the dish.
-- If a value is not found or is not explicitly mentioned in the recipe text, use null (do not infer or generate).
-- **Time Extraction (prepTime, cookTime, totalTime):** Extract durations from the recipe text (e.g., "PT15M", "30 minutes", "1 hour") and convert them into a concise, human-readable string format (e.g., "15 minutes", "30 minutes", "1 hour"). ONLY extract if explicitly stated. Ensure 'totalTime' represents the full duration including both prep and cook time, or the explicitly stated total duration if available. If a time range is given (e.g., "30-45 minutes"), capture the range as is.
-- **Yield Extraction (recipeYield):** Extract the yield as a concise string (e.g., "4 servings", "12 cookies") from phrases like "Serves 4", "Yield: 12", "Makes 12 servings", "Serves 4-6". If a range, capture it as a range (e.g., "4-6 servings").
-- **Ingredient Grouping:** When a recipe has distinct logical sections for ingredients (e.g., "For the Sauce", "Salad Dressing", "Meatball Mixture", "Tzatziki", "Garnish"), group ingredients appropriately under a concise, descriptive "ingredientGroup" name. If no distinct sections are present, use a single group named "Main".
--  If an instruction step contains a vague phrase like "all ingredients" or "all sauce ingredients," expand the instruction by including a comma-separated list of the relevant ingredients from the corresponding ingredientGroup's ingredients array.
-- **Ingredient Substitutions:** For each individual ingredient, suggest 1-2 sensible and common substitutions. If no suitable or obvious substitution exists for an ingredient, set its suggested_substitutions array to null.
-- **Amount Conversion:** Convert all fractional amounts (e.g., "1/2", "3/4", "1 1/2") to their decimal equivalents (e.g., "0.5", "0.75", "1.5").
-- **Content Filtering:** Exclude all brand names, product names, or any other promotional/non-recipe specific text from all extracted fields.
-- **Ingredient Extraction from Sentences**: Some ingredients may only be mentioned within the instruction text. You must extract these as standalone ingredients with a reasonable estimate for quantity and unit, and place them in the appropriate ingredient group. Preserve their order when possible.
-- **Ignore Social Media Content**: Explicitly ignore user handles (e.g., "@username") and hashtags (e.g., "#recipe") when parsing. Do not include them in any field.
-- Output ONLY the JSON object, with no additional text or explanations.`;
+2.  **Strict JSON Output**: The output MUST be a single JSON object, with no markdown fences (like \`\`\`json), comments, or extra text.
+
+3.  **Title Generation**: If the recipe text does not have an explicit title, you MUST create a concise, descriptive title for it.
+
+4.  **Ingredient Parsing**:
+    - Each ingredient must be an object with "name", "quantity", "unit", and "notes".
+    - If a value isn't present, use \`null\` (e.g., "a pinch of salt" might be quantity: null, unit: "pinch", name: "salt").
+    - Combine adjectives with the name (e.g., "finely chopped red onions" -> name: "red onions", notes: "finely chopped").
+
+5.  **Instruction Parsing**:
+    - Instructions should be an array of strings.
+    - Combine related steps into a single instruction where it makes sense.
+    - Do not invent new steps.
+
+6.  **Yield & Time**:
+    - Extract serving yield (e.g., "serves 4", "makes 12 cookies").
+    - Extract total, prep, and cook times. Specify units (e.g., "minutes", "hours").
+
+7.  **Nutritional Info**: Extract nutritional information (calories, protein, etc.) if available.
+
+8.  **No Inventing**: Do not add information that is not present in the source text.
+`;
 
 export function buildTextParsePrompt(input: string): PromptPayload {
   return {
@@ -90,16 +70,10 @@ ${instructions}
 
 export function buildVideoParsePrompt(caption: string, platform: string): PromptPayload {
   const userText = `
-The following text is a caption from a ${platform} video.
-Your task is to parse this caption into the standard recipe JSON format, following the rules provided in the system prompt.
-
-**Special Instructions for Video Captions:**
-- Video captions often contain irrelevant text (e.g., "Follow for more!", "link in bio!").
-- You MUST ignore user handles (e.g., "@username"), hashtags (e.g., "#recipe"), and any other promotional or non-recipe content.
-- Your focus is solely on extracting the recipe.
+Below is a caption containing a full recipe. Some ingredients may be embedded inside instructions — make sure to extract **all ingredients** even if not bulleted.
 
 ---
-VIDEO CAPTION TO PARSE:
+RECIPE CAPTION:
 ---
 ${caption}
 `;
