@@ -1,4 +1,5 @@
 import { CombinedParsedRecipe } from '../../common/types';
+import { supabase } from '../lib/supabase';
 import { createHash } from 'crypto';
 import { generateCacheKeyHash } from '../utils/hash';
 import { StandardizedUsage } from '../utils/usageUtils';
@@ -9,6 +10,8 @@ import { parseUrlRecipe } from './parseUrlRecipe';
 import { parseTextRecipe } from './parseTextRecipe';
 import { runDefaultLLM, PromptPayload } from '../llm/adapters';
 import { ParseErrorCode, StructuredError } from '../../common/types/errors';
+import { normalizeUrl } from '../../utils/normalizeUrl';
+import { generateAndSaveEmbedding } from '../../utils/recipeEmbeddings';
 
 // Type definitions for the external scraper response
 export type ScrapeCaptionResponse = {
@@ -110,6 +113,14 @@ function scoreCaptionQuality(caption: string | null): 'high' | 'medium' | 'low' 
     return count + (matches ? matches.length : 0);
   }, 0);
   
+  // New Rule: If a URL is present and there are few-to-no measurements,
+  // it's likely a "link-in-bio" style post. Prioritize the link.
+  const hasUrl = /https?:\/\//.test(text);
+  if (hasUrl && measurementCount < 2) {
+    logger.info({ event: 'caption_quality_override' }, 'URL found with few measurements, forcing "low" quality to prioritize link extraction.');
+    return 'low';
+  }
+
   // Scoring logic
   const wordCount = text.split(/\s+/).length;
   const keywordDensity = keywordCount / Math.max(wordCount, 1);
@@ -370,6 +381,45 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
       if (parsedRecipe) {
         parsedRecipe.sourceUrl = videoUrl;
       }
+
+      // --- Database Insertion and Embedding ---
+      let insertedId: number | null = null;
+      if (parsedRecipe) {
+        const dbInsertStartTime = Date.now();
+        try {
+          const { data: insertData, error: insertError } = await supabase
+            .from('processed_recipes_cache')
+            .insert({
+              url: videoUrl,
+              normalized_url: normalizeUrl(videoUrl),
+              recipe_data: parsedRecipe,
+              source_type: inputType,
+            })
+            .select('id')
+            .single();
+
+          overallTimings.dbInsert = Date.now() - dbInsertStartTime;
+
+          if (insertError) {
+            logger.error({ requestId, cacheKey, err: insertError }, 'Error saving video recipe to cache.');
+          } else if (insertData) {
+            insertedId = insertData.id;
+            (parsedRecipe as any).id = insertedId;
+            logger.info({ requestId, cacheKey, dbInsertMs: overallTimings.dbInsert, insertedId }, 'Successfully saved video recipe to cache.');
+            
+            // Generate and save embedding asynchronously
+            if (insertedId) {
+              generateAndSaveEmbedding(insertedId, parsedRecipe).catch(err => {
+                logger.error({ requestId, recipeId: insertedId, error: err }, "Failed to generate/save embedding for video recipe");
+              });
+            }
+          }
+        } catch (dbError) {
+          overallTimings.dbInsert = Date.now() - dbInsertStartTime;
+          logger.error({ requestId, cacheKey, err: dbError }, 'Exception during video recipe cache insert.');
+        }
+      }
+      // --- End Database Insertion and Embedding ---
 
       overallTimings.total = Date.now() - requestStartTime;
       
