@@ -7,15 +7,10 @@
     }
   ],
   "devCommand": "npx ts-node --project server/tsconfig.json server/index.ts",
-  "rewrites": [
+  "routes": [
     {
-      "source": "/api/(.*)",
-      "destination": "/server/index.ts"
+      "src": "/api/(.*)",
+      "dest": "/server/index.ts"
     }
-  ],
-  "functions": {
-    "server/index.ts": {
-      "maxDuration": 60
-    }
-  }
+  ]
 }
