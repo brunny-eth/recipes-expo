@@ -227,11 +227,12 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
   const requestId = createHash('sha256').update(Date.now().toString() + Math.random().toString()).digest('hex').substring(0, 12);
   const requestStartTime = Date.now();
   
-  let overallTimings: ParseResult['timings'] = {
+  let overallTimings: ParseResult['timings'] & { scraperTime?: number } = {
     dbCheck: -1,
     geminiParse: -1,
     dbInsert: -1,
-    total: -1
+    total: -1,
+    scraperTime: -1,
   };
   
   let handlerUsage: StandardizedUsage = { inputTokens: 0, outputTokens: 0 };
@@ -242,9 +243,11 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
     logger.info({ requestId, videoUrl }, 'Starting video recipe parsing.');
 
     // Step 1: Fetch caption from video URL
+    logger.info({ requestId, event: 'scraper_call_start' }, 'Calling scraper microservice.');
     const scrapingStartTime = Date.now();
     const scrapeResult = await fetchCaptionFromVideoUrl(videoUrl, requestId);
-    const scrapingTime = Date.now() - scrapingStartTime;
+    overallTimings.scraperTime = Date.now() - scrapingStartTime;
+    logger.info({ requestId, event: 'scraper_call_end', durationMs: overallTimings.scraperTime }, 'Scraper microservice call finished.');
     
     // Step 2: Handle scraping errors
     if (scrapeResult.error) {
@@ -311,10 +314,12 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
       const prompt = buildVideoParsePrompt(scrapeResult.caption, scrapeResult.platform);
       prompt.metadata = { requestId, route: 'video_caption' };
 
+      logger.info({ requestId, event: 'llm_call_start' }, 'Calling LLM to parse caption.');
       const llmStartTime = Date.now();
       const llmResponse = await runDefaultLLM(prompt);
       overallTimings.geminiParse = Date.now() - llmStartTime;
       handlerUsage = llmResponse.usage;
+      logger.info({ requestId, event: 'llm_call_end', durationMs: overallTimings.geminiParse }, 'LLM call finished.');
 
       if (llmResponse.error || !llmResponse.output) {
         const errorMessage = llmResponse.error || 'LLM returned no output';
@@ -433,6 +438,7 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
         platform: scrapeResult.platform,
         source: 'caption',
         totalTimeMs: overallTimings.total,
+        timings: overallTimings,
         event: 'video_recipe_parsing_completed'
       }, 'Video recipe parsing completed successfully via caption.');
       
@@ -471,6 +477,7 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
         }, 'Found URL in caption, delegating to URL parser.');
         
         try {
+          logger.info({ requestId, event: 'url_fallback_start', url: extractedUrl }, 'Starting fallback to parseUrlRecipe.');
           // Parse the extracted URL
           const urlParseStartTime = Date.now();
           const urlParseResult = await parseUrlRecipe(extractedUrl);
@@ -482,7 +489,8 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
             platform: scrapeResult.platform,
             urlParseTimeMs: urlParseTime,
             success: !!urlParseResult.recipe,
-            event: 'url_parsing_completed',
+            event: 'url_fallback_end',
+            timings: urlParseResult.timings,
           }, 'URL parsing completed for extracted link.');
 
           // Return the URL parse result with video-specific metadata

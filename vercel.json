@@ -12,5 +12,10 @@
       "src": "/api/(.*)",
       "dest": "/server/index.ts"
     }
-  ]
+  ],
+  "functions": {
+    "server/index.ts": {
+      "maxDuration": 60
+    }
+  }
 }
