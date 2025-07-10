@@ -272,7 +272,7 @@ export default function HomeScreen() {
         <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
           <View style={styles.contentContainer}>
             <Text style={styles.mainFeatureText}>Recipes, refined.</Text>
-            <Text style={styles.featureText}>Built for the home chef.</Text>
+            <Text style={styles.featureText}>Built for the home cook.</Text>
           </View>
 
           <KeyboardAvoidingView
