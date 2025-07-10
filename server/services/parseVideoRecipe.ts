@@ -1,0 +1,494 @@
+import { CombinedParsedRecipe } from '../../common/types';
+import { createHash } from 'crypto';
+import { generateCacheKeyHash } from '../utils/hash';
+import { StandardizedUsage } from '../utils/usageUtils';
+import logger from '../lib/logger';
+import { finalValidateRecipe } from './finalValidateRecipe';
+import { ParseResult } from './parseRecipe';
+import { parseUrlRecipe } from './parseUrlRecipe';
+import { parseTextRecipe } from './parseTextRecipe';
+import { runDefaultLLM, PromptPayload } from '../llm/adapters';
+import { ParseErrorCode, StructuredError } from '../../common/types/errors';
+
+// Type definitions for the external scraper response
+export type ScrapeCaptionResponse = {
+  caption: string | null;
+  source: 'caption' | null;
+  platform: 'instagram' | 'tiktok' | 'youtube';
+  error: {
+    code: string;
+    severity: 'auth' | 'retryable' | 'fatal';
+  } | null;
+};
+
+export type VideoParseResult = ParseResult & {
+  source?: 'caption' | 'link' | null;
+};
+
+/**
+ * Fetches caption from video URL using the external scraper microservice.
+ * @param videoUrl The video URL to scrape.
+ * @param requestId A unique identifier for tracing the request.
+ * @returns The scraper response.
+ */
+async function fetchCaptionFromVideoUrl(videoUrl: string, requestId: string): Promise<ScrapeCaptionResponse> {
+  const startTime = Date.now();
+  
+  try {
+    logger.info({ requestId, videoUrl }, 'Fetching caption from video URL via scraper microservice.');
+    
+    const response = await fetch('https://meez-scrape.fly.dev/scrape-caption', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ videoUrl }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data: ScrapeCaptionResponse = await response.json();
+    
+    logger.info({ 
+      requestId, 
+      platform: data.platform, 
+      hasCaptionData: !!data.caption,
+      captionLength: data.caption?.length || 0,
+      timeMs: Date.now() - startTime 
+    }, 'Successfully fetched caption from scraper microservice.');
+    
+    return data;
+    
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error({ requestId, error: errorMessage, timeMs: Date.now() - startTime }, 'Failed to fetch caption from scraper microservice.');
+    
+    // Return a fallback response with error information
+    return {
+      caption: null,
+      source: null,
+      platform: 'youtube', // Default fallback
+      error: {
+        code: 'SCRAPER_REQUEST_FAILED',
+        severity: 'fatal'
+      }
+    };
+  }
+}
+
+/**
+ * Scores the quality of a caption for recipe extraction.
+ * @param caption The caption text to evaluate.
+ * @returns Quality score: 'high', 'medium', or 'low'.
+ */
+function scoreCaptionQuality(caption: string | null): 'high' | 'medium' | 'low' {
+  if (!caption) return 'low';
+  
+  const text = caption.trim();
+  if (text.length < 20) return 'low';
+  
+  // Count recipe-related keywords
+  const recipeKeywords = [
+    'recipe', 'ingredients', 'cook', 'bake', 'mix', 'stir', 'add', 'cup', 'tablespoon', 'teaspoon',
+    'minutes', 'hour', 'oven', 'pan', 'bowl', 'salt', 'pepper', 'oil', 'flour', 'sugar',
+    'onion', 'garlic', 'chicken', 'beef', 'pork', 'fish', 'eggs', 'cheese', 'butter', 'milk'
+  ];
+  
+  const keywordCount = recipeKeywords.reduce((count, keyword) => {
+    return count + (text.toLowerCase().includes(keyword.toLowerCase()) ? 1 : 0);
+  }, 0);
+  
+  // Count measurement patterns (e.g., "2 cups", "1 tbsp", "3/4 cup")
+  const measurementPatterns = [
+    /\d+\s*(cup|cups|tbsp|tablespoon|tablespoons|tsp|teaspoon|teaspoons|oz|ounces|lb|lbs|pound|pounds)/gi,
+    /\d+\/\d+\s*(cup|cups|tbsp|tablespoon|tablespoons|tsp|teaspoon|teaspoons)/gi,
+    /\d+\.\d+\s*(cup|cups|tbsp|tablespoon|tablespoons|tsp|teaspoon|teaspoons)/gi
+  ];
+  
+  const measurementCount = measurementPatterns.reduce((count, pattern) => {
+    const matches = text.match(pattern);
+    return count + (matches ? matches.length : 0);
+  }, 0);
+  
+  // Scoring logic
+  const wordCount = text.split(/\s+/).length;
+  const keywordDensity = keywordCount / Math.max(wordCount, 1);
+  
+  if (keywordCount >= 5 && measurementCount >= 2 && wordCount >= 50) {
+    return 'high';
+  } else if (keywordCount >= 3 && (measurementCount >= 1 || wordCount >= 30)) {
+    return 'medium';
+  } else {
+    return 'low';
+  }
+}
+
+/**
+ * Extracts URLs from text using regex patterns.
+ * @param text The text to search for URLs.
+ * @returns The first URL found, or null if none found.
+ */
+function extractUrlFromText(text: string | null): string | null {
+  if (!text) return null;
+  
+  const urlRegex = /https?:\/\/[^\s<>"'{}|\\^`[\]]+/gi;
+  const matches = text.match(urlRegex);
+  
+  // Log the extraction attempt for debugging
+  if (matches && matches.length > 0) {
+    console.log(`[extractUrlFromText] Found ${matches.length} URL(s) in text: ${matches.join(', ')}`);
+  } else {
+    console.log(`[extractUrlFromText] No URLs found in text: "${text.substring(0, 50)}..."`);
+  }
+  
+  return matches ? matches[0] : null;
+}
+
+/**
+ * Builds a prompt for parsing video recipe captions.
+ * @param caption The caption text.
+ * @param platform The video platform.
+ * @returns The prompt payload.
+ */
+function buildVideoParsePrompt(caption: string, platform: string): PromptPayload {
+  const systemPrompt = `You are an expert recipe parsing AI. Parse the provided video caption into a valid JSON object.
+
+The caption comes from a ${platform} video and may contain recipe instructions, ingredients, or cooking tips.
+
+Expected JSON format:
+{
+  "title": "string | null",
+  "ingredientGroups": [ 
+    {
+      "name": "string", 
+      "ingredients": [
+        {
+          "name": "string",
+          "amount": "string | null",
+          "unit": "string | null",
+          "suggested_substitutions": [
+            {
+              "name": "string",
+              "amount": "string | number | null",
+              "unit": "string | null",
+              "description": "string | null"
+            }
+          ] | null
+        }
+      ]
+    }
+  ] | null, 
+  "instructions": "array of strings, each a single step without numbering | null",
+  "substitutions_text": "string | null",
+  "recipeYield": "string | null",
+  "prepTime": "string | null",
+  "cookTime": "string | null",
+  "totalTime": "string | null",
+  "nutrition": {
+    "calories": "string | null",
+    "protein": "string | null"
+  } | null
+}
+
+Parsing Rules:
+- If a value is not found or is not explicitly mentioned in the caption, use null (do not infer or generate).
+- **Time Extraction:** Extract durations from the caption and convert them into a concise, human-readable string format.
+- **Yield Extraction:** Extract the yield as a concise string from phrases like "Serves 4", "Makes 12".
+- **Ingredient Grouping:** Use a single group named "Main" unless distinct sections are clearly indicated.
+- **Ingredient Substitutions:** Suggest 1-2 sensible substitutions for each ingredient where appropriate.
+- **Amount Conversion:** Convert fractional amounts to decimal equivalents.
+- **Content Filtering:** Exclude brand names, hashtags, and promotional content.
+- Output ONLY the JSON object, with no additional text or explanations.`;
+
+  return {
+    system: systemPrompt,
+    text: `Video Caption from ${platform}:\n\n${caption}`,
+    isJson: true
+  };
+}
+
+/**
+ * Parses a recipe from a video URL by extracting captions and processing them.
+ * @param videoUrl The video URL to parse.
+ * @returns The parsed recipe result.
+ */
+export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResult> {
+  const requestId = createHash('sha256').update(Date.now().toString() + Math.random().toString()).digest('hex').substring(0, 12);
+  const requestStartTime = Date.now();
+  
+  let overallTimings: ParseResult['timings'] = {
+    dbCheck: -1,
+    geminiParse: -1,
+    dbInsert: -1,
+    total: -1
+  };
+  
+  let handlerUsage: StandardizedUsage = { inputTokens: 0, outputTokens: 0 };
+  const inputType = 'video';
+  const cacheKey = generateCacheKeyHash(videoUrl);
+
+  try {
+    logger.info({ requestId, videoUrl }, 'Starting video recipe parsing.');
+
+    // Step 1: Fetch caption from video URL
+    const scrapingStartTime = Date.now();
+    const scrapeResult = await fetchCaptionFromVideoUrl(videoUrl, requestId);
+    const scrapingTime = Date.now() - scrapingStartTime;
+    
+    // Step 2: Handle scraping errors
+    if (scrapeResult.error) {
+      logger.error({ requestId, error: scrapeResult.error }, 'Video scraping failed.');
+      return {
+        recipe: null,
+        error: {
+          code: ParseErrorCode.GENERATION_FAILED,
+          message: `Failed to extract caption from video: ${scrapeResult.error.code}`
+        },
+        fromCache: false,
+        inputType,
+        cacheKey,
+        timings: { ...overallTimings, total: Date.now() - requestStartTime },
+        usage: handlerUsage,
+        fetchMethodUsed: 'video_scraper',
+        source: null
+      };
+    }
+
+    if (!scrapeResult.caption) {
+      logger.warn({ requestId }, 'No caption found in video.');
+      return {
+        recipe: null,
+        error: {
+          code: ParseErrorCode.INVALID_INPUT,
+          message: 'No caption or text found in the video.'
+        },
+        fromCache: false,
+        inputType,
+        cacheKey,
+        timings: { ...overallTimings, total: Date.now() - requestStartTime },
+        usage: handlerUsage,
+        fetchMethodUsed: 'video_scraper',
+        source: null
+      };
+    }
+
+    // Step 3: Score caption quality
+    const captionQuality = scoreCaptionQuality(scrapeResult.caption);
+    logger.info({ 
+      requestId, 
+      captionQuality, 
+      captionLength: scrapeResult.caption.length, 
+      platform: scrapeResult.platform,
+      event: 'caption_quality_assessed'
+    }, 'Caption quality assessed.');
+
+    // Step 4: Route based on caption quality
+    if (captionQuality === 'high' || captionQuality === 'medium') {
+      // High/Medium quality: Parse caption directly with LLM
+      logger.info({ 
+        requestId, 
+        captionQuality, 
+        platform: scrapeResult.platform,
+        source: 'caption',
+        event: 'llm_processing_started'
+      }, 'Processing high/medium quality caption with LLM.');
+      
+      const prompt = buildVideoParsePrompt(scrapeResult.caption, scrapeResult.platform);
+      prompt.metadata = { requestId, route: 'video_caption' };
+
+      const llmStartTime = Date.now();
+      const llmResponse = await runDefaultLLM(prompt);
+      overallTimings.geminiParse = Date.now() - llmStartTime;
+      handlerUsage = llmResponse.usage;
+
+      if (llmResponse.error || !llmResponse.output) {
+        const errorMessage = llmResponse.error || 'LLM returned no output';
+        logger.error({ requestId, error: errorMessage }, 'LLM processing failed for video caption.');
+        
+        return {
+          recipe: null,
+          error: {
+            code: ParseErrorCode.GENERATION_FAILED,
+            message: `Failed to process video caption: ${errorMessage}`
+          },
+          fromCache: false,
+          inputType,
+          cacheKey,
+          timings: { ...overallTimings, total: Date.now() - requestStartTime },
+          usage: handlerUsage,
+          fetchMethodUsed: 'video_scraper',
+          source: null
+        };
+      }
+
+      let parsedRecipe: CombinedParsedRecipe | null = null;
+      
+      try {
+        parsedRecipe = JSON.parse(llmResponse.output);
+        logger.info({ requestId, timeMs: overallTimings.geminiParse }, 'Successfully parsed video caption with LLM.');
+      } catch (parseError) {
+        const errorMessage = parseError instanceof Error ? parseError.message : 'JSON parse failed';
+        logger.error({ requestId, error: errorMessage }, 'Failed to parse LLM response as JSON.');
+        
+        return {
+          recipe: null,
+          error: {
+            code: ParseErrorCode.GENERATION_FAILED,
+            message: `Failed to parse LLM response: ${errorMessage}`
+          },
+          fromCache: false,
+          inputType,
+          cacheKey,
+          timings: { ...overallTimings, total: Date.now() - requestStartTime },
+          usage: handlerUsage,
+          fetchMethodUsed: 'video_scraper',
+          source: null
+        };
+      }
+
+      // Validate the parsed recipe
+      const validationResult = finalValidateRecipe(parsedRecipe, requestId);
+      if (!validationResult.ok) {
+        logger.warn({ requestId, reasons: validationResult.reasons }, 'Video recipe validation failed.');
+        return {
+          recipe: null,
+          error: {
+            code: ParseErrorCode.FINAL_VALIDATION_FAILED,
+            message: 'The video caption did not contain enough recipe information.'
+          },
+          fromCache: false,
+          inputType,
+          cacheKey,
+          timings: { ...overallTimings, total: Date.now() - requestStartTime },
+          usage: handlerUsage,
+          fetchMethodUsed: 'video_scraper',
+          source: null
+        };
+      }
+
+      // Add source URL and return successful result
+      if (parsedRecipe) {
+        parsedRecipe.sourceUrl = videoUrl;
+      }
+
+      overallTimings.total = Date.now() - requestStartTime;
+      
+      logger.info({ 
+        requestId, 
+        captionQuality, 
+        platform: scrapeResult.platform,
+        source: 'caption',
+        totalTimeMs: overallTimings.total,
+        event: 'video_recipe_parsing_completed'
+      }, 'Video recipe parsing completed successfully via caption.');
+      
+      return {
+        recipe: parsedRecipe,
+        error: null,
+        fromCache: false,
+        inputType,
+        cacheKey,
+        timings: overallTimings,
+        usage: handlerUsage,
+        fetchMethodUsed: 'video_scraper',
+        source: 'caption'
+      };
+
+    } else {
+      // Low quality: Try to extract URL from caption
+      logger.info({ 
+        requestId, 
+        captionQuality, 
+        platform: scrapeResult.platform,
+        captionLength: scrapeResult.caption.length,
+        event: 'url_extraction_started'
+      }, 'Low quality caption detected, attempting URL extraction.');
+      
+      const extractedUrl = extractUrlFromText(scrapeResult.caption);
+      
+      if (extractedUrl) {
+        logger.info({ 
+          requestId, 
+          extractedUrl, 
+          captionQuality,
+          platform: scrapeResult.platform,
+          source: 'link',
+          event: 'url_extracted_from_caption'
+        }, 'Found URL in caption, delegating to URL parser.');
+        
+        // Parse the extracted URL
+        const urlParseStartTime = Date.now();
+        const urlParseResult = await parseUrlRecipe(extractedUrl);
+        const urlParseTime = Date.now() - urlParseStartTime;
+        
+        logger.info({ 
+          requestId, 
+          extractedUrl, 
+          platform: scrapeResult.platform,
+          urlParseTimeMs: urlParseTime,
+          success: !!urlParseResult.recipe,
+          event: 'url_parsing_completed'
+        }, 'URL parsing completed for extracted link.');
+        
+        // Return the URL parse result with video-specific metadata
+        return {
+          ...urlParseResult,
+          source: 'link',
+          fetchMethodUsed: 'video_scraper_url_extraction'
+        };
+        
+      } else {
+        logger.warn({ 
+          requestId, 
+          captionQuality,
+          platform: scrapeResult.platform,
+          captionLength: scrapeResult.caption.length,
+          captionPreview: scrapeResult.caption.substring(0, 100) + '...',
+          event: 'url_extraction_failed'
+        }, 'No URL found in low-quality caption.');
+        
+        return {
+          recipe: null,
+          error: {
+            code: ParseErrorCode.INVALID_INPUT,
+            message: 'The caption was too short and didn\'t contain a usable link.'
+          },
+          fromCache: false,
+          inputType,
+          cacheKey,
+          timings: { ...overallTimings, total: Date.now() - requestStartTime },
+          usage: handlerUsage,
+          fetchMethodUsed: 'video_scraper',
+          source: null
+        };
+      }
+    }
+
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    overallTimings.total = Date.now() - requestStartTime;
+    
+    logger.error({ 
+      requestId, 
+      error: errorMessage, 
+      videoUrl,
+      totalTimeMs: overallTimings.total,
+      event: 'video_recipe_parsing_failed'
+    }, 'Unhandled exception in parseVideoRecipe.');
+    
+    return {
+      recipe: null,
+      error: {
+        code: ParseErrorCode.GENERATION_FAILED,
+        message: `Video recipe parsing failed: ${errorMessage}`
+      },
+      fromCache: false,
+      inputType,
+      cacheKey,
+      timings: overallTimings,
+      usage: handlerUsage,
+      fetchMethodUsed: 'video_scraper',
+      source: null
+    };
+  }
+} 

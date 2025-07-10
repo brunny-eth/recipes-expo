@@ -43,8 +43,22 @@ export function detectInputType(input: string): InputType {
       // - All parts separated by dots must have some length (e.g., not 'a..b')
       // This helps filter out hostnames like 'invalid' or 'localhost' from being treated as remote URLs.
       if (urlObj.hostname.includes('.') && urlObj.hostname.split('.').every(part => part.length > 0)) {
-          console.log(`[detectInputType] Classification result: 'url' for input: '${input}' (valid URL with proper domain)`);
-          return 'url';
+          // Check if this is a video URL from supported platforms
+          const videoPatterns = [
+            /^(www\.)?(youtube\.com|youtu\.be)/i,
+            /^(www\.)?(instagram\.com)/i,
+            /^(www\.)?(tiktok\.com)/i
+          ];
+          
+          const isVideoUrl = videoPatterns.some(pattern => pattern.test(urlObj.hostname));
+          
+          if (isVideoUrl) {
+              console.log(`[detectInputType] Classification result: 'video' for input: '${input}' (video URL detected)`);
+              return 'video';
+          } else {
+              console.log(`[detectInputType] Classification result: 'url' for input: '${input}' (valid URL with proper domain)`);
+              return 'url';
+          }
       } else {
           // If it has a protocol but the hostname doesn't look like a valid FQDN
           // (e.g., "https://invalid", "http://mylocalhost"), treat it as invalid for parsing.

@@ -26,7 +26,7 @@ app.use('/api/mise', miseRouter)
 
 // 👇 Only run this if executed directly (e.g., via `ts-node server/index.ts`)
 if (require.main === module) {
-  const PORT = process.env.PORT || 3000
+  const PORT = process.env.PORT || 3001
   app.listen(PORT, () => {
     console.log(`🟢 Server running at http://localhost:${PORT}`)
   })

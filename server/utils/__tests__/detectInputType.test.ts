@@ -22,6 +22,24 @@ describe('detectInputType', () => {
     expect(detectInputType('example.com\nsecond line\nthird line')).toBe<InputType>('raw_text');
   });
 
+  it('should detect video URLs from supported platforms', () => {
+    // YouTube URLs
+    expect(detectInputType('https://youtube.com/watch?v=dQw4w9WgXcQ')).toBe<InputType>('video');
+    expect(detectInputType('https://www.youtube.com/watch?v=dQw4w9WgXcQ')).toBe<InputType>('video');
+    expect(detectInputType('https://youtu.be/dQw4w9WgXcQ')).toBe<InputType>('video');
+    expect(detectInputType('youtube.com/watch?v=dQw4w9WgXcQ')).toBe<InputType>('video');
+    
+    // Instagram URLs
+    expect(detectInputType('https://instagram.com/p/ABC123')).toBe<InputType>('video');
+    expect(detectInputType('https://www.instagram.com/reel/ABC123')).toBe<InputType>('video');
+    expect(detectInputType('instagram.com/p/ABC123')).toBe<InputType>('video');
+    
+    // TikTok URLs
+    expect(detectInputType('https://tiktok.com/@user/video/123456')).toBe<InputType>('video');
+    expect(detectInputType('https://www.tiktok.com/@user/video/123456')).toBe<InputType>('video');
+    expect(detectInputType('tiktok.com/@user/video/123456')).toBe<InputType>('video');
+  });
+
   // Test cases for raw text detection
   it('should detect raw text when no URL pattern is matched', () => {
     expect(detectInputType('This is a simple sentence.')).toBe<InputType>('raw_text');
