@@ -6,10 +6,10 @@ import { ParseErrorCode } from '../common/types/errors';
 export function getErrorMessage(errorCode: ParseErrorCode, context?: string): string {
   switch (errorCode) {
     case ParseErrorCode.INVALID_INPUT:
-      return "That doesn't look like a valid recipe. Please try a recipe URL or paste recipe text with ingredients and instructions.";
+      return "That doesn't look like a valid recipe. Please try a URL with an actual recipe on it, or just paste the recipe text directly. You can also just say what you want and we'll suggest a recipe for you.";
       
     case ParseErrorCode.GENERATION_FAILED:
-      return "We couldn't process that recipe. Please try again, or if it's a URL, try pasting the recipe text directly instead.";
+      return "We couldn't process that recipe. Please try a URL with an actual recipe on it, or just paste the recipe text directly. You can also just say what you want and we'll suggest a recipe for you.";
       
     case ParseErrorCode.GENERATION_EMPTY:
       if (context === 'url') {

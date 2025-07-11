@@ -128,7 +128,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
     }
   };
 
-  const handleSpinComplete = () => {
+  const handleSpinComplete = (finalRecipeData: ParsedRecipe) => {
     if (!isMountedRef.current) return;
     
     console.log(`[${new Date().toISOString()}] [handleSpinComplete] Starting state changes...`);
@@ -141,13 +141,13 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
     
     // Navigate after 1 second
     setTimeout(() => {
-      if (!isMountedRef.current || !recipeData) return;
+      if (!isMountedRef.current || !finalRecipeData) return;
       
       console.log(`[${new Date().toISOString()}] [handleSpinComplete] Navigating to recipe summary...`);
       router.replace({
         pathname: '/recipe/summary',
         params: {
-          recipeData: JSON.stringify(recipeData),
+          recipeData: JSON.stringify(finalRecipeData),
           from: '/',
         },
       });
@@ -155,7 +155,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
     }, 1000);
   };
 
-  const parseRecipe = async () => {
+  const parseRecipe = async (): Promise<ParsedRecipe | null> => {
     const baseBackendUrl = process.env.EXPO_PUBLIC_API_URL!;
     const endpoint = '/api/recipes/parse';
     const backendUrl = `${baseBackendUrl}${endpoint}`;
@@ -198,11 +198,12 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
             "We couldn't find a recipe in this video's caption or a link to one.",
             handleBack
           );
-          return; // Stop further processing
+          return null; // Stop further processing
         }
 
         if (result.recipe) {
           setRecipeData(result.recipe);
+          return result.recipe;
         } else {
           // Show error modal globally
           const userMessage = result.error 
@@ -224,37 +225,48 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
     } finally {
       setIsParsingFinished(true);
     }
+    return null;
   };
 
   useEffect(() => {
-    parseRecipe();
+    let parsedRecipeResult: ParsedRecipe | null = null;
+    const runParse = async () => {
+      parsedRecipeResult = await parseRecipe();
+    }
+    runParse();
+
+    return () => {
+      // Cleanup if component unmounts during async operation
+    };
   }, [recipeInput, componentKey]);
 
   useEffect(() => {
-    if (
-      isParsingFinished &&
-      !alreadyNavigated.current
-    ) {
-      alreadyNavigated.current = true;
-      console.log('[LoadingExperienceScreen] Parsing complete. Starting spinner...');
-      console.log(
-        '[LoadingExperienceScreen] recipeData with ID:',
-        recipeData?.id,
-      );
-      
-      // Hide checklist and start spinner animation
-      setHideChecklist(true);
-      setShowSpinner(true);
-      
-      // Animate rotation to 360 degrees over 700ms
-      rotation.value = withTiming(360, { duration: 700 }, (finished) => {
-        console.log(`[${new Date().toISOString()}] [ROTATION] Spinner rotation animation finished: ${finished}`);
-        if (finished) {
-          runOnJS(handleSpinComplete)();
+    let finalRecipeData: ParsedRecipe | null = null;
+    const processFinishedParse = async () => {
+      if (isParsingFinished && !alreadyNavigated.current) {
+        alreadyNavigated.current = true;
+        
+        // Use the recipe data from the state, which should have been updated
+        finalRecipeData = recipeData;
+        console.log('[LoadingExperienceScreen] Parsing complete. Starting spinner...');
+        console.log('[LoadingExperienceScreen] recipeData with ID:', finalRecipeData?.id);
+        
+        if (finalRecipeData) {
+          // Hide checklist and start spinner animation
+          setHideChecklist(true);
+          setShowSpinner(true);
+          
+          // Animate rotation to 360 degrees over 700ms
+          rotation.value = withTiming(360, { duration: 700 }, (finished) => {
+            if (finished && finalRecipeData) {
+              runOnJS(handleSpinComplete)(finalRecipeData);
+            }
+          });
         }
-      });
-    }
-  }, [isParsingFinished, recipeData, router]);
+      }
+    };
+    processFinishedParse();
+  }, [isParsingFinished, recipeData]);
 
   const handleRetry = () => {
     setIsParsingFinished(false);
