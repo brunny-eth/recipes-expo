@@ -141,7 +141,7 @@ function scoreCaptionQuality(caption: string | null): 'high' | 'medium' | 'low' 
   // High quality requires at least some instructions
   if (keywordCount >= 5 && measurementCount >= 2 && wordCount >= 50 && instructionKeywordCount >= 3) {
     return 'high';
-  } else if (keywordCount >= 3 && (measurementCount >= 1 || wordCount >= 30) && instructionKeywordCount >= 1) {
+  } else if (keywordCount >= 3 && (measurementCount >= 1 || wordCount >= 30) && instructionKeywordCount >= 3) {
     return 'medium';
   } else {
     return 'low';
