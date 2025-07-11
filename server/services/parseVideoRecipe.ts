@@ -97,8 +97,20 @@ function scoreCaptionQuality(caption: string | null): 'high' | 'medium' | 'low' 
     'minutes', 'hour', 'oven', 'pan', 'bowl', 'salt', 'pepper', 'oil', 'flour', 'sugar',
     'onion', 'garlic', 'chicken', 'beef', 'pork', 'fish', 'eggs', 'cheese', 'butter', 'milk'
   ];
+
+  // Keywords that strongly indicate instructions
+  const instructionKeywords = [
+    'preheat', 'heat', 'slice', 'chop', 'dice', 'mince', 'combine', 'mix', 'stir', 'whisk', 
+    'beat', 'fold', 'pour', 'sprinkle', 'season', 'bake', 'roast', 'fry', 'sauté', 'boil', 
+    'simmer', 'reduce', 'cool', 'serve', 'garnish', 'set aside', 'drain', 'rinse', 'melt', 
+    'toast', 'spread', 'layer', 'step'
+  ];
   
   const keywordCount = recipeKeywords.reduce((count, keyword) => {
+    return count + (text.toLowerCase().includes(keyword.toLowerCase()) ? 1 : 0);
+  }, 0);
+
+  const instructionKeywordCount = instructionKeywords.reduce((count, keyword) => {
     return count + (text.toLowerCase().includes(keyword.toLowerCase()) ? 1 : 0);
   }, 0);
   
@@ -126,9 +138,10 @@ function scoreCaptionQuality(caption: string | null): 'high' | 'medium' | 'low' 
   const wordCount = text.split(/\s+/).length;
   const keywordDensity = keywordCount / Math.max(wordCount, 1);
   
-  if (keywordCount >= 5 && measurementCount >= 2 && wordCount >= 50) {
+  // High quality requires at least some instructions
+  if (keywordCount >= 5 && measurementCount >= 2 && wordCount >= 50 && instructionKeywordCount >= 3) {
     return 'high';
-  } else if (keywordCount >= 3 && (measurementCount >= 1 || wordCount >= 30)) {
+  } else if (keywordCount >= 3 && (measurementCount >= 1 || wordCount >= 30) && instructionKeywordCount >= 1) {
     return 'medium';
   } else {
     return 'low';
