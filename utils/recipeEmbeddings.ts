@@ -18,9 +18,13 @@ export const generateAndSaveEmbedding = async (
     const { title = '', ingredientsText = '', instructionsText = '' } = recipe;
     const embeddingInput = `${title}\n\n${ingredientsText}\n\n${instructionsText}`.trim();
 
+    // Add detailed logging to see the exact input
+    logger.info({ recipeId, embeddingInputSize: embeddingInput.length, embeddingInputPreview: embeddingInput.substring(0, 500) + '...' }, '[Embedding] Generated embedding input text.');
+
     const embedding = await embedText(embeddingInput);
     if (!embedding) {
-      logger.warn({ recipeId }, 'Failed to generate embedding');
+      // Upgraded from warn to error and added embeddingInput for debugging
+      logger.error({ recipeId, embeddingInput }, 'Failed to generate embedding. The embedText function returned a null or empty value.');
       return;
     }
 
