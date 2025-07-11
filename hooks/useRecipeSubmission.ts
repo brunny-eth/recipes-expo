@@ -54,7 +54,7 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
     }
 
     let normalizedInput = trimmedInput;
-    if (detectedType === 'url') {
+    if (detectedType === 'url' || detectedType === 'video') {
       try {
         normalizedInput = normalizeUrl(trimmedInput);
         console.log(`[useRecipeSubmission] validateInput: URL normalized to: ${normalizedInput}`); // NEW LOG
