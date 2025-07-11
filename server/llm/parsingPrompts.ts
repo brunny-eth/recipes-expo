@@ -50,7 +50,7 @@ The response must be exactly one object with the following shape:
     * **CRITICAL: DO NOT use ISO 8601 duration format (e.g., "PT15M").**
     * Only extract if explicitly stated. Capture time ranges as given (e.g., "30-45 minutes").
 6.  **Yield Formatting (recipeYield)**: Extract the yield into a concise, human-readable string (e.g., "4 servings", "12 cookies", "4-6 servings").
-7.  Ingredient Substitutions (suggested_substitutions): For every ingredient, YOU MUST suggest 1–2 realistic substitutions. You may reasonably guess amounts and units if they make culinary sense. Do not output placeholder objects (e.g. { "name": null, ... }). If no good substitution exists, use null.
+7.  Ingredient Substitutions (suggested_substitutions): For every ingredient, YOU MUST suggest 1–2 realistic substitutions as fully filled-out objects. You may reasonably guess amounts and units if they make culinary sense. If no good substitution exists, set suggested_substitutions to null. NEVER incldue substitutions with all fields null.
 8.  **Amount Conversion**: Convert all fractional amounts (e.g., "1/2", "3/4", "1 1/2") to their decimal equivalents (e.g., "0.5", "0.75", "1.5").
 9.  **Ingredient Preparation (preparation)**: Place any specific preparation instructions for an ingredient into the 'preparation' field (e.g., "finely chopped", "melted", "zest", "diced", "room temperature"). The 'name' field should contain the core ingredient name (e.g., "carrots", not "finely chopped carrots").
 10. **Content Filtering**: Exclude all brand names, product names, promotional text, social media handles (@username), and hashtags (#recipe) from all extracted fields.
