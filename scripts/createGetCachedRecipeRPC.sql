@@ -25,7 +25,7 @@ BEGIN
         prc.created_at
     FROM processed_recipes_cache prc
     WHERE prc.normalized_url = p_normalized_url
-      AND prc.source_type = 'url'  -- Only URL-based recipes
+      AND prc.source_type IN ('url', 'video')  -- Only URL-based or video-based recipes
     ORDER BY prc.created_at DESC  -- Get most recent if duplicates exist
     LIMIT 1;
 END;
@@ -33,7 +33,7 @@ $$;
 
 -- Add a comment for documentation
 COMMENT ON FUNCTION get_cached_recipe_by_url(TEXT) IS 
-'Fast lookup for cached recipes by normalized URL. Returns recipe data for instant frontend feedback. Only searches URL-based recipes (not text or user-modified entries).';
+'Fast lookup for cached recipes by normalized URL. Returns recipe data for instant frontend feedback. Only searches URL-based or video-based recipes (not text or user-modified entries).';
 
 -- Test the function with a sample call (you can modify this URL to test)
 -- SELECT * FROM get_cached_recipe_by_url('https://example.com/recipe'); 
