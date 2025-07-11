@@ -26,8 +26,8 @@ The response must be exactly one object with the following shape:
         }
       ]
     }
-  ],
-  "instructions": ["string"],
+  ] | null,
+  "instructions": "array of strings, each a single step without numbering | null",
   "substitutions_text": "string | null",
   "recipeYield": "string | null",
   "prepTime": "string | null",
