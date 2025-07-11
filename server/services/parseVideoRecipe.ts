@@ -104,7 +104,7 @@ function scoreCaptionQuality(caption: string | null): 'high' | 'medium' | 'low' 
     'beat', 'fold', 'pour', 'sprinkle', 'season', 'bake', 'roast', 'fry', 'sauté', 'boil', 
     'simmer', 'reduce', 'cool', 'serve', 'garnish', 'set aside', 'drain', 'rinse', 'melt', 
     'toast', 'spread', 'layer', 'step', 'in a', 'add', 'place', 'cook', 'remove', 'transfer', 
-    'top with', 'let rest', 'make', 'flatten', 'assemble', 'coat', 'toss'
+    'top with', 'let rest', 'make', 'flatten', 'assemble', 'coat', 'toss', 'brush', 'bring', 'apply', 'allow'
   ];
   
   const keywordCount = recipeKeywords.reduce((count, keyword) => {
