@@ -42,12 +42,13 @@ The response must be exactly one object with the following shape:
 **CRITICAL PARSING RULES (All rules are equally important):**
 
 1.  **Comprehensive Ingredient Extraction**: This is paramount. You **MUST** extract all ingredients, including those mentioned only within instruction steps, and place them in 'ingredientGroups'.
-2.  **Mandatory Ingredient Grouping**: The 'ingredientGroups' array is required. Use logical sections (e.g., "For the Sauce") as group names. If no distinct sections, use a single group named "Main Ingredients".
+2.  **Ingredient Grouping:** When a recipe has distinct logical sections for ingredients (e.g., "For the Sauce", "Salad Dressing", "Meatball Mixture", "Tzatziki", "Garnish"), group ingredients appropriately under a concise, descriptive "ingredientGroup" name. If no distinct sections are present, use a single group named "Main".
+-  If an instruction step contains a vague phrase like "all ingredients" or "all sauce ingredients," expand the instruction by including a comma-separated list of the relevant ingredients from the corresponding ingredientGroup's ingredients array.
 3.  Output ONLY the requested JSON object. Do NOT include any additional text or explanations.
 4.  **No Inference; Use Null**: If a value for a field is not explicitly found in the provided text, you MUST use 'null'. Do not infer or generate information.
 5.  **Time Formatting (prepTime, cookTime, totalTime)**:
     * **Convert durations into concise, human-readable strings (e.g., "15 minutes", "30 minutes", "1 hour", "1 hour 30 minutes").**
-    * **CRITICAL: DO NOT use ISO 8601 duration format (e.g., "PT15M").**
+    * **DO NOT use ISO 8601 duration format (e.g., "PT15M").**
     * Only extract if explicitly stated. Capture time ranges as given (e.g., "30-45 minutes").
 6.  **Yield Formatting (recipeYield)**: Extract the yield into a concise, human-readable string (e.g., "4 servings", "12 cookies", "4-6 servings").
 7.  Ingredient Substitutions (suggested_substitutions): For every ingredient, YOU MUST suggest 1–2 realistic substitutions as fully filled-out objects. You may reasonably guess amounts and units if they make culinary sense. If no good substitution exists, set suggested_substitutions to null. NEVER incldue substitutions with all fields null.
