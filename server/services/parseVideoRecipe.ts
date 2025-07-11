@@ -462,15 +462,15 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
             
             // Generate and save embedding asynchronously
             if (insertedId) {
-              // Prepare text inputs for embedding
-              const ingredientsText = parsedRecipe.ingredientGroups
-                ?.flatMap(group => group.ingredients.map(ing => `${ing.amount || ''} ${ing.unit || ''} ${ing.name}`.trim()))
-                .join('\n');
+              // Prepare text inputs for embedding, matching the logic in parseUrlRecipe.ts
+              const allIngredients = parsedRecipe.ingredientGroups?.flatMap((group: any) => 
+                group.ingredients?.map((ingredient: any) => ingredient.name) || []
+              ) || [];
               const instructionsText = parsedRecipe.instructions?.join('\n');
 
               generateAndSaveEmbedding(insertedId, {
                 title: parsedRecipe.title,
-                ingredientsText,
+                ingredientsText: allIngredients.join('\n'),
                 instructionsText,
               }).catch(err => {
                 logger.error({ requestId, recipeId: insertedId, error: err }, "Failed to generate/save embedding for video recipe");
