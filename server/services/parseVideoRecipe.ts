@@ -163,14 +163,19 @@ function scoreCaptionQuality(caption: string | null): 'high' | 'medium' | 'low' 
 function extractUrlFromText(text: string | null): string | null {
   if (!text) return null;
   
+  // Clean the text to remove non-printable/invisible characters that can break regex,
+  // but preserve standard printable characters and line breaks.
+  const cleanText = text.replace(/[^\x20-\x7E\n\r\t]/g, '');
+
   const urlRegex = /https?:\/\/[^\s<>"'{}|\\^`[\]]+/gi;
-  const matches = text.match(urlRegex);
+  const matches = cleanText.match(urlRegex);
   
-  // Log the extraction attempt for debugging
+  // Log the extraction attempt for debugging, now logging the full text to avoid confusion.
   if (matches && matches.length > 0) {
     console.log(`[extractUrlFromText] Found ${matches.length} URL(s) in text: ${matches.join(', ')}`);
   } else {
-    console.log(`[extractUrlFromText] No URLs found in text: "${text.substring(0, 50)}..."`);
+    // No longer truncating the log to prevent confusion about where the text is being cut off.
+    console.log(`[extractUrlFromText] No URLs found in text. Full cleaned text was: "${cleanText}"`);
   }
   
   return matches ? matches[0] : null;
@@ -228,7 +233,8 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
       };
     }
 
-    console.log(`[parseVideoRecipe] Scraper returned caption:`, scrapeResult.caption?.slice(0, 100));
+    // A check for null caption is performed below, so we can safely access length here.
+    console.log(`[parseVideoRecipe] Scraper returned caption of length ${scrapeResult.caption!.length}`);
 
     // Add a strict check for the caption before proceeding
     if (!scrapeResult.caption || typeof scrapeResult.caption !== 'string') {
@@ -517,12 +523,11 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
           captionPreview: scrapeResult.caption.substring(0, 100) + '...',
           event: 'url_extraction_failed'
         }, 'No URL found in low-quality caption.');
-        
         return {
           recipe: null,
           error: {
             code: ParseErrorCode.INVALID_INPUT,
-            message: 'The caption was too short and didn\'t contain a usable link.'
+            message: 'Low-quality video caption did not contain a usable URL.'
           },
           fromCache: false,
           inputType,
