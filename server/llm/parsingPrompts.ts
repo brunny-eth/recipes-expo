@@ -14,7 +14,7 @@ The response must be exactly one object with the following shape:
           "name": "string",
           "amount": "string | number | null",
           "unit": "string | null",
-          "notes": "string | null",
+          "preparation": "string | null", // Added 'preparation' field
           "suggested_substitutions": [
             {
               "name": "string",
@@ -36,26 +36,25 @@ The response must be exactly one object with the following shape:
   "nutrition": {
     "calories": "string | null",
     "protein": "string | null",
-    "fat": "string | null",
-    "carbs": "string | null",
-    "fiber": "string | null"
   } | null
 }
 
-**CRITICAL PARSING RULES (in order of priority):**
+**CRITICAL PARSING RULES (All rules are equally important):**
 
-1.  **Extract ALL Ingredients**: This is the most important rule. You **MUST** extract all ingredients, especially those only mentioned inside instruction steps, and place them in \`ingredientGroups\`.
-2.  **Use 'ingredientGroups'**: The \`ingredientGroups\` array is mandatory. If the recipe has logical sections (e.g., "For the Sauce"), use those as group names. Otherwise, use a single group named "Main Ingredients".
-3.  **Strictly JSON**: Your entire response MUST be a single, valid JSON object. Do not include any text, explanations, or markdown fences.
-4.  **Do Not Invent**: If a value is not found for a field, you MUST use \`null\`. Do not infer or make up information.
-5.  **Formatting**:
-    - Convert fractional amounts to decimals (e.g., "1 1/2" becomes 1.5).
-    - Extract times (\`prepTime\`, etc.) and yield (\`recipeYield\`) into concise, human-readable strings.
-6.  **Use 'notes' and 'substitutions'**:
-    - Place descriptive adjectives in the \`notes\` field (e.g., "finely chopped").
-    - Populate \`substitutions_text\` if provided, and you may suggest common substitutions in an ingredient's \`suggested_substitutions\` field.
-7.  **Filter Content**: Exclude all brand names, promotional text, social media handles (@username), and hashtags (#recipe).
-8.  **Generate Title**: If a title is missing from the source text, create a concise, descriptive one.
+1.  **Comprehensive Ingredient Extraction**: This is paramount. You **MUST** extract all ingredients, including those mentioned only within instruction steps, and place them in 'ingredientGroups'.
+2.  **Mandatory Ingredient Grouping**: The 'ingredientGroups' array is required. Use logical sections (e.g., "For the Sauce") as group names. If no distinct sections, use a single group named "Main Ingredients".
+3.  **Strictly JSON Output**: Your entire response MUST be a single, valid JSON object. Do NOT include any additional text, explanations, or markdown fences.
+4.  **No Inference; Use Null**: If a value for a field is not explicitly found in the provided text, you MUST use 'null'. Do not infer or generate information.
+5.  **Time Formatting (prepTime, cookTime, totalTime)**:
+    * **Convert durations into concise, human-readable strings (e.g., "15 minutes", "30 minutes", "1 hour", "1 hour 30 minutes").**
+    * **CRITICAL: DO NOT use ISO 8601 duration format (e.g., "PT15M").**
+    * Only extract if explicitly stated. Capture time ranges as given (e.g., "30-45 minutes").
+6.  **Yield Formatting (recipeYield)**: Extract the yield into a concise, human-readable string (e.g., "4 servings", "12 cookies", "4-6 servings").
+7.  **Ingredient Substitutions (suggested_substitutions)**: For **EVERY** ingredient, you **MUST** suggest 1-2 common and sensible substitutions. If no suitable or obvious substitution exists, set its 'suggested_substitutions' array to null.
+8.  **Amount Conversion**: Convert all fractional amounts (e.g., "1/2", "3/4", "1 1/2") to their decimal equivalents (e.g., "0.5", "0.75", "1.5").
+9.  **Ingredient Preparation (preparation)**: Place any specific preparation instructions for an ingredient into the 'preparation' field (e.g., "finely chopped", "melted", "zest", "diced", "room temperature"). The 'name' field should contain the core ingredient name (e.g., "carrots", not "finely chopped carrots").
+10. **Content Filtering**: Exclude all brand names, product names, promotional text, social media handles (@username), and hashtags (#recipe) from all extracted fields.
+11. **Title Generation**: If a title is missing from the source text, create a concise, descriptive title for the recipe.
 `;
 
 export function buildTextParsePrompt(input: string): PromptPayload {
