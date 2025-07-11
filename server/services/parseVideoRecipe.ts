@@ -103,23 +103,31 @@ function scoreCaptionQuality(caption: string | null): 'high' | 'medium' | 'low' 
     'preheat', 'heat', 'slice', 'chop', 'dice', 'mince', 'combine', 'mix', 'stir', 'whisk', 
     'beat', 'fold', 'pour', 'sprinkle', 'season', 'bake', 'roast', 'fry', 'sauté', 'boil', 
     'simmer', 'reduce', 'cool', 'serve', 'garnish', 'set aside', 'drain', 'rinse', 'melt', 
-    'toast', 'spread', 'layer', 'step', 'in a', 'add', 'place', 'cook', 'remove', 'transfer', 'top with', 'let rest'
+    'toast', 'spread', 'layer', 'step', 'in a', 'add', 'place', 'cook', 'remove', 'transfer', 
+    'top with', 'let rest', 'make', 'flatten', 'assemble', 'coat', 'toss'
   ];
   
   const keywordCount = recipeKeywords.reduce((count, keyword) => {
     return count + (text.toLowerCase().includes(keyword.toLowerCase()) ? 1 : 0);
   }, 0);
 
-  // New: Check for lines *starting with* instruction keywords for higher accuracy
-  const lines = text.split('\n').map(line => line.trim().toLowerCase());
-  const instructionKeywordCount = lines.reduce((count, line) => {
-    for (const keyword of instructionKeywords) {
-      if (line.startsWith(keyword)) {
-        return count + 1;
+  // New: Check for sentences starting with instruction keywords for higher accuracy
+  const lines = text.split('\n');
+  let instructionKeywordCount = 0;
+
+  for (const line of lines) {
+    // Split each line into sentences to handle paragraphs of instructions.
+    // Filter out empty strings that can result from splitting.
+    const sentences = line.split('.').filter(s => s.trim().length > 0);
+    
+    for (const sentence of sentences) {
+      const trimmedSentence = sentence.trim().toLowerCase();
+      // Check if the sentence begins with any of our instruction keywords.
+      if (instructionKeywords.some(keyword => trimmedSentence.startsWith(keyword))) {
+        instructionKeywordCount++;
       }
     }
-    return count;
-  }, 0);
+  }
   
   // Count measurement patterns (e.g., "2 cups", "1 tbsp", "3/4 cup")
   const measurementPatterns = [
