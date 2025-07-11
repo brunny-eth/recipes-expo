@@ -468,12 +468,10 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
               ) || [];
               const instructionsText = parsedRecipe.instructions?.join('\n');
 
-              generateAndSaveEmbedding(insertedId, {
+              await generateAndSaveEmbedding(insertedId, {
                 title: parsedRecipe.title,
                 ingredientsText: allIngredients.join('\n'),
                 instructionsText,
-              }).catch(err => {
-                logger.error({ requestId, recipeId: insertedId, error: err }, "Failed to generate/save embedding for video recipe");
               });
             }
           }
