@@ -208,10 +208,50 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
   
   let handlerUsage: StandardizedUsage = { inputTokens: 0, outputTokens: 0 };
   const inputType = 'video';
-  const cacheKey = generateCacheKeyHash(videoUrl);
+  const normalizedUrl = normalizeUrl(videoUrl);
+  const cacheKey = normalizedUrl;
 
   try {
-    logger.info({ requestId, videoUrl }, 'Starting video recipe parsing.');
+    logger.info({ requestId, videoUrl, normalizedUrl }, 'Starting video recipe parsing.');
+
+    // --- Begin Cache Check ---
+    const dbCheckStartTime = Date.now();
+    try {
+        const { data: cachedRecipe, error: dbError } = await supabase
+            .from('processed_recipes_cache')
+            .select('id, recipe_data')
+            .eq('normalized_url', cacheKey)
+            .maybeSingle();
+        
+        overallTimings.dbCheck = Date.now() - dbCheckStartTime;
+
+        if (dbError) {
+            logger.error({ requestId, cacheKey, err: dbError }, `Error checking video cache in Supabase.`);
+        }
+
+        if (cachedRecipe && cachedRecipe.recipe_data) {
+            logger.info({ requestId, cacheKey, dbCheckMs: overallTimings.dbCheck }, `Video cache hit. Returning cached data.`);
+            overallTimings.total = Date.now() - requestStartTime;
+            return { 
+                recipe: {
+                    ...(cachedRecipe.recipe_data as CombinedParsedRecipe),
+                    id: cachedRecipe.id,
+                },
+                error: null, 
+                fromCache: true, 
+                inputType, 
+                cacheKey, 
+                timings: overallTimings, 
+                usage: handlerUsage, 
+                fetchMethodUsed: 'N/A' 
+            };
+        }
+        logger.info({ requestId, cacheKey, dbCheckMs: overallTimings.dbCheck }, `Video cache miss. Proceeding with processing.`);
+    } catch (cacheError) {
+        overallTimings.dbCheck = Date.now() - dbCheckStartTime;
+        logger.error({ requestId, cacheKey, err: cacheError }, `Exception during video cache check.`);
+    }
+    // --- End Cache Check ---
 
     // Step 1: Fetch caption from video URL
     console.time(`[${requestId}] scraper_call`);
@@ -404,7 +444,7 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
             .from('processed_recipes_cache')
             .insert({
               url: videoUrl,
-              normalized_url: normalizeUrl(videoUrl),
+              normalized_url: normalizedUrl,
               recipe_data: parsedRecipe,
               source_type: inputType,
             })

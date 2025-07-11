@@ -99,7 +99,8 @@ export function buildVideoParsePrompt(caption: string, platform: string): Prompt
   const userText = `
 The following text is a caption from a ${platform} video. Your task is to parse it into the standard recipe JSON format, following all rules from the system prompt.
 
-Pay special attention to instructions, as ingredients are often embedded there. If ingredients are only mentioned mid-instruction (e.g. “add carrots, sweet potato, and zucchini”), extract them into ingredient objects. Be sure to ignore irrelevant social media text like "Follow for more!" or "Link in bio!".
+Pay special attention to instructions, as ingredients are often embedded there. If ingredients are only mentioned mid-instruction (e.g. “add carrots, sweet potato, and zucchini”), extract them into ingredient objects. Be sure to ignore irrelevant social media text like "Follow for more!" or "Link in bio!". And -  If an instruction step contains a vague phrase like "all ingredients" or "all sauce ingredients," expand the instruction by including a comma-separated list of the relevant ingredients from the corresponding ingredientGroup's ingredients array.
+
 
 ---
 VIDEO CAPTION TO PARSE:
