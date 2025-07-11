@@ -103,15 +103,22 @@ function scoreCaptionQuality(caption: string | null): 'high' | 'medium' | 'low' 
     'preheat', 'heat', 'slice', 'chop', 'dice', 'mince', 'combine', 'mix', 'stir', 'whisk', 
     'beat', 'fold', 'pour', 'sprinkle', 'season', 'bake', 'roast', 'fry', 'sauté', 'boil', 
     'simmer', 'reduce', 'cool', 'serve', 'garnish', 'set aside', 'drain', 'rinse', 'melt', 
-    'toast', 'spread', 'layer', 'step'
+    'toast', 'spread', 'layer', 'step', 'in a', 'add', 'place', 'cook', 'remove', 'transfer', 'top with', 'let rest'
   ];
   
   const keywordCount = recipeKeywords.reduce((count, keyword) => {
     return count + (text.toLowerCase().includes(keyword.toLowerCase()) ? 1 : 0);
   }, 0);
 
-  const instructionKeywordCount = instructionKeywords.reduce((count, keyword) => {
-    return count + (text.toLowerCase().includes(keyword.toLowerCase()) ? 1 : 0);
+  // New: Check for lines *starting with* instruction keywords for higher accuracy
+  const lines = text.split('\n').map(line => line.trim().toLowerCase());
+  const instructionKeywordCount = lines.reduce((count, line) => {
+    for (const keyword of instructionKeywords) {
+      if (line.startsWith(keyword)) {
+        return count + 1;
+      }
+    }
+    return count;
   }, 0);
   
   // Count measurement patterns (e.g., "2 cups", "1 tbsp", "3/4 cup")
