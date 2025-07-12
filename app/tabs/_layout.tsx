@@ -42,7 +42,7 @@ const MemoizedTabsNavigator = React.memo(() => {
           title: 'Home',
           tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <MaterialCommunityIcons
-              name="home-outline"
+              name="silverware-fork-knife"
               size={size}
               color={color}
             />
@@ -56,7 +56,7 @@ const MemoizedTabsNavigator = React.memo(() => {
           title: 'Explore',
           tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <MaterialCommunityIcons
-              name="compass-outline"
+              name="book-open-variant"
               size={size}
               color={color}
             />
@@ -84,7 +84,7 @@ const MemoizedTabsNavigator = React.memo(() => {
           title: 'Saved',
           tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <MaterialCommunityIcons
-              name="heart-outline"
+              name="bookmark-outline"
               size={size}
               color={color}
             />
@@ -98,7 +98,7 @@ const MemoizedTabsNavigator = React.memo(() => {
           title: 'Settings',
           tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <MaterialCommunityIcons
-              name="cog-outline"
+              name="food-variant"
               size={size}
               color={color}
             />

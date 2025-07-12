@@ -14,7 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS } from '@/constants/theme';
+import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
 import RecipeCard from '@/components/RecipeCard';
 import { useFreeUsage } from '@/context/FreeUsageContext';
 import { router } from 'expo-router';
@@ -255,25 +255,30 @@ const ExploreScreen = () => {
         style={styles.card}
         onPress={() => handleRecipePress(item)}
       >
-        {imageUrl && !hasImageError ? (
-          <FastImage
-            source={{ uri: imageUrl }}
-            style={styles.cardImage}
-            onLoad={() => handleImageLoad(item.title || 'Unknown Recipe')}
-            onError={() => {
-              setImageErrors((prev) => ({ ...prev, [itemId]: true }));
-              handleImageError(item.title || 'Unknown Recipe');
-            }}
-          />
-        ) : (
-          <FastImage
-            source={require('@/assets/images/meez_logo.webp')}
-            style={styles.cardImage}
-            onLoad={() => handleImageLoad(item.title || 'Unknown Recipe')}
-          />
-        )}
-        <View style={styles.cardTextContainer}>
-          <Text style={styles.cardTitle} numberOfLines={2}>
+        {/* Left half - Image */}
+        <View style={styles.imageContainer}>
+          {imageUrl && !hasImageError ? (
+            <FastImage
+              source={{ uri: imageUrl }}
+              style={styles.cardImage}
+              onLoad={() => handleImageLoad(item.title || 'Unknown Recipe')}
+              onError={() => {
+                setImageErrors((prev) => ({ ...prev, [itemId]: true }));
+                handleImageError(item.title || 'Unknown Recipe');
+              }}
+            />
+          ) : (
+            <FastImage
+              source={require('@/assets/images/meez_logo.webp')}
+              style={styles.cardImage}
+              onLoad={() => handleImageLoad(item.title || 'Unknown Recipe')}
+            />
+          )}
+        </View>
+        
+        {/* Right half - Recipe title */}
+        <View style={styles.titleContainer}>
+          <Text style={styles.cardTitle} numberOfLines={3}>
             {item.title}
           </Text>
         </View>
@@ -342,7 +347,7 @@ const ExploreScreen = () => {
         updateCellsBatchingPeriod={50}
         removeClippedSubviews={true}
         getItemLayout={(data, index) => (
-          { length: 85, offset: 85 * index, index } // Approximate item height
+          { length: 120 + SPACING.md, offset: (120 + SPACING.md) * index, index } // Card height + margin
         )}
       />
     );
@@ -417,35 +422,28 @@ const styles = StyleSheet.create({
   } as TextStyle,
   card: {
     flexDirection: 'row',
-    backgroundColor: COLORS.primary, // Set the entire card background to burnt orange
+    backgroundColor: COLORS.white,
     borderRadius: RADIUS.sm,
-    padding: 12,
     marginBottom: SPACING.md,
+    borderWidth: BORDER_WIDTH.default,
+    borderColor: COLORS.primary,
     shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-    alignItems: 'center',
+    shadowRadius: 4,
+    elevation: 3,
+    height: 120, // Fixed height for consistent cards
+    overflow: 'hidden',
   } as ViewStyle,
   cardImage: {
     width: '100%',
-    height: 200, // Increase the height to make images slightly bigger
-    borderTopLeftRadius: RADIUS.md, // Use a valid radius value
-    borderTopRightRadius: RADIUS.md, // Use a valid radius value
-  },
-  cardTextContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: COLORS.primary, // Use burnt orange color
-    padding: SPACING.sm,
+    height: '100%',
   },
   cardTitle: {
-    color: COLORS.white,
+    color: COLORS.textDark,
     ...bodyStrongText,
-    fontSize: FONT.size.body - 2, // Make the text slightly smaller
+    fontSize: FONT.size.body,
+    lineHeight: FONT.size.body * 1.3,
   },
   devToolsContainer: {
     backgroundColor: COLORS.surface,
@@ -485,6 +483,20 @@ const styles = StyleSheet.create({
   recipeTitle: {
     fontWeight: FONT.weight.semiBold,
   } as TextStyle,
+  imageContainer: {
+    width: '40%', // Left half for image
+    height: '100%',
+    borderRadius: RADIUS.md,
+    overflow: 'hidden',
+  } as ViewStyle,
+  titleContainer: {
+    width: '60%', // Right half for title
+    height: '100%',
+    paddingLeft: SPACING.md,
+    paddingRight: SPACING.sm,
+    justifyContent: 'center',
+    backgroundColor: COLORS.surface, // Light background to make text more readable
+  } as ViewStyle,
 });
 
 export default ExploreScreen;

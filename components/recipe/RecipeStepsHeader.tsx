@@ -6,15 +6,19 @@ import {
   ViewStyle,
   TextStyle,
   ImageStyle,
+  Dimensions,
 } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
-import { sectionHeaderText } from '@/constants/typography';
+import { sectionHeaderText, FONT } from '@/constants/typography';
 
 type RecipeStepsHeaderProps = {
   title?: string | null;
   imageUrl?: string | null;
 };
+
+const { height: screenHeight } = Dimensions.get('window');
+const imageHeight = Math.min(screenHeight * 0.15, 150); // 15% of screen height, max 150px
 
 const RecipeStepsHeader: React.FC<RecipeStepsHeaderProps> = ({
   title,
@@ -22,19 +26,18 @@ const RecipeStepsHeader: React.FC<RecipeStepsHeaderProps> = ({
 }) => {
   return (
     <View style={styles.recipeHeader}>
+      <Text style={styles.recipeTitle}>
+        {title}
+      </Text>
       {imageUrl && (
         <FastImage source={{ uri: imageUrl }} style={styles.recipeImage} />
       )}
-      <Text style={[styles.recipeTitle, !imageUrl && styles.recipeTitleNoImage]}>
-        {title}
-      </Text>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   recipeHeader: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: SPACING.pageHorizontal,
@@ -42,19 +45,18 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   recipeImage: {
-    width: 48,
-    height: 48,
-    borderRadius: RADIUS.sm,
-    marginRight: SPACING.sm,
+    width: '100%',
+    height: imageHeight,
+    borderRadius: RADIUS.md,
+    marginTop: SPACING.md,
   },
   recipeTitle: {
     ...sectionHeaderText,
-    flex: 1,
+    fontSize: FONT.size.xl,
+    lineHeight: FONT.size.xl * 1.3,
     textAlign: 'center',
     marginHorizontal: SPACING.xs,
-  },
-  recipeTitleNoImage: {
-    marginHorizontal: 0,
+    paddingHorizontal: SPACING.sm,
   },
 });
 
