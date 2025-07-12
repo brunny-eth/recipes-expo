@@ -16,6 +16,7 @@ export type IngredientGroup = {
 export type CombinedParsedRecipe = {
   id?: number;
   title: string | null;
+  shortDescription?: string | null;
   description?: string | null;
   image?: string | null;
   thumbnailUrl?: string | null;

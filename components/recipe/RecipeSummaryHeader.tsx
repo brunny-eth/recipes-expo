@@ -24,6 +24,9 @@ const RecipeSummaryHeader: React.FC<RecipeSummaryHeaderProps> = ({ recipe, clean
         )}
         <View style={styles.recipeTextContainer}>
           {cleanTitle && <Text style={styles.pageTitle}>{cleanTitle}</Text>}
+          {recipe.shortDescription && (
+            <Text style={styles.shortDescription}>{recipe.shortDescription}</Text>
+          )}
         </View>
       </View>
 
@@ -55,6 +58,14 @@ const styles = StyleSheet.create({
     ...sectionHeaderText,
     color: COLORS.textDark,
     textAlign: 'left',
+    lineHeight: FONT.lineHeight.compact,
+  } as TextStyle,
+  shortDescription: {
+    fontFamily: FONT.family.inter,
+    fontSize: FONT.size.body,
+    color: COLORS.darkGray,
+    textAlign: 'left',
+    marginTop: SPACING.xs,
     lineHeight: FONT.lineHeight.compact,
   } as TextStyle,
   saveButtonContainer: {
