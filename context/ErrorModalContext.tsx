@@ -15,6 +15,8 @@ interface ModalData {
   title: string | null;
   onDismissCallback?: () => void;
   onButtonPress?: () => void;
+  secondButtonLabel?: string;
+  onSecondButtonPress?: () => void;
 }
 
 interface ErrorModalContextType {
@@ -23,6 +25,8 @@ interface ErrorModalContextType {
     message: string,
     onDismissCallback?: () => void,
     onButtonPress?: () => void,
+    secondButtonLabel?: string,
+    onSecondButtonPress?: () => void,
   ) => void;
   hideError: () => void;
 }
@@ -70,7 +74,14 @@ export const ErrorModalProvider: React.FC<{ children: ReactNode }> = ({
   }, [modalData]);
 
   const showError = useCallback(
-    (title: string, message: string, onDismissCallback?: () => void, onButtonPress?: () => void) => {
+    (
+      title: string,
+      message: string,
+      onDismissCallback?: () => void,
+      onButtonPress?: () => void,
+      secondButtonLabel?: string,
+      onSecondButtonPress?: () => void,
+    ) => {
       // Add granular logging for useCallback recreation
       console.log('[ErrorModalContext] showError useCallback recreated. Empty dependencies array - should be stable.');
       
@@ -101,7 +112,7 @@ export const ErrorModalProvider: React.FC<{ children: ReactNode }> = ({
       });
       console.trace('[DEBUG] Trace for showError');
       console.log('[ErrorModalContext] State update: setModalData() called with new modal data');
-      setModalData({ title, message, onDismissCallback, onButtonPress });
+      setModalData({ title, message, onDismissCallback, onButtonPress, secondButtonLabel, onSecondButtonPress });
     },
     [], // Empty dependency array - function is now truly stable
   );
@@ -158,6 +169,8 @@ export const ErrorModalProvider: React.FC<{ children: ReactNode }> = ({
         message={modalData?.message ?? ''}
         onClose={hideError}
         onButtonPress={modalData?.onButtonPress}
+        secondButtonLabel={modalData?.secondButtonLabel}
+        onSecondButtonPress={modalData?.onSecondButtonPress}
       />
     </ErrorModalContext.Provider>
   );

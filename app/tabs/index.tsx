@@ -45,7 +45,7 @@ export default function HomeScreen() {
   const [showMatchSelectionModal, setShowMatchSelectionModal] = useState(false);
   const [potentialMatches, setPotentialMatches] = useState<{ recipe: CombinedParsedRecipe; similarity: number; }[]>([]);
   const router = useRouter();
-  const { showError } = useErrorModal();
+  const { showError, hideError } = useErrorModal();
   const { session } = useAuth();
   const { hasUsedFreeRecipe } = useFreeUsage();
   
@@ -153,9 +153,49 @@ export default function HomeScreen() {
     }
   }, [router, recipeUrl, potentialMatches, showError]);
 
+  // Add this helper function above handleSubmit
+  function isValidRecipeInput(input: string) {
+    const trimmed = input.trim();
+    // Rule 1: At least 2 words, each with at least 2 alphanumeric characters
+    const words = trimmed.split(/\s+/).filter(w => w.length >= 2 && /[a-zA-Z0-9]{2,}/.test(w));
+    if (words.length < 2) return false;
+    // Rule 2: Not just a single character repeated
+    if (/^([a-zA-Z0-9])\1+$/.test(trimmed.replace(/\s+/g, ''))) return false;
+    // Rule 3: Must contain at least one vowel
+    if (!/[aeiouAEIOU]/.test(trimmed)) return false;
+    return true;
+  }
+
   const handleSubmit = async () => {
     if (!recipeUrl || recipeUrl.trim() === '') {
-      showError('Input Required', 'Please paste a recipe URL or recipe text.');
+      showError(
+        'Input Required',
+        'Add a recipe link or dish name.\n\nLooking for ideas? Head to the Explore tab to see what others are cooking.',
+        undefined,
+        undefined,
+        'Go to Explore',
+        () => {
+          hideError();
+          router.push('/tabs/explore');
+        }
+      );
+      setRecipeUrl(''); // Clear the input bar on error
+      return;
+    }
+    // --- New client-side validation ---
+    if (!isValidRecipeInput(recipeUrl)) {
+      showError(
+        'Input Not Recognized',
+        'Please enter a real dish name or recipe (e.g., "chicken soup", "tomato pasta").',
+        undefined,
+        undefined,
+        'Go to Explore',
+        () => {
+          hideError();
+          router.push('/tabs/explore');
+        }
+      );
+      setRecipeUrl('');
       return;
     }
 
@@ -274,8 +314,11 @@ export default function HomeScreen() {
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
           <View style={styles.contentContainer}>
-            <Text style={styles.mainFeatureText}>Recipes, refined.</Text>
-            <Text style={styles.featureText}>Built for the home cook.</Text>
+            <Text style={styles.mainFeatureText}>Make any recipe yours.</Text>
+            <Text style={styles.featureText}>
+              Paste a link or search for a dish.{"\n\n"}
+              One clear format and smart ingredient swaps.
+            </Text>
           </View>
 
           <KeyboardAvoidingView
@@ -301,7 +344,7 @@ export default function HomeScreen() {
                   <View style={styles.divider} />
                   <TextInput
                     style={styles.input}
-                    placeholder="Drop a recipe link or text."
+                    placeholder="Paste a link or type in a dish name."
                     placeholderTextColor={COLORS.darkGray}
                     value={recipeUrl}
                     onChangeText={setRecipeUrl}
@@ -362,11 +405,11 @@ const styles = StyleSheet.create({
   },
   mainFeatureText: {
     fontFamily: FONT.family.interSemiBold,
-    fontSize: 30, // TODO: Add FONT.size.h1? or similar
+    fontSize: 30,
     color: COLORS.textDark,
     textAlign: 'center',
     marginBottom: SPACING.md,
-    lineHeight: 34, // TODO: No token for 34. FONT.lineHeight.loose is 30.
+    lineHeight: 40, // Adjusted for new font size
     letterSpacing: -0.5,
   },
   featureText: {

@@ -70,9 +70,6 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
           <Text style={styles.recipeTitle} numberOfLines={2}>
             {recipe.title}
           </Text>
-          <Text style={styles.similarityText}>
-            {Math.round(item.similarity * 100)}% match
-          </Text>
         </View>
       </TouchableOpacity>
     );
@@ -88,14 +85,16 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
       <View style={styles.modalOverlay}>
         <SafeAreaView style={styles.modalContent}>
           <View style={styles.header}>
-            <Text style={styles.title}>Did you mean one of these?</Text>
+            <Text style={styles.title}>How about one of these?</Text>
             <Text style={styles.subtitle}>
               We found {matches.length} similar recipe{matches.length > 1 ? 's' : ''}
             </Text>
           </View>
 
           <FlatList
-            data={matches}
+            data={matches.slice(0, 5)}
+            initialNumToRender={5}
+            maxToRenderPerBatch={5}
             renderItem={renderRecipeItem}
             keyExtractor={(item) => item.recipe.id?.toString() || Math.random().toString()}
             style={styles.recipeList}
@@ -107,7 +106,7 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
               style={[styles.button, styles.secondaryButton]}
               onPress={handleCreateNew}
             >
-              <Text style={styles.secondaryButtonText}>Create a new recipe for me</Text>
+              <Text style={styles.secondaryButtonText}>None of these. Make a new recipe for me</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -152,6 +151,7 @@ const styles = StyleSheet.create({
     ...bodyText,
     color: COLORS.darkGray,
     textAlign: 'center',
+    fontSize: FONT.size.body + 2, // Make text a few points bigger
   } as TextStyle,
   recipeList: {
     flex: 1,
@@ -175,13 +175,14 @@ const styles = StyleSheet.create({
     borderColor: COLORS.lightGray,
   } as ViewStyle,
   recipeImage: {
-    width: SPACING.xxl,
-    height: SPACING.xxl,
-    borderRadius: 6,
+    width: SPACING.xxxl || 72, // Increase size, fallback if SPACING.xxxl undefined
+    height: SPACING.xxxl || 72,
+    borderRadius: 8, // Slightly more rounded for larger image
     marginRight: SPACING.md,
   },
   recipeTextContainer: {
     flex: 1,
+    justifyContent: 'center', // Vertically center the title
   } as ViewStyle,
   recipeTitle: {
     ...bodyStrongText,

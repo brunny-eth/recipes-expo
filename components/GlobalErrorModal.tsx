@@ -23,6 +23,8 @@ interface GlobalErrorModalProps {
   message: string;
   onClose: () => void; // overlay tap
   onButtonPress?: () => void; // button action (defaults to onClose)
+  secondButtonLabel?: string; // label for optional second button
+  onSecondButtonPress?: () => void; // action for optional second button
 }
 
 const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
@@ -31,6 +33,8 @@ const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
   message,
   onClose,
   onButtonPress,
+  secondButtonLabel,
+  onSecondButtonPress,
 }) => {
   const [isRendered, setIsRendered] = useState(visible);
   const scale = useSharedValue(0.7);
@@ -80,11 +84,17 @@ const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
         onStartShouldSetResponder={() => true}
         onResponderStart={e => e.stopPropagation()}
       >
-        <Text style={styles.title}>{safeTitle}</Text>
         <Text style={styles.message}>{safeMessage}</Text>
-        <Pressable style={styles.button} onPress={onButtonPress || onClose}>
-          <Text style={styles.buttonText}>{isAccountRequired ? 'Go to Login' : 'OK'}</Text>
-        </Pressable>
+        <View style={styles.buttonRow}>
+          <Pressable style={styles.button} onPress={onButtonPress || onClose}>
+            <Text style={styles.buttonText}>{isAccountRequired ? 'Go to Login' : 'OK'}</Text>
+          </Pressable>
+          {secondButtonLabel && onSecondButtonPress && (
+            <Pressable style={[styles.button, styles.secondaryButton]} onPress={onSecondButtonPress}>
+              <Text style={[styles.buttonText, styles.secondaryButtonText]}>{secondButtonLabel}</Text>
+            </Pressable>
+          )}
+        </View>
       </Animated.View>
     </Pressable>
   );
@@ -111,21 +121,36 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.smMd,
   } as TextStyle,
   message: {
-    fontSize: FONT.size.body,
+    fontSize: FONT.size.body, // Slightly smaller than before
     marginBottom: SPACING.pageHorizontal,
     textAlign: 'center',
+    fontWeight: '500',
   } as TextStyle,
   button: {
     backgroundColor: COLORS.primary,
     paddingVertical: SPACING.smMd,
-    paddingHorizontal: SPACING.pageHorizontal,
+    paddingHorizontal: 24, // Shorter button width
     borderRadius: RADIUS.sm,
+    width: 160, // Fixed width for both buttons
+    alignItems: 'center',
   } as ViewStyle,
   buttonText: {
     color: COLORS.white,
     fontWeight: FONT.weight.bold,
     fontSize: FONT.size.body,
   } as TextStyle,
+  buttonRow: {
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  secondaryButton: {
+    marginTop: 12, // Add spacing between buttons
+    // No extra styles needed, will inherit from .button
+  },
+  secondaryButtonText: {
+    color: COLORS.white, // Match the primary button text color
+  },
 });
 
 export default GlobalErrorModal;

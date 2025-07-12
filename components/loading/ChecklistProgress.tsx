@@ -26,11 +26,11 @@ const URL_STEPS = [
 const VIDEO_STEPS = [
   {
     label: 'Waking up the Recipe Gnomes',
-    subtext: 'They help check video caption quality and extract the recipe',
+    subtext: 'They help check the video caption quality',
   },
   {
     label: 'Transcribing the chaos',
-    subtext: 'The Gnomes are zooming in. Rewinding. Again. And again.',
+    subtext: 'The Gnomes are zooming in and rewinding',
   },
   {
     label: 'Sifting through the comments',

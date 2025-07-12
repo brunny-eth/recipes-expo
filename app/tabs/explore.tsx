@@ -350,8 +350,10 @@ const ExploreScreen = () => {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScreenHeader title="Find new recipes" />
-
+      <ScreenHeader title="Explore new recipes" />
+      <Text style={styles.subheading}>
+        These are some of the recipes the Meez community is cooking right now.
+      </Text>
       {renderContent()}
     </View>
   );
@@ -393,6 +395,14 @@ const styles = StyleSheet.create({
     color: COLORS.darkGray,
     textAlign: 'center',
     marginTop: SPACING.xs,
+  } as TextStyle,
+  subheading: {
+    ...bodyText,
+    fontSize: FONT.size.body,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    marginBottom: SPACING.lg,
+    marginTop: SPACING.sm,
   } as TextStyle,
   retryButton: {
     marginTop: SPACING.lg,
