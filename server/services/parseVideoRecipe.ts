@@ -140,6 +140,14 @@ function scoreCaptionQuality(caption: string | null): 'high' | 'medium' | 'low' 
     console.log(`[scoreCaptionQuality] Found ${numberedInstructions.length} numbered instructions`);
   }
   
+  // Additional check for bullet-pointed instructions (e.g., "- add olive oil", "- add carrots")
+  const bulletInstructionPattern = /^-\s+/gm;
+  const bulletInstructions = text.match(bulletInstructionPattern);
+  if (bulletInstructions) {
+    instructionKeywordCount += bulletInstructions.length;
+    console.log(`[scoreCaptionQuality] Found ${bulletInstructions.length} bullet-pointed instructions`);
+  }
+  
   // Count measurement patterns (e.g., "2 cups", "1 tbsp", "3/4 cup")
   const measurementPatterns = [
     /\d+\s*(cup|cups|tbsp|tablespoon|tablespoons|tsp|teaspoon|teaspoons|oz|ounces|lb|lbs|pound|pounds)/gi,

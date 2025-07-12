@@ -64,12 +64,12 @@ const ChecklistProgress: React.FC<ChecklistProgressProps> = ({
   const STEPS = inputType === 'video' ? VIDEO_STEPS : URL_STEPS;
 
   useEffect(() => {
-    // First step loads immediately after 500ms
+    // First step loads after 2.5 seconds
     const firstStepTimer = setTimeout(() => {
       setCurrentStepIndex(1);
-    }, 500);
+    }, 2500);
 
-    // Then start the regular interval for subsequent steps
+    // Then start the regular interval for subsequent steps (3.5 seconds each)
     const regularIntervalTimer = setTimeout(() => {
       intervalRef.current = setInterval(() => {
         setCurrentStepIndex((prevIndex) => {
@@ -79,8 +79,8 @@ const ChecklistProgress: React.FC<ChecklistProgressProps> = ({
           clearInterval(intervalRef.current!);
           return prevIndex;
         });
-      }, 3000) as any;
-    }, 500);
+      }, 3500) as any;
+    }, 2500);
 
     return () => {
       clearTimeout(firstStepTimer);
