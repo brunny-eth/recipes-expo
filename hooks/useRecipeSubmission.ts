@@ -195,7 +195,8 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
           const submissionResult = {
             success: true,
             action: 'navigate_to_loading' as const,
-            normalizedUrl: normalizedInput!
+            normalizedUrl: normalizedInput!,
+            inputType: inputType
           };
           console.log('[useRecipeSubmission] submitRecipe: Final SubmissionResult before return (cache miss):', JSON.stringify(submissionResult)); // NEW LOG
           return submissionResult;
@@ -274,7 +275,8 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
         return {
           success: true,
           action: 'navigate_to_loading',
-          normalizedUrl: normalizedInput!
+          normalizedUrl: normalizedInput!,
+          inputType: inputType
         };
       } else {
         throw new Error('Unsupported input type');

@@ -3,7 +3,7 @@ import { View, StyleSheet, ViewStyle } from 'react-native';
 import StepItem from './StepItem';
 import { SPACING } from '@/constants/theme';
 
-const STEPS = [
+const URL_STEPS = [
   {
     label: 'Skipping the slop',
     subtext: 'Sifting through 3,000 words of fluff',
@@ -23,35 +23,73 @@ const STEPS = [
   },
 ];
 
+const VIDEO_STEPS = [
+  {
+    label: 'Waking up the Recipe Gnomes',
+    subtext: 'They help check video caption quality and extract the recipe',
+  },
+  {
+    label: 'Transcribing the chaos',
+    subtext: 'The Gnomes are zooming in. Rewinding. Again. And again.',
+  },
+  {
+    label: 'Sifting through the comments',
+    subtext: 'Filtering out “first!” and “recipe???”',
+  },
+  {
+    label: 'Extracting ingredients',
+    subtext: 'Counting scoops, pinches, and dashes',
+  },
+  {
+    label: 'Proofreading the magic',
+    subtext: 'The Gnomes are checking for typos and errors',
+  },
+];
+
 interface ChecklistProgressProps {
   isFinished?: boolean;
+  inputType?: string;
 }
 
 const ChecklistProgress: React.FC<ChecklistProgressProps> = ({
   isFinished,
+  inputType = 'url',
 }) => {
   const checklistId = useRef(Math.random().toFixed(5));
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const intervalRef = useRef<number | null>(null);
   const hasCompleted = useRef(false);
 
+  // Select steps based on input type
+  const STEPS = inputType === 'video' ? VIDEO_STEPS : URL_STEPS;
+
   useEffect(() => {
-    intervalRef.current = setInterval(() => {
-      setCurrentStepIndex((prevIndex) => {
-        if (prevIndex < STEPS.length - 1) {
-          return prevIndex + 1;
-        }
-        clearInterval(intervalRef.current!);
-        return prevIndex;
-      });
-    }, 3000) as any;
+    // First step loads immediately after 500ms
+    const firstStepTimer = setTimeout(() => {
+      setCurrentStepIndex(1);
+    }, 500);
+
+    // Then start the regular interval for subsequent steps
+    const regularIntervalTimer = setTimeout(() => {
+      intervalRef.current = setInterval(() => {
+        setCurrentStepIndex((prevIndex) => {
+          if (prevIndex < STEPS.length - 1) {
+            return prevIndex + 1;
+          }
+          clearInterval(intervalRef.current!);
+          return prevIndex;
+        });
+      }, 3000) as any;
+    }, 500);
 
     return () => {
+      clearTimeout(firstStepTimer);
+      clearTimeout(regularIntervalTimer);
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
     };
-  }, []);
+  }, [STEPS.length]);
 
   useEffect(() => {
     if (isFinished) {
@@ -72,7 +110,7 @@ const ChecklistProgress: React.FC<ChecklistProgressProps> = ({
         clearInterval(fastForwardInterval);
       };
     }
-  }, [isFinished]);
+  }, [isFinished, STEPS.length]);
 
   useEffect(() => {
     const maybeComplete = () => {
@@ -86,7 +124,7 @@ const ChecklistProgress: React.FC<ChecklistProgressProps> = ({
     };
 
     maybeComplete();
-  }, [currentStepIndex, isFinished]);
+  }, [currentStepIndex, isFinished, STEPS.length]);
 
   const getStepState = (stepIndex: number) => {
     if (stepIndex < currentStepIndex) {

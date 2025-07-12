@@ -95,7 +95,9 @@ function scoreCaptionQuality(caption: string | null): 'high' | 'medium' | 'low' 
   const recipeKeywords = [
     'recipe', 'ingredients', 'cook', 'bake', 'mix', 'stir', 'add', 'cup', 'tablespoon', 'teaspoon',
     'minutes', 'hour', 'oven', 'pan', 'bowl', 'salt', 'pepper', 'oil', 'flour', 'sugar',
-    'onion', 'garlic', 'chicken', 'beef', 'pork', 'fish', 'eggs', 'cheese', 'butter', 'milk'
+    'onion', 'garlic', 'chicken', 'beef', 'pork', 'fish', 'eggs', 'cheese', 'butter', 'milk',
+    'protein', 'serving', 'size', 'calories', 'gummies', 'watermelon', 'sweetener', 'gelatin', 'whey',
+    'blend', 'strain', 'heat', 'mold', 'fridge', 'instructions'
   ];
 
   // Keywords that strongly indicate instructions
@@ -104,7 +106,8 @@ function scoreCaptionQuality(caption: string | null): 'high' | 'medium' | 'low' 
     'beat', 'fold', 'pour', 'sprinkle', 'season', 'bake', 'roast', 'fry', 'sauté', 'boil', 
     'simmer', 'reduce', 'cool', 'serve', 'garnish', 'set aside', 'drain', 'rinse', 'melt', 
     'toast', 'spread', 'layer', 'step', 'in a', 'add', 'place', 'cook', 'remove', 'transfer', 
-    'top with', 'let rest', 'make', 'flatten', 'assemble', 'coat', 'toss', 'brush', 'bring', 'apply', 'allow'
+    'top with', 'let rest', 'make', 'flatten', 'assemble', 'coat', 'toss', 'brush', 'bring', 'apply', 'allow',
+    'blend', 'strain', 'allow', 'pop'
   ];
   
   const keywordCount = recipeKeywords.reduce((count, keyword) => {
@@ -127,6 +130,14 @@ function scoreCaptionQuality(caption: string | null): 'high' | 'medium' | 'low' 
         instructionKeywordCount++;
       }
     }
+  }
+  
+  // Additional check for numbered instructions (e.g., "1. blend watermelon", "2. add sweetener")
+  const numberedInstructionPattern = /^\d+\.\s+/gm;
+  const numberedInstructions = text.match(numberedInstructionPattern);
+  if (numberedInstructions) {
+    instructionKeywordCount += numberedInstructions.length;
+    console.log(`[scoreCaptionQuality] Found ${numberedInstructions.length} numbered instructions`);
   }
   
   // Count measurement patterns (e.g., "2 cups", "1 tbsp", "3/4 cup")
@@ -153,12 +164,19 @@ function scoreCaptionQuality(caption: string | null): 'high' | 'medium' | 'low' 
   const wordCount = text.split(/\s+/).length;
   const keywordDensity = keywordCount / Math.max(wordCount, 1);
   
+  // Debug logging for caption quality scoring
+  console.log(`[scoreCaptionQuality] Debug - keywordCount: ${keywordCount}, measurementCount: ${measurementCount}, wordCount: ${wordCount}, instructionKeywordCount: ${instructionKeywordCount}`);
+  console.log(`[scoreCaptionQuality] Debug - text preview: "${text.substring(0, 200)}..."`);
+  
   // High quality requires at least some instructions
   if (keywordCount >= 5 && measurementCount >= 2 && wordCount >= 50 && instructionKeywordCount >= 3) {
+    console.log(`[scoreCaptionQuality] Returning 'high' quality`);
     return 'high';
   } else if (keywordCount >= 3 && (measurementCount >= 1 || wordCount >= 30) && instructionKeywordCount >= 3) {
+    console.log(`[scoreCaptionQuality] Returning 'medium' quality`);
     return 'medium';
   } else {
+    console.log(`[scoreCaptionQuality] Returning 'low' quality - criteria not met`);
     return 'low';
   }
 }

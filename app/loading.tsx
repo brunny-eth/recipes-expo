@@ -16,7 +16,11 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function LoadingRoute() {
   const router = useRouter();
-  const { recipeUrl, forceNewParse } = useLocalSearchParams<{ recipeUrl?: string; forceNewParse?: string }>();
+  const { recipeUrl, forceNewParse, inputType } = useLocalSearchParams<{ 
+    recipeUrl?: string; 
+    forceNewParse?: string;
+    inputType?: string;
+  }>();
   const { isAuthenticated } = useAuth();
   const { markFreeRecipeUsed } = useFreeUsage();
 
@@ -55,6 +59,7 @@ export default function LoadingRoute() {
         recipeInput={recipeUrl}
         loadingMode="checklist"
         forceNewParse={forceNewParse === 'true'}
+        inputType={inputType}
         onComplete={() => {
           console.log('[LoadingRoute] Recipe parsing complete callback.');
         }}

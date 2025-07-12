@@ -32,6 +32,7 @@ interface LoadingExperienceScreenProps {
   onComplete: () => void;
   onFailure: () => void;
   loadingMode: 'checklist' | 'default';
+  inputType?: string;
   forceNewParse?: boolean;
 }
 
@@ -40,6 +41,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
   onComplete,
   onFailure,
   loadingMode,
+  inputType = 'url',
   forceNewParse,
 }) => {
   console.log(`[${new Date().toISOString()}] [LoadingExperienceScreen] render/mount with input: ${recipeInput}`);
@@ -57,6 +59,13 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
   
   // Animation values
   const rotation = useSharedValue(0);
+  
+  // Video-specific timing and messaging
+  const isVideo = inputType === 'video';
+  
+  const getSpinnerDuration = () => 700; // Consistent timing for both video and URL
+  const getTagline = () => isVideo ? "Processing video recipe..." : "Working on our mise en place...";
+  const getReadyText = () => isVideo ? "Video Recipe Ready!" : "Recipe Ready!";
   
   // Animated styles
   const spinnerStyle = useAnimatedStyle(() => {
@@ -256,8 +265,8 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
           setHideChecklist(true);
           setShowSpinner(true);
           
-          // Animate rotation to 360 degrees over 700ms
-          rotation.value = withTiming(360, { duration: 700 }, (finished) => {
+          // Animate rotation to 360 degrees with video-specific timing
+          rotation.value = withTiming(360, { duration: getSpinnerDuration() }, (finished) => {
             if (finished && finalRecipeData) {
               runOnJS(handleSpinComplete)(finalRecipeData);
             }
@@ -283,9 +292,9 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
         <LogoHeaderLayout>
           {!hideChecklist && (
             <View style={styles.contentWrapper}>
-              <Text style={styles.tagline}>Working on our mise en place...</Text>
+              <Text style={styles.tagline}>{getTagline()}</Text>
               <View style={styles.checklistContainer}>
-                <ChecklistProgress isFinished={isParsingFinished} />
+                <ChecklistProgress isFinished={isParsingFinished} inputType={inputType} />
               </View>
             </View>
           )}
@@ -318,7 +327,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
                 onLayout={() => console.log(`[${new Date().toISOString()}] [CHECKMARK] Component mounted/rendered`)}
               >
                 <Text style={styles.bigCheckmark}>✓</Text>
-                <Text style={styles.readyText}>Recipe Ready!</Text>
+                <Text style={styles.readyText}>{getReadyText()}</Text>
               </Animated.View>
             )}
           </View>

@@ -216,7 +216,10 @@ export default function HomeScreen() {
         InteractionManager.runAfterInteractions(() => {
                   router.push({
           pathname: '/loading',
-          params: { recipeUrl: result.normalizedUrl },
+          params: { 
+            recipeUrl: result.normalizedUrl,
+            inputType: result.inputType
+          },
         });
         });
         setRecipeUrl(''); // Clear input after successful submission

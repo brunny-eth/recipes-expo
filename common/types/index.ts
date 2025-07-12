@@ -27,6 +27,7 @@ export type SubmissionResult = {
   matches?: { recipe: CombinedParsedRecipe; similarity: number; }[];
   error?: string;
   normalizedUrl?: string;
+  inputType?: 'url' | 'raw_text' | 'video';
 };
 
 /**
