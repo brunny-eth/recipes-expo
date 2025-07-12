@@ -812,6 +812,7 @@ export default function RecipeSummaryScreen() {
       <RecipeStepsHeader
         title={cleanTitle}
         imageUrl={recipe.image || recipe.thumbnailUrl}
+        recipe={recipe}
       />
 
       {/* Sharp divider to separate title from content */}
@@ -821,6 +822,20 @@ export default function RecipeSummaryScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Recipe image at the very top of the scrollable content */}
+        {(recipe.image || recipe.thumbnailUrl) && (
+          <FastImage
+            source={{ uri: String(recipe.image || recipe.thumbnailUrl) }}
+            style={{
+              width: '100%',
+              height: 150, // match previous max height
+              borderRadius: RADIUS.md,
+              marginBottom: SPACING.md,
+              marginTop: 0,
+            }}
+            resizeMode="cover"
+          />
+        )}
 
 
         <CollapsibleSection

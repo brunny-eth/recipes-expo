@@ -15,6 +15,9 @@ import { sectionHeaderText, FONT } from '@/constants/typography';
 type RecipeStepsHeaderProps = {
   title?: string | null;
   imageUrl?: string | null;
+  recipe?: {
+    shortDescription?: string | null;
+  } | null;
 };
 
 const { height: screenHeight } = Dimensions.get('window');
@@ -22,16 +25,20 @@ const imageHeight = Math.min(screenHeight * 0.15, 150); // 15% of screen height,
 
 const RecipeStepsHeader: React.FC<RecipeStepsHeaderProps> = ({
   title,
-  imageUrl,
+  imageUrl, // keep prop for compatibility, but don't use
+  recipe,
 }) => {
+  // Debug log for shortDescription
+  console.log('RecipeStepsHeader shortDescription:', recipe?.shortDescription);
   return (
     <View style={styles.recipeHeader}>
       <Text style={styles.recipeTitle}>
         {title}
       </Text>
-      {imageUrl && (
-        <FastImage source={{ uri: imageUrl }} style={styles.recipeImage} />
+      {recipe?.shortDescription && (
+        <Text style={styles.shortDescription}>{recipe.shortDescription}</Text>
       )}
+      {/* Image removed from here */}
     </View>
   );
 };
@@ -57,6 +64,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginHorizontal: SPACING.xs,
     paddingHorizontal: SPACING.sm,
+  },
+  shortDescription: {
+    fontFamily: FONT.family.inter,
+    fontSize: FONT.size.body,
+    color: COLORS.darkGray,
+    textAlign: 'center',
+    marginTop: SPACING.xs,
+    marginHorizontal: SPACING.xs,
+    paddingHorizontal: SPACING.sm,
+    lineHeight: FONT.lineHeight.compact,
   },
 });
 
