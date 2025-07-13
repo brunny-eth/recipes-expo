@@ -779,9 +779,9 @@ export default function RecipeSummaryScreen() {
               color={COLORS.success}
               style={styles.successIcon}
             />
-            <Text style={styles.modalTitle}>Added to Mise</Text>
+            <Text style={styles.modalTitle}>Added to your mise</Text>
             <Text style={styles.modalMessage}>
-              We've prepped your mise for you. This recipe is now ready for cooking.
+              We've prepped your mise for you. This recipe is now added to your grocery list and ready for cooking.
             </Text>
             
             <View style={styles.modalButtons}>
@@ -789,24 +789,14 @@ export default function RecipeSummaryScreen() {
                 style={[styles.modalButton, styles.secondaryButton]}
                 onPress={handleGoToMise}
               >
-                <MaterialCommunityIcons
-                  name="chef-hat"
-                  size={20}
-                  color={COLORS.primary}
-                />
-                <Text style={styles.secondaryButtonText}>Go to Mise</Text>
+                <Text style={styles.secondaryButtonText}>Go to your mise</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
                 style={[styles.modalButton, styles.secondaryButton]}
                 onPress={handleGoToRecipeSteps}
               >
-                <MaterialCommunityIcons
-                  name="play"
-                  size={20}
-                  color={COLORS.primary}
-                />
-                <Text style={styles.secondaryButtonText}>Cook This Now</Text>
+                <Text style={styles.secondaryButtonText}>Cook this now</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -937,7 +927,6 @@ export default function RecipeSummaryScreen() {
         isSavingForLater={false}
       />
       
-      {/* Save Recipe Button removed from here */}
     </SafeAreaView>
     </PanGestureHandler>
   );
@@ -1167,7 +1156,8 @@ const styles = StyleSheet.create({
   visitSourceLink: {
     fontFamily: FONT.family.inter,
     fontSize: FONT.size.caption,
-    color: COLORS.primary,
+    color: COLORS.textDark,
     textDecorationLine: 'underline',
+    opacity: 0.5,
   },
 });

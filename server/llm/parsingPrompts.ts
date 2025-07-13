@@ -58,6 +58,7 @@ The response must be exactly one object with the following shape:
 10. **Content Filtering**: Exclude all brand names, product names, promotional text, social media handles (@username), and hashtags (#recipe) from all extracted fields.
 11. **Title Generation**: If a title is missing from the source text, create a concise, descriptive title for the recipe.
 12. **Short Description**: Write a <10 word, vivid, natural-language description of the dish (e.g., "Cheesy quesadillas with smoky adobo ranch"). Avoid promo or filler text. Set to null if insufficient context.
+13. If no stated yield is found, estimate the yield. Use context clues (e.g., 4 chicken thighs = 4 servings). Do your best to estimate. Otherwise, set to null.
 `;
 
 export function buildTextParsePrompt(input: string): PromptPayload {

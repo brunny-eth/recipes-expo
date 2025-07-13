@@ -107,8 +107,6 @@ export default function MiseScreen() {
   const [selectedTab, setSelectedTab] = useState<'recipes' | 'grocery'>('recipes');
   const [editingRecipeId, setEditingRecipeId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
-  const [menuVisible, setMenuVisible] = useState(false);
-  const [selectedRecipeForMenu, setSelectedRecipeForMenu] = useState<string | null>(null);
 
   // --- Caching Strategy ---
   const lastSessionIdRef = useRef<string | null>(null);
@@ -490,34 +488,7 @@ export default function MiseScreen() {
     }
   }, [groceryList, miseRecipes, showError]);
 
-  // Handle menu actions
-  const handleMenuOpen = useCallback((recipeId: string) => {
-    setSelectedRecipeForMenu(recipeId);
-    setMenuVisible(true);
-  }, []);
 
-  const handleMenuClose = useCallback(() => {
-    setMenuVisible(false);
-    setSelectedRecipeForMenu(null);
-  }, []);
-
-  const handleMenuRename = useCallback(() => {
-    if (selectedRecipeForMenu) {
-      const recipe = miseRecipes.find(r => r.id === selectedRecipeForMenu);
-      if (recipe) {
-        setEditingRecipeId(selectedRecipeForMenu);
-        setEditingTitle(recipe.title_override || recipe.prepared_recipe_data.title || '');
-      }
-    }
-    handleMenuClose();
-  }, [selectedRecipeForMenu, miseRecipes]);
-
-  const handleMenuDelete = useCallback(() => {
-    if (selectedRecipeForMenu) {
-      handleDeleteRecipe(selectedRecipeForMenu);
-    }
-    handleMenuClose();
-  }, [selectedRecipeForMenu, handleDeleteRecipe]);
 
   // Use focus effect to refresh data when tab becomes active
   // This useFocusEffect is now redundant as the caching strategy handles refetches
@@ -629,11 +600,7 @@ export default function MiseScreen() {
                 <MaterialCommunityIcons name="close" size={20} color={COLORS.error} />
               </TouchableOpacity>
             </>
-          ) : (
-            <TouchableOpacity style={styles.menuButton} onPress={() => handleMenuOpen(item.id)}>
-              <MaterialCommunityIcons name="dots-vertical" size={20} color={COLORS.darkGray} />
-            </TouchableOpacity>
-          )}
+          ) : null}
         </View>
       </View>
     );
@@ -780,7 +747,7 @@ export default function MiseScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScreenHeader title="Mise en place" />
+      <ScreenHeader title="Your mise en place" />
       
       {/* Tab selector */}
       <View style={styles.tabContainer}>
@@ -827,35 +794,7 @@ export default function MiseScreen() {
         </TouchableOpacity>
       )}
 
-      {/* Recipe Actions Menu Modal */}
-      <Modal
-        visible={menuVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={handleMenuClose}
-      >
-        <TouchableOpacity 
-          style={styles.modalOverlay} 
-          onPress={handleMenuClose}
-          activeOpacity={1}
-        >
-          <TouchableOpacity 
-            style={styles.menuContainer} 
-            activeOpacity={1}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <TouchableOpacity style={styles.menuItem} onPress={handleMenuRename}>
-              <MaterialCommunityIcons name="pencil" size={20} color={COLORS.textDark} />
-              <Text style={styles.menuItemText}>Rename</Text>
-            </TouchableOpacity>
-            <View style={styles.menuSeparator} />
-            <TouchableOpacity style={styles.menuItem} onPress={handleMenuDelete}>
-              <MaterialCommunityIcons name="delete-outline" size={20} color={COLORS.error} />
-              <Text style={[styles.menuItemText, { color: COLORS.error }]}>Delete</Text>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
+
     </View>
   );
 }
@@ -997,10 +936,7 @@ const styles = StyleSheet.create({
     padding: SPACING.sm, // Better touch target
     alignSelf: 'center', // Center the delete button
   } as ViewStyle,
-  menuButton: {
-    padding: SPACING.sm, // Better touch target
-    alignSelf: 'center', // Center the menu button
-  } as ViewStyle,
+
   groceryContainer: {
     flex: 1,
   } as ViewStyle,
@@ -1080,33 +1016,5 @@ const styles = StyleSheet.create({
     fontSize: FONT.size.smBody,
     marginLeft: SPACING.xs,
   } as TextStyle,
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'transparent',
-    justifyContent: 'flex-end',
-  } as ViewStyle,
-  menuContainer: {
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius: RADIUS.lg,
-    borderTopRightRadius: RADIUS.lg,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.pageHorizontal,
-    ...SHADOWS.medium,
-  } as ViewStyle,
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: SPACING.md,
-  } as ViewStyle,
-  menuItemText: {
-    ...bodyStrongText,
-    fontSize: FONT.size.body,
-    color: COLORS.textDark,
-    marginLeft: SPACING.md,
-  } as TextStyle,
-  menuSeparator: {
-    height: BORDER_WIDTH.hairline,
-    backgroundColor: COLORS.divider,
-    marginHorizontal: 0,
-  } as ViewStyle,
+
 }); 

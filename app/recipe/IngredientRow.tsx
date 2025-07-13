@@ -237,10 +237,12 @@ const styles = StyleSheet.create({
   ingredientTextRemoved: {
     color: COLORS.darkGray,
     textDecorationLine: 'line-through',
+    opacity: 0.325, // More transparent for removed ingredients
   } as TextStyle,
   ingredientRemovedTag: {
     color: COLORS.darkGray,
     fontStyle: 'italic',
+    opacity: 0.325, // More transparent for removed tag
   } as TextStyle,
   ingredientTextChecked: {
     color: COLORS.darkGray,
