@@ -817,18 +817,55 @@ export default function RecipeSummaryScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Recipe image at the very top of the scrollable content */}
-        {(recipe.image || recipe.thumbnailUrl) && (
-          <FastImage
-            source={{ uri: String(recipe.image || recipe.thumbnailUrl) }}
-            style={{
-              width: '100%',
-              height: 150, // match previous max height
-              borderRadius: RADIUS.md,
-              marginBottom: SPACING.md,
-            }}
-            resizeMode="cover"
-          />
-        )}
+        {(() => {
+          const imageUrl = recipe.image || recipe.thumbnailUrl;
+          const sourceUrl = recipe.sourceUrl;
+          const isVideoRecipe = sourceUrl && (
+            sourceUrl.includes('tiktok.com') ||
+            sourceUrl.includes('instagram.com') ||
+            sourceUrl.includes('youtube.com')
+          );
+          const handleOpenSource = async () => {
+            if (sourceUrl) {
+              try {
+                await Linking.openURL(sourceUrl);
+              } catch (err) {
+                // Optionally, show a user-friendly error
+                alert('Could not open the video link.');
+              }
+            }
+          };
+          if (imageUrl && isVideoRecipe) {
+            return (
+              <TouchableOpacity onPress={handleOpenSource} activeOpacity={0.8} style={{ marginBottom: SPACING.md }}>
+                <FastImage
+                  source={{ uri: String(imageUrl) }}
+                  style={{
+                    width: '100%',
+                    height: 150,
+                    borderRadius: RADIUS.md,
+                  }}
+                  resizeMode="cover"
+                />
+              </TouchableOpacity>
+            );
+          } else if (imageUrl) {
+            return (
+              <FastImage
+                source={{ uri: String(imageUrl) }}
+                style={{
+                  width: '100%',
+                  height: 150,
+                  borderRadius: RADIUS.md,
+                  marginBottom: SPACING.md,
+                }}
+                resizeMode="cover"
+              />
+            );
+          } else {
+            return null;
+          }
+        })()}
         {/* Short description left-aligned, outside columns */}
         {recipe.shortDescription && (
           <Text style={styles.shortDescriptionHeaderLeft}>{recipe.shortDescription}</Text>
