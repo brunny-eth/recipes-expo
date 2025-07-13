@@ -39,6 +39,7 @@ import LogoHeader from '@/components/LogoHeader';
 import RecipeMatchSelectionModal from '@/components/RecipeMatchSelectionModal';
 import { CombinedParsedRecipe } from '@/common/types';
 import { useRecipeSubmission } from '@/hooks/useRecipeSubmission';
+import { detectInputType } from '../../server/utils/detectInputType';
 
 export default function HomeScreen() {
   const [recipeUrl, setRecipeUrl] = useState('');
@@ -153,17 +154,12 @@ export default function HomeScreen() {
     }
   }, [router, recipeUrl, potentialMatches, showError]);
 
-  // Add this helper function above handleSubmit
+  // Replace isValidRecipeInput with a function that uses detectInputType
   function isValidRecipeInput(input: string) {
     const trimmed = input.trim();
-    // Rule 1: At least 2 words, each with at least 2 alphanumeric characters
-    const words = trimmed.split(/\s+/).filter(w => w.length >= 2 && /[a-zA-Z0-9]{2,}/.test(w));
-    if (words.length < 2) return false;
-    // Rule 2: Not just a single character repeated
-    if (/^([a-zA-Z0-9])\1+$/.test(trimmed.replace(/\s+/g, ''))) return false;
-    // Rule 3: Must contain at least one vowel
-    if (!/[aeiouAEIOU]/.test(trimmed)) return false;
-    return true;
+    const detectedType = detectInputType(trimmed);
+    // Accept if it's a valid URL, video, or valid text
+    return detectedType === 'url' || detectedType === 'video' || detectedType === 'raw_text';
   }
 
   const handleSubmit = async () => {
@@ -186,7 +182,7 @@ export default function HomeScreen() {
     if (!isValidRecipeInput(recipeUrl)) {
       showError(
         'Input Not Recognized',
-        'Please enter a real dish name or recipe (e.g., "chicken soup", "tomato pasta").',
+        'Please enter a real dish name or recipe link (e.g., "chicken soup", "tomato pasta", or a recipe/video URL).',
         undefined,
         undefined,
         'Go to Explore',
