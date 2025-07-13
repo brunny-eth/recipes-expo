@@ -458,10 +458,10 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
         };
       }
 
-      // Add source URL and thumbnail to the recipe
+      // Add source URL and image to the recipe
       if (parsedRecipe) {
         parsedRecipe.sourceUrl = videoUrl;
-        parsedRecipe.thumbnailUrl = scrapeResult.thumbnail;
+        parsedRecipe.image = scrapeResult.thumbnail;
       }
 
       // --- Database Insertion and Embedding ---
