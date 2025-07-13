@@ -410,7 +410,7 @@ const renderRecipeItem = useCallback(({ item }: { item: SavedRecipe }) => {
           />
           <Text style={styles.emptyText}>No saved recipes yet</Text>
           <Text style={styles.emptySubtext}>
-            When you save a recipe, it will appear here for quick access
+            You can save recipes directly from the recipe summary screen to build your recipe library. 
           </Text>
         </View>
       );

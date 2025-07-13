@@ -17,6 +17,7 @@ import { generateAndSaveEmbedding } from '../../utils/recipeEmbeddings';
 // Type definitions for the external scraper response
 export type ScrapeCaptionResponse = {
   caption: string | null;
+  thumbnail: string | null;
   source: 'caption' | 'link' | null;
   platform: 'instagram' | 'tiktok' | 'youtube';
   error: {
@@ -70,6 +71,7 @@ async function fetchCaptionFromVideoUrl(videoUrl: string, requestId: string): Pr
     // Return a fallback response with error information
     return {
       caption: null,
+      thumbnail: null,
       source: null,
       platform: 'youtube', // Default fallback
       error: {
@@ -309,6 +311,7 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
 
     // A check for null caption is performed below, so we can safely access length here.
     console.log(`[parseVideoRecipe] Scraper returned caption of length ${scrapeResult.caption!.length}`);
+    console.log("[videoParser] Extracted thumbnail:", scrapeResult.thumbnail);
 
     // Add a strict check for the caption before proceeding
     if (!scrapeResult.caption || typeof scrapeResult.caption !== 'string') {
@@ -455,9 +458,10 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
         };
       }
 
-      // Add source URL and return successful result
+      // Add source URL and thumbnail to the recipe
       if (parsedRecipe) {
         parsedRecipe.sourceUrl = videoUrl;
+        parsedRecipe.thumbnailUrl = scrapeResult.thumbnail;
       }
 
       // --- Database Insertion and Embedding ---
