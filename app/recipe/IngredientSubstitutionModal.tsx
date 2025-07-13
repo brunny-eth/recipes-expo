@@ -217,7 +217,7 @@ export default function IngredientSubstitutionModal({
             onPress={handleApply}
             disabled={!selectedOption}
           >
-            <Text style={styles.applyButtonText}>Apply Substitution</Text>
+            <Text style={styles.applyButtonText}>Make changes</Text>
           </TouchableOpacity>
         </Animated.View>
       </View>

@@ -35,10 +35,6 @@ const RecipeStepsHeader: React.FC<RecipeStepsHeaderProps> = ({
       <Text style={styles.recipeTitle}>
         {title}
       </Text>
-      {recipe?.shortDescription && (
-        <Text style={styles.shortDescription}>{recipe.shortDescription}</Text>
-      )}
-      {/* Image removed from here */}
     </View>
   );
 };

@@ -53,7 +53,7 @@ const ServingScaler: React.FC<ServingScalerProps> = ({
           if (selectedScaleFactor === 1.0) {
             const formattedYield = formatRecipeYield(recipeYield);
             return formattedYield
-              ? `This recipe makes ${formattedYield}. We make it easy to scale it up or down.`
+              ? `This recipe makes ${formattedYield}. Scale it up or down here.`
               : `This recipe doesn't specify servings amount, but we can still scale amounts up or down if you'd like.`;
           }
 
@@ -64,7 +64,7 @@ const ServingScaler: React.FC<ServingScalerProps> = ({
               recipeYield,
               selectedScaleFactor,
             );
-            return `Now scaled ${direction} by ${selectedScaleFactor}x (${scaledYieldString}).`;
+            return `Now scaled ${direction} to ${scaledYieldString}.`;
           }
 
           return `Now scaled ${direction} by ${selectedScaleFactor}x.`;
@@ -99,14 +99,16 @@ const ServingScaler: React.FC<ServingScalerProps> = ({
 
 const styles = StyleSheet.create({
   helperText: {
-    ...bodyText,
+    fontFamily: FONT.family.inter,
+    fontSize: FONT.size.caption,
     color: COLORS.textMuted,
-    marginBottom: SPACING.md,
-    lineHeight: 22,
+    marginBottom: SPACING.sm, // Use small spacing for consistency
+    lineHeight: 18,
     textAlign: 'left',
   } as TextStyle,
   servingsContainer: {
     flexDirection: 'row',
+    marginTop: SPACING.sm, // Add top margin for consistent spacing from helper text
     marginBottom: 12,
     gap: servingsContainerGap,
   } as ViewStyle,

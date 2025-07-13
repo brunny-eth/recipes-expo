@@ -16,12 +16,16 @@ type RecipeFooterButtonsProps = {
   handleGoToSteps: () => void;
   isRewriting: boolean;
   isScalingInstructions: boolean;
+  handleSaveForLater: () => void;
+  isSavingForLater?: boolean;
 };
 
 const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
   handleGoToSteps,
   isRewriting,
   isScalingInstructions,
+  handleSaveForLater,
+  isSavingForLater = false,
 }) => {
   return (
     <View style={styles.footer}>
@@ -47,13 +51,13 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
             ? 'Making sure everything lines up...'
             : 'Add this recipe to your mise'}
         </Text>
-        {!(isRewriting || isScalingInstructions) && (
-          <MaterialCommunityIcons
-            name="chef-hat"
-            size={20}
-            color={COLORS.white}
-          />
-        )}
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.saveButton}
+        onPress={handleSaveForLater}
+        disabled={isSavingForLater}
+      >
+        <Text style={styles.saveButtonText}>Save for later</Text>
       </TouchableOpacity>
     </View>
   );
@@ -74,6 +78,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: SPACING.pageHorizontal,
+    marginBottom: SPACING.sm,
   } as ViewStyle,
   nextButtonDisabled: {
     backgroundColor: COLORS.darkGray,
@@ -82,6 +87,22 @@ const styles = StyleSheet.create({
     ...bodyStrongText,
     color: COLORS.white,
     marginRight: SPACING.sm,
+  } as TextStyle,
+  saveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.sm,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    gap: SPACING.sm,
+  } as ViewStyle,
+  saveButtonText: {
+    ...bodyStrongText,
+    color: COLORS.primary,
   } as TextStyle,
 });
 

@@ -132,7 +132,7 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
 
         {isRemoved && (
           <TouchableOpacity
-            style={styles.revertButton}
+            style={styles.infoButton}
             onPress={() => undoIngredientRemoval(ingredient.name)}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
@@ -146,7 +146,7 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
 
         {substitutedFor && !isRemoved && (
           <TouchableOpacity
-            style={styles.revertButton}
+            style={styles.infoButton}
             onPress={() => undoSubstitution(originalNameForSub)}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
@@ -178,7 +178,7 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
               testID={`substitution-button-${ingredient.name}`}
             >
               <MaterialCommunityIcons
-                name="swap-horizontal"
+                name="shuffle-variant"
                 size={FONT.size.lg}
                 color={COLORS.primary}
               />

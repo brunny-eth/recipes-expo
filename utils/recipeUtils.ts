@@ -292,26 +292,30 @@ export const scaleIngredient = (
   ingredient: StructuredIngredient,
   scaleFactor: number
 ): StructuredIngredient => {
-  // Don't scale if scaleFactor is invalid or 1 (no change)
+  console.log('[scaleIngredient] called with:', JSON.stringify(ingredient), 'scaleFactor:', scaleFactor);
   if (isNaN(scaleFactor) || scaleFactor <= 0 || scaleFactor === 1) {
+    console.log('[scaleIngredient] scaleFactor not valid or 1, returning original');
     return ingredient;
   }
-    
-  const originalAmountNum = parseAmountString(ingredient.amount);
-
-  // Don't scale if amount is not parseable (e.g., "to taste") or zero/negative
+  // Robustly handle both string and number types for amount
+  let amountStr: string | null | undefined = ingredient.amount;
+  if (typeof ingredient.amount === 'number') {
+    amountStr = String(ingredient.amount);
+  } else if (ingredient.amount === undefined || ingredient.amount === null) {
+    amountStr = null;
+  } else if (typeof ingredient.amount !== 'string') {
+    amountStr = String(ingredient.amount);
+  }
+  const originalAmountNum = parseAmountString(amountStr);
+  console.log('[scaleIngredient] ingredient.amount:', ingredient.amount, 'parsed:', originalAmountNum);
   if (originalAmountNum === null || originalAmountNum <= 0) {
+    console.log('[scaleIngredient] amount not parseable or <= 0, returning original');
     return ingredient;
   }
-
-  // Calculate new amount using the direct scaleFactor
   const newAmountNum = originalAmountNum * scaleFactor;
-  
-  // Round to 3 decimal places to avoid floating point noise
   const cleanedAmountNum = Math.round(newAmountNum * 1000) / 1000;
   const newAmountStr = formatAmountNumber(cleanedAmountNum);
-
-  // Return a *new* ingredient object with the updated amount
+  console.log('[scaleIngredient] newAmountNum:', newAmountNum, 'cleaned:', cleanedAmountNum, 'newAmountStr:', newAmountStr);
   return {
     ...ingredient,
     amount: newAmountStr, // Keep unit the same

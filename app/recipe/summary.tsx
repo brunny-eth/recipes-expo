@@ -260,15 +260,17 @@ export default function RecipeSummaryScreen() {
 
   const scaledIngredientGroups = React.useMemo<IngredientGroup[]>(() => {
     if (!recipe?.ingredientGroups) return [];
-    
-    return recipe.ingredientGroups.map(group => {
+    console.log('[summary.tsx] Scaling ingredient groups with scaleFactor:', selectedScaleFactor);
+    console.log('[summary.tsx] Original ingredientGroups:', JSON.stringify(recipe.ingredientGroups));
+    const result = recipe.ingredientGroups.map((group) => {
       if (!group.ingredients || !Array.isArray(group.ingredients)) {
         return { ...group, ingredients: [] };
       }
-
-      const scaledIngredients = group.ingredients.map((ingredient) =>
-        scaleIngredient(ingredient, selectedScaleFactor),
-      );
+      const scaledIngredients = group.ingredients.map((ingredient) => {
+        const scaled = scaleIngredient(ingredient, selectedScaleFactor);
+        console.log('[summary.tsx] Ingredient:', JSON.stringify(ingredient), 'Scaled:', JSON.stringify(scaled));
+        return scaled;
+      });
 
       let finalIngredients = scaledIngredients;
       if (appliedChanges.length > 0) {
@@ -323,6 +325,8 @@ export default function RecipeSummaryScreen() {
         ingredients: finalIngredients,
       };
     });
+    console.log('[summary.tsx] scaledIngredientGroups:', JSON.stringify(result));
+    return result;
   }, [recipe, selectedScaleFactor, appliedChanges, isViewingSavedRecipe]);
 
   // Keep scaledIngredients as a flat array for backward compatibility with existing code
@@ -831,77 +835,46 @@ export default function RecipeSummaryScreen() {
               height: 150, // match previous max height
               borderRadius: RADIUS.md,
               marginBottom: SPACING.md,
-              marginTop: 0,
             }}
             resizeMode="cover"
           />
         )}
-
-
-        <CollapsibleSection
-          title="More About This Recipe"
-          isExpanded={isDescriptionExpanded} // Use state to control expansion
-          onToggle={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
-        >
-          {recipe.description && (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoRowLabel}>Description</Text>
-              <View style={styles.descriptionContainer}>
-                <Text 
-                  style={styles.infoRowContent}
-                  numberOfLines={isDescriptionTextExpanded ? undefined : 3}
-                  ellipsizeMode="tail"
-                >
-                  {decode(recipe.description)}
-                </Text>
-                {recipe.description.length > 150 && (
-                  <TouchableOpacity 
-                    onPress={() => setIsDescriptionTextExpanded(!isDescriptionTextExpanded)}
-                    style={styles.readMoreButton}
-                  >
-                    <Text style={styles.readMoreText}>
-                      {isDescriptionTextExpanded ? 'Read less' : 'Read more'}
-                    </Text>
-                  </TouchableOpacity>
-                )}
+        {/* Short description left-aligned, outside columns */}
+        {recipe.shortDescription && (
+          <Text style={styles.shortDescriptionHeaderLeft}>{recipe.shortDescription}</Text>
+        )}
+        {/* Two-column layout for meta info */}
+        {(recipe.prepTime || recipe.cookTime || detectedAllergens.length > 0) && (
+          <View style={styles.metaInfoContainer}>
+            {recipe.prepTime && (
+              <View style={styles.metaInfoRow}>
+                <Text style={styles.metaInfoLabel}>Prep Time:</Text>
+                <Text style={styles.metaInfoValue}>{recipe.prepTime}</Text>
               </View>
-            </View>
-          )}
-          {(recipe.prepTime || recipe.cookTime) && (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoRowLabel}>Time it will take:</Text>
-              <Text style={styles.infoRowContent}>
-                {recipe.prepTime && `Prep: ${recipe.prepTime}`}
-                {recipe.prepTime && recipe.cookTime ? ', ' : ''}
-                {recipe.cookTime && `Cook: ${recipe.cookTime}`}
-              </Text>
-            </View>
-          )}
-          {detectedAllergens.length > 0 && (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoRowLabel}>Allergens</Text>
-              <Text style={styles.infoRowContent}>
-                {detectedAllergens.join(', ')}
-              </Text>
-            </View>
-          )}
-          {recipe.sourceUrl && (
-            <View style={styles.infoRow}>
-              <Text style={styles.infoRowLabel}>Original Source</Text>
-              <Text
-                style={[styles.infoRowContent, styles.link]}
-                onPress={() => Linking.openURL(recipe.sourceUrl!)}
-              >
-                Visit Source ↗︎
-              </Text>
-            </View>
-          )}
-        </CollapsibleSection>
+            )}
+            {recipe.cookTime && (
+              <View style={styles.metaInfoRow}>
+                <Text style={styles.metaInfoLabel}>Cook Time:</Text>
+                <Text style={styles.metaInfoValue}>{recipe.cookTime}</Text>
+              </View>
+            )}
+            {detectedAllergens.length > 0 && (
+              <View style={styles.metaInfoRow}>
+                <Text style={styles.metaInfoLabel}>Allergens:</Text>
+                <Text style={styles.metaInfoValue}>{detectedAllergens.join(', ')}</Text>
+              </View>
+            )}
+          </View>
+        )}
 
+        {/* Remove More About This Recipe section and its divider */}
+        {/* <CollapsibleSection ... /> and <View style={styles.divider} /> removed */}
+
+        {/* Divider above Adjust servings */}
         <View style={styles.divider} />
 
         <CollapsibleSection
-          title="Adjust Recipe Size"
+          title="Adjust servings"
           isExpanded={isRecipeSizeExpanded}
           onToggle={() => setIsRecipeSizeExpanded(!isRecipeSizeExpanded)}
         >
@@ -913,50 +886,58 @@ export default function RecipeSummaryScreen() {
           />
         </CollapsibleSection>
 
+        {/* Divider between Adjust servings and Swap or remove ingredients */}
         <View style={styles.divider} />
 
         <CollapsibleSection
-          title="Ingredients"
+          title="Swap or remove ingredients"
           isExpanded={isIngredientsExpanded}
           onToggle={() => setIsIngredientsExpanded(!isIngredientsExpanded)}
         >
           {selectedScaleFactor !== 1 && (
             <Text style={styles.ingredientsSubtext}>
-              {`Now scaled up by ${selectedScaleFactor}x (${getScaledYieldText(recipe.recipeYield, selectedScaleFactor)})`}
+              {(() => {
+                const direction = selectedScaleFactor < 1 ? 'down' : 'up';
+                const scaledYieldString = getScaledYieldText(recipe.recipeYield, selectedScaleFactor);
+                return `Now scaled ${direction} to ${scaledYieldString}.`;
+              })()}
             </Text>
           )}
-          <IngredientList
-            ingredientGroups={scaledIngredientGroups}
-            selectedScaleFactor={selectedScaleFactor}
-            appliedChanges={appliedChanges}
-            openSubstitutionModal={openSubstitutionModal}
-            undoIngredientRemoval={undoIngredientRemoval}
-            undoSubstitution={undoSubstitution}
-            showCheckboxes={false}
-          />
+          <View style={{marginTop: SPACING.sm}}>
+            <IngredientList
+              ingredientGroups={scaledIngredientGroups}
+              selectedScaleFactor={selectedScaleFactor}
+              appliedChanges={appliedChanges}
+              openSubstitutionModal={openSubstitutionModal}
+              undoIngredientRemoval={undoIngredientRemoval}
+              undoSubstitution={undoSubstitution}
+              showCheckboxes={false}
+            />
+          </View>
         </CollapsibleSection>
       </ScrollView>
+
+      {/* Move Visit Source to the bottom, above action buttons */}
+      {recipe.sourceUrl && (
+        <View style={styles.visitSourceContainer}>
+          <Text
+            style={styles.visitSourceLink}
+            onPress={() => Linking.openURL(recipe.sourceUrl!)}
+          >
+            Visit Source ↗︎
+          </Text>
+        </View>
+      )}
 
       <RecipeFooterButtons
         handleGoToSteps={handleGoToSteps}
         isRewriting={isRewriting}
         isScalingInstructions={isScalingInstructions}
+        handleSaveForLater={handleSaveForLater}
+        isSavingForLater={false}
       />
       
-      {/* Save Recipe Button */}
-      <View style={styles.saveButtonContainer}>
-        <TouchableOpacity
-          style={styles.saveButton}
-          onPress={handleSaveForLater}
-        >
-          <Text style={styles.saveButtonText}>Save for later</Text>
-          <MaterialCommunityIcons
-            name="bookmark-outline"
-            size={20}
-            color={COLORS.primary}
-          />
-        </TouchableOpacity>
-      </View>
+      {/* Save Recipe Button removed from here */}
     </SafeAreaView>
     </PanGestureHandler>
   );
@@ -1120,8 +1101,73 @@ const styles = StyleSheet.create({
     marginHorizontal: 0,
   },
   ingredientsSubtext: {
+    fontFamily: FONT.family.inter,
+    fontSize: FONT.size.caption,
+    color: COLORS.textMuted,
+    marginBottom: SPACING.sm, // Use small spacing for consistency
+    marginTop: 0,
+    textAlign: 'left',
+    lineHeight: 18,
+  },
+  shortDescription: {
     ...bodyText,
     color: COLORS.textMuted,
-    marginBottom: SPACING.xs,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  shortDescriptionHeader: {
+    fontFamily: FONT.family.inter,
+    fontSize: FONT.size.body,
+    color: COLORS.darkGray,
+    textAlign: 'center',
+    marginTop: SPACING.xs,
+    marginHorizontal: SPACING.xs,
+    paddingHorizontal: SPACING.sm,
+    lineHeight: FONT.lineHeight.compact,
+  },
+  shortDescriptionHeaderLeft: {
+    fontFamily: FONT.family.inter,
+    fontSize: FONT.size.caption, // Use caption size for smaller text
+    color: COLORS.textMuted, // Use muted color for caption effect
+    textAlign: 'left',
+    marginTop: 0.5, // Bring caption even closer to image
+    marginBottom: SPACING.md, // Add more space below caption
+    marginHorizontal: 0,
+    paddingHorizontal: 0,
+    lineHeight: FONT.lineHeight.compact,
+  },
+  metaInfoContainer: {
+    marginBottom: SPACING.sm,
+    marginTop: SPACING.xs,
+  },
+  metaInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 2,
+  },
+  metaInfoLabel: {
+    minWidth: 90,
+    fontWeight: '600',
+    color: COLORS.textDark,
+    fontSize: FONT.size.body,
+    textAlign: 'left',
+  },
+  metaInfoValue: {
+    flex: 1,
+    color: COLORS.textMuted,
+    fontSize: FONT.size.body,
+    textAlign: 'left',
+    marginLeft: SPACING.xs,
+  },
+  visitSourceContainer: {
+    alignItems: 'center',
+    marginTop: SPACING.lg,
+    marginBottom: SPACING.sm, // Smaller margin to bring closer to buttons
+  },
+  visitSourceLink: {
+    fontFamily: FONT.family.inter,
+    fontSize: FONT.size.caption,
+    color: COLORS.primary,
+    textDecorationLine: 'underline',
   },
 });
