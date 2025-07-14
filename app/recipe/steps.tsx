@@ -115,6 +115,10 @@ export default function StepsScreen() {
   const timerIntervalRef = useRef<any>(null);
   // --- End Lifted Timer State ---
 
+  // --- Auto-scroll State ---
+  const scrollViewRef = useRef<ScrollView>(null);
+  // --- End Auto-scroll State ---
+
   // Effect to initialize recipe state from params
   useEffect(() => {
     setIsLoading(true);
@@ -491,6 +495,20 @@ export default function StepsScreen() {
       ...prev,
       [index]: !prev[index],
     }));
+
+    // Auto-scroll to next unchecked step after a short delay
+    setTimeout(() => {
+      const nextUncompletedIndex = instructions.findIndex(
+        (_, stepIndex) => stepIndex > index && !completedSteps[stepIndex]
+      );
+      
+      if (nextUncompletedIndex !== -1 && scrollViewRef.current) {
+        scrollViewRef.current.scrollTo({
+          y: nextUncompletedIndex * 100, // Approximate height per step
+          animated: true,
+        });
+      }
+    }, 200); // 200ms delay for smooth UX
   };
 
   const openToolsModal = (initialTool: ActiveTool = null) => {
@@ -515,6 +533,10 @@ export default function StepsScreen() {
   );
   const activeStepIndex =
     firstUncompletedIndex === -1 ? null : firstUncompletedIndex;
+
+  // Calculate progress percentage
+  const completedStepsCount = Object.values(completedSteps).filter(Boolean).length;
+  const progressPercentage = instructions.length > 0 ? (completedStepsCount / instructions.length) * 100 : 0;
 
   // Handle marking mise recipe as complete
   const handleMarkMiseComplete = async () => {
@@ -614,7 +636,20 @@ export default function StepsScreen() {
         </Pressable>
       </Modal>
 
+      {/* Progress Bar */}
+      <View style={styles.progressBarContainer}>
+        <View style={styles.progressBarBackground}>
+          <View 
+            style={[
+              styles.progressBarFill, 
+              { width: `${progressPercentage}%` }
+            ]} 
+          />
+        </View>
+      </View>
+
       <ScrollView
+        ref={scrollViewRef}
         style={styles.stepsContainer}
         showsVerticalScrollIndicator={false}
       >
@@ -633,26 +668,19 @@ export default function StepsScreen() {
                 ]}
               >
                 <View style={styles.stepNumberContainer}>
-                  <View
-                    style={[
-                      styles.stepNumber,
-                      completedSteps[index] && styles.stepNumberCompleted,
-                    ]}
-                  >
-                    {completedSteps[index] ? (
-                      <MaterialCommunityIcons
-                        name="check-circle"
-                        size={24}
-                        color={COLORS.white}
-                      />
-                    ) : (
-                      <Text style={styles.stepNumberText}>{index + 1}</Text>
-                    )}
-                  </View>
-                  {index < instructions.length - 1 &&
-                    !completedSteps[index] && (
-                      <View style={styles.stepConnector} />
-                    )}
+                  {completedSteps[index] ? (
+                    <MaterialCommunityIcons
+                      name="check-circle"
+                      size={24}
+                      color={COLORS.primary}
+                    />
+                  ) : (
+                    <MaterialCommunityIcons
+                      name="circle-outline"
+                      size={24}
+                      color={index === activeStepIndex ? COLORS.primary : COLORS.lightGray}
+                    />
+                  )}
                 </View>
 
                 <View style={styles.stepContent}>
@@ -849,63 +877,53 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginBottom: SPACING.smLg,
     alignItems: 'flex-start',
-    padding: SPACING.smAlt,
-    borderRadius: RADIUS.smMd,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: '#FAF9F6',
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.divider,
   } as ViewStyle,
   activeStep: {
     transform: [{ scale: 1.02 }],
-    backgroundColor: OVERLAYS.extraLight,
+    backgroundColor: '#FFF9EF',
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.primary,
     ...SHADOWS.small,
   } as ViewStyle,
   stepNumberContainer: {
     alignItems: 'center',
     marginRight: SPACING.md,
   } as ViewStyle,
-  stepNumber: {
-    width: ICON_SIZE.xxl,
-    height: ICON_SIZE.xxl,
-    borderRadius: RADIUS.xxl,
-    backgroundColor: COLORS.white,
-    borderWidth: BORDER_WIDTH.thick,
-    borderColor: COLORS.lightGray,
-    justifyContent: 'center',
-    alignItems: 'center',
-  } as ViewStyle,
-  stepNumberCompleted: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  } as ViewStyle,
   stepNumberText: {
     ...bodyStrongText,
     color: COLORS.textDark,
   } as TextStyle,
-  stepConnector: {
-    width: BORDER_WIDTH.thick,
-    flex: 1,
-    backgroundColor: COLORS.lightGray,
-    marginVertical: SPACING.xs,
-  } as ViewStyle,
   stepContent: {
     flex: 1,
     paddingBottom: SPACING.smMd,
   } as ViewStyle,
   stepText: {
     ...bodyTextLoose,
+    fontSize: 16,
+    lineHeight: 22,
     color: COLORS.textDark,
     marginBottom: SPACING.smMd,
   } as TextStyle,
   stepTextCompleted: {
-    color: COLORS.gray,
-    textDecorationLine: 'line-through',
+    color: COLORS.textDark,
+    opacity: 0.5,
   } as TextStyle,
   activeStepText: {
     ...bodyTextLoose,
-    fontSize: FONT.size.lg,
-    lineHeight: 26,
+    fontSize: 17,
+    lineHeight: 24,
   } as TextStyle,
   highlightedText: {
     fontFamily: FONT.family.interSemiBold,
     color: COLORS.primary,
+    fontSize: 16,
+    lineHeight: 22,
   } as TextStyle,
   completionContainer: {
     position: 'absolute',
@@ -1064,4 +1082,20 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontWeight: 'bold',
   } as TextStyle,
+  // --- Progress Bar Styles ---
+  progressBarContainer: {
+    paddingHorizontal: SPACING.pageHorizontal,
+    paddingVertical: SPACING.sm,
+  } as ViewStyle,
+  progressBarBackground: {
+    height: 4,
+    backgroundColor: '#eee',
+    borderRadius: 2,
+    overflow: 'hidden',
+  } as ViewStyle,
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#F16A2A',
+    borderRadius: 2,
+  } as ViewStyle,
 });
