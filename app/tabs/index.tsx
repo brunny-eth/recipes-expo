@@ -310,11 +310,18 @@ export default function HomeScreen() {
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
           <View style={styles.contentContainer}>
-            <Text style={styles.mainFeatureText}>Make any recipe yours.</Text>
-            <Text style={styles.featureText}>
-              Paste a link or search for a dish.{"\n\n"}
-              One clear format and smart ingredient swaps.
-            </Text>
+            <Text style={styles.mainFeatureText}>Home base for home cooks</Text>
+            <Text style={styles.subheadingText}>Meez clears clutter so you can make meals</Text>
+            <View style={styles.secondaryTextContainer}>
+              <Text style={styles.secondaryText}>Swap out ingredients, save recipes, and plan across multiple meals</Text>
+              <Text style={styles.secondaryTextTight}>
+                <Text style={{ textDecorationLine: 'underline' }}>Find it</Text>
+                {', '}
+                <Text style={{ textDecorationLine: 'underline' }}>tweak it</Text>
+                {', '}
+                <Text style={{ textDecorationLine: 'underline' }}>cook it</Text>
+              </Text>
+            </View>
           </View>
 
           <KeyboardAvoidingView
@@ -387,7 +394,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     alignItems: 'center',
-    marginTop: SPACING.lg,
+    marginTop: SPACING.xxs - 20,
   },
   keyboardAvoidingView: {
     flex: 1,
@@ -404,9 +411,47 @@ const styles = StyleSheet.create({
     fontSize: 30,
     color: COLORS.textDark,
     textAlign: 'center',
-    marginBottom: SPACING.md,
-    lineHeight: 40, // Adjusted for new font size
+    marginBottom: SPACING.xs + 4,
+    lineHeight: 40,
     letterSpacing: -0.5,
+  },
+  subheadingText: {
+    fontFamily: FONT.family.inter,
+    fontSize: 18, // slightly larger than before
+    color: COLORS.textDark,
+    textAlign: 'center',
+    marginBottom: SPACING.xl,
+  },
+  secondaryTextContainer: {
+    alignItems: 'center',
+    marginTop: SPACING.xxxl,
+    marginBottom: SPACING.lg,
+    maxWidth: 320,
+    alignSelf: 'center',
+  },
+  secondaryText: {
+    fontFamily: FONT.family.inter,
+    fontSize: FONT.size.body + 2,
+    color: COLORS.darkGray,
+    opacity: 0.8,
+    textAlign: 'center',
+    marginBottom: 28, // more space after this
+  },
+  secondaryTextTight: {
+    fontFamily: FONT.family.inter,
+    fontSize: FONT.size.body + 2,
+    color: COLORS.darkGray,
+    opacity: 0.8,
+    textAlign: 'center',
+    marginBottom: 12, // more space to next line
+  },
+  secondaryTextLast: {
+    fontFamily: FONT.family.inter,
+    fontSize: FONT.size.body,
+    color: COLORS.darkGray,
+    opacity: 0.65,
+    textAlign: 'center',
+    marginBottom: 0,
   },
   featureText: {
     fontFamily: FONT.family.inter,
@@ -414,7 +459,7 @@ const styles = StyleSheet.create({
     color: COLORS.textDark, // instead of darkGray
     opacity: 0.7, // gives contrast without using a different color
     textAlign: 'center',
-    maxWidth: 300,
+    maxWidth: 360,
     marginTop: SPACING.sm,
     overflow: 'hidden',
     marginBottom: SPACING.lg,

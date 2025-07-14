@@ -244,7 +244,7 @@ export async function parseTextRecipe(
         if (processingError) {
             overallTimings.total = Date.now() - requestStartTime;
             logger.error({ requestId, error: processingError, inputType, timings: overallTimings }, `Processing ultimately failed for input.`);
-            return { recipe: null, error: { code: ParseErrorCode.GENERATION_FAILED, message: processingError }, fromCache: false, inputType, cacheKey, timings: overallTimings, usage: handlerUsage, fetchMethodUsed: 'N/A' };
+            return { recipe: null, error: { code: ParseErrorCode.GENERATION_FAILED, message: "We couldn't find any similar recipes. Try pasting a recipe link instead." }, fromCache: false, inputType, cacheKey, timings: overallTimings, usage: handlerUsage, fetchMethodUsed: 'N/A' };
         }
 
         const isEmptyRecipe = (

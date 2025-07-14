@@ -92,7 +92,7 @@ export async function parseAndCacheRecipe(
             recipe: null,
             error: {
               code: ParseErrorCode.GENERATION_FAILED,
-              message: error.message || 'Unknown error in parseAndCacheRecipe'
+              message: "We couldn't find any similar recipes. Try pasting a recipe link instead."
             },
             fromCache: false,
             inputType: detectInputType(input),
