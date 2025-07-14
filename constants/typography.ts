@@ -1,8 +1,14 @@
 import { TextStyle } from 'react-native';
+import { RFValue } from 'react-native-responsive-fontsize';
 
 const recoleta = 'Recoleta-Medium';
 const inter = 'Inter-Regular';
 const interSemiBold = 'Inter-SemiBold';
+
+export function responsiveFont(base: number, min: number, max: number) {
+  const scaled = RFValue(base);
+  return Math.min(Math.max(scaled, min), max);
+}
 
 export const FONT = {
   family: {
@@ -11,18 +17,18 @@ export const FONT = {
     interSemiBold,
   },
   size: {
-    xs: 12,
-    caption: 13,
-    smBody: 14,
-    bodyMedium: 15,
-    body: 16,
-    lg: 18,
-    sectionHeader: 20,
-    xl: 24,
-    title: 28,
-    screenTitle: 28,
-    h1: 30,
-    xxl: 32,
+    xs: responsiveFont(12, 10, 12),
+    caption: responsiveFont(13, 11, 13),
+    smBody: responsiveFont(14, 12, 14),
+    bodyMedium: responsiveFont(15, 13, 15),
+    body: responsiveFont(16, 14, 16),
+    lg: responsiveFont(18, 16, 18),
+    sectionHeader: responsiveFont(20, 18, 20),
+    xl: responsiveFont(24, 20, 24),
+    title: responsiveFont(28, 24, 28),
+    screenTitle: responsiveFont(28, 24, 28),
+    h1: responsiveFont(30, 26, 30),
+    xxl: responsiveFont(32, 28, 32),
   },
   weight: {
     regular: '400',
@@ -85,5 +91,5 @@ export const captionStrongText: TextStyle = {
 
 export const monoSpacedText: TextStyle = {
   fontFamily: 'monospace', // A generic font family that should work on both platforms
-  fontSize: 14,
+  fontSize: responsiveFont(14, 12, 14),
 };

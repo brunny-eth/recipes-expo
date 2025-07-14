@@ -37,6 +37,7 @@ import RecipeMatchSelectionModal from '@/components/RecipeMatchSelectionModal';
 import { CombinedParsedRecipe } from '@/common/types';
 import { useRecipeSubmission } from '@/hooks/useRecipeSubmission';
 import { detectInputType } from '../../server/utils/detectInputType';
+import ChefUnderline from '@/components/ChefUnderline';
 
 // Custom hook for interval management
 const useInterval = (callback: () => void, delay: number | null) => {
@@ -334,10 +335,20 @@ export default function HomeScreen() {
   const [hasInputBeenFocused, setHasInputBeenFocused] = useState(false);
   const [hasUserTyped, setHasUserTyped] = useState(false);
 
-  // On first focus, if input is empty and user hasn't typed, typewriter animate second prompt
-  const handleInputFocus = () => {
+  const subheaderOpacity = useRef(new Animated.Value(1)).current;
+
+  const handleInputFocus = useCallback(() => {
     setIsInputFocused(true);
     setHasInputBeenFocused(true);
+    
+    // Fade out subheaders
+    Animated.timing(subheaderOpacity, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: true,
+    }).start();
+    
+    // Typewriter effect for second prompt on first focus
     if (!hasUserTyped && recipeUrl === '' && !hasInputBeenFocused) {
       setDisplayedPlaceholder(""); // Clear placeholder before typewriter
       Animated.timing(placeholderOpacity, {
@@ -346,21 +357,30 @@ export default function HomeScreen() {
         useNativeDriver: true,
       }).start(() => {
         setTimeout(() => {
-            typewriterEffect(secondPrompt, () => {
-              Animated.timing(placeholderOpacity, {
-                toValue: 1,
-                duration: 500,
-                useNativeDriver: true,
-              }).start();
-            });
+          typewriterEffect(secondPrompt, () => {
+            Animated.timing(placeholderOpacity, {
+              toValue: 1,
+              duration: 500,
+              useNativeDriver: true,
+            }).start();
+          });
         }, 500); // 500ms delay before typewriter
       });
     }
-  };
+  }, [subheaderOpacity, hasUserTyped, recipeUrl, hasInputBeenFocused, typewriterEffect, placeholderOpacity]);
 
-  const handleInputBlur = () => {
+  const handleInputBlur = useCallback(() => {
     setIsInputFocused(false);
-  };
+    
+    // Only fade subheaders back in if we're not submitting (i.e., user is staying on home screen)
+    if (!isSubmitting) {
+      Animated.timing(subheaderOpacity, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [subheaderOpacity, isSubmitting]);
 
   // Track if user has typed
   const handleChangeText = (text: string) => {
@@ -426,19 +446,22 @@ export default function HomeScreen() {
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
           <View style={styles.contentContainer}>
-            <Text style={styles.mainFeatureText}>Home base for home cooks</Text>
-            <View style={styles.secondaryTextContainer}>
+            <View style={styles.headerContainer}>
+              <Text style={styles.mainFeatureText}>Home base for home cooks</Text>
+              <ChefUnderline color="rgba(199,91,42,0.5)" />
+            </View>
+            <Animated.View style={[styles.secondaryTextContainer, { opacity: subheaderOpacity }]}>
               <Text style={styles.subheadingText}>
                 Meez clears clutter so you can make meals{"\n\n"}
                 <Text style={styles.subheadingText}>Swap out ingredients, save recipes, and plan across multiple dishes</Text>
               </Text>
-            </View>
+            </Animated.View>
           </View>
 
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            behavior="padding"
             style={styles.keyboardAvoidingView}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 30}
+            keyboardVerticalOffset={60}
           >
             <View style={styles.inputSection}>
               <View style={styles.inputContainer}>
@@ -509,6 +532,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: SPACING.xxs - 20,
   },
+  headerContainer: {
+    alignItems: 'center',
+    marginBottom: SPACING.xxl,
+  },
+  chefUnderline: {
+    alignItems: 'center',
+    marginTop: SPACING.xs,
+  },
+  underlineMain: {
+    width: 120,
+    height: 3,
+    backgroundColor: COLORS.primary,
+    borderRadius: 2,
+  },
+  underlineAccent: {
+    width: 60,
+    height: 2,
+    backgroundColor: COLORS.accent,
+    borderRadius: 1,
+    marginTop: 2,
+  },
   keyboardAvoidingView: {
     flex: 1,
     width: '100%',
@@ -521,11 +565,10 @@ const styles = StyleSheet.create({
   },
   mainFeatureText: {
     fontFamily: FONT.family.interSemiBold,
-    fontSize: 30,
+    fontSize: 26,
     color: COLORS.textDark,
     textAlign: 'center',
-    marginBottom: SPACING.xxl,
-    lineHeight: 40,
+    lineHeight: 34,
     letterSpacing: -0.5,
   },
   subheadingText: {
@@ -576,7 +619,7 @@ const styles = StyleSheet.create({
     height: '100%',
     paddingHorizontal: SPACING.base,
     color: COLORS.textDark,
-    fontSize: FONT.size.body,
+    fontSize: FONT.size.smBody,
     lineHeight: undefined,
   },
   submitButton: {

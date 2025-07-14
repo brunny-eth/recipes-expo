@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Animated, Text, Dimensions } from 'react-native';
 import { COLORS, SPACING } from '@/constants/theme';
-import { FONT } from '@/constants/typography';
+import { FONT, responsiveFont } from '@/constants/typography';
 import ReanimatedAnimated, { FadeOut } from 'react-native-reanimated';
+import SplashCookSVG from '@/assets/images/splash-cook.svg';
 
 const { width } = Dimensions.get('window');
 
@@ -87,12 +88,12 @@ function SplashScreenMeez({ onFinish }: { onFinish: () => void }) {
               },
             ]}
           >
-            <Text style={styles.logoText}>🍳</Text>
+            <SplashCookSVG width={175} height={175} />
           </Animated.View>
         </View>
-        <Animated.Text style={[styles.tagline, { opacity: taglineOpacity }]}>
-          Mise en place for the at-home chef
-        </Animated.Text>
+        <View style={styles.taglineContainer}>
+          <Animated.Text style={[styles.tagline, { opacity: taglineOpacity }]}>Mise en place for the at-home chef</Animated.Text>
+        </View>
       </View>
     </ReanimatedAnimated.View>
   );
@@ -129,8 +130,6 @@ const styles = StyleSheet.create({
     height: 120,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.primary,
-    borderRadius: 60,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -140,16 +139,21 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
-  logoText: {
-    fontSize: 60,
-    textAlign: 'center',
+  taglineContainer: {
+    width: '100%',
+    maxWidth: 300,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   tagline: {
     fontFamily: FONT.family.inter,
-    fontSize: 18,
+    fontSize: 18, // Match subheadingText exactly
     color: COLORS.textDark,
     textAlign: 'center',
     lineHeight: 24,
     paddingHorizontal: 20,
+    // Add safeguards to prevent text cutoff
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
 });
