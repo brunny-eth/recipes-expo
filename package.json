@@ -53,6 +53,7 @@
     "fraction.js": "^5.2.2",
     "he": "^1.2.0",
     "jsonwebtoken": "^9.0.2",
+    "lottie-react-native": "^7.2.4",
     "openai": "^4.55.1",
     "pino": "^9.6.0",
     "pino-http": "^10.4.0",

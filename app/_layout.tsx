@@ -7,6 +7,7 @@ import { StyleSheet, View, ActivityIndicator } from 'react-native';
 import * as Font from 'expo-font';
 import { Asset } from 'expo-asset';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { ErrorModalProvider } from '@/context/ErrorModalContext';
@@ -16,8 +17,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import WelcomeScreen from '@/components/WelcomeScreen';
 import AppNavigators from '@/components/AppNavigators';
 import { COLORS } from '@/constants/theme';
+import SplashScreenMeez from './SplashScreen';
 
 SplashScreen.preventAutoHideAsync();
+console.log('[GLOBAL] SplashScreen.preventAutoHideAsync called.');
 
 if (__DEV__) {
   // @ts-expect-error - ErrorUtils is a global internal to react-native
@@ -36,256 +39,208 @@ function RootLayoutNav() {
   const router = useRouter();
   const segments = useSegments();
 
-  // === INITIALIZATION STATE (moved from RootLayout) ===
-  const [assetsLoaded, setAssetsLoaded] = useState(false);
+  // Simplified readiness states
+  const [isFirstLaunch, setIsFirstLaunch] = useState<boolean | null>(null); // null means not yet determined
+  const [splashAnimationComplete, setSplashAnimationComplete] = useState(false); // True when custom splash animation is over
+  
+  // Ref to track if splash has already finished to prevent race conditions
+  const splashFinishedRef = useRef(false);
+
   const [fontsLoaded] = useFonts({
     'Recoleta-Medium': require('../assets/fonts/Recoleta-Medium.otf'),
     'Inter-Regular': require('../assets/fonts/Inter-Regular.ttf'),
     'Inter-SemiBold': require('../assets/fonts/Inter-SemiBold.ttf'),
   });
-  const [isFirstLaunch, setIsFirstLaunch] = useState<boolean | null>(null);
+  const [assetsLoaded, setAssetsLoaded] = useState(false);
 
-  // === NAVIGATION STATE ===
-  const routerRef = useRef(router);
-  const initialNavigationHandled = useRef(false);
-  const stableSegments = useMemo(() => segments, [segments.join('/')]);
+  // Simplified readiness logic
+  const isFrameworkReady = fontsLoaded && assetsLoaded;
+  const isAuthReady = !isAuthLoading && !isLoadingFreeUsage;
+  const isReadyToRender = isFrameworkReady && isFirstLaunch !== null && isAuthReady;
 
-  // Update router ref when it changes
+  // === APP PREPARATION EFFECT ===
+  // Loads assets and determines if it's the first launch
   useEffect(() => {
-    routerRef.current = router;
-  }, [router]);
-
-  // === INITIALIZATION LOGIC (moved from RootLayout) ===
-  useEffect(() => {
-    async function prepareInitialAppLoad() {
-      console.log('[RootLayoutNav] Starting prepareInitialAppLoad function...');
+    let isMounted = true;
+    console.log('[RootLayoutNav][Effect: prepareApp] Running. fontsLoaded:', fontsLoaded);
+    async function prepareApp() {
       try {
-        // Load assets
-        await Asset.loadAsync(require('@/assets/images/meez_logo.webp'));
-        console.log('[RootLayoutNav] Assets loaded successfully.');
-
-        // Check first launch
-        const hasLaunched = await AsyncStorage.getItem('hasLaunched');
-        console.log(`[RootLayoutNav] AsyncStorage 'hasLaunched' value: ${hasLaunched}`);
-
-        if (hasLaunched === null) {
-          console.log('[RootLayoutNav] First launch detected. Setting isFirstLaunch to true.');
-          console.log('[RootLayoutNav] State update: setIsFirstLaunch(true)');
-          setIsFirstLaunch(true);
-        } else {
-          console.log('[RootLayoutNav] Not first launch. Setting isFirstLaunch to false.');
-          console.log('[RootLayoutNav] State update: setIsFirstLaunch(false)');
-          setIsFirstLaunch(false);
+        console.log('[RootLayoutNav][prepareApp] Starting asset load...');
+        await Asset.loadAsync([
+          require('@/assets/images/meez_logo.webp'),
+        ]);
+        if (!isMounted) {
+          console.log('[RootLayoutNav][prepareApp] Component unmounted during asset load, skipping state update.');
+          return;
         }
-      } catch (e) {
-        console.warn('[RootLayoutNav] Failed to load assets or check first launch', e);
-        console.log('[RootLayoutNav] State update: setIsFirstLaunch(false) - error fallback');
-        setIsFirstLaunch(false); // Default to not first launch on error
-      } finally {
-        console.log('[RootLayoutNav] prepareInitialAppLoad finished. Setting assetsLoaded to true.');
-        console.log('[RootLayoutNav] State update: setAssetsLoaded(true)');
         setAssetsLoaded(true);
+        console.log('[RootLayoutNav][prepareApp] Assets loaded. assetsLoaded set to true.');
+
+        console.log('[RootLayoutNav][prepareApp] Checking AsyncStorage for \'hasLaunched\'...');
+        const hasLaunched = await AsyncStorage.getItem('hasLaunched');
+        if (!isMounted) {
+          console.log('[RootLayoutNav][prepareApp] Component unmounted during AsyncStorage check, skipping state update.');
+          return;
+        }
+        setIsFirstLaunch(hasLaunched === null);
+        console.log(`[RootLayoutNav][prepareApp] isFirstLaunch determined: ${hasLaunched === null}.`);
+
+      } catch (e) {
+        console.warn('[RootLayoutNav][prepareApp] Failed during preparation:', e);
+        // Ensure state is set to allow app to proceed even on error
+        if (isMounted) {
+          setAssetsLoaded(true);
+          setIsFirstLaunch(false); // Assume not first launch on error if something went wrong
+        }
       }
     }
 
-    console.log(`[RootLayoutNav] useFonts hook state: fontsLoaded = ${fontsLoaded}`);
     if (fontsLoaded) {
-      console.log('[RootLayoutNav] Fonts are now loaded via useFonts.');
+      prepareApp();
+    } else {
+      console.log('[RootLayoutNav][Effect: prepareApp] Waiting for fonts to load before starting prepareApp.');
     }
 
-    prepareInitialAppLoad();
-  }, [fontsLoaded]);
+    return () => { isMounted = false; console.log('[RootLayoutNav][Effect: prepareApp] Cleanup - isMounted set to false.'); };
+  }, [fontsLoaded]); // Rerun when fontsLoaded changes
 
-  // === READY STATE CALCULATION ===
-  const isReadyForNavigation = fontsLoaded && assetsLoaded && isFirstLaunch !== null && !isAuthLoading && !isLoadingFreeUsage;
-  
-  console.log('[RootLayoutNav] Ready state calculation:', {
-    fontsLoaded,
-    assetsLoaded,
-    isFirstLaunch,
-    isAuthLoading,
-    isLoadingFreeUsage,
-    isReadyForNavigation,
-    // Detailed breakdown of each condition
-    conditions: {
-      'fontsLoaded': fontsLoaded ? '✅' : '❌',
-      'assetsLoaded': assetsLoaded ? '✅' : '❌', 
-      'isFirstLaunch !== null': isFirstLaunch !== null ? '✅' : '❌',
-      '!isAuthLoading': !isAuthLoading ? '✅' : '❌',
-      '!isLoadingFreeUsage': !isLoadingFreeUsage ? '✅' : '❌',
+  // === CUSTOM SPLASH ANIMATION COMPLETE HANDLER ===
+  const handleSplashFinish = useCallback(() => {
+    console.log('[RootLayoutNav][handleSplashFinish] Custom splash animation reported complete.');
+    
+    // Prevent multiple calls
+    if (splashFinishedRef.current) {
+      console.log('[RootLayoutNav][handleSplashFinish] Splash already finished, ignoring duplicate call.');
+      return;
     }
-  });
+    
+    splashFinishedRef.current = true;
+    setSplashAnimationComplete(true);
+    console.log('[RootLayoutNav][handleSplashFinish] setSplashAnimationComplete(true) called');
+  }, []); // Empty dependencies to ensure stable reference
 
-  // === SPLASH SCREEN MANAGEMENT ===
-  // Splash screen is now hidden in the navigation logic once initial navigation is complete
-  // This ensures it only hides after all redirects are settled
+  // === TRACK SPLASH ANIMATION COMPLETION ===
+  useEffect(() => {
+    console.log('[RootLayoutNav][Effect: splashAnimationComplete] State changed to:', splashAnimationComplete);
+  }, [splashAnimationComplete]);
+
+  // === INITIAL NAVIGATION LOGIC ===
+  // Handle initial navigation for non-first launch scenario after everything is ready
+  // This logic runs once when initialContentReady is true AND isFirstLaunch is false
+  useEffect(() => {
+    // Only run this logic if it's not the first launch and initial content is ready
+    if (isReadyToRender && isFirstLaunch === false) {
+      const currentPathSegments = segments.join('/');
+      const inAuthFlow = segments[0] === 'login' || segments[0] === 'auth';
+      const inRecipeContentFlow = segments[0] === 'recipe';
+
+      const PUBLIC_ALLOWED_ROUTES_PREFIXES = [
+        'tabs', 
+        'login',
+        'auth', 
+        '+not-found', 
+      ];
+
+      const isCurrentlyOnAllowedPublicRoute = PUBLIC_ALLOWED_ROUTES_PREFIXES.some(
+        (prefix) => {
+          if (prefix === 'tabs') {
+            return segments[0] === 'tabs';
+          }
+          return (
+            currentPathSegments === prefix ||
+            currentPathSegments.startsWith(prefix + '/')
+          );
+        },
+      );
+      
+      // If on '+not-found' or root, redirect to tabs.
+      if (segments[0] === '+not-found' || currentPathSegments === '') {
+        console.log(`[RootLayoutNav][Effect: InitialNav] Redirecting '+not-found' or empty path to /tabs.`);
+        router.replace('/tabs');
+        return;
+      }
+
+      // AUTHENTICATION LOGIC for non-first launch
+      if (session) {
+        if (inAuthFlow) {
+          console.log(`[RootLayoutNav][Effect: InitialNav] Authenticated user on auth page, redirecting to main app.`);
+          router.replace('/tabs');
+          return;
+        }
+      } else {
+        // Unauthenticated user
+        if (hasUsedFreeRecipe) {
+          // User has used their free recipe, restrict access to recipe content
+          if (inRecipeContentFlow && !isCurrentlyOnAllowedPublicRoute) {
+            console.log(`[RootLayoutNav][Effect: InitialNav] Unauthenticated, free recipe used, trying to access restricted recipe content, redirecting to login.`);
+            router.replace('/login');
+            return;
+          }
+        }
+      }
+      console.log(`[RootLayoutNav][Effect: InitialNav] Initial navigation path settled for current segments: ${currentPathSegments}.`);
+    }
+  }, [isReadyToRender, isFirstLaunch, session, hasUsedFreeRecipe, segments, router]);
 
   // === WELCOME SCREEN DISMISS HANDLER ===
   const handleWelcomeDismiss = useCallback(async () => {
+    console.log('[RootLayoutNav][handleWelcomeDismiss] Welcome screen dismissed by user.');
     try {
       await AsyncStorage.setItem('hasLaunched', 'true');
-      console.log('[RootLayoutNav] Welcome dismissed - navigating to home tab');
-      console.log('[RootLayoutNav] State update: setIsFirstLaunch(false) - welcome dismissed');
-      setIsFirstLaunch(false); // Hide the welcome screen immediately
-      
-      // Navigate to home tab after dismissing welcome screen
-      router.replace('/tabs'); // Navigate to home tab (index)
-      
-      // Hide splash screen after welcome screen is dismissed
-      console.log('[RootLayoutNav] Welcome dismissed - hiding splash screen');
-      SplashScreen.hideAsync();
+      console.log('[RootLayoutNav][handleWelcomeDismiss] AsyncStorage \'hasLaunched\' set to true.');
+      setIsFirstLaunch(false); // Update state to prevent WelcomeScreen from showing again next time
+      console.log('[RootLayoutNav][handleWelcomeDismiss] State updated, letting useEffect handle SplashScreen.hideAsync().');
+      // Don't call SplashScreen.hideAsync() here - let the useEffect handle it
     } catch (error) {
-      console.error('Failed to set hasLaunched flag', error);
-      // Still proceed to app
-      console.log('[RootLayoutNav] State update: setIsFirstLaunch(false) - welcome dismiss error fallback');
+      console.error('[RootLayoutNav][handleWelcomeDismiss] Failed to set hasLaunched flag:', error);
       setIsFirstLaunch(false);
-      
-      // Still try to navigate even if AsyncStorage failed
-      router.replace('/tabs');
-      
-      // Still hide splash screen on error
+      // Don't call SplashScreen.hideAsync() here either
+    }
+  }, []); // Empty dependencies to ensure stable reference
+
+  // === FINAL SPLASH SCREEN HIDE LOGIC ===
+  // Hide native splash only when everything is ready and we're showing the main app
+  useEffect(() => {
+    if (isReadyToRender && splashAnimationComplete && !isFirstLaunch) {
+      console.log('[RootLayoutNav][Effect: hideNativeSplash] Hiding native splash (SplashScreen.hideAsync).');
       SplashScreen.hideAsync();
     }
-  }, [router]);
+  }, [isReadyToRender, splashAnimationComplete, isFirstLaunch]);
 
-  // === PUBLIC ROUTES CONFIGURATION ===
-  const PUBLIC_ALLOWED_ROUTES_PREFIXES = [
-    'tabs', // Covers /tabs (index), /explore, /settings, /saved
-    'login',
-    'auth', // Covers auth/callback
-    '+not-found', // For the 404 page
-  ];
-
-  // === MAIN NAVIGATION LOGIC ===
-  const handleNavigation = useCallback(() => {
-    console.log('[RootLayoutNav] Main Navigation logic evaluating...');
-    console.log('[RootLayoutNav] Dependencies for navigation logic:', { 
-      session: !!session, 
-      sessionUserId: session?.user?.id, 
-      hasUsedFreeRecipe, 
-      isAuthLoading, 
-      isLoadingFreeUsage, 
-      segments: stableSegments.join('/'),
-      isFirstLaunch,
-      isReadyForNavigation,
-      initialNavigationHandled: initialNavigationHandled.current
-    });
+  // === MEMOIZED RENDER LOGIC ===
+  // Use useMemo to prevent unnecessary re-renders of SplashScreenMeez
+  const renderContent = useMemo(() => {
+    console.log(`[RootLayoutNav][useMemo] Evaluating render: isReadyToRender=${isReadyToRender}, splashAnimationComplete=${splashAnimationComplete}, isFirstLaunch=${isFirstLaunch}`);
     
-    // Only proceed if framework is ready and initial navigation hasn't been handled
-    if (!isReadyForNavigation || initialNavigationHandled.current || isFirstLaunch === null) {
-      console.log('[RootLayoutNav] Not ready for navigation yet, waiting...');
-      return;
+    // 1. Show custom splash screen while app is not fully ready for main content OR splash animation hasn't completed
+    if (!isReadyToRender || !splashAnimationComplete) {
+      console.log('[RootLayoutNav][useMemo] Returning SplashScreenMeez');
+      return <SplashScreenMeez onFinish={handleSplashFinish} />;
     }
-
-    // If this is a first launch, don't run navigation logic - let WelcomeScreen handle it
-    if (isFirstLaunch) {
-      console.log('[RootLayoutNav] First launch detected - deferring navigation to WelcomeScreen');
-      return;
-    }
-
-    const currentPathSegments = stableSegments.join('/');
-    const inAuthFlow = stableSegments[0] === 'login' || stableSegments[0] === 'auth';
-    const inRecipeContentFlow = stableSegments[0] === 'recipe';
-
-    const isCurrentlyOnAllowedPublicRoute = PUBLIC_ALLOWED_ROUTES_PREFIXES.some(
-      (prefix) => {
-        if (prefix === 'tabs') {
-          return stableSegments[0] === 'tabs';
-        }
-        return (
-          currentPathSegments === prefix ||
-          currentPathSegments.startsWith(prefix + '/')
-        );
-      },
-    );
-
-    // === CRITICAL FIX: Handle +not-found or empty segments FIRST ===
-    // Always mark navigation as handled *before* attempting redirect to prevent re-entry
-    if (stableSegments[0] === '+not-found' || currentPathSegments === '') {
-      console.log(`[RootLayoutNav] Initial '+not-found' or empty segment detected, redirecting to /tabs`);
-      initialNavigationHandled.current = true; // Mark handled IMMEDIATELY
-      routerRef.current.replace('/tabs');
-      return; // Exit to prevent further evaluation in this cycle
-    }
-
-    // === AUTHENTICATION LOGIC ===
-    // Handle authenticated users
-    if (session) {
-      // If authenticated, prevent them from accessing login/auth pages directly
-      if (inAuthFlow) {
-        console.log(`[RootLayoutNav] Authenticated user on auth page: ${currentPathSegments}. Redirecting to main app.`);
-        initialNavigationHandled.current = true; // Mark handled
-        routerRef.current.replace('/tabs');
-        return;
-      } else {
-        console.log(`[RootLayoutNav] Authenticated user on valid route: ${currentPathSegments}. No redirect needed.`);
-      }
-    } else {
-      // Handle unauthenticated users
-      if (hasUsedFreeRecipe) {
-        // User has used their free recipe
-        if (inAuthFlow || isCurrentlyOnAllowedPublicRoute) {
-          console.log(`[RootLayoutNav] Unauthenticated, free recipe used, but on allowed route: ${currentPathSegments}. No redirect.`);
-        } else if (inRecipeContentFlow) {
-          console.log(`[RootLayoutNav] Unauthenticated, free recipe used, trying to access restricted recipe content: ${currentPathSegments}. Redirecting to login.`);
-          initialNavigationHandled.current = true; // Mark handled
-          routerRef.current.replace('/login');
-          return;
-        } else {
-          console.warn(`[RootLayoutNav] Unauthenticated, free recipe used, accessing unexpected restricted route: ${currentPathSegments}. Redirecting to login.`);
-          initialNavigationHandled.current = true; // Mark handled
-          routerRef.current.replace('/login');
-          return;
-        }
-      } else {
-        // User has NOT used their free recipe - allow most access
-        if (inAuthFlow) {
-          console.log(`[RootLayoutNav] Unauthenticated, free recipe NOT used, attempting auth flow: ${currentPathSegments}. No redirect.`);
-        } else {
-          console.log(`[RootLayoutNav] Unauthenticated, free recipe NOT used, allowing access to: ${currentPathSegments}.`);
-        }
-      }
-    }
-
-    // If we've reached here, initial navigation has been processed for a stable state
-    console.log(`[RootLayoutNav] User on valid route: ${currentPathSegments}. No redirect needed.`);
-    initialNavigationHandled.current = true; // Mark as handled if no redirects were needed but conditions were met
     
-    // Hide splash screen once all initial navigation logic is settled
-    console.log('[RootLayoutNav] Initial navigation complete - hiding splash screen');
-    SplashScreen.hideAsync();
-  }, [session, hasUsedFreeRecipe, isReadyForNavigation, isFirstLaunch, stableSegments]);
+    // 2. If app is ready AND splash animation is complete AND it's the first launch, show Welcome Screen
+    if (isFirstLaunch === true) {
+      console.log('[RootLayoutNav][useMemo] Returning WelcomeScreen');
+      return <WelcomeScreen onDismiss={handleWelcomeDismiss} />;
+    }
 
-  useEffect(() => {
-    handleNavigation();
-  }, [handleNavigation]);
-
-  // === RENDER LOGIC ===
-  
-  // Show loading indicator while not ready for navigation
-  if (!isReadyForNavigation) {
-    console.log('[RootLayoutNav] Not ready for navigation - showing loading indicator');
+    // 3. Otherwise, app is ready AND splash animation is complete AND it's not the first launch (or welcome dismissed), show main app
+    console.log('[RootLayoutNav][useMemo] Returning AppNavigators');
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' }}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
+      <Animated.View 
+        style={{ 
+          flex: 1,
+          backgroundColor: COLORS.background,
+        }}
+        entering={FadeIn.duration(400).delay(100)}
+      >
+        <StatusBar style="dark" />
+        <AppNavigators />
+      </Animated.View>
     );
-  }
+  }, [isReadyToRender, splashAnimationComplete, isFirstLaunch, handleSplashFinish, handleWelcomeDismiss]);
 
-  // Show WelcomeScreen if first launch
-  if (isFirstLaunch) {
-    console.log('[RootLayoutNav] First launch - showing WelcomeScreen');
-    return <WelcomeScreen onDismiss={handleWelcomeDismiss} />;
-  }
-
-  // Show main app
-  console.log('[RootLayoutNav] Ready and not first launch - showing main app');
-  return (
-    <>
-      <StatusBar style="dark" />
-      <AppNavigators />
-    </>
-  );
+  return renderContent;
 }
 
 export default function RootLayout() {

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -9,15 +9,34 @@ import {
 } from 'react-native';
 import { COLORS } from '@/constants/theme';
 import { bodyText, screenTitleText } from '@/constants/typography';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 interface WelcomeScreenProps {
   onDismiss: () => void;
 }
 
 const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onDismiss }) => {
+  console.log('[WelcomeScreen] Component rendering');
+  
+  const [isDismissing, setIsDismissing] = useState(false);
+  
+  const handleDismiss = () => {
+    console.log('[WelcomeScreen] onDismiss handler called, starting fade-out animation');
+    setIsDismissing(true);
+    
+    // Add a small delay to allow the fade-out animation to start
+    setTimeout(() => {
+      console.log('[WelcomeScreen] Animation delay complete, calling props.onDismiss()');
+      onDismiss();
+    }, 300); // 300ms fade-out duration
+  };
+
   return (
-    <View style={styles.overlay}>
+    <Animated.View 
+      style={styles.overlay}
+      entering={FadeIn.duration(500)}
+      exiting={FadeOut.duration(300)}
+    >
       <SafeAreaView style={styles.container}>
         <View style={styles.contentContainer}>
           <View style={styles.bodyContainer}>
@@ -33,15 +52,19 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onDismiss }) => {
         </View>
 
         <Animated.View
-          entering={FadeIn.duration(500)}
+          entering={FadeIn.duration(500).delay(200)}
           style={styles.buttonContainer}
         >
-          <TouchableOpacity style={styles.button} onPress={onDismiss}>
+          <TouchableOpacity 
+            style={styles.button} 
+            onPress={handleDismiss}
+            disabled={isDismissing}
+          >
             <Text style={styles.buttonText}>Get Started</Text>
           </TouchableOpacity>
         </Animated.View>
       </SafeAreaView>
-    </View>
+    </Animated.View>
   );
 };
 
