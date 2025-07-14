@@ -9,7 +9,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   TouchableWithoutFeedback,
-  ScrollView,
   Animated,
   Image,
   SafeAreaView,
@@ -24,14 +23,12 @@ import {
   RADIUS,
   BORDER_WIDTH,
   ICON_SIZE,
-  OVERLAYS,
 } from '@/constants/theme';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import {
   bodyText,
   bodyStrongText,
   FONT,
-  titleText,
 } from '@/constants/typography';
 import { useAuth } from '@/context/AuthContext';
 import { useFreeUsage } from '@/context/FreeUsageContext';
@@ -41,10 +38,28 @@ import { CombinedParsedRecipe } from '@/common/types';
 import { useRecipeSubmission } from '@/hooks/useRecipeSubmission';
 import { detectInputType } from '../../server/utils/detectInputType';
 
+// Custom hook for interval management
+const useInterval = (callback: () => void, delay: number | null) => {
+  const savedCallback = useRef(callback);
+
+  useEffect(() => {
+    savedCallback.current = callback;
+  }, [callback]);
+
+  useEffect(() => {
+    if (delay !== null) {
+      const id = setInterval(() => savedCallback.current(), delay);
+      return () => clearInterval(id);
+    }
+  }, [delay]);
+};
+
 export default function HomeScreen() {
   const [recipeUrl, setRecipeUrl] = useState('');
   const [showMatchSelectionModal, setShowMatchSelectionModal] = useState(false);
   const [potentialMatches, setPotentialMatches] = useState<{ recipe: CombinedParsedRecipe; similarity: number; }[]>([]);
+  const [isInputFocused, setIsInputFocused] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const router = useRouter();
   const { showError, hideError } = useErrorModal();
   const { session } = useAuth();
@@ -64,6 +79,56 @@ export default function HomeScreen() {
   // Logo animation - slide down + fade in
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const logoTranslateY = useRef(new Animated.Value(-30)).current;
+
+  // Placeholder animation
+  const placeholderOpacity = useRef(new Animated.Value(1)).current;
+
+  // Placeholder rotation state
+  const [displayedPlaceholder, setDisplayedPlaceholder] = useState('');
+  const [isTypingPlaceholder, setIsTypingPlaceholder] = useState(false);
+
+  const firstPrompt = "What do you want to cook today?";
+  const secondPrompt = "Try 'mac and cheese' or 'www...'";
+
+  // Typewriter effect for placeholder
+  const typewriterEffect = useCallback((text: string, onComplete?: () => void) => {
+    setIsTypingPlaceholder(true);
+    setDisplayedPlaceholder('');
+    
+    let index = 0;
+    const interval = setInterval(() => {
+      if (index < text.length) {
+        setDisplayedPlaceholder(text.slice(0, index + 1));
+        index++;
+      } else {
+        clearInterval(interval);
+        setIsTypingPlaceholder(false);
+        onComplete?.();
+      }
+    }, 50); // 50ms per character for smooth typewriter effect
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // On mount, typewriter animate first prompt after a short delay, and keep it until first focus
+  useEffect(() => {
+    let typewriterTimeout: NodeJS.Timeout;
+    setDisplayedPlaceholder(""); // Start with empty placeholder
+    typewriterTimeout = setTimeout(() => {
+      typewriterEffect(firstPrompt);
+    }, 3000); // 400ms initial delay
+    return () => clearTimeout(typewriterTimeout);
+  }, []);
+
+  // Keyboard listeners (only track visible state for possible future use)
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => {
+      keyboardDidShowListener?.remove();
+      keyboardDidHideListener?.remove();
+    };
+  }, []);
 
   // Component Mount/Unmount logging
   useEffect(() => {
@@ -266,6 +331,57 @@ export default function HomeScreen() {
     }
   };
 
+  const [hasInputBeenFocused, setHasInputBeenFocused] = useState(false);
+  const [hasUserTyped, setHasUserTyped] = useState(false);
+
+  // On first focus, if input is empty and user hasn't typed, typewriter animate second prompt
+  const handleInputFocus = () => {
+    setIsInputFocused(true);
+    setHasInputBeenFocused(true);
+    if (!hasUserTyped && recipeUrl === '' && !hasInputBeenFocused) {
+      setDisplayedPlaceholder(""); // Clear placeholder before typewriter
+      Animated.timing(placeholderOpacity, {
+        toValue: 0,
+        duration: 0,
+        useNativeDriver: true,
+      }).start(() => {
+        setTimeout(() => {
+            typewriterEffect(secondPrompt, () => {
+              Animated.timing(placeholderOpacity, {
+                toValue: 1,
+                duration: 500,
+                useNativeDriver: true,
+              }).start();
+            });
+        }, 500); // 500ms delay before typewriter
+      });
+    }
+  };
+
+  const handleInputBlur = () => {
+    setIsInputFocused(false);
+  };
+
+  // Track if user has typed
+  const handleChangeText = (text: string) => {
+    setRecipeUrl(text);
+    if (text.length > 0 && !hasUserTyped) {
+      setHasUserTyped(true);
+    }
+  };
+
+  // Placeholder logic
+  let placeholder = '';
+  if (isInputFocused) {
+    if (hasUserTyped) {
+      placeholder = '';
+    } else {
+      placeholder = displayedPlaceholder;
+    }
+  } else {
+    placeholder = displayedPlaceholder;
+  }
+
   // Memoized animated logo component to prevent recreation on re-renders
   const animatedLogo = useMemo(() => (
     <Animated.View
@@ -311,15 +427,10 @@ export default function HomeScreen() {
         <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
           <View style={styles.contentContainer}>
             <Text style={styles.mainFeatureText}>Home base for home cooks</Text>
-            <Text style={styles.subheadingText}>Meez clears clutter so you can make meals</Text>
             <View style={styles.secondaryTextContainer}>
-              <Text style={styles.secondaryText}>Swap out ingredients, save recipes, and plan across multiple meals</Text>
-              <Text style={styles.secondaryTextTight}>
-                <Text style={{ textDecorationLine: 'underline' }}>Find it</Text>
-                {', '}
-                <Text style={{ textDecorationLine: 'underline' }}>tweak it</Text>
-                {', '}
-                <Text style={{ textDecorationLine: 'underline' }}>cook it</Text>
+              <Text style={styles.subheadingText}>
+                Meez clears clutter so you can make meals{"\n\n"}
+                <Text style={styles.subheadingText}>Swap out ingredients, save recipes, and plan across multiple dishes</Text>
               </Text>
             </View>
           </View>
@@ -327,7 +438,7 @@ export default function HomeScreen() {
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.keyboardAvoidingView}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 30}
           >
             <View style={styles.inputSection}>
               <View style={styles.inputContainer}>
@@ -347,14 +458,16 @@ export default function HomeScreen() {
                   <View style={styles.divider} />
                   <TextInput
                     style={styles.input}
-                    placeholder="Paste a link or type in a dish name."
+                    placeholder={placeholder}
                     placeholderTextColor={COLORS.darkGray}
                     value={recipeUrl}
-                    onChangeText={setRecipeUrl}
+                    onChangeText={handleChangeText}
                     autoCapitalize="none"
                     autoCorrect={false}
                     onSubmitEditing={handleSubmit}
                     editable={!isSubmitting}
+                    onFocus={handleInputFocus}
+                    onBlur={handleInputBlur}
                   />
                 </View>
                 <TouchableOpacity
@@ -411,7 +524,7 @@ const styles = StyleSheet.create({
     fontSize: 30,
     color: COLORS.textDark,
     textAlign: 'center',
-    marginBottom: SPACING.xs + 4,
+    marginBottom: SPACING.xxl,
     lineHeight: 40,
     letterSpacing: -0.5,
   },
@@ -420,13 +533,14 @@ const styles = StyleSheet.create({
     fontSize: 18, // slightly larger than before
     color: COLORS.textDark,
     textAlign: 'center',
-    marginBottom: SPACING.xl,
+    marginTop: SPACING.xxs, 
+    marginBottom: SPACING.lg, 
+    lineHeight: 24,
   },
   secondaryTextContainer: {
     alignItems: 'center',
-    marginTop: SPACING.xxxl,
     marginBottom: SPACING.lg,
-    maxWidth: 320,
+    maxWidth: 360,
     alignSelf: 'center',
   },
   secondaryText: {
@@ -435,34 +549,7 @@ const styles = StyleSheet.create({
     color: COLORS.darkGray,
     opacity: 0.8,
     textAlign: 'center',
-    marginBottom: 28, // more space after this
-  },
-  secondaryTextTight: {
-    fontFamily: FONT.family.inter,
-    fontSize: FONT.size.body + 2,
-    color: COLORS.darkGray,
-    opacity: 0.8,
-    textAlign: 'center',
-    marginBottom: 12, // more space to next line
-  },
-  secondaryTextLast: {
-    fontFamily: FONT.family.inter,
-    fontSize: FONT.size.body,
-    color: COLORS.darkGray,
-    opacity: 0.65,
-    textAlign: 'center',
-    marginBottom: 0,
-  },
-  featureText: {
-    fontFamily: FONT.family.inter,
-    fontSize: FONT.size.lg,
-    color: COLORS.textDark, // instead of darkGray
-    opacity: 0.7, // gives contrast without using a different color
-    textAlign: 'center',
-    maxWidth: 360,
-    marginTop: SPACING.sm,
-    overflow: 'hidden',
-    marginBottom: SPACING.lg,
+    lineHeight: 22,
   },
   inputContainer: {
     flexDirection: 'row',
