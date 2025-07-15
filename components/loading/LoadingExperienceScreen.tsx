@@ -218,19 +218,27 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
           const userMessage = result.error 
             ? processBackendError(result)
             : "We received an incomplete response from the server. Please try again.";
-          showError('Oops!', userMessage, handleBack);
+          if (isMountedRef.current) {
+            showError('Oops!', userMessage, handleBack);
+          }
         }
       } else {
         try {
           const errorResponse = await response.json();
-          showError('Oops!', processBackendError(errorResponse), handleBack);
+          if (isMountedRef.current) {
+            showError('Oops!', processBackendError(errorResponse), handleBack);
+          }
         } catch {
           const statusMessage = getNetworkErrorMessage(`HTTP ${response.status}`, response.status);
-          showError('Oops!', statusMessage, handleBack);
+          if (isMountedRef.current) {
+            showError('Oops!', statusMessage, handleBack);
+          }
         }
       }
     } catch (e: any) {
-      showError('Oops!', getNetworkErrorMessage(e), handleBack);
+      if (isMountedRef.current) {
+        showError('Oops!', getNetworkErrorMessage(e), handleBack);
+      }
     } finally {
       setIsParsingFinished(true);
     }

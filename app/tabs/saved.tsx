@@ -465,7 +465,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xl,
   },
   emptyText: {
-    fontFamily: FONT.family.recoleta,
+            fontFamily: FONT.family.libreBaskerville,
     fontSize: 18,
     color: COLORS.textDark,
     marginTop: SPACING.md,

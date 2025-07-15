@@ -17,8 +17,16 @@
       "channel": "preview"
     },
     "production": {
+      "env": {
+        "EXPO_NO_CAPABILITY_SYNC": "1"
+      },
+      "developmentClient": false,
+      "distribution": "internal",
       "autoIncrement": true,
-      "channel": "production"
+      "channel": "production",
+      "ios": {
+        "simulator": false
+      }
     },
     "testflight": {
       "distribution": "store",

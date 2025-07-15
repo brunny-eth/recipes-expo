@@ -47,7 +47,9 @@ function RootLayoutNav() {
   const splashFinishedRef = useRef(false);
 
   const [fontsLoaded] = useFonts({
-    'Recoleta-Medium': require('../assets/fonts/Recoleta-Medium.otf'),
+    'LibreBaskerville-Regular': require('../assets/fonts/LibreBaskerville-Regular.ttf'),
+    'LibreBaskerville-Bold': require('../assets/fonts/LibreBaskerville-Bold.ttf'),
+    'LibreBaskerville-Italic': require('../assets/fonts/LibreBaskerville-Italic.ttf'),
     'Inter-Regular': require('../assets/fonts/Inter-Regular.ttf'),
     'Inter-SemiBold': require('../assets/fonts/Inter-SemiBold.ttf'),
   });

@@ -1,7 +1,9 @@
 import { TextStyle } from 'react-native';
 import { RFValue } from 'react-native-responsive-fontsize';
 
-const recoleta = 'Recoleta-Medium';
+const libreBaskerville = 'LibreBaskerville-Regular';
+const libreBaskervilleBold = 'LibreBaskerville-Bold';
+const libreBaskervilleItalic = 'LibreBaskerville-Italic';
 const inter = 'Inter-Regular';
 const interSemiBold = 'Inter-SemiBold';
 
@@ -12,7 +14,9 @@ export function responsiveFont(base: number, min: number, max: number) {
 
 export const FONT = {
   family: {
-    recoleta,
+    libreBaskerville,
+    libreBaskervilleBold,
+    libreBaskervilleItalic,
     inter,
     interSemiBold,
   },
@@ -47,17 +51,17 @@ export const FONT = {
 };
 
 export const screenTitleText: TextStyle = {
-  fontFamily: FONT.family.recoleta,
+  fontFamily: FONT.family.libreBaskerville,
   fontSize: FONT.size.screenTitle,
 };
 
 export const titleText: TextStyle = {
-  fontFamily: FONT.family.recoleta,
+  fontFamily: FONT.family.libreBaskerville,
   fontSize: FONT.size.title,
 };
 
 export const sectionHeaderText: TextStyle = {
-  fontFamily: FONT.family.recoleta,
+  fontFamily: FONT.family.libreBaskerville,
   fontSize: FONT.size.sectionHeader,
 };
 
@@ -68,7 +72,7 @@ export const bodyText = {
   lineHeight: 20, // UI-safe baseline
 };
 
-// Use `bodyTextLoose` only where font clipping was observed (e.g. Recoleta on iOS)
+// Use `bodyTextLoose` only where font clipping was observed (e.g. Libre Baskerville on iOS)
 export const bodyTextLoose = {
   ...bodyText,
   lineHeight: 24, // for custom font rendering quirks

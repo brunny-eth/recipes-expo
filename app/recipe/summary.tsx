@@ -996,7 +996,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   infoRowLabel: {
-    fontFamily: FONT.family.recoleta,
+            fontFamily: FONT.family.libreBaskerville,
     fontSize: FONT.size.body,
   },
   infoRowContent: {

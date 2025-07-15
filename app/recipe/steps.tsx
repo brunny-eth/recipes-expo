@@ -16,6 +16,7 @@ import {
   ViewStyle,
   TextStyle,
   ImageStyle,
+  FlatList,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -49,6 +50,7 @@ import { parseAmountString } from '@/utils/recipeUtils';
 import { useAuth } from '@/context/AuthContext';
 import { useFreeUsage } from '@/context/FreeUsageContext';
 import RecipeStepsHeader from '@/components/recipe/RecipeStepsHeader';
+import StepsFooterButtons from '@/components/recipe/StepsFooterButtons';
 import {
   titleText,
   sectionHeaderText,
@@ -111,6 +113,10 @@ export default function StepsScreen() {
     useState<StructuredIngredient | null>(null);
   const [isTooltipVisible, setIsTooltipVisible] = useState(false);
   // --- End Tooltip State ---
+
+  // --- Recipe Tips Modal State ---
+  const [isRecipeTipsModalVisible, setIsRecipeTipsModalVisible] = useState(false);
+  // --- End Recipe Tips Modal State ---
 
   // --- Lifted Timer State ---
   const [timerTimeRemaining, setTimerTimeRemaining] = useState(0); // Time in seconds
@@ -690,6 +696,21 @@ export default function StepsScreen() {
     }
   };
 
+  // Footer button handlers
+  const handleTimersPress = () => {
+    openToolsModal('timer');
+  };
+
+  const handleRecipeTipsPress = () => {
+    if (modifiedRecipe?.tips) {
+      setIsRecipeTipsModalVisible(true);
+    }
+  };
+
+  const handleSaveRecipePress = () => {
+    handleSaveModifiedRecipe();
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <RecipeStepsHeader title={recipeTitle} imageUrl={recipeImageUrl} />
@@ -873,34 +894,18 @@ export default function StepsScreen() {
           </Animated.View>
         )}
 
-      {/* Save Modified Recipe Button */}
-      {hasModifications() && modifiedRecipe && originalRecipeId && appliedChanges && session?.user?.id && (
-        <View style={styles.saveButtonContainer}>
-          <TouchableOpacity
-            style={[
-              styles.saveButton,
-              isLoadingSave && styles.saveButtonDisabled
-            ]}
-            onPress={handleSaveModifiedRecipe}
-            disabled={isLoadingSave}
-          >
-            {isLoadingSave ? (
-              <ActivityIndicator color={COLORS.white} />
-            ) : (
-              <>
-                <MaterialCommunityIcons
-                  name="bookmark-plus"
-                  size={20}
-                  color={COLORS.white}
-                  style={{ marginRight: SPACING.sm }}
-                />
-                <Text style={styles.saveButtonText}>Save Modified Recipe</Text>
-              </>
-            )}
-          </TouchableOpacity>
-          {saveError && (
-            <Text style={styles.saveErrorText}>{saveError}</Text>
-          )}
+      {/* Footer Buttons */}
+      <StepsFooterButtons
+        onTimersPress={handleTimersPress}
+        onRecipeTipsPress={handleRecipeTipsPress}
+        onSaveRecipePress={handleSaveRecipePress}
+        isSaving={isLoadingSave}
+        hasModifications={!!(hasModifications() && modifiedRecipe && originalRecipeId && appliedChanges && session?.user?.id)}
+        hasRecipeTips={!!modifiedRecipe?.tips}
+      />
+      {saveError && (
+        <View style={styles.saveErrorContainer}>
+          <Text style={styles.saveErrorText}>{saveError}</Text>
         </View>
       )}
 
@@ -956,6 +961,43 @@ export default function StepsScreen() {
             )}
           </Pressable>
         </Pressable>
+      </Modal>
+
+      {/* Recipe Tips Modal */}
+      <Modal
+        visible={isRecipeTipsModalVisible}
+        animationType="slide"
+        onRequestClose={() => setIsRecipeTipsModalVisible(false)}
+      >
+        <SafeAreaView style={styles.recipeTipsModalContainer}>
+          <View style={styles.recipeTipsHeader}>
+            <Text style={styles.recipeTipsTitle}>Recipe Tips</Text>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setIsRecipeTipsModalVisible(false)}
+            >
+              <MaterialCommunityIcons
+                name="close"
+                size={24}
+                color={COLORS.white}
+              />
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            style={styles.recipeTipsList}
+            data={modifiedRecipe?.tips?.split(/\.\s+|\n+/).filter(tip => tip.trim()) || []}
+            keyExtractor={(item, index) => index.toString()}
+            renderItem={({ item }) => (
+              <View style={styles.tipItem}>
+                <Text style={styles.recipeTipsText}>
+                  • {item.trim()}.
+                </Text>
+              </View>
+            )}
+            showsVerticalScrollIndicator={true}
+            contentContainerStyle={styles.recipeTipsListContent}
+          />
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
@@ -1160,6 +1202,64 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xs,
     textAlign: 'center',
   } as TextStyle,
+  // --- Recipe Tips Modal Styles ---
+  recipeTipsModalContainer: {
+    flex: 1,
+    backgroundColor: COLORS.white,
+  } as ViewStyle,
+  recipeTipsContainer: {
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.lg,
+    width: '90%',
+    maxWidth: 400,
+    height: '60%',
+    ...SHADOWS.large,
+  } as ViewStyle,
+  recipeTipsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    backgroundColor: COLORS.primary,
+    borderTopLeftRadius: RADIUS.lg,
+    borderTopRightRadius: RADIUS.lg,
+  } as ViewStyle,
+  recipeTipsTitle: {
+    ...bodyStrongText,
+    color: COLORS.white,
+    flex: 1,
+  } as TextStyle,
+  closeButton: {
+    padding: SPACING.xs,
+  } as ViewStyle,
+  recipeTipsScrollView: {
+    flex: 1,
+    maxHeight: '100%',
+  } as ViewStyle,
+  recipeTipsList: {
+    flex: 1,
+  } as ViewStyle,
+  recipeTipsContent: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    paddingBottom: SPACING.lg,
+    flexGrow: 1,
+  } as ViewStyle,
+  recipeTipsListContent: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    paddingBottom: SPACING.lg,
+  } as ViewStyle,
+  recipeTipsText: {
+    ...bodyTextLoose,
+    color: COLORS.textDark,
+    lineHeight: 28,
+    fontSize: 17,
+  } as TextStyle,
+  tipItem: {
+    marginBottom: SPACING.md,
+  } as ViewStyle,
   // --- Save Button Styles ---
   saveButtonContainer: {
     position: 'absolute',
@@ -1194,6 +1294,11 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xs,
     textAlign: 'center',
   } as TextStyle,
+  saveErrorContainer: {
+    paddingHorizontal: SPACING.pageHorizontal,
+    paddingBottom: SPACING.sm,
+    alignItems: 'center',
+  } as ViewStyle,
   completeButton: {
     flexDirection: 'row',
     alignItems: 'center',

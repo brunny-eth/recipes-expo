@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     fontWeight: FONT.weight.bold,
     color: COLORS.textDark,
     marginBottom: SPACING.md,
-    fontFamily: FONT.family.recoleta,
+            fontFamily: FONT.family.libreBaskerville,
   } as TextStyle,
   subtitle: {
     ...bodyTextLoose,
