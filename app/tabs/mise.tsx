@@ -557,6 +557,15 @@ export default function MiseScreen() {
           style={styles.recipeItem}
           onPress={() => {
             if (isEditing) return; // Don't navigate while editing
+            
+            console.log('[MiseScreen] 🚀 Attempting to navigate to steps for recipe:', {
+              recipeId: item.id,
+              title: item.title_override || item.prepared_recipe_data.title,
+              hasPreparedData: !!item.prepared_recipe_data,
+              preparedDataKeys: Object.keys(item.prepared_recipe_data || {}),
+              finalYield: item.final_yield,
+            });
+            
             // Navigate to recipe steps with the prepared recipe data
             router.push({
               pathname: '/recipe/steps',
@@ -566,6 +575,8 @@ export default function MiseScreen() {
                 miseRecipeId: item.id, // Pass the mise recipe ID for completion functionality
               },
             });
+            
+            console.log('[MiseScreen] ✅ Navigation push completed');
           }}
           disabled={isEditing}
         >

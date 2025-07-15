@@ -39,7 +39,7 @@ const MemoizedTabsNavigator = React.memo(() => {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: 'Prep',
           tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <MaterialCommunityIcons
               name="silverware-fork-knife"

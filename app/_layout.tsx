@@ -133,6 +133,8 @@ function RootLayoutNav() {
       const currentPathSegments = segments.join('/');
       const inAuthFlow = segments[0] === 'login' || segments[0] === 'auth';
       const inRecipeContentFlow = segments[0] === 'recipe';
+      
+      console.log(`[RootLayoutNav][Effect: InitialNav] Processing navigation. Segments: [${segments.join(', ')}], currentPathSegments: "${currentPathSegments}"`);
 
       const PUBLIC_ALLOWED_ROUTES_PREFIXES = [
         'tabs', 
@@ -155,12 +157,14 @@ function RootLayoutNav() {
       
       // If on '+not-found' or root, redirect to tabs.
       if (segments[0] === '+not-found' || currentPathSegments === '') {
-        console.log(`[RootLayoutNav][Effect: InitialNav] Redirecting '+not-found' or empty path to /tabs.`);
+        console.log(`[RootLayoutNav][Effect: InitialNav] Redirecting '+not-found' or empty path to /tabs. Segments: [${segments.join(', ')}], currentPathSegments: "${currentPathSegments}"`);
         router.replace('/tabs');
         return;
       }
 
       // AUTHENTICATION LOGIC for non-first launch
+      console.log(`[RootLayoutNav][Effect: InitialNav] Auth check - session: ${!!session}, hasUsedFreeRecipe: ${hasUsedFreeRecipe}, inAuthFlow: ${inAuthFlow}, inRecipeContentFlow: ${inRecipeContentFlow}`);
+      
       if (session) {
         if (inAuthFlow) {
           console.log(`[RootLayoutNav][Effect: InitialNav] Authenticated user on auth page, redirecting to main app.`);

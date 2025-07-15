@@ -49,7 +49,7 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
             ? 'Customizing instructions...'
             : isScalingInstructions
             ? 'Making sure everything lines up...'
-            : 'Add this recipe to your mise'}
+            : 'Add to your mise'}
         </Text>
       </TouchableOpacity>
       <TouchableOpacity

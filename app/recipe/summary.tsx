@@ -781,7 +781,7 @@ export default function RecipeSummaryScreen() {
             />
             <Text style={styles.modalTitle}>Added to your mise</Text>
             <Text style={styles.modalMessage}>
-              We've prepped your mise for you. This recipe is now added to your grocery list and ready for cooking.
+              This recipe is now added to your grocery list and ready for cooking.
             </Text>
             
             <View style={styles.modalButtons}>
@@ -1122,7 +1122,7 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
   },
   titleDivider: {
-    height: BORDER_WIDTH.default,
+    height: BORDER_WIDTH.hairline,
     backgroundColor: COLORS.divider,
     marginHorizontal: 0,
   },

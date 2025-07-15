@@ -29,7 +29,7 @@ const RecipeStepsHeader: React.FC<RecipeStepsHeaderProps> = ({
   recipe,
 }) => {
   // Debug log for shortDescription
-  console.log('RecipeStepsHeader shortDescription:', recipe?.shortDescription);
+  // console.log('RecipeStepsHeader shortDescription:', recipe?.shortDescription);
   return (
     <View style={styles.recipeHeader}>
       <Text style={styles.recipeTitle}>

@@ -5,6 +5,9 @@ PODS:
     - ExpoModulesCore
   - EXApplication (6.1.5):
     - ExpoModulesCore
+  - EXAV (15.1.7):
+    - ExpoModulesCore
+    - ReactCommon/turbomodule/core
   - EXConstants (17.1.6):
     - ExpoModulesCore
   - EXJSONUtils (0.15.0)
@@ -324,6 +327,8 @@ PODS:
   - ExpoRandom (14.0.1):
     - ExpoModulesCore
   - ExpoSecureStore (14.2.3):
+    - ExpoModulesCore
+  - ExpoSpeech (13.1.7):
     - ExpoModulesCore
   - ExpoSplashScreen (0.30.9):
     - ExpoModulesCore
@@ -2603,6 +2608,7 @@ DEPENDENCIES:
   - DoubleConversion (from `../node_modules/react-native/third-party-podspecs/DoubleConversion.podspec`)
   - EASClient (from `../node_modules/expo-eas-client/ios`)
   - EXApplication (from `../node_modules/expo-application/ios`)
+  - EXAV (from `../node_modules/expo-av/ios`)
   - EXConstants (from `../node_modules/expo-constants/ios`)
   - EXJSONUtils (from `../node_modules/expo-json-utils/ios`)
   - EXManifests (from `../node_modules/expo-manifests/ios`)
@@ -2626,6 +2632,7 @@ DEPENDENCIES:
   - ExpoModulesCore (from `../node_modules/expo-modules-core`)
   - ExpoRandom (from `../node_modules/expo-random/ios`)
   - ExpoSecureStore (from `../node_modules/expo-secure-store/ios`)
+  - ExpoSpeech (from `../node_modules/expo-speech/ios`)
   - ExpoSplashScreen (from `../node_modules/expo-splash-screen/ios`)
   - ExpoSymbols (from `../node_modules/expo-symbols/ios`)
   - ExpoSystemUI (from `../node_modules/expo-system-ui/ios`)
@@ -2739,6 +2746,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-eas-client/ios"
   EXApplication:
     :path: "../node_modules/expo-application/ios"
+  EXAV:
+    :path: "../node_modules/expo-av/ios"
   EXConstants:
     :path: "../node_modules/expo-constants/ios"
   EXJSONUtils:
@@ -2785,6 +2794,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-random/ios"
   ExpoSecureStore:
     :path: "../node_modules/expo-secure-store/ios"
+  ExpoSpeech:
+    :path: "../node_modules/expo-speech/ios"
   ExpoSplashScreen:
     :path: "../node_modules/expo-splash-screen/ios"
   ExpoSymbols:
@@ -2970,6 +2981,7 @@ SPEC CHECKSUMS:
   DoubleConversion: cb417026b2400c8f53ae97020b2be961b59470cb
   EASClient: 83423c51dde4c5504cb4186e1f39728273ed334b
   EXApplication: 50cc8ea58c138da6e3f25cd789634219c86b90d5
+  EXAV: 28241f071fd70ea38d278d94096b61d893645946
   EXConstants: be238322d57d084dc055dbd5d6fe6479510504ce
   EXJSONUtils: 1d3e4590438c3ee593684186007028a14b3686cd
   EXManifests: 75cba7539b60676be1911d024252a11b846085ed
@@ -2993,6 +3005,7 @@ SPEC CHECKSUMS:
   ExpoModulesCore: 5dc8b937bbed1e00c3d1d09caa1f6e75dc19de17
   ExpoRandom: 099ddce39b39ffb984b45118d031e8713e962a50
   ExpoSecureStore: 3148869ad24ab94f9e0c5777c7941d7a37d60399
+  ExpoSpeech: fceabf6bf31aa9530ef0696e6793571edb702068
   ExpoSplashScreen: 37e2fd371d4b93215f86a81d8cad3e7b69287e42
   ExpoSymbols: bd4e20b0b6a9dbacc31dd7c861e0d6d01b56e1f2
   ExpoSystemUI: 5dce97654754330ba6e2c39e7242c5d71c8d9952
