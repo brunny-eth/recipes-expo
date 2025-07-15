@@ -64,7 +64,7 @@ router.post('/chat', async (req: Request, res: Response) => {
         historyForApi = [{ role: "user", parts: [{ text: contextText }] }];
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest", safetySettings });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp", safetySettings });
     const chat = model.startChat({ history: historyForApi });
     
     const result = await chat.sendMessage(promptForApi);

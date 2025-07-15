@@ -37,7 +37,8 @@ The response must be exactly one object with the following shape:
   "nutrition": {
     "calories": "string | null",
     "protein": "string | null"
-  } | null
+  } | null,
+  "tips": "string | null"
 }
 
 **CRITICAL PARSING RULES (All rules are equally important):**
@@ -58,7 +59,9 @@ The response must be exactly one object with the following shape:
 10. **Content Filtering**: Exclude all brand names, product names, promotional text, social media handles (@username), and hashtags (#recipe) from all extracted fields.
 11. **Title Generation**: If a title is missing from the source text, create a concise, descriptive title for the recipe.
 12. **Short Description**: Write a <10 word, vivid, natural-language description of the dish (e.g., "Cheesy quesadillas with smoky adobo ranch"). Avoid promo or filler text. Set to null if insufficient context.
-13. If no stated yield is found, estimate the yield. Use context clues (e.g., 4 chicken thighs = 4 servings). Do your best to estimate. Otherwise, set to null.
+13. If no stated yield is found, estimate the yield. Use context clues (e.g., 4 chicken thighs = 4 servings). Do your best to estimate. 
+14. **Instruction Length Control**: Each instruction step MUST be 1-2 sentences maximum. If an instruction contains multiple steps or complex procedures, break it into separate, focused instruction steps. Each step should be clear, actionable, and concise.
+15. **Tips Extraction**: Extract relevant cooking tips, tricks, or helpful advice mentioned in the text into the 'tips' field. This includes equipment recommendations (e.g., "use a cast iron skillet for best results" or "if you don't have galangal or kefir lime leaves, you can also swap ginger and fresh lime juice"), technique suggestions, timing advice, or any other helpful guidance that isn't explicitly an instruction. These may be in the form of a 'Recipe Notes' or 'Tips' section, or just plainly in text. BUT DO NOT include any promotional text ("sign up for our newsletter" or similar) in the tips field.
 `;
 
 export function buildTextParsePrompt(input: string): PromptPayload {
@@ -76,7 +79,8 @@ export function buildUrlParsePrompt(
   prepTimeExtracted: string | null = null,
   cookTimeExtracted: string | null = null,
   totalTimeExtracted: string | null = null,
-  recipeYieldExtracted: string | null = null
+  recipeYieldExtracted: string | null = null,
+  tipsExtracted: string | null = null
 ): PromptPayload {
   const combinedText = `
 Title: ${title}
@@ -89,6 +93,7 @@ ${ingredients}
 
 Instructions:
 ${instructions}
+${tipsExtracted ? `\nTips and Notes:\n${tipsExtracted}` : ''}
 `.trim();
 
   return {

@@ -33,6 +33,7 @@ export type CombinedParsedRecipe = {
     protein?: string | null;
     [key: string]: any;
   } | null;
+  tips?: string | null;
   created_at?: string;
   last_processed_at?: string;
 };

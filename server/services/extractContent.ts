@@ -19,6 +19,7 @@ export type ExtractedContent = {
   ingredientsText: string | null;
   instructionsText: string | null;
   recipeYieldText?: string | null;
+  tipsText?: string | null;
   isFallback?: boolean;
   prepTime?: string | null;
   cookTime?: string | null;
@@ -155,6 +156,7 @@ export function extractRecipeContent(html: string, requestId: string, sourceUrl?
   let ingredientsText: string | null = null;
   let instructionsText: string | null = null;
   let recipeYieldText: string | null = null;
+  let tipsText: string | null = null;
   let isFallback = false;
   let prepTime: string | null = null;
   let cookTime: string | null = null;
@@ -348,6 +350,58 @@ export function extractRecipeContent(html: string, requestId: string, sourceUrl?
       }
     }
 
+    // Tips Selectors (new section)
+    if (!tipsText) { // Only run if JSON-LD didn't provide it
+      const tipsSelectors = [
+        '.wprm-recipe-notes', '.wprm-recipe-tips',
+        '.tasty-recipes-tips', '.tasty-recipes-details .recipe-tips',
+        '.easyrecipe-tips', '.mf-recipe-tips',
+        '[itemprop="recipeNotes"]', '[itemprop="recipeTips"]',
+        // Create by Mediavine
+        '.mv-create-tips',
+        '.mv-create-meta-tip',
+        // Generic selectors looking for keywords if specific classes fail
+        'div:contains("Notes:")', 'span:contains("Notes:")', 'p:contains("Notes:")',
+        'div:contains("Tips:")', 'span:contains("Tips:")', 'p:contains("Tips:")',
+        'div:contains("Hints:")', 'span:contains("Hints:")', 'p:contains("Hints:")'
+      ];
+      let foundTips = false;
+      for (const selector of tipsSelectors) {
+        if (foundTips) break;
+        // For keyword selectors, we need more careful extraction
+        if (selector.includes(':contains')) {
+          const keyword = selector.substring(selector.indexOf('"') + 1, selector.lastIndexOf('"'));
+          const tagName = selector.substring(0, selector.indexOf(':'));
+          $(tagName).each((_, el) => {
+            const elementText = $(el).text();
+            if (elementText.toLowerCase().includes(keyword.toLowerCase())) {
+              // Try to get the most specific text containing the keyword and its value
+              // This is a simple approach; might need refinement
+              const lines = elementText.split('\n').map(line => line.trim()).filter(line => line.toLowerCase().includes(keyword.toLowerCase()));
+              if (lines.length > 0) {
+                tipsText = lines[0]; // Take the first line that contains the keyword
+                foundTips = true;
+                return false; // Break from .each()
+              }
+            }
+          });
+        } else {
+          // For class/attribute selectors
+          $(selector).each((_, el) => {
+            const text = $(el).text().trim();
+            if (text) {
+              tipsText = text;
+              foundTips = true;
+              return false; // Break from .each()
+            }
+          });
+        }
+      }
+      if (tipsText) {
+        logger.debug({ requestId, tips: tipsText }, `Extracted tipsText using selectors.`);
+      }
+    }
+
     // --- Extract Time Fields from JSON-LD --- 
     prepTime = recipeJson.prepTime || null;
     cookTime = recipeJson.cookTime || null;
@@ -387,10 +441,10 @@ export function extractRecipeContent(html: string, requestId: string, sourceUrl?
         logger.debug({ requestId, ingredientsTextPreview: ingredientsText.slice(0, 300) }, '[extractRecipeContent] Final ingredientsText preview (JSON-LD path)');
         
         const payloadSizeKb = Buffer.byteLength(JSON.stringify({
-          title, description, image, thumbnailUrl, sourceUrl, ingredientsText, instructionsText, recipeYieldText, prepTime, cookTime, totalTime
+          title, description, image, thumbnailUrl, sourceUrl, ingredientsText, instructionsText, recipeYieldText, tipsText, prepTime, cookTime, totalTime
         }), 'utf8') / 1024;
         logger.info({ requestId, sizeKb: payloadSizeKb.toFixed(2), isFallback }, '[extractRecipeContent] Final recipe JSON size');
-        return { title, description, image, thumbnailUrl, sourceUrl: sourceUrl ?? null, ingredientsText, instructionsText, recipeYieldText, isFallback, prepTime, cookTime, totalTime, fallbackType };
+        return { title, description, image, thumbnailUrl, sourceUrl: sourceUrl ?? null, ingredientsText, instructionsText, recipeYieldText, tipsText, isFallback, prepTime, cookTime, totalTime, fallbackType };
     }
     // Continue to selector fallback if JSON-LD was incomplete for essentials
     fallbackType = 'incomplete_jsonld';
@@ -725,6 +779,89 @@ export function extractRecipeContent(html: string, requestId: string, sourceUrl?
     }
   }
 
+  // Tips Extraction (new section)
+  const tipsSelectors = [
+    // Common tips/notes selectors
+    '.wprm-recipe-notes', '.wprm-recipe-notes-text',
+    '.tasty-recipes-notes', '.tasty-recipes-notes-content',
+    '.easyrecipe-notes', '.easyrecipe-notes-content',
+    '.recipe-notes', '.recipe-tips', '.cooking-tips',
+    '.notes', '.tips', '.helpful-tips',
+    // Create by Mediavine
+    '.mv-create-notes', '.mv-create-tips',
+    // Generic selectors looking for tips keywords
+    'div:contains("Tips:")', 'div:contains("Notes:")', 'div:contains("Helpful Tips:")',
+    'div:contains("Cooking Tips:")', 'div:contains("Recipe Notes:")',
+    'p:contains("Tips:")', 'p:contains("Notes:")', 'p:contains("Helpful Tips:")',
+    'p:contains("Cooking Tips:")', 'p:contains("Recipe Notes:")',
+    // Look for sections with tip-related keywords
+    'div[class*="tip" i]', 'div[class*="note" i]', 'div[class*="helpful" i]',
+    'section[class*="tip" i]', 'section[class*="note" i]'
+  ];
+
+  let foundTips = false;
+  for (const selector of tipsSelectors) {
+    if (foundTips) break;
+    
+    // For keyword selectors, we need more careful extraction
+    if (selector.includes(':contains')) {
+      const keyword = selector.substring(selector.indexOf('"') + 1, selector.lastIndexOf('"'));
+      const tagName = selector.substring(0, selector.indexOf(':'));
+      $(tagName).each((_, el) => {
+        const elementText = $(el).text();
+        if (elementText.toLowerCase().includes(keyword.toLowerCase())) {
+          // Get the full text of the element containing the keyword
+          const text = $(el).text().trim();
+          if (text && text.length > 10) {
+            tipsText = text;
+            foundTips = true;
+            return false; // Break from .each()
+          }
+        }
+      });
+    } else {
+      // For class/attribute selectors
+      $(selector).each((_, el) => {
+        const text = $(el).text().trim();
+        if (text && text.length > 10) {
+          tipsText = text;
+          foundTips = true;
+          return false; // Break from .each()
+        }
+      });
+    }
+  }
+
+  // Also look for tips in the main content area that might not have specific selectors
+  if (!tipsText) {
+    const tipKeywords = ['tip', 'note', 'helpful', 'recommend', 'suggest', 'cast iron', 'best results'];
+    const mainContent = $('body').text();
+    
+    // Look for paragraphs or divs that contain tip keywords
+    $('p, div').each((_, el) => {
+      const text = $(el).text().trim();
+      if (text && text.length > 20 && text.length < 500) {
+        const hasTipKeyword = tipKeywords.some(keyword => 
+          text.toLowerCase().includes(keyword.toLowerCase())
+        );
+        
+        // Check if it's not already an instruction or ingredient
+        const isNotInstruction = !text.match(/\d+\.|\•|\-|\*|\–|\d+\)/);
+        const isNotIngredient = !text.match(/^\d+\s*(cup|cups|tablespoon|teaspoon|pound|ounce|gram|kilo)/i);
+        
+        if (hasTipKeyword && isNotInstruction && isNotIngredient) {
+          tipsText = text;
+          foundTips = true;
+          return false; // Break from .each()
+        }
+      }
+    });
+  }
+
+  if (tipsText) {
+    logger.debug({ requestId, tipsPreview: (tipsText as string).substring(0, 200) }, 'Extracted tipsText using selectors.');
+  }
+
   // --- Fallback Logic (New Implementation) ---
   // Fallback: use raw body text if no structured content was found or content is too short.
   const minLengthThreshold = 50;
@@ -924,7 +1061,7 @@ export function extractRecipeContent(html: string, requestId: string, sourceUrl?
   logger.debug({ requestId, instructionsPreview: instructionsText?.slice(0, 200) }, "[extractRecipeContent] Final instructionsText preview");
 
   const payloadSizeKb = Buffer.byteLength(JSON.stringify({
-    title, description, image, thumbnailUrl, sourceUrl, ingredientsText, instructionsText, recipeYieldText, prepTime, cookTime, totalTime
+    title, description, image, thumbnailUrl, sourceUrl, ingredientsText, instructionsText, recipeYieldText, tipsText, prepTime, cookTime, totalTime
   }), 'utf8') / 1024;
   
   logger.info({ requestId, sizeKb: payloadSizeKb.toFixed(2), isFallback, fallbackType, event: 'extraction_complete' }, '[extractRecipeContent] Final recipe JSON size');
@@ -933,5 +1070,5 @@ export function extractRecipeContent(html: string, requestId: string, sourceUrl?
   logger.debug({ requestId, ingredientsTextPreview: ingredientsText?.slice(0, 300) || 'null' }, '[extractRecipeContent] Final ingredientsText preview (fallback path)');
   
   // Return structure includes the fallback flag again
-  return { title, description, image, thumbnailUrl, sourceUrl: sourceUrl ?? null, ingredientsText, instructionsText, recipeYieldText, isFallback, prepTime, cookTime, totalTime, fallbackType };
+  return { title, description, image, thumbnailUrl, sourceUrl: sourceUrl ?? null, ingredientsText, instructionsText, recipeYieldText, tipsText, isFallback, prepTime, cookTime, totalTime, fallbackType };
 }

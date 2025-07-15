@@ -130,7 +130,8 @@ export async function parseUrlRecipe(
               extractedContent.prepTime || null,
               extractedContent.cookTime || null,
               extractedContent.totalTime || null,
-              extractedContent.recipeYieldText || null
+              extractedContent.recipeYieldText || null,
+              extractedContent.tipsText || null
             );
             prompt.metadata = { requestId };
 
