@@ -268,6 +268,9 @@ export default function RecipeSummaryScreen() {
   // Track if modifications have been made for mise entry point
   const [hasModifications, setHasModifications] = useState(false);
 
+  // Track if recipe is already in mise with current modifications
+  const [isAlreadyInMise, setIsAlreadyInMise] = useState(false);
+
   const scaledIngredientGroups = React.useMemo<IngredientGroup[]>(() => {
     if (!recipe?.ingredientGroups) return [];
     console.log('[summary.tsx] Scaling ingredient groups with scaleFactor:', selectedScaleFactor);
@@ -416,6 +419,13 @@ export default function RecipeSummaryScreen() {
       setHasModifications(hasScaleChanges || hasIngredientChanges);
     }
   }, [selectedScaleFactor, appliedChanges, entryPoint]);
+
+  // Reset isAlreadyInMise when user makes modifications that would change the recipe
+  useEffect(() => {
+    if (isAlreadyInMise) {
+      setIsAlreadyInMise(false);
+    }
+  }, [selectedScaleFactor, appliedChanges]); // Reset when scaling or ingredient changes occur
 
   const detectedAllergens = React.useMemo(() => {
     if (!recipe) return [];
@@ -763,7 +773,24 @@ export default function RecipeSummaryScreen() {
       });
 
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || `Save failed (Status: ${response.status})`);
+      
+      if (!response.ok) {
+        if (response.status === 409) {
+          // Recipe already exists in mise with same modifications
+          setIsAlreadyInMise(true);
+          showError(
+            'Already in Mise',
+            result.message || 'This recipe with these modifications is already in your mise en place.',
+            () => {
+              hideError();
+              router.push('/tabs/mise');
+            }
+          );
+        } else {
+          throw new Error(result.error || `Save failed (Status: ${response.status})`);
+        }
+        return;
+      }
 
       // Store the mise recipe ID for navigation
       setPreparedRecipeData({ miseRecipeId: result.miseRecipe.id, ...finalRecipeData });
@@ -1239,6 +1266,7 @@ export default function RecipeSummaryScreen() {
         isSavingForLater={isSavingForLater}
         entryPoint={entryPoint}
         hasModifications={hasModifications}
+        isAlreadyInMise={isAlreadyInMise}
       />
       
     </SafeAreaView>

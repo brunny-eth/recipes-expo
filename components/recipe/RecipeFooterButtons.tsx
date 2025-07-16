@@ -22,6 +22,7 @@ type RecipeFooterButtonsProps = {
   isSavingForLater?: boolean;
   entryPoint: string;
   hasModifications?: boolean;
+  isAlreadyInMise?: boolean;
 };
 
 const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
@@ -34,10 +35,13 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
   isSavingForLater = false,
   entryPoint,
   hasModifications = false,
+  isAlreadyInMise = false,
 }) => {
   const getMainButtonText = () => {
     if (isRewriting) return 'Customizing instructions...';
     if (isScalingInstructions) return 'Making sure everything lines up...';
+    
+    if (isAlreadyInMise) return 'Already in mise';
     
     switch (entryPoint) {
       case 'saved':
@@ -104,12 +108,12 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
       <TouchableOpacity
         style={[
           styles.nextButton,
-          (isRewriting || isScalingInstructions) && styles.nextButtonDisabled,
+          (isRewriting || isScalingInstructions || isAlreadyInMise) && styles.nextButtonDisabled,
         ]}
         onPress={handleGoToSteps}
-        disabled={isRewriting || isScalingInstructions}
+        disabled={isRewriting || isScalingInstructions || isAlreadyInMise}
       >
-        {(isRewriting || isScalingInstructions) && (
+        {(isRewriting || isScalingInstructions) && !isAlreadyInMise && (
           <ActivityIndicator
             size="small"
             color={COLORS.white}

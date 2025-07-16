@@ -154,6 +154,30 @@ router.post('/save-recipe', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    // Check for duplicate recipe in mise (same user, same original recipe, same modifications, not completed)
+    const { data: existingRecipe, error: duplicateCheckError } = await supabaseAdmin
+      .from('user_mise_recipes')
+      .select('id, title_override, final_yield, created_at')
+      .eq('user_id', userId)
+      .eq('original_recipe_id', originalRecipeId)
+      .eq('applied_changes', JSON.stringify(appliedChanges))
+      .eq('is_completed', false)
+      .maybeSingle();
+
+    if (duplicateCheckError) {
+      logger.error({ requestId, err: duplicateCheckError }, 'Error checking for duplicate mise recipe');
+      return res.status(500).json({ error: 'Failed to check for existing recipe' });
+    }
+
+    if (existingRecipe) {
+      logger.info({ requestId, existingRecipeId: existingRecipe.id }, 'Recipe with same modifications already exists in mise');
+      return res.status(409).json({ 
+        error: 'Recipe already in mise',
+        message: 'This recipe with these modifications is already in your mise en place',
+        existingRecipe: existingRecipe
+      });
+    }
+
     // Insert into user_mise_recipes
     const { data: miseRecipe, error: insertError } = await supabaseAdmin
       .from('user_mise_recipes')

@@ -616,6 +616,8 @@ export default function MiseScreen() {
               hasPreparedData: !!item.prepared_recipe_data,
               preparedDataKeys: Object.keys(item.prepared_recipe_data || {}),
               finalYield: item.final_yield,
+              hasAppliedChanges: !!item.applied_changes,
+              appliedChanges: item.applied_changes,
             });
             
             // Navigate to recipe summary with the prepared recipe data and mise entry point
@@ -626,6 +628,10 @@ export default function MiseScreen() {
                 entryPoint: 'mise',
                 miseRecipeId: item.id, // Pass the mise recipe ID for future reference
                 finalYield: item.final_yield.toString(),
+                // Pass applied changes so the summary can restore the correct scaling factor
+                ...(item.applied_changes && {
+                  appliedChanges: JSON.stringify(item.applied_changes)
+                }),
               },
             });
             
