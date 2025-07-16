@@ -7,6 +7,7 @@ import {
   ScrollView,
   ViewStyle,
   TextStyle,
+  Linking,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
@@ -80,11 +81,11 @@ export default function SettingsScreen() {
         contentContainerStyle={styles.scrollContent}
       >
         <View style={styles.section}>
-          <TouchableOpacity style={styles.linkRow}>
+          <TouchableOpacity style={styles.linkRow} onPress={() => Linking.openURL('https://meez.app/tos.html')}>
             <Text style={styles.linkText}>Privacy Policy</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.linkRow}>
+          <TouchableOpacity style={styles.linkRow} onPress={() => Linking.openURL('https://meez.app/privacy.html')}>
             <Text style={styles.linkText}>Terms of Service</Text>
           </TouchableOpacity>
 

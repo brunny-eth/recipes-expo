@@ -107,6 +107,13 @@ const LoginScreen = () => {
             )}
           </TouchableOpacity>
         )}
+        {/* TOS/Privacy Policy agreement text */}
+        <Text style={styles.tosText}>
+          By continuing, you agree to our{' '}
+          <Text style={styles.tosLink} onPress={() => router.push('/tabs/settings')}>Terms of Service</Text>
+          {' '}and{' '}
+          <Text style={styles.tosLink} onPress={() => router.push('/tabs/settings')}>Privacy Policy</Text>.
+        </Text>
       </View>
     </SafeAreaView>
   );
@@ -180,6 +187,17 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   } as ViewStyle,
+  tosText: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.md,
+  } as TextStyle,
+  tosLink: {
+    color: COLORS.primary,
+    textDecorationLine: 'underline',
+  } as TextStyle,
 });
 
 export default LoginScreen;

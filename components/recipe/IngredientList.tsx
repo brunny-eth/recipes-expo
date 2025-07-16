@@ -67,7 +67,6 @@ const IngredientList: React.FC<IngredientListProps> = ({
         }
         globalIndex += ingredientIndex;
 
-        console.log(`IngredientList - Rendering ingredient: ${ingredient.name}`);
         return (
           <IngredientRow
             key={`${ingredient.name}-${globalIndex}`}

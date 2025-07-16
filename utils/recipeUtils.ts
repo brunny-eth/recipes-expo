@@ -81,7 +81,7 @@ export const parseAmountString = (amountStr: string | null | undefined): number 
   }
 
   // 4. Check for mixed numbers with ASCII fraction (e.g., "1 1/2")
-  const mixedNumberMatchOld = currentAmountStr.match(/^(\d+)\s+(\d+\/\d+)$/);
+  const mixedNumberMatchOld = currentAmountStr.match(/^(\d+)\s+(\d+\/\d+)/);
   if (mixedNumberMatchOld) {
     const whole = parseFloat(mixedNumberMatchOld[1]);
     const fracDecimal = fractionToDecimal(mixedNumberMatchOld[2]);
@@ -91,7 +91,7 @@ export const parseAmountString = (amountStr: string | null | undefined): number 
   }
 
   // 5. Check for simple ASCII fractions (e.g., "1/2")
-  const fractionMatchOld = currentAmountStr.match(/^(\d+\/\d+)$/);
+  const fractionMatchOld = currentAmountStr.match(/^(\d+\/\d+)/);
   if (fractionMatchOld) {
     return fractionToDecimal(fractionMatchOld[1]);
   }
@@ -292,9 +292,7 @@ export const scaleIngredient = (
   ingredient: StructuredIngredient,
   scaleFactor: number
 ): StructuredIngredient => {
-  console.log('[scaleIngredient] called with:', JSON.stringify(ingredient), 'scaleFactor:', scaleFactor);
   if (isNaN(scaleFactor) || scaleFactor <= 0 || scaleFactor === 1) {
-    console.log('[scaleIngredient] scaleFactor not valid or 1, returning original');
     return ingredient;
   }
   // Robustly handle both string and number types for amount
@@ -307,15 +305,12 @@ export const scaleIngredient = (
     amountStr = String(ingredient.amount);
   }
   const originalAmountNum = parseAmountString(amountStr);
-  console.log('[scaleIngredient] ingredient.amount:', ingredient.amount, 'parsed:', originalAmountNum);
   if (originalAmountNum === null || originalAmountNum <= 0) {
-    console.log('[scaleIngredient] amount not parseable or <= 0, returning original');
     return ingredient;
   }
   const newAmountNum = originalAmountNum * scaleFactor;
   const cleanedAmountNum = Math.round(newAmountNum * 1000) / 1000;
   const newAmountStr = formatAmountNumber(cleanedAmountNum);
-  console.log('[scaleIngredient] newAmountNum:', newAmountNum, 'cleaned:', cleanedAmountNum, 'newAmountStr:', newAmountStr);
   return {
     ...ingredient,
     amount: newAmountStr, // Keep unit the same

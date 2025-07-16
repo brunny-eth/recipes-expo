@@ -38,6 +38,7 @@ type ServingScalerProps = {
   handleScaleFactorChange: (factor: number) => void;
   recipeYield: string | null | undefined;
   originalYieldValue: number | null;
+  isViewingSavedRecipe?: boolean;
 };
 
 const ServingScaler: React.FC<ServingScalerProps> = ({
@@ -45,6 +46,7 @@ const ServingScaler: React.FC<ServingScalerProps> = ({
   handleScaleFactorChange,
   recipeYield,
   originalYieldValue,
+  isViewingSavedRecipe = false,
 }) => {
   return (
     <>
@@ -60,10 +62,15 @@ const ServingScaler: React.FC<ServingScalerProps> = ({
           const direction = selectedScaleFactor < 1 ? 'down' : 'up';
 
           if (originalYieldValue && originalYieldValue > 0 && recipeYield) {
-            const scaledYieldString = getScaledYieldText(
+            const scaledYieldString = isViewingSavedRecipe 
+              ? recipeYield 
+              : getScaledYieldText(recipeYield, selectedScaleFactor);
+            console.log('[DEBUG] ServingScaler yield:', {
+              isViewingSavedRecipe,
               recipeYield,
               selectedScaleFactor,
-            );
+              scaledYieldString,
+            });
             return `Now scaled ${direction} to ${scaledYieldString}.`;
           }
 

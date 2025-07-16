@@ -69,11 +69,9 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
   showCheckboxes = true,
   isViewingSavedRecipe = false,
 }) => {
-  console.log(`[Render] Rendering IngredientRow: ${ingredient.name}`);
   const { baseName, isRemoved, substitutedFor } = parseIngredientDisplayName(
     ingredient.name,
   );
-  console.log(`IngredientRow - Parsed baseName: ${baseName}`);
   const originalNameForSub = getOriginalIngredientNameFromAppliedChanges(
     appliedChanges,
     ingredient.name,
@@ -135,59 +133,59 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
         {/* Button area - maintains consistent spacing whether buttons are present or not */}
         <View style={styles.buttonArea}>
           {isRemoved && !isViewingSavedRecipe && (
-            <TouchableOpacity
-              style={styles.infoButton}
-              onPress={() => undoIngredientRemoval(ingredient.name)}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <MaterialCommunityIcons
-                name="arrow-u-left-top"
-                size={FONT.size.lg}
-                color={COLORS.primary}
-              />
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            style={styles.infoButton}
+            onPress={() => undoIngredientRemoval(ingredient.name)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <MaterialCommunityIcons
+              name="arrow-u-left-top"
+              size={FONT.size.lg}
+              color={COLORS.primary}
+            />
+          </TouchableOpacity>
+        )}
 
           {substitutedFor && !isRemoved && !isViewingSavedRecipe && (
+          <TouchableOpacity
+            style={styles.infoButton}
+            onPress={() => undoSubstitution(originalNameForSub)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <MaterialCommunityIcons
+              name="arrow-u-left-top"
+              size={FONT.size.lg}
+              color={COLORS.primary}
+            />
+          </TouchableOpacity>
+        )}
+
+        {/* Substitution Button */}
+        {!substitutedFor &&
+          !isRemoved &&
+          ingredient.suggested_substitutions &&
+          ingredient.suggested_substitutions.length > 0 &&
+          ingredient.suggested_substitutions.some(
+            (sub) => sub && sub.name != null,
+          ) && (
             <TouchableOpacity
               style={styles.infoButton}
-              onPress={() => undoSubstitution(originalNameForSub)}
+              onPress={() => {
+                /* removed verbose button press log */
+                requestAnimationFrame(() => {
+                  openSubstitutionModal(ingredient);
+                });
+              }}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              testID={`substitution-button-${ingredient.name}`}
             >
               <MaterialCommunityIcons
-                name="arrow-u-left-top"
+                name="shuffle-variant"
                 size={FONT.size.lg}
                 color={COLORS.primary}
               />
             </TouchableOpacity>
           )}
-
-          {/* Substitution Button */}
-          {!substitutedFor &&
-            !isRemoved &&
-            ingredient.suggested_substitutions &&
-            ingredient.suggested_substitutions.length > 0 &&
-            ingredient.suggested_substitutions.some(
-              (sub) => sub && sub.name != null,
-            ) && (
-              <TouchableOpacity
-                style={styles.infoButton}
-                onPress={() => {
-                  /* removed verbose button press log */
-                  requestAnimationFrame(() => {
-                    openSubstitutionModal(ingredient);
-                  });
-                }}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                testID={`substitution-button-${ingredient.name}`}
-              >
-                <MaterialCommunityIcons
-                  name="shuffle-variant"
-                  size={FONT.size.lg}
-                  color={COLORS.primary}
-                />
-              </TouchableOpacity>
-            )}
         </View>
       </View>
     </TouchableOpacity>

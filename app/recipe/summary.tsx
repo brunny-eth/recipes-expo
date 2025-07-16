@@ -225,7 +225,7 @@ export default function RecipeSummaryScreen() {
   // Extract and validate entryPoint with logging
   const entryPoint = params.entryPoint || 'new'; // Default to 'new' for backward compatibility
   const miseRecipeId = params.miseRecipeId; // Store the mise recipe ID for modifications
-  console.log('[Summary] Entry point:', entryPoint, 'Mise Recipe ID:', miseRecipeId);
+
 
   const [recipe, setRecipe] = useState<ParsedRecipe | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -264,6 +264,13 @@ export default function RecipeSummaryScreen() {
 
   // Determine if we're viewing a saved recipe (clean display) vs actively editing (show indicators)
   const isViewingSavedRecipe = !!params.appliedChanges;
+  console.log('[DEBUG] Entry point analysis:', {
+    entryPoint,
+    hasAppliedChanges: !!params.appliedChanges,
+    isViewingSavedRecipe,
+    selectedScaleFactor,
+    miseRecipeId,
+  });
 
   // Track if modifications have been made for mise entry point
   const [hasModifications, setHasModifications] = useState(false);
@@ -273,16 +280,20 @@ export default function RecipeSummaryScreen() {
 
   const scaledIngredientGroups = React.useMemo<IngredientGroup[]>(() => {
     if (!recipe?.ingredientGroups) return [];
-    console.log('[summary.tsx] Scaling ingredient groups with scaleFactor:', selectedScaleFactor);
-    console.log('[summary.tsx] Original ingredientGroups:', JSON.stringify(recipe.ingredientGroups));
     const result = recipe.ingredientGroups.map((group) => {
       if (!group.ingredients || !Array.isArray(group.ingredients)) {
         return { ...group, ingredients: [] };
       }
+      // For saved recipes, ingredients are already scaled - don't scale again
+      // For new recipes, apply the scaling factor
       const scaledIngredients = group.ingredients.map((ingredient) => {
-        const scaled = scaleIngredient(ingredient, selectedScaleFactor);
-        console.log('[summary.tsx] Ingredient:', JSON.stringify(ingredient), 'Scaled:', JSON.stringify(scaled));
-        return scaled;
+        if (isViewingSavedRecipe) {
+          console.log('[DEBUG] Saved recipe - using ingredient as-is:', ingredient.name, ingredient.amount, 'entryPoint:', entryPoint);
+          return ingredient; // Already scaled
+        } else {
+          console.log('[DEBUG] New recipe - applying scaling factor:', selectedScaleFactor, 'to', ingredient.name, ingredient.amount, 'entryPoint:', entryPoint);
+          return scaleIngredient(ingredient, selectedScaleFactor);
+        }
       });
 
       let finalIngredients = scaledIngredients;
@@ -338,7 +349,6 @@ export default function RecipeSummaryScreen() {
         ingredients: finalIngredients,
       };
     });
-    console.log('[summary.tsx] scaledIngredientGroups:', JSON.stringify(result));
     return result;
   }, [recipe, selectedScaleFactor, appliedChanges, isViewingSavedRecipe]);
 
@@ -368,8 +378,11 @@ export default function RecipeSummaryScreen() {
         
         // Check if this is a saved recipe with existing applied changes
         if (params.appliedChanges) {
+          console.log('[DEBUG] Found appliedChanges URL param:', params.appliedChanges);
           try {
             const savedAppliedChanges = JSON.parse(params.appliedChanges as string);
+            console.log('[DEBUG] Parsed appliedChanges from URL:', savedAppliedChanges);
+            
             // Convert saved format to internal format
             if (savedAppliedChanges.ingredientChanges) {
               const convertedChanges: AppliedChange[] = savedAppliedChanges.ingredientChanges.map((change: any) => ({
@@ -386,16 +399,19 @@ export default function RecipeSummaryScreen() {
             }
             // Set scaling factor from saved changes
             if (savedAppliedChanges.scalingFactor) {
+              console.log('[DEBUG] Setting scaling factor from saved changes:', savedAppliedChanges.scalingFactor);
               setSelectedScaleFactor(savedAppliedChanges.scalingFactor);
             } else {
+              console.log('[DEBUG] No scaling factor in saved changes, defaulting to 1.0');
               setSelectedScaleFactor(1.0);
             }
           } catch (appliedChangesError: any) {
-            console.error('Error parsing applied changes:', appliedChangesError);
+            console.error('[DEBUG] Error parsing applied changes:', appliedChangesError);
             setSelectedScaleFactor(1.0);
             setAppliedChanges([]);
           }
         } else {
+          console.log('[DEBUG] No appliedChanges URL param, defaulting to new recipe state');
           // New recipe, no existing changes
           setSelectedScaleFactor(1.0);
           setAppliedChanges([]);
@@ -438,8 +454,20 @@ export default function RecipeSummaryScreen() {
 
   const openSubstitutionModal = React.useCallback(
     (ingredient: StructuredIngredient) => {
+      console.log('[DEBUG] openSubstitutionModal called with:', {
+        ingredientName: ingredient.name,
+        ingredientAmount: ingredient.amount,
+        selectedScaleFactor,
+        isViewingSavedRecipe,
+        appliedChanges,
+        hasSuggestedSubstitutions: !!ingredient.suggested_substitutions,
+        substitutionCount: ingredient.suggested_substitutions?.length || 0,
+        suggestedSubstitutions: ingredient.suggested_substitutions,
+      });
+
       let scaledSuggestions: SubstitutionSuggestion[] | null = null;
       if (ingredient.suggested_substitutions && selectedScaleFactor !== 1) {
+        console.log('[DEBUG] Scaling substitutions with factor:', selectedScaleFactor);
         const scalingFactor = selectedScaleFactor;
         scaledSuggestions = ingredient.suggested_substitutions.map((sub) => {
           let finalAmount: string | number | null = sub.amount ?? null;
@@ -448,13 +476,28 @@ export default function RecipeSummaryScreen() {
             if (parsedAmount !== null) {
               const calculatedAmount = parsedAmount * scalingFactor;
               finalAmount = formatAmountNumber(calculatedAmount) || calculatedAmount.toFixed(2);
+              console.log('[DEBUG] Scaled substitution:', {
+                original: sub.amount,
+                parsed: parsedAmount,
+                scalingFactor,
+                calculated: calculatedAmount,
+                final: finalAmount,
+              });
             }
           }
           return { ...sub, amount: finalAmount };
         });
       } else {
+        console.log('[DEBUG] No scaling applied to substitutions:', {
+          hasSubstitutions: !!ingredient.suggested_substitutions,
+          selectedScaleFactor,
+          reason: selectedScaleFactor === 1 ? 'scale factor is 1' : 'no substitutions',
+        });
         scaledSuggestions = ingredient.suggested_substitutions || null;
       }
+
+      console.log('[DEBUG] Final scaled suggestions:', scaledSuggestions);
+
       setSelectedIngredientOriginalData(ingredient);
       setProcessedSubstitutionsForModal(scaledSuggestions);
       setSubstitutionModalVisible(true);
@@ -548,17 +591,17 @@ export default function RecipeSummaryScreen() {
   const navigateToNextScreen = React.useCallback(async () => {
     // If we're coming from mise, we still need to apply any new modifications before going to steps
     if (entryPoint === 'mise' && miseRecipeId) {
-      console.log('[Summary] Navigating to steps from mise');
+      
       
       if (!recipe) {
         console.error('[Summary] No recipe data available for navigation');
         showError('Navigation Error', 'Recipe data is missing.');
-        return;
-      }
-      
+      return;
+    }
+
       const needsSubstitution = appliedChanges.length > 0;
-      const needsScaling = selectedScaleFactor !== 1;
-      
+    const needsScaling = selectedScaleFactor !== 1;
+
       // Check if we have local modifications to use as base
       const getMiseRecipe = (globalThis as any).getMiseRecipe;
       let baseRecipe = recipe;
@@ -566,22 +609,22 @@ export default function RecipeSummaryScreen() {
       if (getMiseRecipe) {
         const miseRecipe = getMiseRecipe(miseRecipeId);
         if (miseRecipe?.local_modifications?.modified_recipe_data) {
-          console.log('[Summary] Using existing local modifications as base');
+
           baseRecipe = miseRecipe.local_modifications.modified_recipe_data;
         }
       }
       
       // If there are new modifications on this screen, apply them
       if (needsSubstitution || needsScaling) {
-        console.log('[Summary] Applying new modifications before going to steps');
+        
         
         try {
-          setIsRewriting(true);
+      setIsRewriting(true);
           
           let finalInstructions = baseRecipe.instructions || [];
           let newTitle: string | null = null;
           
-          const backendUrl = process.env.EXPO_PUBLIC_API_URL!;
+        const backendUrl = process.env.EXPO_PUBLIC_API_URL!;
           
           // Flatten all ingredients from ingredient groups for scaling
           const allIngredients: StructuredIngredient[] = [];
@@ -594,41 +637,41 @@ export default function RecipeSummaryScreen() {
           }
 
           const response = await fetch(`${backendUrl}/api/recipes/modify-instructions`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
               originalInstructions: baseRecipe.instructions || [],
-              substitutions: appliedChanges.map((change) => ({
-                from: change.from,
-                to: change.to ? change.to.name : null,
-              })),
+            substitutions: appliedChanges.map((change) => ({
+              from: change.from,
+              to: change.to ? change.to.name : null,
+            })),
               originalIngredients: allIngredients,
               scaledIngredients: scaledIngredients || [],
               scalingFactor: selectedScaleFactor,
-            }),
-          });
+          }),
+        });
           
-          const result = await response.json();
+        const result = await response.json();
           if (!response.ok) throw new Error(result.error || `Modification failed (Status: ${response.status})`);
           if (!result.modifiedInstructions) throw new Error('Invalid format for modified instructions.');
           
           finalInstructions = result.modifiedInstructions;
-          
-          // Capture new title if suggested by LLM
-          if (result.newTitle && result.newTitle.trim() !== '') {
-            newTitle = result.newTitle;
-          }
+        
+        // Capture new title if suggested by LLM
+        if (result.newTitle && result.newTitle.trim() !== '') {
+          newTitle = result.newTitle;
+        }
 
           // Create the modified recipe for steps
-          const modifiedRecipe = {
-            ...baseRecipe,
-            title: newTitle || baseRecipe.title,
-            recipeYield: getScaledYieldText(baseRecipe.recipeYield, selectedScaleFactor),
-            instructions: finalInstructions,
-            ingredientGroups: scaledIngredientGroups,
-          };
+                  const modifiedRecipe = {
+          ...baseRecipe,
+          title: newTitle || baseRecipe.title,
+          recipeYield: isViewingSavedRecipe ? baseRecipe.recipeYield : getScaledYieldText(baseRecipe.recipeYield, selectedScaleFactor),
+          instructions: finalInstructions,
+          ingredientGroups: scaledIngredientGroups,
+        };
 
-          setIsRewriting(false);
+        setIsRewriting(false);
 
           router.push({
             pathname: '/recipe/steps',
@@ -729,7 +772,7 @@ export default function RecipeSummaryScreen() {
       // Pass the ORIGINAL recipe data with all metadata intact
       ...recipe,
       // Update the yield text and instructions for the prepared version
-      recipeYield: getScaledYieldText(recipe.recipeYield, selectedScaleFactor),
+      recipeYield: isViewingSavedRecipe ? recipe.recipeYield : getScaledYieldText(recipe.recipeYield, selectedScaleFactor),
       instructions: finalInstructions,
       ingredientGroups: scaledIngredientGroups,
     };
@@ -767,7 +810,7 @@ export default function RecipeSummaryScreen() {
           originalRecipeId: recipe.id,
           preparedRecipeData: finalRecipeData,
           appliedChanges: appliedChangesData,
-          finalYield: getScaledYieldText(recipe.recipeYield, selectedScaleFactor),
+          finalYield: isViewingSavedRecipe ? recipe.recipeYield : getScaledYieldText(recipe.recipeYield, selectedScaleFactor),
           titleOverride: newTitle || null,
         }),
       });
@@ -907,7 +950,7 @@ export default function RecipeSummaryScreen() {
         const modifiedRecipeData = {
           ...recipe,
           title: newTitle || recipe.title,
-          recipeYield: getScaledYieldText(recipe.recipeYield, selectedScaleFactor),
+          recipeYield: isViewingSavedRecipe ? recipe.recipeYield : getScaledYieldText(recipe.recipeYield, selectedScaleFactor),
           instructions: finalInstructions,
           ingredientGroups: scaledIngredientGroups,
         };
@@ -935,7 +978,7 @@ export default function RecipeSummaryScreen() {
         const saveResult = await saveResponse.json();
         if (!saveResponse.ok) throw new Error(saveResult.error || 'Failed to save modified recipe');
 
-        console.log('[Summary] Modified recipe saved successfully');
+
         setPreparationComplete(false);
         router.replace('/tabs/saved' as any);
 
@@ -948,17 +991,17 @@ export default function RecipeSummaryScreen() {
       // No modifications, save original recipe
       try {
         setIsSavingForLater(true);
-        const { saveRecipe } = require('@/lib/savedRecipes');
-        const success = await saveRecipe(recipe.id);
-        if (success) {
-          setPreparationComplete(false);
-          router.replace('/tabs/saved' as any);
-        } else {
-          showError('Save Failed', 'Could not save recipe. Please try again.');
-        }
-      } catch (error) {
-        console.error('Error saving recipe:', error);
+      const { saveRecipe } = require('@/lib/savedRecipes');
+      const success = await saveRecipe(recipe.id);
+      if (success) {
+        setPreparationComplete(false);
+        router.replace('/tabs/saved' as any);
+      } else {
         showError('Save Failed', 'Could not save recipe. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error saving recipe:', error);
+      showError('Save Failed', 'Could not save recipe. Please try again.');
       } finally {
         setIsSavingForLater(false);
       }
@@ -987,7 +1030,7 @@ export default function RecipeSummaryScreen() {
 
   const handleSaveModifications = () => {
     if (entryPoint !== 'mise' || !miseRecipeId || !recipe) {
-      console.log('[Summary] Cannot save modifications - not mise entry point, no recipe ID, or no recipe data');
+      
       return;
     }
 
@@ -1002,7 +1045,7 @@ export default function RecipeSummaryScreen() {
     // Prepare the modified recipe data
     const modifiedRecipeData = {
       ...recipe,
-      recipeYield: getScaledYieldText(recipe.recipeYield, selectedScaleFactor),
+      recipeYield: isViewingSavedRecipe ? recipe.recipeYield : getScaledYieldText(recipe.recipeYield, selectedScaleFactor),
       ingredientGroups: scaledIngredientGroups,
     };
 
@@ -1013,7 +1056,7 @@ export default function RecipeSummaryScreen() {
       modified_recipe_data: modifiedRecipeData,
     });
 
-    console.log('[Summary] Modifications saved locally for mise recipe:', miseRecipeId);
+    
     
     // Reset modifications state
     setHasModifications(false);
@@ -1210,6 +1253,7 @@ export default function RecipeSummaryScreen() {
             handleScaleFactorChange={handleScaleFactorChange}
             recipeYield={recipe.recipeYield}
             originalYieldValue={originalYieldValue}
+            isViewingSavedRecipe={isViewingSavedRecipe}
           />
         </CollapsibleSection>
 
@@ -1225,7 +1269,13 @@ export default function RecipeSummaryScreen() {
             <Text style={styles.ingredientsSubtext}>
               {(() => {
                 const direction = selectedScaleFactor < 1 ? 'down' : 'up';
-                const scaledYieldString = getScaledYieldText(recipe.recipeYield, selectedScaleFactor);
+                const scaledYieldString = isViewingSavedRecipe ? recipe.recipeYield : getScaledYieldText(recipe.recipeYield, selectedScaleFactor);
+                console.log('[DEBUG] Yield display:', {
+                  isViewingSavedRecipe,
+                  originalYield: recipe.recipeYield,
+                  scaledYieldString,
+                  selectedScaleFactor,
+                });
                 return `Now scaled ${direction} to ${scaledYieldString}.`;
               })()}
             </Text>

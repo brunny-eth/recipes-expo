@@ -61,17 +61,7 @@ export default function IngredientSubstitutionModal({
     onClose();
   };
 
-  useEffect(() => {
-    console.log('[Modal] substitutionModalVisible changed to:', visible);
-  }, [visible]);
 
-  useEffect(() => {
-    if (!visible) {
-      console.log('[Modal] substitution modal unmount requested');
-    }
-  }, [visible]);
-
-  console.log('[Render] substitution modal is', visible ? 'visible' : 'hidden');
 
   /* ----------------------------------------------------
    * Ensure a "Remove ingredient" option is always present
