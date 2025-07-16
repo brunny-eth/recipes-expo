@@ -26,6 +26,7 @@ type IngredientListProps = {
   undoIngredientRemoval: (fullName: string) => void;
   undoSubstitution: (originalName: string) => void;
   showCheckboxes?: boolean; // New prop to control checkbox visibility
+  isViewingSavedRecipe?: boolean; // New prop to control revert buttons
 };
 
 const IngredientList: React.FC<IngredientListProps> = ({
@@ -38,6 +39,7 @@ const IngredientList: React.FC<IngredientListProps> = ({
   undoIngredientRemoval,
   undoSubstitution,
   showCheckboxes = true,
+  isViewingSavedRecipe = false,
 }) => {
   // State to track which groups are expanded (default: all collapsed = false)
   const [expandedGroups, setExpandedGroups] = useState<{ [key: number]: boolean }>({});
@@ -78,6 +80,7 @@ const IngredientList: React.FC<IngredientListProps> = ({
             undoIngredientRemoval={undoIngredientRemoval}
             undoSubstitution={undoSubstitution}
             showCheckboxes={showCheckboxes}
+            isViewingSavedRecipe={isViewingSavedRecipe}
           />
         );
       });

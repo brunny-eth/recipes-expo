@@ -46,6 +46,10 @@ function RootLayoutNav() {
   // Ref to track if splash has already finished to prevent race conditions
   const splashFinishedRef = useRef(false);
 
+  // Add timeout mechanism to prevent getting stuck in loading states after inactivity
+  const [forceReady, setForceReady] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const [fontsLoaded] = useFonts({
     'LibreBaskerville-Regular': require('../assets/fonts/LibreBaskerville-Regular.ttf'),
     'LibreBaskerville-Bold': require('../assets/fonts/LibreBaskerville-Bold.ttf'),
@@ -58,7 +62,34 @@ function RootLayoutNav() {
   // Simplified readiness logic
   const isFrameworkReady = fontsLoaded && assetsLoaded;
   const isAuthReady = !isAuthLoading && !isLoadingFreeUsage;
-  const isReadyToRender = isFrameworkReady && isFirstLaunch !== null && isAuthReady;
+  
+  // Don't show splash screen when user is actively on login screen
+  const isOnLoginScreen = segments[0] === 'login';
+  const isReadyToRender = isFrameworkReady && isFirstLaunch !== null && (isAuthReady || forceReady || isOnLoginScreen);
+
+  // Add timeout to force readiness if stuck in loading state
+  useEffect(() => {
+    // Clear any existing timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    // Only start timeout if we're NOT on the login screen and auth is not ready
+    if (isFrameworkReady && isFirstLaunch !== null && !isAuthReady && !forceReady && !isOnLoginScreen) {
+      console.log('[RootLayoutNav] Starting timeout - auth not ready, will force ready in 8 seconds');
+      timeoutRef.current = setTimeout(() => {
+        console.warn('[RootLayoutNav] 🚨 TIMEOUT: Auth loading taking too long, forcing ready state');
+        setForceReady(true);
+      }, 8000); // 8 seconds timeout
+    }
+
+    // Clean up timeout if we become ready naturally
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [isFrameworkReady, isFirstLaunch, isAuthReady, forceReady, isOnLoginScreen]);
 
   // === APP PREPARATION EFFECT ===
   // Loads assets and determines if it's the first launch

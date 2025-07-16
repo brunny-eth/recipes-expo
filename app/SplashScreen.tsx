@@ -22,8 +22,6 @@ function SplashScreenMeez({ onFinish }: { onFinish: () => void }) {
   useEffect(() => {
     console.log('[SplashScreenMeez] useEffect - Component mounted, starting animation sequence');
     
-
-    
     // Logo animation: fade in and scale up
     const logoAnimation = Animated.parallel([
       Animated.timing(logoOpacity, {
@@ -61,12 +59,25 @@ function SplashScreenMeez({ onFinish }: { onFinish: () => void }) {
       onFinish();
     }, 2000); // Reduced from 3 seconds to 2 seconds for faster testing
 
+    // FALLBACK TIMEOUT: Force app to continue after 5 seconds to prevent getting stuck
+    const fallbackTimeout = setTimeout(() => {
+      console.warn('[SplashScreenMeez] 🚨 FALLBACK TIMEOUT: Splash screen active for 5+ seconds, forcing navigation to home');
+      
+      // Try to navigate to home screen as fallback
+      try {
+        router.replace('/tabs' as any);
+      } catch (error) {
+        console.error('[SplashScreenMeez] Failed to navigate to home screen:', error);
+      }
+    }, 5000);
+
     return () => {
       console.log('[SplashScreenMeez] useEffect cleanup - Component unmounting');
       clearTimeout(taglineTimeout);
       clearTimeout(finishTimeout);
+      clearTimeout(fallbackTimeout);
     };
-  }, [taglineOpacity, logoOpacity, logoScale, onFinish]);
+  }, [taglineOpacity, logoOpacity, logoScale, onFinish, router]);
 
   console.log('[SplashScreenMeez] About to render animated logo');
 

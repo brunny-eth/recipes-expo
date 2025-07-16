@@ -41,6 +41,7 @@ type IngredientRowProps = {
   undoIngredientRemoval: (name: string) => void;
   undoSubstitution: (originalName: string) => void;
   showCheckboxes?: boolean;
+  isViewingSavedRecipe?: boolean;
 };
 
 /**
@@ -66,6 +67,7 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
   undoIngredientRemoval,
   undoSubstitution,
   showCheckboxes = true,
+  isViewingSavedRecipe = false,
 }) => {
   console.log(`[Render] Rendering IngredientRow: ${ingredient.name}`);
   const { baseName, isRemoved, substitutedFor } = parseIngredientDisplayName(
@@ -130,60 +132,63 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
           </Text>
         )}
 
-        {isRemoved && (
-          <TouchableOpacity
-            style={styles.infoButton}
-            onPress={() => undoIngredientRemoval(ingredient.name)}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <MaterialCommunityIcons
-              name="arrow-u-left-top"
-              size={FONT.size.lg}
-              color={COLORS.primary}
-            />
-          </TouchableOpacity>
-        )}
-
-        {substitutedFor && !isRemoved && (
-          <TouchableOpacity
-            style={styles.infoButton}
-            onPress={() => undoSubstitution(originalNameForSub)}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <MaterialCommunityIcons
-              name="arrow-u-left-top"
-              size={FONT.size.lg}
-              color={COLORS.primary}
-            />
-          </TouchableOpacity>
-        )}
-
-        {/* Substitution Button */}
-        {!substitutedFor &&
-          !isRemoved &&
-          ingredient.suggested_substitutions &&
-          ingredient.suggested_substitutions.length > 0 &&
-          ingredient.suggested_substitutions.some(
-            (sub) => sub && sub.name != null,
-          ) && (
+        {/* Button area - maintains consistent spacing whether buttons are present or not */}
+        <View style={styles.buttonArea}>
+          {isRemoved && !isViewingSavedRecipe && (
             <TouchableOpacity
               style={styles.infoButton}
-              onPress={() => {
-                /* removed verbose button press log */
-                requestAnimationFrame(() => {
-                  openSubstitutionModal(ingredient);
-                });
-              }}
+              onPress={() => undoIngredientRemoval(ingredient.name)}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              testID={`substitution-button-${ingredient.name}`}
             >
               <MaterialCommunityIcons
-                name="shuffle-variant"
+                name="arrow-u-left-top"
                 size={FONT.size.lg}
                 color={COLORS.primary}
               />
             </TouchableOpacity>
           )}
+
+          {substitutedFor && !isRemoved && !isViewingSavedRecipe && (
+            <TouchableOpacity
+              style={styles.infoButton}
+              onPress={() => undoSubstitution(originalNameForSub)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <MaterialCommunityIcons
+                name="arrow-u-left-top"
+                size={FONT.size.lg}
+                color={COLORS.primary}
+              />
+            </TouchableOpacity>
+          )}
+
+          {/* Substitution Button */}
+          {!substitutedFor &&
+            !isRemoved &&
+            ingredient.suggested_substitutions &&
+            ingredient.suggested_substitutions.length > 0 &&
+            ingredient.suggested_substitutions.some(
+              (sub) => sub && sub.name != null,
+            ) && (
+              <TouchableOpacity
+                style={styles.infoButton}
+                onPress={() => {
+                  /* removed verbose button press log */
+                  requestAnimationFrame(() => {
+                    openSubstitutionModal(ingredient);
+                  });
+                }}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                testID={`substitution-button-${ingredient.name}`}
+              >
+                <MaterialCommunityIcons
+                  name="shuffle-variant"
+                  size={FONT.size.lg}
+                  color={COLORS.primary}
+                />
+              </TouchableOpacity>
+            )}
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -224,15 +229,16 @@ const styles = StyleSheet.create({
   ingredientNameContainer: {
     flex: 1,
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    minHeight: ICON_SIZE.xl, // Ensure consistent height for button or no button
   } as ViewStyle,
   ingredientName: {
     ...bodyStrongText,
     color: COLORS.textDark,
     lineHeight: 24,
-    flexShrink: 1,
-    marginRight: SPACING.sm,
+    flex: 1,
+    marginRight: SPACING.sm, // Consistent spacing from text to button area
   } as TextStyle,
   ingredientTextRemoved: {
     color: COLORS.darkGray,
@@ -289,6 +295,12 @@ const styles = StyleSheet.create({
     height: 6,
     borderRadius: 3,
     backgroundColor: COLORS.primary,
+  } as ViewStyle,
+  buttonArea: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: ICON_SIZE.xl, // Reserve space for button even when not present
+    justifyContent: 'flex-end', // Align button to the right
   } as ViewStyle,
 });
 

@@ -1239,6 +1239,7 @@ export default function RecipeSummaryScreen() {
               undoIngredientRemoval={undoIngredientRemoval}
               undoSubstitution={undoSubstitution}
               showCheckboxes={false}
+              isViewingSavedRecipe={isViewingSavedRecipe}
             />
           </View>
         </CollapsibleSection>

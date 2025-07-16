@@ -730,9 +730,9 @@ export default function MiseScreen() {
           </Text>
           <TouchableOpacity
             style={styles.retryButton}
-            onPress={() => router.push('/tabs/settings')}
+            onPress={() => router.push('/login')}
           >
-            <Text style={styles.retryButtonText}>Go to Settings</Text>
+            <Text style={styles.retryButtonText}>Log In</Text>
           </TouchableOpacity>
         </View>
       );

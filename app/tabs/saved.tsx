@@ -389,9 +389,9 @@ const renderRecipeItem = useCallback(({ item }: { item: SavedRecipe }) => {
           </Text>
           <TouchableOpacity
             style={styles.loginButton}
-            onPress={() => router.push('/tabs/settings')}
+            onPress={() => router.push('/login')}
           >
-            <Text style={styles.loginButtonText}>Go to Settings</Text>
+            <Text style={styles.loginButtonText}>Log In</Text>
           </TouchableOpacity>
         </View>
       );
