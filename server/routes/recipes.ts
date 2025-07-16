@@ -7,10 +7,11 @@ import { supabase } from '../lib/supabase';
 import { parseAndCacheRecipe } from '../services/parseRecipe';
 import { rewriteForSubstitution } from '../services/substitutionRewriter';
 import { scaleInstructions } from '../services/instructionScaling';
+import { modifyInstructions } from '../services/instructionModification';
 import { getAllRecipes, getRecipeById } from '../services/recipeDB';
 import { generateAndSaveEmbedding } from '../../utils/recipeEmbeddings';
 import { CombinedParsedRecipe } from '../../common/types';
-import { IngredientChange } from '../llm/substitutionPrompts';
+import { IngredientChange } from '../llm/modificationPrompts';
 import logger from '../lib/logger'; 
 import { ParseErrorCode } from '../../common/types/errors';
 
@@ -244,6 +245,60 @@ router.post('/scale-instructions', async (req: Request, res: Response) => {
     const error = err as Error;
     logger.error({ requestId: (req as any).id, err: error, route: req.originalUrl, method: req.method, body: req.body }, 'Error in /scale-instructions route processing');
     res.status(500).json({ error: error.message || 'Internal server error processing instruction scaling request.' });
+  }
+});
+
+// --- Unified Modify Instructions Endpoint ---
+router.post('/modify-instructions', async (req: Request, res: Response) => {
+  try {
+    const { originalInstructions, substitutions, originalIngredients, scaledIngredients, scalingFactor } = req.body;
+    const requestId = (req as any).id;
+
+    logger.info({ requestId, body: req.body }, '[modify-instructions] Received body');
+
+    // Validation
+    if (!originalInstructions || !Array.isArray(originalInstructions) || originalInstructions.length === 0) {
+      logger.warn({ requestId, route: req.originalUrl, method: req.method }, 'Missing or invalid original instructions');
+      return res.status(400).json({ error: 'Missing or invalid original instructions' });
+    }
+    if (!substitutions || !Array.isArray(substitutions)) {
+      logger.warn({ requestId, route: req.originalUrl, method: req.method }, 'Missing or invalid substitutions array');
+      return res.status(400).json({ error: 'Missing or invalid substitutions array' });
+    }
+    if (!originalIngredients || !Array.isArray(originalIngredients)) {
+      logger.warn({ requestId, route: req.originalUrl, method: req.method }, 'Missing or invalid originalIngredients array');
+      return res.status(400).json({ error: 'Missing or invalid originalIngredients array' });
+    }
+    if (!scaledIngredients || !Array.isArray(scaledIngredients)) {
+      logger.warn({ requestId, route: req.originalUrl, method: req.method }, 'Missing or invalid scaledIngredients array');
+      return res.status(400).json({ error: 'Missing or invalid scaledIngredients array' });
+    }
+    if (typeof scalingFactor !== 'number' || scalingFactor <= 0) {
+      logger.warn({ requestId, route: req.originalUrl, method: req.method, scalingFactor }, 'Invalid scalingFactor');
+      return res.status(400).json({ error: 'scalingFactor must be a positive number' });
+    }
+
+    const { modifiedInstructions, newTitle, error: modifyError, usage, timeMs } = await modifyInstructions(
+      originalInstructions,
+      substitutions,
+      originalIngredients,
+      scaledIngredients,
+      scalingFactor,
+      requestId
+    );
+
+    if (modifyError || !modifiedInstructions) {
+      logger.error({ requestId, route: req.originalUrl, method: req.method, errMessage: modifyError || 'Result was null' }, `Failed to modify instructions with unified approach`);
+      return res.status(500).json({ error: `Failed to modify instructions: ${modifyError || 'Unknown error'}` });
+    } else {
+      logger.info({ requestId, route: req.originalUrl, method: req.method, usage, timeMs }, 'Successfully modified instructions.');
+      res.json({ modifiedInstructions, newTitle, usage, timeMs });
+    }
+
+  } catch (err) {
+    const error = err as Error;
+    logger.error({ requestId: (req as any).id, err: error, route: req.originalUrl, method: req.method, body: req.body }, 'Error in /modify-instructions route processing');
+    res.status(500).json({ error: error.message || 'An unknown server error occurred' });
   }
 });
 

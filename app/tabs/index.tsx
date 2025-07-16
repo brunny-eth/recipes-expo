@@ -196,6 +196,7 @@ export default function HomeScreen() {
           pathname: '/recipe/summary',
           params: {
             recipeData: JSON.stringify(selectedMatch.recipe),
+            entryPoint: 'new',
             from: '/tabs',
           },
         });
@@ -218,7 +219,7 @@ export default function HomeScreen() {
       setRecipeUrl('');
       console.log('[HomeScreen] User opted to return to home, clearing input.');
     }
-  }, [router, recipeUrl, potentialMatches, showError]);
+  }, [potentialMatches, router, showError, recipeUrl]);
 
   // Replace isValidRecipeInput with a function that uses detectInputType
   function isValidRecipeInput(input: string) {
@@ -307,6 +308,7 @@ export default function HomeScreen() {
             pathname: '/recipe/summary',
             params: {
               recipeData: JSON.stringify(result.recipe),
+              entryPoint: 'new',
               from: '/tabs',
             },
           });

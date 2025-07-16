@@ -44,9 +44,26 @@ export async function findSimilarRecipe(
       return null;
     }
 
-    // Filter by threshold, sort by similarity descending, and take top 3
+    // Filter out unwanted recipe types (user_modified, raw_text) and keep only URL or video sources
+    const allowedSourceTypes = ['url', 'video'];
+
     const filteredMatches = data
-      .filter((match: any) => match.similarity >= threshold)
+      .filter((match: any) => {
+        // Ensure similarity meets threshold first
+        if (match.similarity < threshold) return false;
+
+        // If the RPC returned a source_type column, use it; otherwise, fall back to inspecting the JSON if available
+        const sourceType = match.source_type || match.recipe_data?.source_type || null;
+
+        // If we can determine the source type, enforce the whitelist
+        if (sourceType) {
+          return allowedSourceTypes.includes(sourceType);
+        }
+
+        // If sourceType is missing, include by default (conservative) – but log for visibility
+        logger.warn({ function: 'findSimilarRecipe', matchId: match.id, note: 'source_type missing, including match by default' }, 'RPC result is missing source_type field.');
+        return true;
+      })
       .sort((a: any, b: any) => b.similarity - a.similarity)
       .slice(0, 3);
 

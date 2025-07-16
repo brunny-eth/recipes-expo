@@ -217,10 +217,15 @@ const buttonWidth = (availableWidth - buttonTotalGap) / numButtons;
 // --- End Types ---
 
 export default function RecipeSummaryScreen() {
-  const params = useLocalSearchParams<{ recipeData?: string; from?: string; appliedChanges?: string; isModified?: string }>();
+  const params = useLocalSearchParams<{ recipeData?: string; from?: string; appliedChanges?: string; isModified?: string; entryPoint?: string; miseRecipeId?: string; finalYield?: string }>();
   const router = useRouter();
   const { showError, hideError } = useErrorModal();
   const { session } = useAuth();
+
+  // Extract and validate entryPoint with logging
+  const entryPoint = params.entryPoint || 'new'; // Default to 'new' for backward compatibility
+  const miseRecipeId = params.miseRecipeId; // Store the mise recipe ID for modifications
+  console.log('[Summary] Entry point:', entryPoint, 'Mise Recipe ID:', miseRecipeId);
 
   const [recipe, setRecipe] = useState<ParsedRecipe | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -243,6 +248,8 @@ export default function RecipeSummaryScreen() {
   const [appliedChanges, setAppliedChanges] = useState<AppliedChange[]>([]);
   const [isRewriting, setIsRewriting] = useState(false);
   const [isScalingInstructions, setIsScalingInstructions] = useState(false);
+  // Track loading state specifically for the "Save for later" action so we don't disable the primary button.
+  const [isSavingForLater, setIsSavingForLater] = useState(false);
   const [isHelpModalVisible, setIsHelpModalVisible] = useState(false);
   const [preparationComplete, setPreparationComplete] = useState(false);
   const [preparedRecipeData, setPreparedRecipeData] = useState<any>(null);
@@ -257,6 +264,9 @@ export default function RecipeSummaryScreen() {
 
   // Determine if we're viewing a saved recipe (clean display) vs actively editing (show indicators)
   const isViewingSavedRecipe = !!params.appliedChanges;
+
+  // Track if modifications have been made for mise entry point
+  const [hasModifications, setHasModifications] = useState(false);
 
   const scaledIngredientGroups = React.useMemo<IngredientGroup[]>(() => {
     if (!recipe?.ingredientGroups) return [];
@@ -398,6 +408,15 @@ export default function RecipeSummaryScreen() {
     setIsLoading(false);
   }, [params.recipeData, params.appliedChanges, showError]);
 
+  // Update hasModifications when scaling factor or applied changes change
+  useEffect(() => {
+    if (entryPoint === 'mise') {
+      const hasScaleChanges = selectedScaleFactor !== 1;
+      const hasIngredientChanges = appliedChanges.length > 0;
+      setHasModifications(hasScaleChanges || hasIngredientChanges);
+    }
+  }, [selectedScaleFactor, appliedChanges, entryPoint]);
+
   const detectedAllergens = React.useMemo(() => {
     if (!recipe) return [];
     return extractAllergens(recipe.ingredientGroups);
@@ -517,6 +536,118 @@ export default function RecipeSummaryScreen() {
   };
 
   const navigateToNextScreen = React.useCallback(async () => {
+    // If we're coming from mise, we still need to apply any new modifications before going to steps
+    if (entryPoint === 'mise' && miseRecipeId) {
+      console.log('[Summary] Navigating to steps from mise');
+      
+      if (!recipe) {
+        console.error('[Summary] No recipe data available for navigation');
+        showError('Navigation Error', 'Recipe data is missing.');
+        return;
+      }
+      
+      const needsSubstitution = appliedChanges.length > 0;
+      const needsScaling = selectedScaleFactor !== 1;
+      
+      // Check if we have local modifications to use as base
+      const getMiseRecipe = (globalThis as any).getMiseRecipe;
+      let baseRecipe = recipe;
+      
+      if (getMiseRecipe) {
+        const miseRecipe = getMiseRecipe(miseRecipeId);
+        if (miseRecipe?.local_modifications?.modified_recipe_data) {
+          console.log('[Summary] Using existing local modifications as base');
+          baseRecipe = miseRecipe.local_modifications.modified_recipe_data;
+        }
+      }
+      
+      // If there are new modifications on this screen, apply them
+      if (needsSubstitution || needsScaling) {
+        console.log('[Summary] Applying new modifications before going to steps');
+        
+        try {
+          setIsRewriting(true);
+          
+          let finalInstructions = baseRecipe.instructions || [];
+          let newTitle: string | null = null;
+          
+          const backendUrl = process.env.EXPO_PUBLIC_API_URL!;
+          
+          // Flatten all ingredients from ingredient groups for scaling
+          const allIngredients: StructuredIngredient[] = [];
+          if (baseRecipe.ingredientGroups) {
+            baseRecipe.ingredientGroups.forEach(group => {
+              if (group.ingredients && Array.isArray(group.ingredients)) {
+                allIngredients.push(...group.ingredients);
+              }
+            });
+          }
+
+          const response = await fetch(`${backendUrl}/api/recipes/modify-instructions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              originalInstructions: baseRecipe.instructions || [],
+              substitutions: appliedChanges.map((change) => ({
+                from: change.from,
+                to: change.to ? change.to.name : null,
+              })),
+              originalIngredients: allIngredients,
+              scaledIngredients: scaledIngredients || [],
+              scalingFactor: selectedScaleFactor,
+            }),
+          });
+          
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || `Modification failed (Status: ${response.status})`);
+          if (!result.modifiedInstructions) throw new Error('Invalid format for modified instructions.');
+          
+          finalInstructions = result.modifiedInstructions;
+          
+          // Capture new title if suggested by LLM
+          if (result.newTitle && result.newTitle.trim() !== '') {
+            newTitle = result.newTitle;
+          }
+
+          // Create the modified recipe for steps
+          const modifiedRecipe = {
+            ...baseRecipe,
+            title: newTitle || baseRecipe.title,
+            recipeYield: getScaledYieldText(baseRecipe.recipeYield, selectedScaleFactor),
+            instructions: finalInstructions,
+            ingredientGroups: scaledIngredientGroups,
+          };
+
+          setIsRewriting(false);
+
+          router.push({
+            pathname: '/recipe/steps',
+            params: {
+              recipeData: JSON.stringify(modifiedRecipe),
+              miseRecipeId: miseRecipeId,
+            },
+          });
+          return;
+
+        } catch (modificationError: any) {
+          setIsRewriting(false);
+          showError('Update Failed', `Couldn't apply modifications: ${modificationError.message}`);
+          return;
+        }
+      } else {
+        // No new modifications, use base recipe
+        router.push({
+          pathname: '/recipe/steps',
+          params: {
+            recipeData: JSON.stringify(baseRecipe),
+            miseRecipeId: miseRecipeId,
+          },
+        });
+        return;
+      }
+    }
+
+    // Regular flow for new/saved recipes
     const removalCount = appliedChanges.filter((c) => !c.to).length;
     if (removalCount > 2) {
       showError('Limit Reached', 'You can only remove up to 2 ingredients per recipe.');
@@ -531,45 +662,14 @@ export default function RecipeSummaryScreen() {
     let finalInstructions = recipe.instructions || [];
     let newTitle: string | null = null; // Capture new title from LLM if suggested
     const needsScaling = selectedScaleFactor !== 1;
+    const needsSubstitution = appliedChanges.length > 0;
 
-    // --- 1. Handle Substitution Rewriting (if applicable) ---
-    if (appliedChanges.length > 0) {
+    // --- Unified Instruction Modification (handles both substitutions and scaling) ---
+    if (needsSubstitution || needsScaling) {
       setIsRewriting(true);
       try {
         const backendUrl = process.env.EXPO_PUBLIC_API_URL!;
-        const response = await fetch(`${backendUrl}/api/recipes/rewrite-instructions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            originalInstructions: recipe.instructions || [],
-            substitutions: appliedChanges.map((change) => ({
-              from: change.from,
-              to: change.to ? change.to.name : null,
-            })),
-          }),
-        });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || `Rewrite failed (Status: ${response.status})`);
-        if (!result.rewrittenInstructions) throw new Error('Invalid format for rewritten instructions.');
-        finalInstructions = result.rewrittenInstructions;
         
-        // Capture new title if suggested by LLM
-        if (result.newTitle && result.newTitle.trim() !== '') {
-          newTitle = result.newTitle;
-        }
-      } catch (rewriteError: any) {
-        showError('Update Failed', `Couldn't update steps for substitutions: ${rewriteError.message}`);
-        return; // Stop navigation on failure
-      } finally {
-        setIsRewriting(false);
-      }
-    }
-
-    // --- 2. Handle Instruction Scaling (if applicable) ---
-    if (needsScaling && scaledIngredients.length > 0) {
-      setIsScalingInstructions(true);
-      try {
-        const backendUrl = process.env.EXPO_PUBLIC_API_URL!;
         // Flatten all ingredients from ingredient groups for scaling
         const allIngredients: StructuredIngredient[] = [];
         if (recipe.ingredientGroups) {
@@ -579,25 +679,38 @@ export default function RecipeSummaryScreen() {
             }
           });
         }
-        const originalIngredients = allIngredients;
-        const response = await fetch(`${backendUrl}/api/recipes/scale-instructions`, {
+
+        const response = await fetch(`${backendUrl}/api/recipes/modify-instructions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            instructionsToScale: finalInstructions,
-            originalIngredients: originalIngredients,
-            scaledIngredients: scaledIngredients,
+            originalInstructions: recipe.instructions || [],
+            substitutions: appliedChanges.map((change) => ({
+              from: change.from,
+              to: change.to ? change.to.name : null,
+            })),
+            originalIngredients: allIngredients,
+            scaledIngredients: scaledIngredients || [],
+            scalingFactor: selectedScaleFactor,
           }),
         });
+        
         const result = await response.json();
-        if (!response.ok) throw new Error(result.error || `Scaling failed (Status: ${response.status})`);
-        if (!result.scaledInstructions) throw new Error('Invalid format for scaled instructions.');
-        finalInstructions = result.scaledInstructions;
-      } catch (scalingError: any) {
-        showError('Update Failed', `Couldn't adjust steps for scaling: ${scalingError.message}`);
+        if (!response.ok) throw new Error(result.error || `Modification failed (Status: ${response.status})`);
+        if (!result.modifiedInstructions) throw new Error('Invalid format for modified instructions.');
+        
+        finalInstructions = result.modifiedInstructions;
+        
+        // Capture new title if suggested by LLM
+        if (result.newTitle && result.newTitle.trim() !== '') {
+          newTitle = result.newTitle;
+        }
+        
+      } catch (modificationError: any) {
+        showError('Update Failed', `Couldn't update recipe instructions: ${modificationError.message}`);
         return; // Stop navigation on failure
       } finally {
-        setIsScalingInstructions(false);
+        setIsRewriting(false);
       }
     }
 
@@ -660,7 +773,7 @@ export default function RecipeSummaryScreen() {
       showError('Save Failed', `Couldn't save recipe to mise: ${saveError.message}`);
       return; // Stop execution on failure
     }
-  }, [recipe, scaledIngredients, scaledIngredientGroups, appliedChanges, router, showError, selectedScaleFactor, session]);
+  }, [recipe, scaledIngredients, scaledIngredientGroups, appliedChanges, router, showError, selectedScaleFactor, session, entryPoint, miseRecipeId]);
 
   const handleGoToSteps = () => InteractionManager.runAfterInteractions(navigateToNextScreen);
 
@@ -711,19 +824,179 @@ export default function RecipeSummaryScreen() {
       return;
     }
 
-    try {
-      const { saveRecipe } = require('@/lib/savedRecipes');
-      const success = await saveRecipe(recipe.id);
-      if (success) {
+    const needsSubstitution = appliedChanges.length > 0;
+    const needsScaling = selectedScaleFactor !== 1;
+
+    // If we have modifications, we need to save a modified version
+    if (needsSubstitution || needsScaling) {
+      try {
+        setIsSavingForLater(true);
+        
+        // Apply modifications using the unified endpoint
+        let finalInstructions = recipe.instructions || [];
+        let newTitle: string | null = null;
+        
+        const backendUrl = process.env.EXPO_PUBLIC_API_URL!;
+        
+        // Flatten all ingredients from ingredient groups for scaling
+        const allIngredients: StructuredIngredient[] = [];
+        if (recipe.ingredientGroups) {
+          recipe.ingredientGroups.forEach(group => {
+            if (group.ingredients && Array.isArray(group.ingredients)) {
+              allIngredients.push(...group.ingredients);
+            }
+          });
+        }
+
+        const response = await fetch(`${backendUrl}/api/recipes/modify-instructions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            originalInstructions: recipe.instructions || [],
+            substitutions: appliedChanges.map((change) => ({
+              from: change.from,
+              to: change.to ? change.to.name : null,
+            })),
+            originalIngredients: allIngredients,
+            scaledIngredients: scaledIngredients || [],
+            scalingFactor: selectedScaleFactor,
+          }),
+        });
+        
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || `Modification failed (Status: ${response.status})`);
+        if (!result.modifiedInstructions) throw new Error('Invalid format for modified instructions.');
+        
+        finalInstructions = result.modifiedInstructions;
+        
+        // Capture new title if suggested by LLM
+        if (result.newTitle && result.newTitle.trim() !== '') {
+          newTitle = result.newTitle;
+        }
+
+        setIsSavingForLater(false);
+
+        // Create modified recipe data
+        const modifiedRecipeData = {
+          ...recipe,
+          title: newTitle || recipe.title,
+          recipeYield: getScaledYieldText(recipe.recipeYield, selectedScaleFactor),
+          instructions: finalInstructions,
+          ingredientGroups: scaledIngredientGroups,
+        };
+
+        const appliedChangesData = {
+          ingredientChanges: appliedChanges.map((change) => ({
+            from: change.from,
+            to: change.to ? change.to.name : null,
+          })),
+          scalingFactor: selectedScaleFactor,
+        };
+
+        // Save the modified recipe
+        const saveResponse = await fetch(`${backendUrl}/api/recipes/save-modified`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            originalRecipeId: recipe.id,
+            userId: session.user.id,
+            modifiedRecipeData,
+            appliedChanges: appliedChangesData,
+          }),
+        });
+
+        const saveResult = await saveResponse.json();
+        if (!saveResponse.ok) throw new Error(saveResult.error || 'Failed to save modified recipe');
+
+        console.log('[Summary] Modified recipe saved successfully');
         setPreparationComplete(false);
         router.replace('/tabs/saved' as any);
-      } else {
+
+      } catch (error: any) {
+        setIsSavingForLater(false);
+        console.error('Error saving modified recipe:', error);
+        showError('Save Failed', `Could not save modified recipe: ${error.message}`);
+      }
+    } else {
+      // No modifications, save original recipe
+      try {
+        setIsSavingForLater(true);
+        const { saveRecipe } = require('@/lib/savedRecipes');
+        const success = await saveRecipe(recipe.id);
+        if (success) {
+          setPreparationComplete(false);
+          router.replace('/tabs/saved' as any);
+        } else {
+          showError('Save Failed', 'Could not save recipe. Please try again.');
+        }
+      } catch (error) {
+        console.error('Error saving recipe:', error);
         showError('Save Failed', 'Could not save recipe. Please try again.');
+      } finally {
+        setIsSavingForLater(false);
+      }
+    }
+  };
+
+  const handleRemoveFromSaved = async () => {
+    if (!recipe?.id || !session?.user) {
+      showError('Account Required', 'You need an account to manage saved recipes.');
+      return;
+    }
+
+    try {
+      const { unsaveRecipe } = require('@/lib/savedRecipes');
+      const success = await unsaveRecipe(recipe.id);
+      if (success) {
+        router.replace('/tabs/saved' as any);
+      } else {
+        showError('Remove Failed', 'Could not remove recipe from saved. Please try again.');
       }
     } catch (error) {
-      console.error('Error saving recipe:', error);
-      showError('Save Failed', 'Could not save recipe. Please try again.');
+      console.error('Error removing recipe from saved:', error);
+      showError('Remove Failed', 'Could not remove recipe from saved. Please try again.');
     }
+  };
+
+  const handleSaveModifications = () => {
+    if (entryPoint !== 'mise' || !miseRecipeId || !recipe) {
+      console.log('[Summary] Cannot save modifications - not mise entry point, no recipe ID, or no recipe data');
+      return;
+    }
+
+    // Access the global updateMiseRecipe function
+    const updateMiseRecipe = (globalThis as any).updateMiseRecipe;
+    if (!updateMiseRecipe) {
+      console.error('[Summary] updateMiseRecipe function not available');
+      showError('Update Failed', 'Could not save modifications. Please try again.');
+      return;
+    }
+
+    // Prepare the modified recipe data
+    const modifiedRecipeData = {
+      ...recipe,
+      recipeYield: getScaledYieldText(recipe.recipeYield, selectedScaleFactor),
+      ingredientGroups: scaledIngredientGroups,
+    };
+
+    // Call the updateMiseRecipe function with modifications
+    updateMiseRecipe(miseRecipeId, {
+      scaleFactor: selectedScaleFactor,
+      appliedChanges: appliedChanges,
+      modified_recipe_data: modifiedRecipeData,
+    });
+
+    console.log('[Summary] Modifications saved locally for mise recipe:', miseRecipeId);
+    
+    // Reset modifications state
+    setHasModifications(false);
+    
+    // Show success feedback
+    showError('Modifications Saved', 'Your changes have been saved for this cooking session. The grocery list will update when you return to your mise.', () => {
+      hideError();
+      // Navigate to mise screen instead of going back
+      router.replace('/tabs/mise' as any);
+    });
   };
 
   if (isLoading) {
@@ -961,7 +1234,11 @@ export default function RecipeSummaryScreen() {
         isRewriting={isRewriting}
         isScalingInstructions={isScalingInstructions}
         handleSaveForLater={handleSaveForLater}
-        isSavingForLater={false}
+        handleRemoveFromSaved={handleRemoveFromSaved}
+        handleSaveModifications={handleSaveModifications}
+        isSavingForLater={isSavingForLater}
+        entryPoint={entryPoint}
+        hasModifications={hasModifications}
       />
       
     </SafeAreaView>

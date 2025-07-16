@@ -157,6 +157,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
         pathname: '/recipe/summary',
         params: {
           recipeData: JSON.stringify(finalRecipeData),
+          entryPoint: 'new',
           from: '/',
         },
       });

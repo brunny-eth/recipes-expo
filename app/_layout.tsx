@@ -126,6 +126,10 @@ function RootLayoutNav() {
     console.log('[RootLayoutNav][Effect: splashAnimationComplete] State changed to:', splashAnimationComplete);
   }, [splashAnimationComplete]);
 
+
+
+
+
   // === INITIAL NAVIGATION LOGIC ===
   // Handle initial navigation for non-first launch scenario after everything is ready
   // This logic runs once when initialContentReady is true AND isFirstLaunch is false

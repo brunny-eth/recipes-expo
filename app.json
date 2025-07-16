@@ -9,7 +9,7 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/meez_logo.webp",
+      "image": "./assets/images/meez_logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#fefcf7"
     },
@@ -18,16 +18,14 @@
       "bundleIdentifier": "com.meez.app",
       "usesAppleSignIn": true,
       "splash": {
-        "image": "./assets/images/meez_logo.webp",
+        "image": "./assets/images/meez_logo.png",
         "resizeMode": "contain",
         "backgroundColor": "#fefcf7"
       },
       "infoPlist": {
         "CFBundleURLTypes": [
           {
-            "CFBundleURLSchemes": [
-              "meez"
-            ]
+            "CFBundleURLSchemes": ["meez"]
           }
         ]
       }
@@ -58,7 +56,7 @@
     "android": {
       "package": "com.meez.app",
       "splash": {
-        "image": "./assets/images/meez_logo.webp",
+        "image": "./assets/images/meez_logo.png",
         "resizeMode": "contain",
         "backgroundColor": "#fefcf7"
       }

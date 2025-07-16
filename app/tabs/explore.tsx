@@ -6,6 +6,7 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
+  RefreshControl,
   ViewStyle,
   TextStyle,
 } from 'react-native';
@@ -77,6 +78,7 @@ const ExploreScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [imageErrors, setImageErrors] = useState<{ [key: string]: boolean }>({});
+  const [refreshing, setRefreshing] = useState(false);
 
   // Component Mount/Unmount logging
   useEffect(() => {
@@ -199,6 +201,66 @@ const ExploreScreen = () => {
     await fetchExploreRecipesFromAPI();
   }, [loadCachedRecipes, fetchExploreRecipesFromAPI]);
 
+  // Pull-to-refresh handler - bypasses cache and forces fresh fetch
+  const handleRefresh = useCallback(async () => {
+    console.log('[ExploreScreen] Pull-to-refresh triggered - fetching fresh data');
+    setRefreshing(true);
+    setError(null);
+    
+    const startTime = Date.now();
+    
+    try {
+      // Keep existing recipes visible while fetching new ones
+      // Only update state when we have new data
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+      if (!backendUrl) {
+        throw new Error('API configuration error. Please check your environment variables.');
+      }
+
+      const apiUrl = `${backendUrl}/api/recipes/explore-random`;
+      console.log(`[ExploreScreen] Refreshing from: ${apiUrl}`);
+      
+      const response = await fetch(apiUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch explore recipes: ${response.statusText}`);
+      }
+
+      const recipes = await response.json();
+      console.log(`[ExploreScreen] Refreshed ${recipes?.length || 0} explore recipes from API.`);
+      
+      // Store cache data first
+      try {
+        const now = Date.now().toString();
+        await Promise.all([
+          AsyncStorage.setItem('exploreLastFetched', now),
+          AsyncStorage.setItem('exploreRecipes', JSON.stringify(recipes || []))
+        ]);
+        console.log('[ExploreScreen] Updated cache with fresh data');
+      } catch (storageError) {
+        console.warn('[ExploreScreen] Failed to store cache data:', storageError);
+      }
+      
+      // Ensure minimum 750ms delay for better UX
+      const elapsedTime = Date.now() - startTime;
+      const minDelay = 750;
+      const remainingDelay = Math.max(0, minDelay - elapsedTime);
+      
+      if (remainingDelay > 0) {
+        await new Promise(resolve => setTimeout(resolve, remainingDelay));
+      }
+      
+      // Update recipes AFTER the delay so content changes when spinner stops
+      setExploreRecipes(recipes || []);
+      
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load explore recipes';
+      console.error('[ExploreScreen] Error refreshing explore recipes:', err);
+      setError(errorMessage);
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
   // Fetch recipes on component mount and focus
   useEffect(() => {
     fetchExploreRecipes();
@@ -230,6 +292,7 @@ const ExploreScreen = () => {
       pathname: '/recipe/summary',
       params: {
         recipeData: JSON.stringify(recipe),
+        entryPoint: 'new',
         from: '/explore',
       },
     });
@@ -341,6 +404,14 @@ const ExploreScreen = () => {
         renderItem={renderRecipeItem}
         keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
         contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[COLORS.primary]}
+            tintColor={COLORS.primary}
+          />
+        }
         initialNumToRender={10}
         windowSize={21}
         maxToRenderPerBatch={10}

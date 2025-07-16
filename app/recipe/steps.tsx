@@ -21,7 +21,6 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
-import * as Speech from 'expo-speech';
 import {
   COLORS,
   OVERLAYS,
@@ -128,12 +127,6 @@ export default function StepsScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
   // --- End Auto-scroll State ---
 
-  // --- Speech State ---
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [speakingStepIndex, setSpeakingStepIndex] = useState<number | null>(null);
-  const [availableVoices, setAvailableVoices] = useState<Speech.Voice[]>([]);
-  // --- End Speech State ---
-
   // Component mount/unmount logging
   useEffect(() => {
     console.log('[StepsScreen] 🎯 Component DID MOUNT');
@@ -167,9 +160,24 @@ export default function StepsScreen() {
         setOriginalRecipe(parsedOriginalRecipe); // Store original for reference
 
         // Start with a deep copy of the original recipe to preserve all fields
-        const currentModifiedRecipe: ParsedRecipe = JSON.parse(JSON.stringify(parsedOriginalRecipe));
+        let currentModifiedRecipe: ParsedRecipe = JSON.parse(JSON.stringify(parsedOriginalRecipe));
 
-        // Apply specific modifications passed from summary.tsx
+        // If we have a miseRecipeId, check for local modifications
+        if (params.miseRecipeId) {
+          console.log('[StepsScreen] 📝 Checking for local modifications for mise recipe:', params.miseRecipeId);
+          
+          // Access the global miseRecipes (we'll need to pass this properly later)
+          const getMiseRecipe = (globalThis as any).getMiseRecipe;
+          if (getMiseRecipe) {
+            const miseRecipe = getMiseRecipe(params.miseRecipeId);
+            if (miseRecipe?.local_modifications?.modified_recipe_data) {
+              console.log('[StepsScreen] 🔄 Using local modifications for mise recipe');
+              currentModifiedRecipe = miseRecipe.local_modifications.modified_recipe_data;
+            }
+          }
+        }
+
+        // Apply specific modifications passed from summary.tsx (these override local modifications)
         if (params.editedInstructions) {
           currentModifiedRecipe.instructions = JSON.parse(params.editedInstructions);
         }
@@ -200,6 +208,7 @@ export default function StepsScreen() {
           titleChanged: currentModifiedRecipe.title !== parsedOriginalRecipe.title,
           hasImage: !!currentModifiedRecipe.image,
           appliedChanges: params.appliedChanges ? JSON.parse(params.appliedChanges) : null,
+          usingMiseModifications: params.miseRecipeId && currentModifiedRecipe !== parsedOriginalRecipe,
         });
 
         // Update legacy state for backward compatibility with existing UI components
@@ -259,86 +268,6 @@ export default function StepsScreen() {
       }
     };
   }, [session, markFreeRecipeUsed]); // Dependencies to ensure it reacts to auth state changes and function stability
-
-  // --- Speech Functionality ---
-  // Initialize available voices
-  useEffect(() => {
-    const loadVoices = async () => {
-      try {
-        const voices = await Speech.getAvailableVoicesAsync();
-        setAvailableVoices(voices);
-        console.log('[StepsScreen] Available voices loaded:', voices.length);
-        
-        // Log all available voices with their details
-        console.log('[StepsScreen] All available voices:');
-        voices.forEach((voice, index) => {
-          console.log(`  ${index + 1}. ${voice.name} (${voice.language}) - ID: ${voice.identifier}`);
-        });
-        
-        // Find British voices specifically
-        const britishVoices = voices.filter(voice => 
-          voice.language.startsWith('en-GB') || 
-          voice.name.toLowerCase().includes('british') ||
-          voice.name.toLowerCase().includes('uk')
-        );
-        
-        if (britishVoices.length > 0) {
-          console.log('[StepsScreen] British voices found:');
-          britishVoices.forEach((voice, index) => {
-            console.log(`  ${index + 1}. ${voice.name} (${voice.language}) - ID: ${voice.identifier}`);
-          });
-        } else {
-          console.log('[StepsScreen] No specific British voices found');
-        }
-        
-      } catch (error) {
-        console.error('[StepsScreen] Error loading voices:', error);
-      }
-    };
-    loadVoices();
-  }, []);
-
-  // Simple speech handler
-  const handleSpeakStep = useCallback(async (stepIndex: number) => {
-    if (isSpeaking) {
-      // Cancel current speech
-      await Speech.stop();
-      setIsSpeaking(false);
-      setSpeakingStepIndex(null);
-      return;
-    }
-
-    const step = instructions[stepIndex];
-    if (!step) return;
-
-    try {
-      setIsSpeaking(true);
-      setSpeakingStepIndex(stepIndex);
-
-      console.log('[StepsScreen] Speaking step', stepIndex);
-
-      await Speech.speak(step, {
-        voice: 'com.apple.voice.compact.en-ZA.Tessa', // Tessa - South African English, very clear and pleasant
-        rate: 0.65, // Even slower for more natural pace
-        pitch: 0.95, // Slightly lower pitch for more warmth
-        volume: 0.7, // Slightly higher volume for clarity
-        onDone: () => {
-          console.log('[StepsScreen] Speech completed for step', stepIndex);
-          setIsSpeaking(false);
-          setSpeakingStepIndex(null);
-        },
-        onError: (error) => {
-          console.error('[StepsScreen] Speech error:', error);
-          setIsSpeaking(false);
-          setSpeakingStepIndex(null);
-        },
-      });
-    } catch (error) {
-      console.error('[StepsScreen] Error starting speech:', error);
-      setIsSpeaking(false);
-      setSpeakingStepIndex(null);
-    }
-  }, [isSpeaking, instructions]);
 
   // Function to handle saving the modified recipe
   const handleSaveModifiedRecipe = async () => {
@@ -801,7 +730,6 @@ export default function StepsScreen() {
                 style={[
                   styles.stepItem,
                   index === activeStepIndex && styles.activeStep,
-                  speakingStepIndex === index && styles.speakingStep,
                 ]}
               >
                 <View style={styles.stepNumberContainer}>
@@ -827,19 +755,6 @@ export default function StepsScreen() {
                     index === activeStepIndex,
                   )}
                 </View>
-
-                {/* Speaker Icon */}
-                <TouchableOpacity
-                  style={styles.speakerButton}
-                  onPress={() => handleSpeakStep(index)}
-                  disabled={isLoading}
-                >
-                  <MaterialCommunityIcons
-                    name={speakingStepIndex === index ? "volume-high" : "volume-medium"}
-                    size={20}
-                    color={speakingStepIndex === index ? COLORS.primary : COLORS.darkGray}
-                  />
-                </TouchableOpacity>
               </Animated.View>
             </TouchableOpacity>
           ))
@@ -1332,19 +1247,5 @@ const styles = StyleSheet.create({
     backgroundColor: '#F16A2A',
     borderRadius: 2,
   } as ViewStyle,
-  // --- Speech Styles ---
-  speakingStep: {
-    backgroundColor: '#FFF0E6',
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.primary,
-    transform: [{ scale: 1.02 }],
-    ...SHADOWS.small,
-  } as ViewStyle,
-  speakerButton: {
-    padding: SPACING.sm,
-    marginLeft: SPACING.sm,
-    justifyContent: 'center',
-    alignItems: 'center',
-  } as ViewStyle,
-  // --- End Speech Styles ---
+
 });

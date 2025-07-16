@@ -266,6 +266,7 @@ export default function SavedScreen() {
       pathname: '/recipe/summary',
       params: {
         recipeData: JSON.stringify(recipeWithId), 
+        entryPoint: 'saved',
         from: '/saved',
         isModified: isModified.toString(),
         ...(isModified && item.applied_changes && {

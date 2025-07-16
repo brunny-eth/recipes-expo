@@ -4,10 +4,12 @@ import { COLORS, SPACING } from '@/constants/theme';
 import { FONT, responsiveFont } from '@/constants/typography';
 import ReanimatedAnimated, { FadeOut } from 'react-native-reanimated';
 import SplashCookSVG from '@/assets/images/splash-cook.svg';
+import { useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
 function SplashScreenMeez({ onFinish }: { onFinish: () => void }) {
+  const router = useRouter();
   const taglineOpacity = useRef(new Animated.Value(0)).current;
   const logoScale = useRef(new Animated.Value(0.8)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
@@ -19,6 +21,8 @@ function SplashScreenMeez({ onFinish }: { onFinish: () => void }) {
 
   useEffect(() => {
     console.log('[SplashScreenMeez] useEffect - Component mounted, starting animation sequence');
+    
+
     
     // Logo animation: fade in and scale up
     const logoAnimation = Animated.parallel([
@@ -51,17 +55,11 @@ function SplashScreenMeez({ onFinish }: { onFinish: () => void }) {
       });
     }, 1000);
 
-    // Always show splash for at least 3 seconds, then start fade-out
+    // Complete the animation sequence and call onFinish
     const finishTimeout = setTimeout(() => {
-      console.log('[SplashScreenMeez] Starting fade-out animation');
-      setIsFinishing(true);
-      
-      // Add delay to allow fade-out animation to complete
-      setTimeout(() => {
-        console.log('[SplashScreenMeez] Animation complete, calling onFinish');
-        onFinish();
-      }, 300); // 300ms fade-out duration
-    }, 3000); // Ensures the animation plays for at least 3 seconds
+      console.log('[SplashScreenMeez] Animation sequence complete, calling onFinish');
+      onFinish();
+    }, 2000); // Reduced from 3 seconds to 2 seconds for faster testing
 
     return () => {
       console.log('[SplashScreenMeez] useEffect cleanup - Component unmounting');

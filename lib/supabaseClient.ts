@@ -3,7 +3,13 @@ import * as SecureStore from 'expo-secure-store'
 import { Database } from '../common/types/database.types'
 import 'react-native-url-polyfill/auto'
 
-// ADD THIS LINE at the very top of the file
+// Polyfill for structuredClone (not available in React Native)
+if (typeof global.structuredClone === 'undefined') {
+  global.structuredClone = function(obj: any) {
+    return JSON.parse(JSON.stringify(obj));
+  };
+}
+
 console.log('[DEBUG] supabaseClient.ts file is being loaded.');
 
 let _logHistory: string[] = []

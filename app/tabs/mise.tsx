@@ -51,6 +51,12 @@ type MiseRecipe = {
   is_completed: boolean;
   created_at: string;
   updated_at: string;
+  // Local modifications for non-persistent changes
+  local_modifications?: {
+    scaleFactor?: number;
+    appliedChanges?: any[];
+    modified_recipe_data?: ParsedRecipe;
+  };
 };
 
 type GroceryItem = {
@@ -110,6 +116,52 @@ export default function MiseScreen() {
 
   // --- Caching Strategy ---
   const lastSessionIdRef = useRef<string | null>(null);
+
+  // Add updateMiseRecipe function for local modifications
+  const updateMiseRecipe = useCallback((recipeId: string, modifications: { scaleFactor?: number; appliedChanges?: any[]; modified_recipe_data?: ParsedRecipe }) => {
+    console.log('[MiseScreen] Updating local modifications for recipe:', recipeId, modifications);
+    
+    setMiseRecipes(prev => prev.map(recipe => {
+      if (recipe.id === recipeId) {
+        return {
+          ...recipe,
+          local_modifications: {
+            ...recipe.local_modifications,
+            ...modifications,
+          }
+        };
+      }
+      return recipe;
+    }));
+
+    // Note: Grocery list refresh will be triggered when user navigates back to mise screen
+    console.log('[MiseScreen] Local modifications saved, grocery list will refresh on next focus');
+  }, []);
+
+  // Make updateMiseRecipe available to other screens via a context or pass it down
+  // For now, we'll store it in a ref so it can be accessed by other components
+  const updateMiseRecipeRef = useRef(updateMiseRecipe);
+  updateMiseRecipeRef.current = updateMiseRecipe;
+
+  // Add getMiseRecipe function for other screens to access mise data
+  const getMiseRecipe = useCallback((recipeId: string) => {
+    const recipe = miseRecipes.find(r => r.id === recipeId);
+    console.log('[MiseScreen] getMiseRecipe called for ID:', recipeId, 'Found:', !!recipe);
+    return recipe;
+  }, [miseRecipes]);
+
+  // Make the function available globally (temporary solution)
+  useEffect(() => {
+    // Store the update function in a way that can be accessed by other screens
+    (globalThis as any).updateMiseRecipe = updateMiseRecipe;
+    (globalThis as any).getMiseRecipe = getMiseRecipe;
+    
+    return () => {
+      // Clean up on unmount
+      delete (globalThis as any).updateMiseRecipe;
+      delete (globalThis as any).getMiseRecipe;
+    };
+  }, [updateMiseRecipe, getMiseRecipe]);
 
   // Component Mount/Unmount logging
   useEffect(() => {
@@ -558,7 +610,7 @@ export default function MiseScreen() {
           onPress={() => {
             if (isEditing) return; // Don't navigate while editing
             
-            console.log('[MiseScreen] 🚀 Attempting to navigate to steps for recipe:', {
+            console.log('[MiseScreen] 🚀 Attempting to navigate to summary for recipe:', {
               recipeId: item.id,
               title: item.title_override || item.prepared_recipe_data.title,
               hasPreparedData: !!item.prepared_recipe_data,
@@ -566,17 +618,18 @@ export default function MiseScreen() {
               finalYield: item.final_yield,
             });
             
-            // Navigate to recipe steps with the prepared recipe data
+            // Navigate to recipe summary with the prepared recipe data and mise entry point
             router.push({
-              pathname: '/recipe/steps',
+              pathname: '/recipe/summary',
               params: {
                 recipeData: JSON.stringify(item.prepared_recipe_data),
+                entryPoint: 'mise',
+                miseRecipeId: item.id, // Pass the mise recipe ID for future reference
                 finalYield: item.final_yield.toString(),
-                miseRecipeId: item.id, // Pass the mise recipe ID for completion functionality
               },
             });
             
-            console.log('[MiseScreen] ✅ Navigation push completed');
+            console.log('[MiseScreen] ✅ Navigation to summary completed');
           }}
           disabled={isEditing}
         >
