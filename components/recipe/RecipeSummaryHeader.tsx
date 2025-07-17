@@ -23,7 +23,7 @@ const RecipeSummaryHeader: React.FC<RecipeSummaryHeaderProps> = ({ recipe, clean
           />
         )}
         <View style={styles.recipeTextContainer}>
-          {cleanTitle && <Text style={styles.pageTitle}>{cleanTitle}</Text>}
+          {cleanTitle && <Text style={styles.pageTitle} numberOfLines={2} ellipsizeMode="tail">{cleanTitle}</Text>}
           {recipe.shortDescription && (
             <Text style={styles.shortDescription}>{recipe.shortDescription}</Text>
           )}

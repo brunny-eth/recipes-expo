@@ -32,7 +32,7 @@ const RecipeStepsHeader: React.FC<RecipeStepsHeaderProps> = ({
   // console.log('RecipeStepsHeader shortDescription:', recipe?.shortDescription);
   return (
     <View style={styles.recipeHeader}>
-      <Text style={styles.recipeTitle}>
+      <Text style={styles.recipeTitle} numberOfLines={2} ellipsizeMode="tail">
         {title}
       </Text>
     </View>
