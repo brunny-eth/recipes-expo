@@ -46,6 +46,7 @@ type MiseRecipe = {
   title_override: string | null;
   planned_date: string | null;
   prepared_recipe_data: ParsedRecipe;
+  original_recipe_data: ParsedRecipe | null; // Original recipe data for consistent scaling
   final_yield: number;
   applied_changes: any | null;
   is_completed: boolean;
@@ -631,6 +632,10 @@ export default function MiseScreen() {
                 // Pass applied changes so the summary can restore the correct scaling factor
                 ...(item.applied_changes && {
                   appliedChanges: JSON.stringify(item.applied_changes)
+                }),
+                // Pass original recipe data for consistent scaling
+                ...(item.original_recipe_data && {
+                  originalRecipeData: JSON.stringify(item.original_recipe_data)
                 }),
               },
             });

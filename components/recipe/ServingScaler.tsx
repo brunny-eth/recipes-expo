@@ -38,8 +38,6 @@ type ServingScalerProps = {
   handleScaleFactorChange: (factor: number) => void;
   recipeYield: string | null | undefined;
   originalYieldValue: number | null;
-  isViewingSavedRecipe?: boolean;
-  appliedChanges?: any; // Add appliedChanges parameter
 };
 
 const ServingScaler: React.FC<ServingScalerProps> = ({
@@ -47,8 +45,6 @@ const ServingScaler: React.FC<ServingScalerProps> = ({
   handleScaleFactorChange,
   recipeYield,
   originalYieldValue,
-  isViewingSavedRecipe = false,
-  appliedChanges,
 }) => {
   return (
     <>
@@ -64,32 +60,10 @@ const ServingScaler: React.FC<ServingScalerProps> = ({
           const direction = selectedScaleFactor < 1 ? 'down' : 'up';
 
           if (originalYieldValue && originalYieldValue > 0 && recipeYield) {
-            let scaledYieldString;
+            // Always scale from original recipe yield
+            const scaledYieldString = getScaledYieldText(recipeYield, selectedScaleFactor);
             
-            if (isViewingSavedRecipe) {
-              // For saved recipes, calculate the relative scale factor
-              const savedScaleFactor = (() => {
-                if (appliedChanges) {
-                  try {
-                    const savedAppliedChanges = JSON.parse(appliedChanges);
-                    return savedAppliedChanges.scalingFactor || 1.0;
-                  } catch {
-                    return 1.0;
-                  }
-                }
-                return 1.0;
-              })();
-              
-              // Calculate the relative scale factor and apply it
-              const relativeScaleFactor = selectedScaleFactor / savedScaleFactor;
-              scaledYieldString = getScaledYieldText(recipeYield, relativeScaleFactor);
-            } else {
-              // For new recipes, scale directly
-              scaledYieldString = getScaledYieldText(recipeYield, selectedScaleFactor);
-            }
-            
-            console.log('[DEBUG] ServingScaler yield:', {
-              isViewingSavedRecipe,
+            console.log('[DEBUG] ServingScaler yield (simplified):', {
               recipeYield,
               selectedScaleFactor,
               scaledYieldString,

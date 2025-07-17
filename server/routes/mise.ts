@@ -299,6 +299,7 @@ router.get('/recipes', async (req: Request, res: Response) => {
         planned_date,
         display_order,
         prepared_recipe_data,
+        original_recipe_data,
         final_yield,
         applied_changes,
         is_completed,

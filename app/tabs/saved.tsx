@@ -29,6 +29,7 @@ type SavedRecipe = {
   base_recipe_id: number;
   title_override: string | null;
   applied_changes: any | null; // JSON object with ingredient changes and scaling
+  original_recipe_data: ParsedRecipe | null; // Original recipe data for consistent scaling
   processed_recipes_cache: {
     id: number;
     recipe_data: ParsedRecipe;
@@ -78,6 +79,7 @@ export default function SavedScreen() {
         base_recipe_id,
         title_override,
         applied_changes,
+        original_recipe_data,
         processed_recipes_cache (
           id,
           recipe_data,
@@ -201,6 +203,7 @@ export default function SavedScreen() {
             base_recipe_id,
             title_override,
             applied_changes,
+            original_recipe_data,
             processed_recipes_cache (
               id,
               recipe_data,
@@ -271,6 +274,9 @@ export default function SavedScreen() {
         isModified: isModified.toString(),
         ...(isModified && item.applied_changes && {
           appliedChanges: JSON.stringify(item.applied_changes)
+        }),
+        ...(item.original_recipe_data && {
+          originalRecipeData: JSON.stringify(item.original_recipe_data)
         }),
       },
     });

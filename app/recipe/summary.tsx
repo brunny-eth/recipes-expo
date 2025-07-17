@@ -217,7 +217,7 @@ const buttonWidth = (availableWidth - buttonTotalGap) / numButtons;
 // --- End Types ---
 
 export default function RecipeSummaryScreen() {
-  const params = useLocalSearchParams<{ recipeData?: string; from?: string; appliedChanges?: string; isModified?: string; entryPoint?: string; miseRecipeId?: string; finalYield?: string }>();
+  const params = useLocalSearchParams<{ recipeData?: string; from?: string; appliedChanges?: string; isModified?: string; entryPoint?: string; miseRecipeId?: string; finalYield?: string; originalRecipeData?: string }>();
   const router = useRouter();
   const { showError, hideError } = useErrorModal();
   const { session } = useAuth();
@@ -228,6 +228,7 @@ export default function RecipeSummaryScreen() {
 
 
   const [recipe, setRecipe] = useState<ParsedRecipe | null>(null);
+  const [originalRecipe, setOriginalRecipe] = useState<ParsedRecipe | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isAllergensExpanded, setIsAllergensExpanded] = useState(false);
@@ -279,46 +280,23 @@ export default function RecipeSummaryScreen() {
   const [isAlreadyInMise, setIsAlreadyInMise] = useState(false);
 
   const scaledIngredientGroups = React.useMemo<IngredientGroup[]>(() => {
-    if (!recipe?.ingredientGroups) return [];
-    const result = recipe.ingredientGroups.map((group) => {
+    if (!originalRecipe?.ingredientGroups) return [];
+    
+    const result = originalRecipe.ingredientGroups.map((group) => {
       if (!group.ingredients || !Array.isArray(group.ingredients)) {
         return { ...group, ingredients: [] };
       }
-      // Always scale ingredients based on current selectedScaleFactor
-      // For saved recipes, we need to scale relative to the saved scale factor
+      
+      // Always scale ingredients from the original recipe using the current selectedScaleFactor
       const scaledIngredients = group.ingredients.map((ingredient) => {
-        if (isViewingSavedRecipe) {
-          // For saved recipes, we need to scale relative to the saved scale factor
-          // First get the saved scale factor from appliedChanges
-          const savedScaleFactor = (() => {
-            if (params.appliedChanges) {
-              try {
-                const savedAppliedChanges = JSON.parse(params.appliedChanges as string);
-                return savedAppliedChanges.scalingFactor || 1.0;
-              } catch {
-                return 1.0;
-              }
-            }
-            return 1.0;
-          })();
-          
-          // Calculate the relative scale factor
-          const relativeScaleFactor = selectedScaleFactor / savedScaleFactor;
-          
-          console.log('[DEBUG] Saved recipe - scaling with relative factor:', {
-            ingredient: ingredient.name,
-            amount: ingredient.amount,
-            savedScaleFactor,
-            currentScaleFactor: selectedScaleFactor,
-            relativeScaleFactor,
-            entryPoint
-          });
-          
-          return scaleIngredient(ingredient, relativeScaleFactor);
-        } else {
-          console.log('[DEBUG] New recipe - applying scaling factor:', selectedScaleFactor, 'to', ingredient.name, ingredient.amount, 'entryPoint:', entryPoint);
-          return scaleIngredient(ingredient, selectedScaleFactor);
-        }
+        console.log('[DEBUG] Scaling from original recipe:', {
+          ingredient: ingredient.name,
+          amount: ingredient.amount,
+          scaleFactor: selectedScaleFactor,
+          entryPoint
+        });
+        
+        return scaleIngredient(ingredient, selectedScaleFactor);
       });
 
       let finalIngredients = scaledIngredients;
@@ -375,7 +353,7 @@ export default function RecipeSummaryScreen() {
       };
     });
     return result;
-  }, [recipe, selectedScaleFactor, appliedChanges, isViewingSavedRecipe]);
+  }, [originalRecipe, selectedScaleFactor, appliedChanges, isViewingSavedRecipe]);
 
   // Keep scaledIngredients as a flat array for backward compatibility with existing code
   const scaledIngredients = React.useMemo<StructuredIngredient[]>(() => {
@@ -398,8 +376,27 @@ export default function RecipeSummaryScreen() {
           return;
         }
         setRecipe(parsed);
-        const yieldNum = parseServingsValue(parsed.recipeYield);
-        setOriginalYieldValue(yieldNum);
+        
+        // Set original recipe data if available (for consistent scaling)
+        if (params.originalRecipeData) {
+          try {
+            const originalParsed = JSON.parse(params.originalRecipeData as string);
+            setOriginalRecipe(originalParsed);
+            const yieldNum = parseServingsValue(originalParsed.recipeYield);
+            setOriginalYieldValue(yieldNum);
+          } catch (originalError) {
+            console.error('[DEBUG] Error parsing original recipe data:', originalError);
+            // Fall back to using the current recipe as original
+            setOriginalRecipe(parsed);
+            const yieldNum = parseServingsValue(parsed.recipeYield);
+            setOriginalYieldValue(yieldNum);
+          }
+        } else {
+          // For new recipes or when original data is not available, use current recipe as original
+          setOriginalRecipe(parsed);
+          const yieldNum = parseServingsValue(parsed.recipeYield);
+          setOriginalYieldValue(yieldNum);
+        }
         
         // Check if this is a saved recipe with existing applied changes
         if (params.appliedChanges) {
@@ -422,9 +419,30 @@ export default function RecipeSummaryScreen() {
               }));
               setAppliedChanges(convertedChanges);
             }
-            // Set scaling factor from saved changes
-            if (savedAppliedChanges.scalingFactor) {
-              console.log('[DEBUG] Setting scaling factor from saved changes:', savedAppliedChanges.scalingFactor);
+            
+            // Calculate the actual scale factor from original recipe
+            if (savedAppliedChanges.scalingFactor && params.originalRecipeData) {
+              // For saved/mise recipes, calculate the current scale factor based on the current recipe yield vs original yield
+              const currentYieldNum = parseServingsValue(parsed.recipeYield);
+              let originalYieldNum = null;
+              
+              try {
+                const originalParsed = JSON.parse(params.originalRecipeData as string);
+                originalYieldNum = parseServingsValue(originalParsed?.recipeYield);
+              } catch (originalError) {
+                console.error('[DEBUG] Error parsing original recipe for yield calculation:', originalError);
+              }
+              
+              if (currentYieldNum && originalYieldNum) {
+                const actualScaleFactor = currentYieldNum / originalYieldNum;
+                console.log('[DEBUG] Calculated actual scale factor:', { currentYieldNum, originalYieldNum, actualScaleFactor });
+                setSelectedScaleFactor(actualScaleFactor);
+              } else {
+                console.log('[DEBUG] Could not calculate yield-based scale factor, using saved factor:', savedAppliedChanges.scalingFactor);
+                setSelectedScaleFactor(savedAppliedChanges.scalingFactor);
+              }
+            } else if (savedAppliedChanges.scalingFactor) {
+              console.log('[DEBUG] Using scaling factor from saved changes:', savedAppliedChanges.scalingFactor);
               setSelectedScaleFactor(savedAppliedChanges.scalingFactor);
             } else {
               console.log('[DEBUG] No scaling factor in saved changes, defaulting to 1.0');
@@ -469,9 +487,9 @@ export default function RecipeSummaryScreen() {
   }, [selectedScaleFactor, appliedChanges]); // Reset when scaling or ingredient changes occur
 
   const detectedAllergens = React.useMemo(() => {
-    if (!recipe) return [];
-    return extractAllergens(recipe.ingredientGroups);
-  }, [recipe]);
+    if (!originalRecipe) return [];
+    return extractAllergens(originalRecipe.ingredientGroups);
+  }, [originalRecipe]);
 
   const handleScaleFactorChange = (factor: number) => setSelectedScaleFactor(factor);
 
@@ -691,7 +709,7 @@ export default function RecipeSummaryScreen() {
                   const modifiedRecipe = {
           ...baseRecipe,
           title: newTitle || baseRecipe.title,
-          recipeYield: isViewingSavedRecipe ? baseRecipe.recipeYield : getScaledYieldText(baseRecipe.recipeYield, selectedScaleFactor),
+          recipeYield: getScaledYieldText(originalRecipe?.recipeYield || baseRecipe.recipeYield, selectedScaleFactor),
           instructions: finalInstructions,
           ingredientGroups: scaledIngredientGroups,
         };
@@ -793,37 +811,13 @@ export default function RecipeSummaryScreen() {
     }
 
     // --- 3. Save Prepared Recipe to Mise Table ---
-    // Calculate the correct scale factor for saved recipes
-    const actualScaleFactor = (() => {
-      if (isViewingSavedRecipe) {
-        // For saved recipes, calculate the relative scale factor
-        const savedScaleFactor = (() => {
-          if (params.appliedChanges) {
-            try {
-              const savedAppliedChanges = JSON.parse(params.appliedChanges as string);
-              return savedAppliedChanges.scalingFactor || 1.0;
-            } catch {
-              return 1.0;
-            }
-          }
-          return 1.0;
-        })();
-        
-        // Calculate the relative scale factor
-        return selectedScaleFactor / savedScaleFactor;
-      } else {
-        // For new recipes, use the selected scale factor directly
-        return selectedScaleFactor;
-      }
-    })();
+    // Use the selected scale factor directly (now always relative to original)
 
     const finalRecipeData = {
       // Pass the ORIGINAL recipe data with all metadata intact
       ...recipe,
       // Update the yield text and instructions for the prepared version
-      recipeYield: isViewingSavedRecipe 
-        ? getScaledYieldText(recipe.recipeYield, actualScaleFactor)
-        : getScaledYieldText(recipe.recipeYield, selectedScaleFactor),
+                recipeYield: getScaledYieldText(originalRecipe?.recipeYield || recipe?.recipeYield, selectedScaleFactor),
       instructions: finalInstructions,
       ingredientGroups: scaledIngredientGroups,
     };
@@ -833,7 +827,7 @@ export default function RecipeSummaryScreen() {
         from: change.from,
         to: change.to ? change.to.name : null, // Convert StructuredIngredient to string
       })),
-      scalingFactor: actualScaleFactor,
+              scalingFactor: selectedScaleFactor,
     };
 
     // Check authentication before saving
@@ -861,9 +855,7 @@ export default function RecipeSummaryScreen() {
           originalRecipeId: recipe.id,
           preparedRecipeData: finalRecipeData,
           appliedChanges: appliedChangesData,
-          finalYield: isViewingSavedRecipe 
-            ? getScaledYieldText(recipe.recipeYield, actualScaleFactor)
-            : getScaledYieldText(recipe.recipeYield, selectedScaleFactor),
+          finalYield: getScaledYieldText(originalRecipe?.recipeYield || recipe?.recipeYield, selectedScaleFactor),
           titleOverride: newTitle || null,
         }),
       });
@@ -1003,7 +995,7 @@ export default function RecipeSummaryScreen() {
         const modifiedRecipeData = {
           ...recipe,
           title: newTitle || recipe.title,
-          recipeYield: isViewingSavedRecipe ? recipe.recipeYield : getScaledYieldText(recipe.recipeYield, selectedScaleFactor),
+          recipeYield: getScaledYieldText(originalRecipe?.recipeYield || recipe?.recipeYield, selectedScaleFactor),
           instructions: finalInstructions,
           ingredientGroups: scaledIngredientGroups,
         };
@@ -1304,10 +1296,8 @@ export default function RecipeSummaryScreen() {
           <ServingScaler
             selectedScaleFactor={selectedScaleFactor}
             handleScaleFactorChange={handleScaleFactorChange}
-            recipeYield={recipe.recipeYield}
+            recipeYield={originalRecipe?.recipeYield || recipe?.recipeYield}
             originalYieldValue={originalYieldValue}
-            isViewingSavedRecipe={isViewingSavedRecipe}
-            appliedChanges={params.appliedChanges}
           />
         </CollapsibleSection>
 
@@ -1323,33 +1313,11 @@ export default function RecipeSummaryScreen() {
             <Text style={styles.ingredientsSubtext}>
               {(() => {
                 const direction = selectedScaleFactor < 1 ? 'down' : 'up';
-                let scaledYieldString;
+                // Always scale from original recipe yield
+                const scaledYieldString = getScaledYieldText(originalRecipe?.recipeYield || recipe?.recipeYield, selectedScaleFactor);
                 
-                if (isViewingSavedRecipe) {
-                  // For saved recipes, calculate the relative scale factor
-                  const savedScaleFactor = (() => {
-                    if (params.appliedChanges) {
-                      try {
-                        const savedAppliedChanges = JSON.parse(params.appliedChanges as string);
-                        return savedAppliedChanges.scalingFactor || 1.0;
-                      } catch {
-                        return 1.0;
-                      }
-                    }
-                    return 1.0;
-                  })();
-                  
-                  // Calculate the relative scale factor and apply it
-                  const relativeScaleFactor = selectedScaleFactor / savedScaleFactor;
-                  scaledYieldString = getScaledYieldText(recipe.recipeYield, relativeScaleFactor);
-                } else {
-                  // For new recipes, scale directly
-                  scaledYieldString = getScaledYieldText(recipe.recipeYield, selectedScaleFactor);
-                }
-                
-                console.log('[DEBUG] Yield display:', {
-                  isViewingSavedRecipe,
-                  originalYield: recipe.recipeYield,
+                console.log('[DEBUG] Yield display (simplified):', {
+                  originalYield: originalRecipe?.recipeYield || recipe?.recipeYield,
                   scaledYieldString,
                   selectedScaleFactor,
                 });
