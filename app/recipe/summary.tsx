@@ -282,25 +282,50 @@ export default function RecipeSummaryScreen() {
   const scaledIngredientGroups = React.useMemo<IngredientGroup[]>(() => {
     if (!originalRecipe?.ingredientGroups) return [];
     
+    console.log('[DEBUG] ===== SCALING INGREDIENTS =====');
+    console.log('[DEBUG] Scaling context:', {
+      entryPoint,
+      selectedScaleFactor,
+      appliedChangesCount: appliedChanges.length,
+      appliedChanges,
+      isViewingSavedRecipe,
+      originalRecipeTitle: originalRecipe.title,
+    });
+    
     const result = originalRecipe.ingredientGroups.map((group) => {
       if (!group.ingredients || !Array.isArray(group.ingredients)) {
         return { ...group, ingredients: [] };
       }
+      
+      console.log('[DEBUG] Processing group:', {
+        groupName: group.name || 'Default',
+        ingredientCount: group.ingredients.length,
+      });
       
       // Always scale ingredients from the original recipe using the current selectedScaleFactor
       const scaledIngredients = group.ingredients.map((ingredient) => {
         console.log('[DEBUG] Scaling from original recipe:', {
           ingredient: ingredient.name,
           amount: ingredient.amount,
+          unit: ingredient.unit,
           scaleFactor: selectedScaleFactor,
           entryPoint
         });
         
-        return scaleIngredient(ingredient, selectedScaleFactor);
+        const scaledIngredient = scaleIngredient(ingredient, selectedScaleFactor);
+        console.log('[DEBUG] After scaling:', {
+          ingredient: scaledIngredient.name,
+          amount: scaledIngredient.amount,
+          unit: scaledIngredient.unit,
+        });
+        
+        return scaledIngredient;
       });
 
       let finalIngredients = scaledIngredients;
       if (appliedChanges.length > 0) {
+        console.log('[DEBUG] Applying substitutions to scaled ingredients...');
+        
         if (isViewingSavedRecipe) {
           // Clean display for saved recipes: filter out removed, cleanly replace substituted
           finalIngredients = scaledIngredients
@@ -309,17 +334,37 @@ export default function RecipeSummaryScreen() {
               const { baseName: originalName } = parseIngredientDisplayName(baseIngredient.name);
               const change = appliedChanges.find((c) => c.from === originalName);
               
+              console.log('[DEBUG] Checking ingredient for substitution (clean display):', {
+                baseIngredientName: baseIngredient.name,
+                originalName,
+                foundChange: !!change,
+                change,
+              });
+              
               if (change) {
                 if (change.to === null) {
+                  console.log('[DEBUG] Marking ingredient for removal:', originalName);
                   // Mark for removal (will be filtered out)
                   return null;
                 }
                 // Replace with substituted ingredient (no visual indicators)
-                return {
+                const substitutedIngredient = {
                   ...change.to,
                   // Keep the substituted ingredient's name as-is
                 };
+                console.log('[DEBUG] Applying clean substitution:', {
+                  originalName,
+                  substitutedIngredient,
+                  substituteAmount: substitutedIngredient.amount,
+                  substituteUnit: substitutedIngredient.unit,
+                });
+                return substitutedIngredient;
               }
+              console.log('[DEBUG] No substitution found, keeping original:', {
+                name: baseIngredient.name,
+                amount: baseIngredient.amount,
+                unit: baseIngredient.unit,
+              });
               return baseIngredient;
             })
             .filter((ingredient): ingredient is StructuredIngredient => ingredient !== null);
@@ -327,8 +372,16 @@ export default function RecipeSummaryScreen() {
           // Active editing: show visual indicators for user feedback
           finalIngredients = scaledIngredients.map((baseIngredient) => {
             const change = appliedChanges.find((c) => c.from === baseIngredient.name);
+            
+            console.log('[DEBUG] Checking ingredient for substitution (with indicators):', {
+              baseIngredientName: baseIngredient.name,
+              foundChange: !!change,
+              change,
+            });
+            
             if (change) {
               if (change.to === null) {
+                console.log('[DEBUG] Applying removal indicator:', baseIngredient.name);
                 return {
                   ...baseIngredient,
                   name: `${baseIngredient.name} (removed)`,
@@ -337,21 +390,44 @@ export default function RecipeSummaryScreen() {
                   suggested_substitutions: null,
                 };
               }
-              return {
+              const substitutedIngredient = {
                 ...change.to,
                 name: `${change.to.name} (substituted for ${change.from})`,
               };
+              console.log('[DEBUG] Applying substitution with indicator:', {
+                originalName: baseIngredient.name,
+                substitutedIngredient,
+                substituteAmount: substitutedIngredient.amount,
+                substituteUnit: substitutedIngredient.unit,
+              });
+              return substitutedIngredient;
             }
+            console.log('[DEBUG] No substitution found, keeping original:', {
+              name: baseIngredient.name,
+              amount: baseIngredient.amount,
+              unit: baseIngredient.unit,
+            });
             return baseIngredient;
           });
         }
       }
+
+      console.log('[DEBUG] Final ingredients for group:', {
+        groupName: group.name || 'Default',
+        finalIngredients: finalIngredients.map(ing => ({
+          name: ing.name,
+          amount: ing.amount,
+          unit: ing.unit,
+        })),
+      });
 
       return {
         ...group,
         ingredients: finalIngredients,
       };
     });
+    
+    console.log('[DEBUG] ===== END SCALING INGREDIENTS =====');
     return result;
   }, [originalRecipe, selectedScaleFactor, appliedChanges, isViewingSavedRecipe]);
 
@@ -407,16 +483,33 @@ export default function RecipeSummaryScreen() {
             
             // Convert saved format to internal format
             if (savedAppliedChanges.ingredientChanges) {
+              console.log('[DEBUG] Converting ingredientChanges to internal format:', savedAppliedChanges.ingredientChanges);
+              
               const convertedChanges: AppliedChange[] = savedAppliedChanges.ingredientChanges.map((change: any) => ({
                 from: change.from,
-                to: change.to ? { 
-                  name: change.to, 
-                  amount: null, 
-                  unit: null, 
-                  preparation: null, 
-                  suggested_substitutions: null 
+                to: change.to ? {
+                  // Handle both old format (string) and new format (object)
+                  name: typeof change.to === 'string' ? change.to : change.to.name,
+                  amount: typeof change.to === 'string' ? null : change.to.amount,
+                  unit: typeof change.to === 'string' ? null : change.to.unit,
+                  preparation: typeof change.to === 'string' ? null : change.to.preparation,
+                  suggested_substitutions: null,
                 } : null,
               }));
+              
+              console.log('[DEBUG] Converted appliedChanges:', {
+                original: savedAppliedChanges.ingredientChanges,
+                converted: convertedChanges,
+                details: convertedChanges.map(change => ({
+                  from: change.from,
+                  to: change.to ? {
+                    name: change.to.name,
+                    amount: change.to.amount,
+                    unit: change.to.unit,
+                  } : null,
+                })),
+              });
+              
               setAppliedChanges(convertedChanges);
             }
             
@@ -500,6 +593,7 @@ export default function RecipeSummaryScreen() {
       console.log('[DEBUG] openSubstitutionModal called with:', {
         ingredientName: ingredient.name,
         ingredientAmount: ingredient.amount,
+        ingredientUnit: ingredient.unit,
         selectedScaleFactor,
         isViewingSavedRecipe,
         appliedChanges,
@@ -514,21 +608,44 @@ export default function RecipeSummaryScreen() {
         const scalingFactor = selectedScaleFactor;
         scaledSuggestions = ingredient.suggested_substitutions.map((sub) => {
           let finalAmount: string | number | null = sub.amount ?? null;
+          
+          console.log('[DEBUG] Processing substitution before scaling:', {
+            name: sub.name,
+            originalAmount: sub.amount,
+            unit: sub.unit,
+            description: sub.description,
+          });
+          
           if (sub.amount != null) {
             const parsedAmount = parseAmountString(String(sub.amount));
             if (parsedAmount !== null) {
               const calculatedAmount = parsedAmount * scalingFactor;
               finalAmount = formatAmountNumber(calculatedAmount) || calculatedAmount.toFixed(2);
               console.log('[DEBUG] Scaled substitution:', {
+                name: sub.name,
                 original: sub.amount,
                 parsed: parsedAmount,
                 scalingFactor,
                 calculated: calculatedAmount,
                 final: finalAmount,
               });
+            } else {
+              console.log('[DEBUG] Could not parse amount for substitution:', {
+                name: sub.name,
+                amount: sub.amount,
+                typeof: typeof sub.amount,
+              });
             }
           }
-          return { ...sub, amount: finalAmount };
+          
+          const scaledSub = { ...sub, amount: finalAmount };
+          console.log('[DEBUG] Final scaled substitution:', {
+            name: scaledSub.name,
+            amount: scaledSub.amount,
+            unit: scaledSub.unit,
+          });
+          
+          return scaledSub;
         });
       } else {
         console.log('[DEBUG] No scaling applied to substitutions:', {
@@ -539,7 +656,11 @@ export default function RecipeSummaryScreen() {
         scaledSuggestions = ingredient.suggested_substitutions || null;
       }
 
-      console.log('[DEBUG] Final scaled suggestions:', scaledSuggestions);
+      console.log('[DEBUG] Final scaled suggestions for modal:', {
+        originalSuggestions: ingredient.suggested_substitutions,
+        scaledSuggestions,
+        ingredientName: ingredient.name,
+      });
 
       setSelectedIngredientOriginalData(ingredient);
       setProcessedSubstitutionsForModal(scaledSuggestions);
@@ -570,6 +691,24 @@ export default function RecipeSummaryScreen() {
       const { substitutedFor } = parseIngredientDisplayName(ingredientToSubstitute.name);
       if (substitutedFor) originalNameForSub = substitutedFor;
       
+      console.log('[DEBUG] Creating substitution change:', {
+        originalIngredient: {
+          name: ingredientToSubstitute.name,
+          amount: ingredientToSubstitute.amount,
+          unit: ingredientToSubstitute.unit,
+        },
+        substitution: {
+          name: substitution.name,
+          amount: substitution.amount,
+          unit: substitution.unit,
+          description: substitution.description,
+        },
+        originalNameForSub,
+        isRemoval,
+        entryPoint,
+        selectedScaleFactor,
+      });
+      
       const newChange: AppliedChange = {
         from: originalNameForSub,
         to: isRemoval
@@ -583,6 +722,13 @@ export default function RecipeSummaryScreen() {
             },
       };
 
+      console.log('[DEBUG] Final substitution change object:', {
+        newChange,
+        toIngredient: newChange.to,
+        amountAfterConversion: newChange.to?.amount,
+        unitAfterConversion: newChange.to?.unit,
+      });
+
       if (isRemoval) setLastRemoved({ from: newChange.from, to: null });
 
       setAppliedChanges((prev) => {
@@ -590,9 +736,20 @@ export default function RecipeSummaryScreen() {
         if (existingChangeIndex > -1) {
           const updated = [...prev];
           updated[existingChangeIndex] = newChange;
+          console.log('[DEBUG] Updated existing substitution:', {
+            index: existingChangeIndex,
+            oldChange: prev[existingChangeIndex],
+            newChange,
+          });
           return updated;
         }
-        return [...prev, newChange];
+        const newAppliedChanges = [...prev, newChange];
+        console.log('[DEBUG] Added new substitution:', {
+          previousChanges: prev,
+          newChange,
+          allChanges: newAppliedChanges,
+        });
+        return newAppliedChanges;
       });
     });
   };
@@ -825,10 +982,64 @@ export default function RecipeSummaryScreen() {
     const appliedChangesData = {
       ingredientChanges: appliedChanges.map((change) => ({
         from: change.from,
-        to: change.to ? change.to.name : null, // Convert StructuredIngredient to string
+        to: change.to ? {
+          name: change.to.name,
+          amount: change.to.amount,
+          unit: change.to.unit,
+          preparation: change.to.preparation,
+        } : null, // Preserve complete substitution data
       })),
               scalingFactor: selectedScaleFactor,
     };
+
+    console.log('[DEBUG] ✅ FIXED: Preserving complete substitution data when saving:', {
+      originalAppliedChanges: appliedChanges.map(change => ({
+        from: change.from,
+        to: change.to ? {
+          name: change.to.name,
+          amount: change.to.amount,
+          unit: change.to.unit,
+          preparation: change.to.preparation,
+        } : null,
+      })),
+      savedAppliedChangesData: appliedChangesData,
+      dataPreserved: appliedChanges.map(change => ({
+        from: change.from,
+        originalAmount: change.to?.amount || 'N/A',
+        originalUnit: change.to?.unit || 'N/A',
+        savedData: change.to,
+        amountPreserved: !!change.to?.amount,
+        unitPreserved: !!change.to?.unit,
+      })),
+    });
+
+    console.log('[DEBUG] Preparing recipe for mise save:', {
+      finalRecipeData: {
+        title: finalRecipeData.title,
+        recipeYield: finalRecipeData.recipeYield,
+        ingredientGroups: finalRecipeData.ingredientGroups?.map(group => ({
+          name: group.name,
+          ingredients: group.ingredients?.map(ing => ({
+            name: ing.name,
+            amount: ing.amount,
+            unit: ing.unit,
+          })),
+        })),
+      },
+      appliedChangesData,
+      originalRecipeData: {
+        title: (originalRecipe || recipe).title,
+        recipeYield: (originalRecipe || recipe).recipeYield,
+        ingredientGroups: (originalRecipe || recipe).ingredientGroups?.map(group => ({
+          name: group.name,
+          ingredients: group.ingredients?.map(ing => ({
+            name: ing.name,
+            amount: ing.amount,
+            unit: ing.unit,
+          })),
+        })),
+      },
+    });
 
     // Check authentication before saving
     if (!session?.user?.id) {
@@ -862,6 +1073,17 @@ export default function RecipeSummaryScreen() {
       });
 
       const result = await response.json();
+      
+      console.log('[DEBUG] Mise save response:', {
+        success: response.ok,
+        status: response.status,
+        result,
+        savedRecipeData: result.miseRecipe ? {
+          id: result.miseRecipe.id,
+          title: result.miseRecipe.title,
+          // Add any other relevant fields from the saved recipe
+        } : null,
+      });
       
       if (!response.ok) {
         if (response.status === 409) {
@@ -1004,10 +1226,56 @@ export default function RecipeSummaryScreen() {
         const appliedChangesData = {
           ingredientChanges: appliedChanges.map((change) => ({
             from: change.from,
-            to: change.to ? change.to.name : null,
+            to: change.to ? {
+              name: change.to.name,
+              amount: change.to.amount,
+              unit: change.to.unit,
+              preparation: change.to.preparation,
+            } : null, // Preserve complete substitution data
           })),
           scalingFactor: selectedScaleFactor,
         };
+
+        console.log('[DEBUG] ✅ FIXED: Preserving complete substitution data when saving (handleSaveForLater):', {
+          originalAppliedChanges: appliedChanges.map(change => ({
+            from: change.from,
+            to: change.to ? {
+              name: change.to.name,
+              amount: change.to.amount,
+              unit: change.to.unit,
+              preparation: change.to.preparation,
+            } : null,
+          })),
+          savedAppliedChangesData: appliedChangesData,
+          dataPreserved: appliedChanges.map(change => ({
+            from: change.from,
+            originalAmount: change.to?.amount || 'N/A',
+            originalUnit: change.to?.unit || 'N/A',
+            savedData: change.to,
+            amountPreserved: !!change.to?.amount,
+            unitPreserved: !!change.to?.unit,
+          })),
+        });
+
+        console.log('[DEBUG] Saving modified recipe with data:', {
+          modifiedRecipeData: {
+            title: modifiedRecipeData.title,
+            recipeYield: modifiedRecipeData.recipeYield,
+            ingredientGroups: modifiedRecipeData.ingredientGroups?.map(group => ({
+              name: group.name,
+              ingredients: group.ingredients?.map(ing => ({
+                name: ing.name,
+                amount: ing.amount,
+                unit: ing.unit,
+              })),
+            })),
+          },
+          appliedChangesData,
+          originalRecipeData: {
+            title: (originalRecipe || recipe).title,
+            recipeYield: (originalRecipe || recipe).recipeYield,
+          },
+        });
 
         // Save the modified recipe
         const saveResponse = await fetch(`${backendUrl}/api/recipes/save-modified`, {

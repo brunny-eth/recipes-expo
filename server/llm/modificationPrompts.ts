@@ -2,7 +2,15 @@ import { formatMeasurement } from '../../utils/format';
 import { PromptPayload } from './adapters';
 import logger from '../lib/logger';
 
-export type IngredientChange = { from: string; to: string | null };
+export type IngredientChange = { 
+  from: string; 
+  to: string | null | {
+    name: string;
+    amount: string | null;
+    unit: string | null;
+    preparation: string | null;
+  };
+};
 
 export function buildModificationPrompt(
     originalInstructions: string[],
@@ -20,7 +28,7 @@ export function buildModificationPrompt(
             return null;
         }
 
-        if (!sub.to || sub.to.trim() === '') {
+        if (!sub.to) {
             // derive simple alternative names (last word and grated form)
             const words = from.split(' ');
             const base = words[words.length - 1];
@@ -30,7 +38,39 @@ export function buildModificationPrompt(
             const altLine = altPhrases.length ? `\nALSO REMOVE if referred to as: ${altPhrases.map(a => `"${a}"`).join(', ')}` : '';
             return `REMOVE: "${from}"${altLine}`;
         }
-        return `REPLACE: "${from}" → "${formatMeasurement(Number(sub.to)) || sub.to}"`;
+
+        // Handle both old format (string) and new format (object)
+        if (typeof sub.to === 'string') {
+            if (sub.to.trim() === '') {
+                // derive simple alternative names (last word and grated form)
+                const words = from.split(' ');
+                const base = words[words.length - 1];
+                const altPhrases: string[] = [];
+                if (base.toLowerCase() !== from.toLowerCase()) altPhrases.push(base);
+                altPhrases.push(`grated ${base}`);
+                const altLine = altPhrases.length ? `\nALSO REMOVE if referred to as: ${altPhrases.map(a => `"${a}"`).join(', ')}` : '';
+                return `REMOVE: "${from}"${altLine}`;
+            }
+            return `REPLACE: "${from}" → "${formatMeasurement(Number(sub.to)) || sub.to}"`;
+        } else {
+            // New format: object with name, amount, unit, preparation
+            const toIngredient = sub.to;
+            let replacementText = toIngredient.name;
+            
+            // Include amount and unit if available
+            if (toIngredient.amount && toIngredient.unit) {
+                replacementText = `${toIngredient.amount} ${toIngredient.unit} ${toIngredient.name}`;
+            } else if (toIngredient.amount) {
+                replacementText = `${toIngredient.amount} ${toIngredient.name}`;
+            }
+            
+            // Include preparation if available
+            if (toIngredient.preparation) {
+                replacementText += ` (${toIngredient.preparation})`;
+            }
+            
+            return `REPLACE: "${from}" → "${replacementText}"`;
+        }
     }).filter(Boolean).join('\n');
 
     // Build ingredient scaling info (from scalingPrompts.ts)
