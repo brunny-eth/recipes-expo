@@ -1458,6 +1458,7 @@ export default function RecipeSummaryScreen() {
           userId: session.user.id,
           preparedRecipeData: modifiedRecipeData,
           appliedChanges: appliedChangesData,
+          finalYield: getScaledYieldText(originalRecipe?.recipeYield || recipe.recipeYield, selectedScaleFactor),
         }),
       });
 
@@ -1478,6 +1479,14 @@ export default function RecipeSummaryScreen() {
 
       // Reset modifications state
       setHasModifications(false);
+      
+      // Invalidate mise cache to force fresh data fetch
+      try {
+        await AsyncStorage.removeItem('miseLastFetched');
+        console.log('[Summary] Invalidated mise cache after saving modifications');
+      } catch (cacheError) {
+        console.warn('[Summary] Failed to invalidate mise cache:', cacheError);
+      }
       
       // Show success feedback
       showError('Modifications Saved', 'Your changes have been saved for this cooking session. The grocery list will update when you return to your mise.', () => {

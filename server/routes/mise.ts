@@ -327,7 +327,7 @@ router.put('/recipes/:id', async (req: Request, res: Response) => {
   
   try {
     const { id } = req.params;
-    const { userId, titleOverride, plannedDate, displayOrder, isCompleted, preparedRecipeData, appliedChanges } = req.body;
+    const { userId, titleOverride, plannedDate, displayOrder, isCompleted, preparedRecipeData, appliedChanges, finalYield } = req.body;
 
     if (!userId) {
       return res.status(400).json({ error: 'Missing userId' });
@@ -343,6 +343,7 @@ router.put('/recipes/:id', async (req: Request, res: Response) => {
     if (isCompleted !== undefined) updates.is_completed = isCompleted;
     if (preparedRecipeData !== undefined) updates.prepared_recipe_data = preparedRecipeData;
     if (appliedChanges !== undefined) updates.applied_changes = appliedChanges;
+    if (finalYield !== undefined) updates.final_yield = finalYield;
 
     const { data: updatedRecipe, error: updateError } = await supabaseAdmin
       .from('user_mise_recipes')
