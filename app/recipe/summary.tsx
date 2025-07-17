@@ -1409,45 +1409,87 @@ export default function RecipeSummaryScreen() {
     }
   };
 
-  const handleSaveModifications = () => {
+  const handleSaveModifications = async () => {
     if (entryPoint !== 'mise' || !miseRecipeId || !recipe) {
+      console.error('[Summary] handleSaveModifications: Invalid entry point or missing data');
+      return;
+    }
+
+    if (!session?.user?.id) {
+      showError('Authentication Required', 'You must be logged in to save modifications.');
+      return;
+    }
+
+    try {
+      // Prepare the modified recipe data
+      const modifiedRecipeData = {
+        ...recipe,
+        recipeYield: isViewingSavedRecipe ? recipe.recipeYield : getScaledYieldText(originalRecipe?.recipeYield || recipe.recipeYield, selectedScaleFactor),
+        ingredientGroups: scaledIngredientGroups,
+      };
+
+      const appliedChangesData = {
+        ingredientChanges: appliedChanges.map((change) => ({
+          from: change.from,
+          to: change.to ? {
+            name: change.to.name,
+            amount: change.to.amount,
+            unit: change.to.unit,
+            preparation: change.to.preparation,
+          } : null,
+        })),
+        scalingFactor: selectedScaleFactor,
+      };
+
+      console.log('[Summary] Saving modifications to database:', {
+        miseRecipeId,
+        selectedScaleFactor,
+        appliedChangesCount: appliedChanges.length,
+        modifiedRecipeTitle: modifiedRecipeData.title,
+        modifiedRecipeYield: modifiedRecipeData.recipeYield,
+      });
+
+      // Save to database via API
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL!;
+      const response = await fetch(`${backendUrl}/api/mise/recipes/${miseRecipeId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: session.user.id,
+          preparedRecipeData: modifiedRecipeData,
+          appliedChanges: appliedChangesData,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorResult = await response.json();
+        throw new Error(errorResult.error || `Update failed (Status: ${response.status})`);
+      }
+
+      // Also update local state for immediate UI feedback
+      const updateMiseRecipe = (globalThis as any).updateMiseRecipe;
+      if (updateMiseRecipe) {
+        updateMiseRecipe(miseRecipeId, {
+          scaleFactor: selectedScaleFactor,
+          appliedChanges: appliedChanges,
+          modified_recipe_data: modifiedRecipeData,
+        });
+      }
+
+      // Reset modifications state
+      setHasModifications(false);
       
-      return;
+      // Show success feedback
+      showError('Modifications Saved', 'Your changes have been saved for this cooking session. The grocery list will update when you return to your mise.', () => {
+        hideError();
+        // Navigate to mise screen instead of going back
+        router.replace('/tabs/mise' as any);
+      });
+
+    } catch (error: any) {
+      console.error('[Summary] Failed to save modifications:', error);
+      showError('Save Failed', `Could not save modifications: ${error.message}`);
     }
-
-    // Access the global updateMiseRecipe function
-    const updateMiseRecipe = (globalThis as any).updateMiseRecipe;
-    if (!updateMiseRecipe) {
-      console.error('[Summary] updateMiseRecipe function not available');
-      showError('Update Failed', 'Could not save modifications. Please try again.');
-      return;
-    }
-
-    // Prepare the modified recipe data
-    const modifiedRecipeData = {
-      ...recipe,
-      recipeYield: isViewingSavedRecipe ? recipe.recipeYield : getScaledYieldText(recipe.recipeYield, selectedScaleFactor),
-      ingredientGroups: scaledIngredientGroups,
-    };
-
-    // Call the updateMiseRecipe function with modifications
-    updateMiseRecipe(miseRecipeId, {
-      scaleFactor: selectedScaleFactor,
-      appliedChanges: appliedChanges,
-      modified_recipe_data: modifiedRecipeData,
-    });
-
-    
-    
-    // Reset modifications state
-    setHasModifications(false);
-    
-    // Show success feedback
-    showError('Modifications Saved', 'Your changes have been saved for this cooking session. The grocery list will update when you return to your mise.', () => {
-      hideError();
-      // Navigate to mise screen instead of going back
-      router.replace('/tabs/mise' as any);
-    });
   };
 
   if (isLoading) {
@@ -1687,6 +1729,8 @@ export default function RecipeSummaryScreen() {
           </Text>
         </View>
       )}
+
+
 
       <RecipeFooterButtons
         handleGoToSteps={handleGoToSteps}

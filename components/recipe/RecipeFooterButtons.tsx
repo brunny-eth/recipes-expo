@@ -37,6 +37,8 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
   hasModifications = false,
   isAlreadyInMise = false,
 }) => {
+
+
   const getMainButtonText = () => {
     if (isRewriting) return 'Customizing instructions...';
     if (isScalingInstructions) return 'Making sure everything lines up...';
@@ -47,11 +49,33 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
       case 'saved':
         return 'Add to your mise';
       case 'mise':
-        return 'Go to steps';
+        return 'Update Mise Recipe';
       default:
         return 'Add to your mise';
     }
   };
+
+  const getMainButtonHandler = () => {
+    switch (entryPoint) {
+      case 'mise':
+        return handleSaveModifications;
+      default:
+        return handleGoToSteps;
+    }
+  };
+
+  const isMainButtonDisabled = () => {
+    if (isRewriting || isScalingInstructions || isAlreadyInMise) return true;
+    
+    // For mise entry point, disable if no modifications
+    if (entryPoint === 'mise' && !hasModifications) {
+      return true;
+    }
+    
+    return false;
+  };
+
+  const buttonDisabled = isMainButtonDisabled();
 
   const getSecondaryButton = () => {
     switch (entryPoint) {
@@ -92,10 +116,10 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
       <TouchableOpacity
         style={[
           styles.nextButton,
-          (isRewriting || isScalingInstructions || isAlreadyInMise) && styles.nextButtonDisabled,
+          buttonDisabled && styles.nextButtonDisabled,
         ]}
-        onPress={handleGoToSteps}
-        disabled={isRewriting || isScalingInstructions || isAlreadyInMise}
+        onPress={getMainButtonHandler()}
+        disabled={buttonDisabled}
       >
         {(isRewriting || isScalingInstructions) && !isAlreadyInMise && (
           <ActivityIndicator
