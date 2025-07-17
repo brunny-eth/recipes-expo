@@ -853,6 +853,7 @@ export default function RecipeSummaryScreen() {
         body: JSON.stringify({
           userId: session?.user?.id,
           originalRecipeId: recipe.id,
+          originalRecipeData: originalRecipe || recipe, // Pass original recipe data directly
           preparedRecipeData: finalRecipeData,
           appliedChanges: appliedChangesData,
           finalYield: getScaledYieldText(originalRecipe?.recipeYield || recipe?.recipeYield, selectedScaleFactor),
@@ -1014,6 +1015,7 @@ export default function RecipeSummaryScreen() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             originalRecipeId: recipe.id,
+            originalRecipeData: originalRecipe || recipe, // Pass original recipe data directly
             userId: session.user.id,
             modifiedRecipeData,
             appliedChanges: appliedChangesData,

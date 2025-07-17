@@ -133,6 +133,7 @@ router.post('/save-recipe', async (req: Request, res: Response) => {
     const { 
       userId, 
       originalRecipeId, 
+      originalRecipeData,
       preparedRecipeData, 
       appliedChanges, 
       finalYield,
@@ -149,22 +150,13 @@ router.post('/save-recipe', async (req: Request, res: Response) => {
     }, 'Saving recipe to mise');
 
     // Validation
-    if (!userId || !originalRecipeId || !preparedRecipeData || !appliedChanges) {
+    if (!userId || !originalRecipeId || !originalRecipeData || !preparedRecipeData || !appliedChanges) {
       logger.error({ requestId, body: req.body }, 'Missing required fields for saving mise recipe');
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Fetch original recipe data for storage
-    const { data: originalRecipe, error: originalRecipeError } = await supabaseAdmin
-      .from('processed_recipes_cache')
-      .select('recipe_data')
-      .eq('id', originalRecipeId)
-      .single();
-
-    if (originalRecipeError || !originalRecipe) {
-      logger.error({ requestId, originalRecipeId, err: originalRecipeError }, 'Failed to fetch original recipe data');
-      return res.status(500).json({ error: 'Failed to fetch original recipe data' });
-    }
+    // Use the original recipe data passed directly from the client
+    const originalRecipe = { recipe_data: originalRecipeData };
 
     // Check for duplicate recipe in mise (same user, same original recipe, same modifications, not completed)
     const { data: existingRecipe, error: duplicateCheckError } = await supabaseAdmin

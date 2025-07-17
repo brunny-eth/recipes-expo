@@ -17,6 +17,7 @@ import { ParseErrorCode } from '../../common/types/errors';
 
 interface SaveModifiedRecipeRequestBody {
   originalRecipeId: number;
+  originalRecipeData: CombinedParsedRecipe;
   userId: string;
   modifiedRecipeData: CombinedParsedRecipe;
   appliedChanges: { // Ensure this matches the exact structure from frontend
@@ -307,7 +308,7 @@ router.post('/save-modified', async (req: Request<any, any, SaveModifiedRecipeRe
   const requestId = (req as any).id;
 
   try {
-    const { originalRecipeId, userId, modifiedRecipeData, appliedChanges } = req.body;
+    const { originalRecipeId, originalRecipeData, userId, modifiedRecipeData, appliedChanges } = req.body;
 
     logger.info({ 
       requestId, 
@@ -320,7 +321,7 @@ router.post('/save-modified', async (req: Request<any, any, SaveModifiedRecipeRe
     }, 'Received request to save modified recipe');
 
     // --- Data Validation (basic, extend as needed) ---
-    if (!originalRecipeId || !userId || !modifiedRecipeData || !appliedChanges) {
+    if (!originalRecipeId || !originalRecipeData || !userId || !modifiedRecipeData || !appliedChanges) {
       logger.error({ requestId, body: req.body }, 'Missing required fields for saving modified recipe.');
       return res.status(400).json({ error: 'Missing required fields.' });
     }
@@ -329,17 +330,8 @@ router.post('/save-modified', async (req: Request<any, any, SaveModifiedRecipeRe
         return res.status(400).json({ error: 'Incomplete modified recipe data provided.' });
     }
 
-    // Fetch original recipe data for storage
-    const { data: originalRecipe, error: originalRecipeError } = await supabaseAdmin
-      .from('processed_recipes_cache')
-      .select('recipe_data')
-      .eq('id', originalRecipeId)
-      .single();
-
-    if (originalRecipeError || !originalRecipe) {
-      logger.error({ requestId, originalRecipeId, err: originalRecipeError }, 'Failed to fetch original recipe data');
-      return res.status(500).json({ error: 'Failed to fetch original recipe data' });
-    }
+    // Use the original recipe data passed directly from the client
+    const originalRecipe = { recipe_data: originalRecipeData };
 
     // --- 1. Generate a new unique URL (UUID) for the modified recipe ---
     const newRecipeUrl = uuidv4(); // Generates a Version 4 UUID
