@@ -3,6 +3,9 @@ import { PromptPayload } from './adapters';
 import logger from '../lib/logger';
 import { IngredientChange } from './modificationPrompts';
 
+// Re-export IngredientChange for other modules
+export { IngredientChange };
+
 export function buildSubstitutionPrompt(
     originalInstructions: string[],
     substitutions: IngredientChange[],

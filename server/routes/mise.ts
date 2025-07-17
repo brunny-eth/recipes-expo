@@ -321,6 +321,63 @@ router.get('/recipes', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/mise/recipes/:id - Get single mise recipe by ID
+router.get('/recipes/:id', async (req: Request, res: Response) => {
+  const requestId = (req as any).id;
+  
+  try {
+    const { id } = req.params;
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'Missing userId parameter' });
+    }
+
+    logger.info({ requestId, miseRecipeId: id, userId }, 'Fetching single mise recipe');
+
+    const { data: miseRecipe, error: fetchError } = await supabaseAdmin
+      .from('user_mise_recipes')
+      .select(`
+        id,
+        original_recipe_id,
+        title_override,
+        planned_date,
+        display_order,
+        prepared_recipe_data,
+        original_recipe_data,
+        final_yield,
+        applied_changes,
+        is_completed,
+        created_at,
+        updated_at
+      `)
+      .eq('id', id)
+      .eq('user_id', userId) // Ensure user owns this recipe
+      .single();
+
+    if (fetchError) {
+      logger.error({ requestId, err: fetchError }, 'Failed to fetch mise recipe');
+      return res.status(500).json({ error: 'Failed to fetch mise recipe' });
+    }
+
+    if (!miseRecipe) {
+      logger.warn({ requestId, miseRecipeId: id }, 'Mise recipe not found');
+      return res.status(404).json({ error: 'Recipe not found' });
+    }
+
+    logger.info({ requestId, miseRecipeId: id }, 'Successfully fetched mise recipe');
+
+    res.json({
+      recipe: miseRecipe
+    });
+
+  } catch (err) {
+    const error = err as Error;
+    logger.error({ requestId, err: error }, 'Error in /recipes/:id GET route');
+    res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+});
+
 // PUT /api/mise/recipes/:id - Update mise recipe
 router.put('/recipes/:id', async (req: Request, res: Response) => {
   const requestId = (req as any).id;

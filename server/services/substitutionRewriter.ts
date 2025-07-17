@@ -19,7 +19,7 @@ export async function rewriteForSubstitution(
     requestId: string
 ): Promise<LLMResponse<{ rewrittenInstructions: string[] | null; newTitle: string | null }>> {
 
-    const removalCount = substitutions.filter(s => !s.to || s.to.trim() === '').length;
+    const removalCount = substitutions.filter(s => !s.to || (typeof s.to === 'string' && s.to.trim() === '')).length;
 
     const prompt = buildSubstitutionPrompt(originalInstructions, substitutions);
     prompt.metadata = { requestId };
@@ -35,7 +35,7 @@ export async function rewriteForSubstitution(
     }
 
     if (removalCount > 0) {
-        const removedNames = substitutions.filter(s => !s.to || s.to.trim() === '').map(s => s.from);
+        const removedNames = substitutions.filter(s => !s.to || (typeof s.to === 'string' && s.to.trim() === '')).map(s => s.from);
         logger.info({ phase: 'removal_trigger', removedNames }, '[REWRITE] Triggered removal mode');
     }
 

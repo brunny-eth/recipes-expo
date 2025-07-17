@@ -12,6 +12,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { ErrorModalProvider } from '@/context/ErrorModalContext';
 import { FreeUsageProvider, useFreeUsage } from '@/context/FreeUsageContext';
+import { CookingProvider } from '@/context/CookingContext';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import WelcomeScreen from '@/components/WelcomeScreen';
@@ -306,7 +307,9 @@ export default function RootLayout() {
       <ErrorModalProvider>
         <FreeUsageProvider>
           <AuthProvider>
-            <RootLayoutNav />
+            <CookingProvider>
+              <RootLayoutNav />
+            </CookingProvider>
           </AuthProvider>
         </FreeUsageProvider>
       </ErrorModalProvider>

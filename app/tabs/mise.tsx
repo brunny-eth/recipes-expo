@@ -35,6 +35,7 @@ import { useErrorModal } from '@/context/ErrorModalContext';
 import ScreenHeader from '@/components/ScreenHeader';
 import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
 import { parseServingsValue } from '@/utils/recipeUtils';
+import { useCooking } from '@/context/CookingContext';
 
 const MISE_CACHE_KEYS = {
   LAST_FETCHED: 'miseLastFetched',
@@ -110,6 +111,7 @@ export default function MiseScreen() {
   const router = useRouter();
   const { session } = useAuth();
   const { showError } = useErrorModal();
+  const { hasResumableSession } = useCooking();
   const [miseRecipes, setMiseRecipes] = useState<MiseRecipe[]>([]);
   const [groceryList, setGroceryList] = useState<GroceryCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -763,6 +765,23 @@ export default function MiseScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Cooking Session Button - only show on recipes tab */}
+      {selectedTab === 'recipes' && miseRecipes.length > 0 && (
+        <TouchableOpacity
+          style={styles.cookingSessionButton}
+          onPress={() => router.push('/tabs/mise/cook')}
+        >
+          <MaterialCommunityIcons 
+            name="chef-hat" 
+            size={20} 
+            color={COLORS.white} 
+          />
+          <Text style={styles.cookingSessionButtonText}>
+            {hasResumableSession() ? 'Resume Cooking Session' : 'Start Cooking Session'}
+          </Text>
+        </TouchableOpacity>
+      )}
+
       {renderContent()}
       
       {/* Floating Action Button for sharing grocery list */}
@@ -1038,6 +1057,22 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: FONT.size.smBody,
     marginLeft: SPACING.xs,
+  } as TextStyle,
+  cookingSessionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.sm,
+    marginBottom: SPACING.md,
+    ...SHADOWS.small,
+  } as ViewStyle,
+  cookingSessionButtonText: {
+    ...bodyStrongText,
+    color: COLORS.white,
+    marginLeft: SPACING.sm,
   } as TextStyle,
 
 }); 
