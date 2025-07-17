@@ -33,10 +33,26 @@ export async function saveRecipe(recipeId: number): Promise<boolean> {
     return true;
   }
 
+  // Fetch original recipe data for storage
+  const { data: originalRecipe, error: originalRecipeError } = await supabase
+    .from('processed_recipes_cache')
+    .select('recipe_data')
+    .eq('id', recipeId)
+    .single();
+
+  if (originalRecipeError || !originalRecipe) {
+    console.error("Error fetching original recipe data:", originalRecipeError);
+    return false;
+  }
+
   // If not saved, insert a new record
   const { error: insertError } = await supabase
     .from('user_saved_recipes')
-    .insert({ user_id: user.id, base_recipe_id: recipeId });
+    .insert({ 
+      user_id: user.id, 
+      base_recipe_id: recipeId,
+      original_recipe_data: originalRecipe.recipe_data
+    });
 
   if (insertError) {
     console.error("Error saving recipe:", insertError);

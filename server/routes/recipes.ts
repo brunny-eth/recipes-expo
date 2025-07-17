@@ -329,6 +329,18 @@ router.post('/save-modified', async (req: Request<any, any, SaveModifiedRecipeRe
         return res.status(400).json({ error: 'Incomplete modified recipe data provided.' });
     }
 
+    // Fetch original recipe data for storage
+    const { data: originalRecipe, error: originalRecipeError } = await supabaseAdmin
+      .from('processed_recipes_cache')
+      .select('recipe_data')
+      .eq('id', originalRecipeId)
+      .single();
+
+    if (originalRecipeError || !originalRecipe) {
+      logger.error({ requestId, originalRecipeId, err: originalRecipeError }, 'Failed to fetch original recipe data');
+      return res.status(500).json({ error: 'Failed to fetch original recipe data' });
+    }
+
     // --- 1. Generate a new unique URL (UUID) for the modified recipe ---
     const newRecipeUrl = uuidv4(); // Generates a Version 4 UUID
 
@@ -388,6 +400,7 @@ router.post('/save-modified', async (req: Request<any, any, SaveModifiedRecipeRe
         base_recipe_id: newModifiedRecipeId, // Link to the newly created modified recipe
         title_override: modifiedRecipeData.title, // Use the (potentially LLM-suggested) title
         applied_changes: appliedChanges, // Store the explicit changes metadata
+        original_recipe_data: originalRecipe.recipe_data, // Store original recipe data
         // notes: null, // As per plan, leave notes as null unless user input is added
       })
       .select('id')

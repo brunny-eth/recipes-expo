@@ -66,23 +66,7 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
           </TouchableOpacity>
         );
       case 'mise':
-        return (
-          <TouchableOpacity
-            style={[
-              styles.saveButton, 
-              !hasModifications && styles.saveButtonDisabled
-            ]}
-            onPress={handleSaveModifications}
-            disabled={!hasModifications}
-          >
-            <Text style={[
-              styles.saveButtonText, 
-              !hasModifications && styles.saveButtonTextDisabled
-            ]}>
-              Save modifications
-            </Text>
-          </TouchableOpacity>
-        );
+        return null; // Don't show the modifications button for mise entrypoint
       default:
         return (
           <TouchableOpacity

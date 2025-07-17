@@ -154,6 +154,18 @@ router.post('/save-recipe', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    // Fetch original recipe data for storage
+    const { data: originalRecipe, error: originalRecipeError } = await supabaseAdmin
+      .from('processed_recipes_cache')
+      .select('recipe_data')
+      .eq('id', originalRecipeId)
+      .single();
+
+    if (originalRecipeError || !originalRecipe) {
+      logger.error({ requestId, originalRecipeId, err: originalRecipeError }, 'Failed to fetch original recipe data');
+      return res.status(500).json({ error: 'Failed to fetch original recipe data' });
+    }
+
     // Check for duplicate recipe in mise (same user, same original recipe, same modifications, not completed)
     const { data: existingRecipe, error: duplicateCheckError } = await supabaseAdmin
       .from('user_mise_recipes')
@@ -187,6 +199,7 @@ router.post('/save-recipe', async (req: Request, res: Response) => {
         title_override: titleOverride || null,
         planned_date: plannedDate || null,
         prepared_recipe_data: preparedRecipeData,
+        original_recipe_data: originalRecipe.recipe_data,
         final_yield: finalYield || null,
         applied_changes: appliedChanges,
         display_order: 0, // New recipes go to top

@@ -345,7 +345,7 @@ describe('RecipeSummaryScreen', () => {
       });
 
       // Save modifications
-      const saveButton = getByText('Save modifications');
+      const saveButton = getByText('Update recipe');
       fireEvent.press(saveButton);
       
       await waitFor(() => {
