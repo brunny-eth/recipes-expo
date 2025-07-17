@@ -17,7 +17,8 @@ export function buildModificationPrompt(
     substitutions: IngredientChange[],
     originalIngredients: any[],
     scaledIngredients: any[],
-    scalingFactor: number
+    scalingFactor: number,
+    skipTitleUpdate?: boolean
 ): PromptPayload {
 
     // Build substitution lines (from substitutionPrompts.ts)
@@ -79,6 +80,14 @@ export function buildModificationPrompt(
 
     const needsSubstitution = substitutions.length > 0;
     const needsScaling = scalingFactor !== 1;
+    
+    logger.info({ 
+        skipTitleUpdate, 
+        needsSubstitution, 
+        needsScaling, 
+        substitutionCount: substitutions.length,
+        scalingFactor 
+    }, '[buildModificationPrompt] Title update behavior');
 
     let modificationsSection = '';
     
@@ -126,12 +135,15 @@ ${modificationsSection}
 
 **GENERAL RULES**:
 10. Preserve step order and DO NOT number the steps.
-11. Title Rewriting: Suggest a newTitle if a primary/key ingredient is significantly substituted or removed. Primary ingredients are typically those that:
+${skipTitleUpdate ? 
+`11. Title Rewriting: DO NOT suggest title changes. Keep newTitle as null since the user has already set a custom title.` :
+`11. Title Rewriting: Suggest a newTitle if a primary/key ingredient is significantly substituted or removed. Primary ingredients are typically those that:
     - Appear in common recipe names (e.g., "chicken" in "chicken quesadillas", "blueberry" in "blueberry muffins")
     - Are the main protein, featured fruit, or one of the defining characteristics of the dish
     - When substituted/removed, should change what the dish is called logically.
     Do NOT suggest title changes for minor/supporting ingredients (e.g., removing carrots from chicken pot pie stays "Chicken Pot Pie") or for scaling alone.
-    Examples: strawberry→blueberry pancakes becomes "Blueberry Pancakes", chicken→tofu quesadillas becomes "Tofu Quesadillas", remove chicken from chicken quesadillas becomes "Quesadillas", remove Sage from a Grilled Cheese Sage Pesto Sandwich becomes "Grilled Cheese Pesto Sandwich".
+    Examples: strawberry→blueberry pancakes becomes "Blueberry Pancakes", chicken→tofu quesadillas becomes "Tofu Quesadillas", remove chicken from chicken quesadillas becomes "Quesadillas", remove Sage from a Grilled Cheese Sage Pesto Sandwich becomes "Grilled Cheese Pesto Sandwich".`
+}
 
 Respond ONLY in valid JSON:
 { "modifiedInstructions": [ ... ], "newTitle": "string | null" }

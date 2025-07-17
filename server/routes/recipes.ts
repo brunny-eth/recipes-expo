@@ -252,7 +252,7 @@ router.post('/scale-instructions', async (req: Request, res: Response) => {
 // --- Unified Modify Instructions Endpoint ---
 router.post('/modify-instructions', async (req: Request, res: Response) => {
   try {
-    const { originalInstructions, substitutions, originalIngredients, scaledIngredients, scalingFactor } = req.body;
+    const { originalInstructions, substitutions, originalIngredients, scaledIngredients, scalingFactor, skipTitleUpdate } = req.body;
     const requestId = (req as any).id;
 
     logger.info({ requestId, body: req.body }, '[modify-instructions] Received body');
@@ -285,7 +285,8 @@ router.post('/modify-instructions', async (req: Request, res: Response) => {
       originalIngredients,
       scaledIngredients,
       scalingFactor,
-      requestId
+      requestId,
+      skipTitleUpdate
     );
 
     if (modifyError || !modifiedInstructions) {

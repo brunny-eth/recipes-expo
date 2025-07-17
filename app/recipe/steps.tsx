@@ -37,7 +37,7 @@ import { ActiveTool } from '@/components/ToolsModal';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import InlineErrorBanner from '@/components/InlineErrorBanner';
 import { StructuredIngredient, CombinedParsedRecipe as ParsedRecipe, IngredientGroup } from '../../common/types';
-import { IngredientChange } from '../../server/llm/substitutionPrompts';
+import { IngredientChange } from '../../server/llm/modificationPrompts';
 import { abbreviateUnit } from '@/utils/format';
 
 // Define AppliedRecipeChanges type for frontend use
@@ -73,6 +73,7 @@ export default function StepsScreen() {
     newTitle?: string; // LLM-suggested new title
     appliedChanges?: string; // The AppliedRecipeChanges object (stringified)
     miseRecipeId?: string; // New parameter for mise integration
+    titleOverride?: string; // Title override from mise/saved screens
   }>();
   const router = useRouter();
   const { showError } = useErrorModal();
@@ -212,7 +213,16 @@ export default function StepsScreen() {
         });
 
         // Update legacy state for backward compatibility with existing UI components
-        setRecipeTitle(currentModifiedRecipe.title || 'Instructions');
+        // Use titleOverride if available, otherwise use the modified recipe title
+        const displayTitle = params.titleOverride || currentModifiedRecipe.title || 'Instructions';
+        setRecipeTitle(displayTitle);
+        
+        console.log('[StepsScreen] Title selection:', {
+          titleOverride: params.titleOverride,
+          modifiedRecipeTitle: currentModifiedRecipe.title,
+          originalRecipeTitle: parsedOriginalRecipe.title,
+          displayTitle,
+        });
         setRecipeImageUrl(currentModifiedRecipe.image || currentModifiedRecipe.thumbnailUrl || null);
         
         if (currentModifiedRecipe.instructions && Array.isArray(currentModifiedRecipe.instructions)) {

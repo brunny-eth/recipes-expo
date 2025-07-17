@@ -18,19 +18,21 @@ export async function modifyInstructions(
     originalIngredients: any[],
     scaledIngredients: any[],
     scalingFactor: number,
-    requestId: string
+    requestId: string,
+    skipTitleUpdate?: boolean
 ): Promise<LLMResponse<{ modifiedInstructions: string[] | null; newTitle: string | null }>> {
 
     const needsSubstitution = substitutions.length > 0;
     const needsScaling = scalingFactor !== 1;
-    const removalCount = substitutions.filter(s => !s.to || s.to.trim() === '').length;
+    const removalCount = substitutions.filter(s => !s.to || (typeof s.to === 'string' && s.to.trim() === '')).length;
 
     const prompt = buildModificationPrompt(
         originalInstructions, 
         substitutions, 
         originalIngredients, 
         scaledIngredients, 
-        scalingFactor
+        scalingFactor,
+        skipTitleUpdate
     );
     prompt.metadata = { requestId };
 
@@ -70,7 +72,7 @@ export async function modifyInstructions(
     }
 
     if (needsSubstitution && removalCount > 0) {
-        const removedNames = substitutions.filter(s => !s.to || s.to.trim() === '').map(s => s.from);
+        const removedNames = substitutions.filter(s => !s.to || (typeof s.to === 'string' && s.to.trim() === '')).map(s => s.from);
         logger.info({ phase: 'removal_trigger', removedNames }, '[MODIFY] Modification includes ingredient removals');
     }
 

@@ -217,7 +217,7 @@ const buttonWidth = (availableWidth - buttonTotalGap) / numButtons;
 // --- End Types ---
 
 export default function RecipeSummaryScreen() {
-  const params = useLocalSearchParams<{ recipeData?: string; from?: string; appliedChanges?: string; isModified?: string; entryPoint?: string; miseRecipeId?: string; finalYield?: string; originalRecipeData?: string }>();
+  const params = useLocalSearchParams<{ recipeData?: string; from?: string; appliedChanges?: string; isModified?: string; entryPoint?: string; miseRecipeId?: string; finalYield?: string; originalRecipeData?: string; titleOverride?: string }>();
   const router = useRouter();
   const { showError, hideError } = useErrorModal();
   const { session } = useAuth();
@@ -808,7 +808,17 @@ export default function RecipeSummaryScreen() {
     setAppliedChanges((prev) => prev.filter((change) => change.from !== originalName));
   }, []);
 
-  const cleanTitle = recipe?.title?.replace(/\s*(?:[–-]\s*)?by\s+.*$/i, '').replace(/\s+recipe\s*$/i, '').trim();
+  // Use titleOverride if available (for mise recipes), otherwise use the recipe title
+  const rawTitle = params.titleOverride || recipe?.title;
+  const cleanTitle = rawTitle?.replace(/\s*(?:[–-]\s*)?by\s+.*$/i, '').replace(/\s+recipe\s*$/i, '').trim();
+  
+  console.log('[DEBUG] Title selection:', {
+    titleOverride: params.titleOverride,
+    recipeTitle: recipe?.title,
+    rawTitle,
+    cleanTitle,
+    entryPoint,
+  });
 
   // Swipe to go back gesture handler
   const onSwipeGesture = (event: any) => {
@@ -889,6 +899,7 @@ export default function RecipeSummaryScreen() {
               originalIngredients: allIngredients,
               scaledIngredients: scaledIngredients || [],
               scalingFactor: selectedScaleFactor,
+              skipTitleUpdate: !!params.titleOverride, // Skip title suggestions if title override exists
           }),
         });
           
@@ -919,6 +930,10 @@ export default function RecipeSummaryScreen() {
             params: {
               recipeData: JSON.stringify(modifiedRecipe),
               miseRecipeId: miseRecipeId,
+              // Pass title_override if available
+              ...(params.titleOverride && {
+                titleOverride: params.titleOverride
+              }),
             },
           });
           return;
@@ -935,6 +950,10 @@ export default function RecipeSummaryScreen() {
           params: {
             recipeData: JSON.stringify(baseRecipe),
             miseRecipeId: miseRecipeId,
+            // Pass title_override if available
+            ...(params.titleOverride && {
+              titleOverride: params.titleOverride
+            }),
           },
         });
         return;
@@ -986,6 +1005,7 @@ export default function RecipeSummaryScreen() {
             originalIngredients: allIngredients,
             scaledIngredients: scaledIngredients || [],
             scalingFactor: selectedScaleFactor,
+            skipTitleUpdate: !!params.titleOverride, // Skip title suggestions if title override exists
           }),
         });
         
@@ -1175,6 +1195,10 @@ export default function RecipeSummaryScreen() {
           })),
           scalingFactor: selectedScaleFactor,
         }),
+        // Pass title_override if available
+        ...(params.titleOverride && {
+          titleOverride: params.titleOverride
+        }),
       },
     });
   };
@@ -1239,6 +1263,7 @@ export default function RecipeSummaryScreen() {
             originalIngredients: allIngredients,
             scaledIngredients: scaledIngredients || [],
             scalingFactor: selectedScaleFactor,
+            skipTitleUpdate: !!params.titleOverride, // Skip title suggestions if title override exists
           }),
         });
         

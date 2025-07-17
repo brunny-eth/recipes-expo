@@ -629,6 +629,10 @@ export default function MiseScreen() {
                 entryPoint: 'mise',
                 miseRecipeId: item.id, // Pass the mise recipe ID for future reference
                 finalYield: item.final_yield.toString(),
+                // Pass title_override for correct title display
+                ...(item.title_override && {
+                  titleOverride: item.title_override
+                }),
                 // Pass applied changes so the summary can restore the correct scaling factor
                 ...(item.applied_changes && {
                   appliedChanges: JSON.stringify(item.applied_changes)

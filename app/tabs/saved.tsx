@@ -272,6 +272,10 @@ export default function SavedScreen() {
         entryPoint: 'saved',
         from: '/saved',
         isModified: isModified.toString(),
+        // Pass title_override for correct title display
+        ...(item.title_override && {
+          titleOverride: item.title_override
+        }),
         ...(isModified && item.applied_changes && {
           appliedChanges: JSON.stringify(item.applied_changes)
         }),
