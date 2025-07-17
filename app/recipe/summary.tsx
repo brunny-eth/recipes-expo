@@ -348,15 +348,27 @@ export default function RecipeSummaryScreen() {
                   return null;
                 }
                 // Replace with substituted ingredient (no visual indicators)
+                // Scale the substitution amount based on current scale factor
+                let scaledSubstitutionAmount = change.to.amount;
+                if (change.to.amount && selectedScaleFactor !== 1) {
+                  const parsedAmount = parseAmountString(change.to.amount);
+                  if (parsedAmount !== null) {
+                    const scaledAmount = parsedAmount * selectedScaleFactor;
+                    scaledSubstitutionAmount = formatAmountNumber(scaledAmount) || scaledAmount.toString();
+                  }
+                }
+                
                 const substitutedIngredient = {
                   ...change.to,
+                  amount: scaledSubstitutionAmount,
                   // Keep the substituted ingredient's name as-is
                 };
-                console.log('[DEBUG] Applying clean substitution:', {
+                console.log('[DEBUG] Applying clean substitution with dynamic scaling:', {
                   originalName,
+                  originalSubstitutionAmount: change.to.amount,
+                  currentScaleFactor: selectedScaleFactor,
+                  scaledSubstitutionAmount,
                   substitutedIngredient,
-                  substituteAmount: substitutedIngredient.amount,
-                  substituteUnit: substitutedIngredient.unit,
                 });
                 return substitutedIngredient;
               }
@@ -379,29 +391,41 @@ export default function RecipeSummaryScreen() {
               change,
             });
             
-            if (change) {
-              if (change.to === null) {
-                console.log('[DEBUG] Applying removal indicator:', baseIngredient.name);
-                return {
-                  ...baseIngredient,
-                  name: `${baseIngredient.name} (removed)`,
-                  amount: null,
-                  unit: null,
-                  suggested_substitutions: null,
+                          if (change) {
+                if (change.to === null) {
+                  console.log('[DEBUG] Applying removal indicator:', baseIngredient.name);
+                  return {
+                    ...baseIngredient,
+                    name: `${baseIngredient.name} (removed)`,
+                    amount: null,
+                    unit: null,
+                    suggested_substitutions: null,
+                  };
+                }
+                // Scale the substitution amount based on current scale factor
+                let scaledSubstitutionAmount = change.to.amount;
+                if (change.to.amount && selectedScaleFactor !== 1) {
+                  const parsedAmount = parseAmountString(change.to.amount);
+                  if (parsedAmount !== null) {
+                    const scaledAmount = parsedAmount * selectedScaleFactor;
+                    scaledSubstitutionAmount = formatAmountNumber(scaledAmount) || scaledAmount.toString();
+                  }
+                }
+                
+                const substitutedIngredient = {
+                  ...change.to,
+                  amount: scaledSubstitutionAmount,
+                  name: `${change.to.name} (substituted for ${change.from})`,
                 };
+                console.log('[DEBUG] Applying substitution with indicator and dynamic scaling:', {
+                  originalName: baseIngredient.name,
+                  originalSubstitutionAmount: change.to.amount,
+                  currentScaleFactor: selectedScaleFactor,
+                  scaledSubstitutionAmount,
+                  substitutedIngredient,
+                });
+                return substitutedIngredient;
               }
-              const substitutedIngredient = {
-                ...change.to,
-                name: `${change.to.name} (substituted for ${change.from})`,
-              };
-              console.log('[DEBUG] Applying substitution with indicator:', {
-                originalName: baseIngredient.name,
-                substitutedIngredient,
-                substituteAmount: substitutedIngredient.amount,
-                substituteUnit: substitutedIngredient.unit,
-              });
-              return substitutedIngredient;
-            }
             console.log('[DEBUG] No substitution found, keeping original:', {
               name: baseIngredient.name,
               amount: baseIngredient.amount,
@@ -709,23 +733,40 @@ export default function RecipeSummaryScreen() {
         selectedScaleFactor,
       });
       
+      // Calculate the original (unscaled) amount for substitution
+      let originalSubstitutionAmount: string | null = null;
+      if (substitution.amount != null && selectedScaleFactor !== 1) {
+        const parsedAmount = parseAmountString(String(substitution.amount));
+        if (parsedAmount !== null) {
+          // Unscale the amount to get the original amount
+          const originalAmount = parsedAmount / selectedScaleFactor;
+          originalSubstitutionAmount = formatAmountNumber(originalAmount) || originalAmount.toString();
+        } else {
+          originalSubstitutionAmount = String(substitution.amount);
+        }
+      } else {
+        originalSubstitutionAmount = substitution.amount != null ? String(substitution.amount) : null;
+      }
+      
       const newChange: AppliedChange = {
         from: originalNameForSub,
         to: isRemoval
           ? null
           : {
               name: substitution.name,
-              amount: substitution.amount != null ? String(substitution.amount) : null,
+              amount: originalSubstitutionAmount, // Save the original unscaled amount
               unit: substitution.unit ?? null,
               preparation: substitution.description ?? null,
               suggested_substitutions: null,
             },
       };
 
-      console.log('[DEBUG] Final substitution change object:', {
+      console.log('[DEBUG] Final substitution change object (with unscaled amount):', {
         newChange,
         toIngredient: newChange.to,
-        amountAfterConversion: newChange.to?.amount,
+        scaledAmountFromModal: substitution.amount,
+        unscaledAmountSaved: newChange.to?.amount,
+        currentScaleFactor: selectedScaleFactor,
         unitAfterConversion: newChange.to?.unit,
       });
 
