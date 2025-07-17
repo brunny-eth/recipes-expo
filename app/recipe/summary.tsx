@@ -279,6 +279,10 @@ export default function RecipeSummaryScreen() {
   // Track if recipe is already in mise with current modifications
   const [isAlreadyInMise, setIsAlreadyInMise] = useState(false);
 
+  // Track the baseline state when screen loads (for mise entry point)
+  const [baselineScaleFactor, setBaselineScaleFactor] = useState<number>(1);
+  const [baselineAppliedChanges, setBaselineAppliedChanges] = useState<AppliedChange[]>([]);
+
   const scaledIngredientGroups = React.useMemo<IngredientGroup[]>(() => {
     if (!originalRecipe?.ingredientGroups) return [];
     
@@ -535,9 +539,14 @@ export default function RecipeSummaryScreen() {
               });
               
               setAppliedChanges(convertedChanges);
+              // Set baseline for mise entry point
+              if (entryPoint === 'mise') {
+                setBaselineAppliedChanges(convertedChanges);
+              }
             }
             
             // Calculate the actual scale factor from original recipe
+            let finalScaleFactor = 1.0;
             if (savedAppliedChanges.scalingFactor && params.originalRecipeData) {
               // For saved/mise recipes, calculate the current scale factor based on the current recipe yield vs original yield
               const currentYieldNum = parseServingsValue(parsed.recipeYield);
@@ -553,17 +562,23 @@ export default function RecipeSummaryScreen() {
               if (currentYieldNum && originalYieldNum) {
                 const actualScaleFactor = currentYieldNum / originalYieldNum;
                 console.log('[DEBUG] Calculated actual scale factor:', { currentYieldNum, originalYieldNum, actualScaleFactor });
-                setSelectedScaleFactor(actualScaleFactor);
+                finalScaleFactor = actualScaleFactor;
               } else {
                 console.log('[DEBUG] Could not calculate yield-based scale factor, using saved factor:', savedAppliedChanges.scalingFactor);
-                setSelectedScaleFactor(savedAppliedChanges.scalingFactor);
+                finalScaleFactor = savedAppliedChanges.scalingFactor;
               }
             } else if (savedAppliedChanges.scalingFactor) {
               console.log('[DEBUG] Using scaling factor from saved changes:', savedAppliedChanges.scalingFactor);
-              setSelectedScaleFactor(savedAppliedChanges.scalingFactor);
+              finalScaleFactor = savedAppliedChanges.scalingFactor;
             } else {
               console.log('[DEBUG] No scaling factor in saved changes, defaulting to 1.0');
-              setSelectedScaleFactor(1.0);
+              finalScaleFactor = 1.0;
+            }
+            
+            setSelectedScaleFactor(finalScaleFactor);
+            // Set baseline for mise entry point
+            if (entryPoint === 'mise') {
+              setBaselineScaleFactor(finalScaleFactor);
             }
           } catch (appliedChangesError: any) {
             console.error('[DEBUG] Error parsing applied changes:', appliedChangesError);
@@ -575,6 +590,11 @@ export default function RecipeSummaryScreen() {
           // New recipe, no existing changes
           setSelectedScaleFactor(1.0);
           setAppliedChanges([]);
+          // Set baseline for mise entry point
+          if (entryPoint === 'mise') {
+            setBaselineScaleFactor(1.0);
+            setBaselineAppliedChanges([]);
+          }
         }
         
 
@@ -590,11 +610,30 @@ export default function RecipeSummaryScreen() {
   // Update hasModifications when scaling factor or applied changes change
   useEffect(() => {
     if (entryPoint === 'mise') {
-      const hasScaleChanges = selectedScaleFactor !== 1;
-      const hasIngredientChanges = appliedChanges.length > 0;
-      setHasModifications(hasScaleChanges || hasIngredientChanges);
+      // Compare current state against baseline to detect NEW modifications
+      const hasScaleChanges = selectedScaleFactor !== baselineScaleFactor;
+      const hasIngredientChanges = appliedChanges.length !== baselineAppliedChanges.length || 
+        !appliedChanges.every((change, index) => {
+          const baselineChange = baselineAppliedChanges[index];
+          return baselineChange && 
+            change.from === baselineChange.from && 
+            JSON.stringify(change.to) === JSON.stringify(baselineChange.to);
+        });
+      
+      const newHasModifications = hasScaleChanges || hasIngredientChanges;
+      console.log('[DEBUG] hasModifications calculation (baseline comparison):', {
+        selectedScaleFactor,
+        baselineScaleFactor,
+        hasScaleChanges,
+        appliedChangesCount: appliedChanges.length,
+        baselineAppliedChangesCount: baselineAppliedChanges.length,
+        hasIngredientChanges,
+        newHasModifications,
+      });
+      
+      setHasModifications(newHasModifications);
     }
-  }, [selectedScaleFactor, appliedChanges, entryPoint]);
+  }, [selectedScaleFactor, appliedChanges, entryPoint, baselineScaleFactor, baselineAppliedChanges]);
 
   // Reset isAlreadyInMise when user makes modifications that would change the recipe
   useEffect(() => {
@@ -1424,7 +1463,7 @@ export default function RecipeSummaryScreen() {
       // Prepare the modified recipe data
       const modifiedRecipeData = {
         ...recipe,
-        recipeYield: isViewingSavedRecipe ? recipe.recipeYield : getScaledYieldText(originalRecipe?.recipeYield || recipe.recipeYield, selectedScaleFactor),
+        recipeYield: getScaledYieldText(originalRecipe?.recipeYield || recipe.recipeYield, selectedScaleFactor),
         ingredientGroups: scaledIngredientGroups,
       };
 
