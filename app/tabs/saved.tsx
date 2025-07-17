@@ -23,6 +23,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
+import { parseServingsValue } from '@/utils/recipeUtils';
 import ScreenHeader from '@/components/ScreenHeader';
 
 type SavedRecipe = {
@@ -355,17 +356,12 @@ const renderRecipeItem = useCallback(({ item }: { item: SavedRecipe }) => {
               <Text style={styles.cardTitle} numberOfLines={2}>
                   {displayTitle}
               </Text>
-              {isModified && (
-                <View style={styles.modifiedBadge}>
-                  <MaterialCommunityIcons
-                    name="account-edit"
-                    size={14}
-                    color={COLORS.primary}
-                    style={styles.modifiedIcon}
-                  />
-                  <Text style={styles.modifiedText}>Modified by you</Text>
-                </View>
-              )}
+              {(() => {
+                const servingsCount = parseServingsValue(recipe_data.recipeYield);
+                return servingsCount ? (
+                  <Text style={styles.servingsText}>(servings: {servingsCount})</Text>
+                ) : null;
+              })()}
           </View>
           <TouchableOpacity style={styles.deleteButton} onPress={() => handleDeleteRecipe(item.base_recipe_id)}>
             <MaterialCommunityIcons name="delete-outline" size={20} color={COLORS.error} />
@@ -519,8 +515,8 @@ const styles = StyleSheet.create({
     minHeight: 75, // Adjust this value based on the image
   },
   cardImage: {
-    width: SPACING.xxl,
-    height: SPACING.xxl,
+    width: SPACING.xxl + 8,
+    height: SPACING.xxl + 8,
     borderRadius: 6,
     marginRight: SPACING.md,
   },
@@ -529,23 +525,17 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     ...bodyStrongText,
+    fontSize: FONT.size.body - 1,
     color: COLORS.textDark,
-    lineHeight: 20,
+    lineHeight: 19,
     flexWrap: 'wrap',
   },
-  modifiedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: SPACING.xs,
-  },
-  modifiedIcon: {
-    marginRight: SPACING.xs,
-  },
-  modifiedText: {
+  servingsText: {
     ...bodyText,
     fontSize: FONT.size.caption,
-    color: COLORS.primary,
-    fontWeight: '500',
+    color: COLORS.textMuted,
+    fontWeight: '400',
+    marginTop: SPACING.xs,
   },
   errorText: {
     ...bodyText,

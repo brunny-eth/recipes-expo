@@ -128,7 +128,7 @@ describe('MiseScreen', () => {
     it('renders mise screen correctly', async () => {
       const { getByText } = render(<MiseScreen />);
       
-      expect(getByText('Your mise en place')).toBeTruthy();
+      expect(getByText('Your prep station')).toBeTruthy();
       expect(getByText('Recipes (0)')).toBeTruthy(); // Initial count before loading
       expect(getByText('Shopping List')).toBeTruthy();
     });

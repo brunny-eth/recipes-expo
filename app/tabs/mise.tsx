@@ -9,10 +9,12 @@ import {
   ScrollView,
   ViewStyle,
   TextStyle,
+  ImageStyle,
   TextInput,
   Share,
   Modal,
 } from 'react-native';
+import FastImage from '@d11/react-native-fast-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -32,6 +34,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import ScreenHeader from '@/components/ScreenHeader';
 import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
+import { parseServingsValue } from '@/utils/recipeUtils';
 
 const MISE_CACHE_KEYS = {
   LAST_FETCHED: 'miseLastFetched',
@@ -112,8 +115,6 @@ export default function MiseScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState<'recipes' | 'grocery'>('recipes');
-  const [editingRecipeId, setEditingRecipeId] = useState<string | null>(null);
-  const [editingTitle, setEditingTitle] = useState('');
 
   // --- Caching Strategy ---
   const lastSessionIdRef = useRef<string | null>(null);
@@ -343,41 +344,7 @@ export default function MiseScreen() {
     }, [fetchMiseData])
   );
 
-  // Handle updating a recipe's title
-  const handleUpdateTitle = useCallback(async (recipeId: string, newTitle: string) => {
-    if (!session?.access_token || !session.user?.id) return;
 
-    // Find the original title to revert on failure
-    const originalTitle = miseRecipes.find(r => r.id === recipeId)?.title_override;
-
-    // Optimistically update the UI
-    setMiseRecipes(prev => prev.map(r => r.id === recipeId ? { ...r, title_override: newTitle } : r));
-    setEditingRecipeId(null);
-
-    try {
-      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
-      if (!backendUrl) throw new Error('API URL not configured');
-
-      const response = await fetch(`${backendUrl}/api/mise/recipes/${recipeId}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ userId: session.user.id, titleOverride: newTitle }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update title on the server');
-      }
-      await invalidateMiseCache();
-    } catch (err) {
-      console.error('[MiseScreen] Error updating title:', err);
-      showError('Update Failed', 'Could not save the new title. Please try again.');
-      // Revert optimistic update on failure
-      setMiseRecipes(prev => prev.map(r => r.id === recipeId ? { ...r, title_override: originalTitle || r.prepared_recipe_data.title } : r));
-    }
-  }, [session?.access_token, session?.user?.id, showError, miseRecipes]);
 
   const handleCompleteRecipe = useCallback(async (recipeId: string, isCompleted: boolean) => {
     if (!session?.user) return;
@@ -554,136 +521,72 @@ export default function MiseScreen() {
 
   // Render recipe item
   const renderRecipeItem = useCallback(({ item }: { item: MiseRecipe }) => {
-    const isEditing = editingRecipeId === item.id;
-
-    const cancelEditing = () => {
-      setEditingRecipeId(null);
-      setEditingTitle('');
-    };
-
-    const saveEditing = async () => {
-      if (!session?.access_token || !session.user?.id) return;
-
-      // Find the original title to revert on failure
-      const originalTitle = miseRecipes.find(r => r.id === editingRecipeId)?.title_override;
-
-      // Optimistically update the UI
-      setMiseRecipes(prev => prev.map(r => r.id === editingRecipeId ? { ...r, title_override: editingTitle } : r));
-      setEditingRecipeId(null);
-
-      try {
-        const backendUrl = process.env.EXPO_PUBLIC_API_URL;
-        if (!backendUrl) throw new Error('API URL not configured');
-
-        const response = await fetch(`${backendUrl}/api/mise/recipes/${editingRecipeId}`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ userId: session.user.id, titleOverride: editingTitle }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to update title');
-        }
-
-        setMiseRecipes((prev) =>
-          prev.map((r) => (r.id === editingRecipeId ? { ...r, title_override: editingTitle } : r))
-        );
-        
-        // Invalidate cache after editing title
-        await invalidateMiseCache();
-
-        cancelEditing();
-      } catch (error) {
-        console.error('Error saving title:', error);
-        showError('Update Failed', 'Could not save the new title. Please try again.');
-        // Revert optimistic update on failure
-        setMiseRecipes(prev => prev.map(r => r.id === editingRecipeId ? { ...r, title_override: originalTitle || r.prepared_recipe_data.title } : r));
-      }
-    };
+    const imageUrl = item.prepared_recipe_data.image || item.prepared_recipe_data.thumbnailUrl;
+    const displayTitle = item.title_override || item.prepared_recipe_data.title;
 
     return (
-      <View style={styles.recipeCard}>
-        <TouchableOpacity
-          style={styles.recipeItem}
-          onPress={() => {
-            if (isEditing) return; // Don't navigate while editing
-            
-            console.log('[MiseScreen] 🚀 Attempting to navigate to summary for recipe:', {
-              recipeId: item.id,
-              title: item.title_override || item.prepared_recipe_data.title,
-              hasPreparedData: !!item.prepared_recipe_data,
-              preparedDataKeys: Object.keys(item.prepared_recipe_data || {}),
-              finalYield: item.final_yield,
-              hasAppliedChanges: !!item.applied_changes,
-              appliedChanges: item.applied_changes,
-            });
-            
-            // Navigate to recipe summary with the prepared recipe data and mise entry point
-            router.push({
-              pathname: '/recipe/summary',
-              params: {
-                recipeData: JSON.stringify(item.prepared_recipe_data),
-                entryPoint: 'mise',
-                miseRecipeId: item.id, // Pass the mise recipe ID for future reference
-                finalYield: item.final_yield.toString(),
-                // Pass title_override for correct title display
-                ...(item.title_override && {
-                  titleOverride: item.title_override
-                }),
-                // Pass applied changes so the summary can restore the correct scaling factor
-                ...(item.applied_changes && {
-                  appliedChanges: JSON.stringify(item.applied_changes)
-                }),
-                // Pass original recipe data for consistent scaling
-                ...(item.original_recipe_data && {
-                  originalRecipeData: JSON.stringify(item.original_recipe_data)
-                }),
-              },
-            });
-            
-            console.log('[MiseScreen] ✅ Navigation to summary completed');
-          }}
-          disabled={isEditing}
-        >
-          <View style={styles.recipeInfo}>
-            <View style={styles.titleContainer}>
-              {isEditing ? (
-                <TextInput
-                  style={styles.recipeTitleInput}
-                  value={editingTitle}
-                  onChangeText={setEditingTitle}
-                  autoFocus
-                  onBlur={saveEditing} // Save when input loses focus
-                />
-              ) : (
-                <Text style={styles.recipeTitle} numberOfLines={1} ellipsizeMode="tail">
-                  {item.title_override || item.prepared_recipe_data.title}
-                </Text>
-              )}
-            </View>
-            <Text style={styles.recipeYield}>
-              Makes {item.final_yield} 
-            </Text>
-          </View>
-        </TouchableOpacity>
-        <View style={styles.recipeActions}>
-          {isEditing ? (
-            <>
-              <TouchableOpacity style={styles.actionButton} onPress={saveEditing}>
-                <MaterialCommunityIcons name="check" size={20} color={COLORS.success} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton} onPress={cancelEditing}>
-                <MaterialCommunityIcons name="close" size={20} color={COLORS.error} />
-              </TouchableOpacity>
-            </>
-          ) : null}
+      <TouchableOpacity
+        style={[styles.card, styles.cardWithMinHeight]}
+        onPress={() => {
+          console.log('[MiseScreen] 🚀 Attempting to navigate to summary for recipe:', {
+            recipeId: item.id,
+            title: displayTitle,
+            hasPreparedData: !!item.prepared_recipe_data,
+            preparedDataKeys: Object.keys(item.prepared_recipe_data || {}),
+            finalYield: item.final_yield,
+            hasAppliedChanges: !!item.applied_changes,
+            appliedChanges: item.applied_changes,
+          });
+          
+          // Navigate to recipe summary with the prepared recipe data and mise entry point
+          router.push({
+            pathname: '/recipe/summary',
+            params: {
+              recipeData: JSON.stringify(item.prepared_recipe_data),
+              entryPoint: 'mise',
+              miseRecipeId: item.id, // Pass the mise recipe ID for future reference
+              finalYield: item.final_yield.toString(),
+              // Pass title_override for correct title display
+              ...(item.title_override && {
+                titleOverride: item.title_override
+              }),
+              // Pass applied changes so the summary can restore the correct scaling factor
+              ...(item.applied_changes && {
+                appliedChanges: JSON.stringify(item.applied_changes)
+              }),
+              // Pass original recipe data for consistent scaling
+              ...(item.original_recipe_data && {
+                originalRecipeData: JSON.stringify(item.original_recipe_data)
+              }),
+            },
+          });
+          
+          console.log('[MiseScreen] ✅ Navigation to summary completed');
+        }}
+      >
+        {imageUrl && (
+          <FastImage
+            source={{ uri: imageUrl }}
+            style={styles.cardImage}
+          />
+        )}
+        <View style={styles.cardTextContainer}>
+          <Text style={styles.cardTitle} numberOfLines={2}>
+            {displayTitle}
+          </Text>
+          {(() => {
+            const servingsCount = parseServingsValue(item.prepared_recipe_data.recipeYield);
+            return servingsCount ? (
+              <Text style={styles.servingsText}>(servings: {servingsCount})</Text>
+            ) : null;
+          })()}
         </View>
-      </View>
+        <TouchableOpacity style={styles.deleteButton} onPress={() => handleDeleteRecipe(item.id)}>
+          <MaterialCommunityIcons name="delete-outline" size={20} color={COLORS.error} />
+        </TouchableOpacity>
+      </TouchableOpacity>
     );
-  }, [editingRecipeId, editingTitle, handleUpdateTitle, handleCompleteRecipe, handleDeleteRecipe, router, session?.access_token, session?.user?.id, showError, miseRecipes]);
+  }, [handleDeleteRecipe, router]);
 
   // Render grocery category
   const renderGroceryCategory = useCallback(({ item }: { item: GroceryCategory }) => (
@@ -826,7 +729,7 @@ export default function MiseScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScreenHeader title="Your mise en place" />
+      <ScreenHeader title="Your prep station" />
       
       {/* Tab selector */}
       <View style={styles.tabContainer}>
@@ -1015,6 +918,47 @@ const styles = StyleSheet.create({
     padding: SPACING.sm, // Better touch target
     alignSelf: 'center', // Center the delete button
   } as ViewStyle,
+
+  // New card styles to match saved.tsx
+  card: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.sm,
+    padding: 12,
+    marginBottom: SPACING.md,
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+    alignItems: 'center',
+  } as ViewStyle,
+  cardWithMinHeight: {
+    minHeight: 75,
+  } as ViewStyle,
+  cardImage: {
+    width: SPACING.xxl + 8,
+    height: SPACING.xxl + 8,
+    borderRadius: 6,
+    marginRight: SPACING.md,
+  },
+  cardTextContainer: {
+    flex: 1,
+  } as ViewStyle,
+  cardTitle: {
+    ...bodyStrongText,
+    fontSize: FONT.size.body - 1,
+    color: COLORS.textDark,
+    lineHeight: 19,
+    flexWrap: 'wrap',
+  } as TextStyle,
+  servingsText: {
+    ...bodyText,
+    fontSize: FONT.size.caption,
+    color: COLORS.textMuted,
+    fontWeight: '400',
+    marginTop: SPACING.xs,
+  } as TextStyle,
 
   groceryContainer: {
     flex: 1,
