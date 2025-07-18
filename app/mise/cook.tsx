@@ -20,11 +20,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useCooking } from '@/context/CookingContext';
 import { useAuth } from '@/context/AuthContext';
-import { COLORS, SPACING, RADIUS, OVERLAYS, SHADOWS } from '@/constants/theme';
+import { COLORS, SPACING, RADIUS, OVERLAYS, SHADOWS, BORDER_WIDTH } from '@/constants/theme';
 import { sectionHeaderText, bodyText, bodyStrongText, bodyTextLoose, captionText } from '@/constants/typography';
 import { CombinedParsedRecipe, StructuredIngredient } from '@/common/types';
 import RecipeSwitcher from '@/components/recipe/RecipeSwitcher';
 import StepItem from '@/components/recipe/StepItem';
+import RecipeStepsHeader from '@/components/recipe/RecipeStepsHeader';
 import { 
   StepCompletionState, 
   isStepCompleted, 
@@ -350,6 +351,16 @@ export default function CookScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         handleRecipeSwitch(state.activeRecipes[currentIndex - 1].recipeId);
       }
+      // Swipe from left edge to go back - similar to summary.tsx
+      else if (translationX > 100 && velocityX > 300 && currentIndex === 0) {
+        // Check if we can go back properly, otherwise navigate to mise as fallback
+        if (router.canGoBack()) {
+          router.back();
+        } else {
+          // Navigate back to mise tab
+          router.navigate('/tabs/mise' as any);
+        }
+      }
     }
   };
 
@@ -402,7 +413,7 @@ export default function CookScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.centeredStatusContainer}>
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Loading cooking session...</Text>
         </View>
@@ -412,7 +423,7 @@ export default function CookScreen() {
 
   if (state.activeRecipes.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.centeredStatusContainer}>
         <View style={styles.emptyContainer}>
           <MaterialCommunityIcons name="chef-hat" size={64} color={COLORS.textMuted} />
           <Text style={styles.emptyTitle}>No Recipes to Cook</Text>
@@ -424,22 +435,35 @@ export default function CookScreen() {
     );
   }
 
+  // Get the current recipe title for the header
+  const headerRecipe = state.activeRecipes.find(
+    recipe => recipe.recipeId === state.activeRecipeId
+  );
+  const currentRecipeTitle = headerRecipe?.recipe?.title || "Cooking Session";
+
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Cooking Session</Text>
-      </View>
+    <PanGestureHandler onHandlerStateChange={handleSwipeGesture}>
+      <SafeAreaView style={styles.container}>
+        
+        <RecipeStepsHeader
+          title={currentRecipeTitle}
+          imageUrl={null}
+          recipe={headerRecipe?.recipe}
+        />
 
-      {/* Recipe Switcher */}
-      <RecipeSwitcher
-        recipes={state.activeRecipes}
-        activeRecipeId={state.activeRecipeId || ''}
-        onRecipeSwitch={handleRecipeSwitch}
-      />
+        {/* Sharp divider to separate title from content */}
+        <View style={styles.titleDivider} />
 
-      {/* Current Recipe Content */}
-      <PanGestureHandler onHandlerStateChange={handleSwipeGesture}>
+        {/* Recipe Switcher */}
+        <View style={styles.recipeSwitcherContainer}>
+          <RecipeSwitcher
+            recipes={state.activeRecipes}
+            activeRecipeId={state.activeRecipeId || ''}
+            onRecipeSwitch={handleRecipeSwitch}
+          />
+        </View>
+
+        {/* Current Recipe Content */}
         <ScrollView 
           ref={scrollViewRef}
           style={styles.content} 
@@ -510,44 +534,44 @@ export default function CookScreen() {
             <Text style={styles.noRecipeText}>Select a recipe to start cooking</Text>
           </View>
         )}
-      </ScrollView>
-      </PanGestureHandler>
+        </ScrollView>
 
-      {/* Ingredient Tooltip Modal */}
-      <Modal
-        transparent
-        visible={isTooltipVisible}
-        animationType="fade"
-        onRequestClose={() => setIsTooltipVisible(false)}
-      >
-        <Pressable
-          style={styles.tooltipBackdrop}
-          onPress={() => setIsTooltipVisible(false)}
+        {/* Ingredient Tooltip Modal */}
+        <Modal
+          transparent
+          visible={isTooltipVisible}
+          animationType="fade"
+          onRequestClose={() => setIsTooltipVisible(false)}
         >
-          <Pressable style={styles.tooltipContainer}>
-            {selectedIngredient && (
-              <>
-                <Text style={styles.tooltipTitle}>
-                  {selectedIngredient.name}
-                </Text>
-                {(selectedIngredient.amount || selectedIngredient.unit) && (
-                  <Text style={styles.tooltipText}>
-                    {selectedIngredient.amount || ''}{' '}
-                    {abbreviateUnit(selectedIngredient.unit || '')}
+          <Pressable
+            style={styles.tooltipBackdrop}
+            onPress={() => setIsTooltipVisible(false)}
+          >
+            <Pressable style={styles.tooltipContainer}>
+              {selectedIngredient && (
+                <>
+                  <Text style={styles.tooltipTitle}>
+                    {selectedIngredient.name}
                   </Text>
-                )}
-                {selectedIngredient.preparation && (
-                  <Text style={styles.tooltipPreparationText}>
-                    {selectedIngredient.preparation}
-                  </Text>
-                )}
-              </>
-            )}
+                  {(selectedIngredient.amount || selectedIngredient.unit) && (
+                    <Text style={styles.tooltipText}>
+                      {selectedIngredient.amount || ''}{' '}
+                      {abbreviateUnit(selectedIngredient.unit || '')}
+                    </Text>
+                  )}
+                  {selectedIngredient.preparation && (
+                    <Text style={styles.tooltipPreparationText}>
+                      {selectedIngredient.preparation}
+                    </Text>
+                  )}
+                </>
+              )}
+            </Pressable>
           </Pressable>
-        </Pressable>
-      </Modal>
+        </Modal>
 
-    </SafeAreaView>
+      </SafeAreaView>
+    </PanGestureHandler>
   );
 }
 
@@ -555,6 +579,22 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  centeredStatusContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: COLORS.background,
+  },
+  titleDivider: {
+    height: BORDER_WIDTH.hairline,
+    backgroundColor: COLORS.divider,
+    marginHorizontal: 0,
+  },
+  recipeSwitcherContainer: {
+    paddingHorizontal: SPACING.pageHorizontal,
+    paddingVertical: SPACING.sm,
   },
   loadingContainer: {
     flex: 1,
@@ -647,5 +687,3 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
   },
 }); 
-
-

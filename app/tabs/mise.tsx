@@ -674,11 +674,11 @@ export default function MiseScreen() {
       {selectedTab === 'recipes' && miseRecipes.length > 0 && (
         <TouchableOpacity
           style={styles.cookingSessionButton}
-          onPress={() => router.push('/tabs/mise/cook')}
+          onPress={() => router.push('/mise/cook')}
         >
         
           <Text style={styles.cookingSessionButtonText}>
-            Cook now!
+            Cook your recipes
           </Text>
         </TouchableOpacity>
       )}
