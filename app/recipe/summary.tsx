@@ -1474,12 +1474,91 @@ export default function RecipeSummaryScreen() {
     }
 
     try {
-      // Prepare the modified recipe data
-      const modifiedRecipeData = {
-        ...recipe,
-        recipeYield: getScaledYieldText(originalRecipe?.recipeYield || recipe.recipeYield, selectedScaleFactor),
-        ingredientGroups: scaledIngredientGroups,
-      };
+      // Check if we have modifications that need LLM processing
+      const needsSubstitution = appliedChanges.length > 0;
+      const needsScaling = selectedScaleFactor !== 1;
+      
+      let processedRecipeData = recipe;
+      let finalInstructions = recipe.instructions || [];
+      let newTitle: string | null = null;
+
+      // Process modifications with LLM if needed
+      if (needsSubstitution || needsScaling) {
+        console.log('[Summary] Processing modifications with LLM before saving...');
+        
+        // Get base recipe (use local modifications if available)
+        const getMiseRecipe = (globalThis as any).getMiseRecipe;
+        let baseRecipe = recipe;
+        
+        if (getMiseRecipe) {
+          const miseRecipe = getMiseRecipe(miseRecipeId);
+          if (miseRecipe?.local_modifications?.modified_recipe_data) {
+            baseRecipe = miseRecipe.local_modifications.modified_recipe_data;
+          }
+        }
+
+        // Flatten all ingredients from ingredient groups for scaling
+        const allIngredients: StructuredIngredient[] = [];
+        if (baseRecipe.ingredientGroups) {
+          baseRecipe.ingredientGroups.forEach(group => {
+            if (group.ingredients && Array.isArray(group.ingredients)) {
+              allIngredients.push(...group.ingredients);
+            }
+          });
+        }
+
+        // Call modify-instructions API to process changes
+        const backendUrl = process.env.EXPO_PUBLIC_API_URL!;
+        const response = await fetch(`${backendUrl}/api/recipes/modify-instructions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            originalInstructions: baseRecipe.instructions || [],
+            substitutions: appliedChanges.map((change) => ({
+              from: change.from,
+              to: change.to ? change.to.name : null,
+            })),
+            originalIngredients: allIngredients,
+            scaledIngredients: scaledIngredients || [],
+            scalingFactor: selectedScaleFactor,
+            skipTitleUpdate: !!params.titleOverride, // Skip title suggestions if title override exists
+          }),
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.error || `Modification processing failed (Status: ${response.status})`);
+        }
+        if (!result.modifiedInstructions) {
+          throw new Error('Invalid format for modified instructions.');
+        }
+
+        finalInstructions = result.modifiedInstructions;
+        
+        // Capture new title if suggested by LLM
+        if (result.newTitle && result.newTitle.trim() !== '') {
+          newTitle = result.newTitle;
+        }
+
+        // Create the processed recipe data
+        processedRecipeData = {
+          ...baseRecipe,
+          title: newTitle || baseRecipe.title,
+          recipeYield: getScaledYieldText(originalRecipe?.recipeYield || baseRecipe.recipeYield, selectedScaleFactor),
+          instructions: finalInstructions,
+          ingredientGroups: scaledIngredientGroups,
+        };
+
+        console.log('[Summary] ✅ LLM processing completed:', {
+          originalInstructionsCount: baseRecipe.instructions?.length || 0,
+          processedInstructionsCount: finalInstructions.length,
+          newTitle: newTitle,
+          scalingFactor: selectedScaleFactor,
+          substitutionsCount: appliedChanges.length,
+        });
+      } else {
+        console.log('[Summary] No modifications requiring LLM processing');
+      }
 
       const appliedChangesData = {
         ingredientChanges: appliedChanges.map((change) => ({
@@ -1494,22 +1573,24 @@ export default function RecipeSummaryScreen() {
         scalingFactor: selectedScaleFactor,
       };
 
-      console.log('[Summary] Saving modifications to database:', {
+      console.log('[Summary] Saving processed modifications to database:', {
         miseRecipeId,
         selectedScaleFactor,
         appliedChangesCount: appliedChanges.length,
-        modifiedRecipeTitle: modifiedRecipeData.title,
-        modifiedRecipeYield: modifiedRecipeData.recipeYield,
+        processedRecipeTitle: processedRecipeData.title,
+        processedRecipeYield: processedRecipeData.recipeYield,
+        instructionsCount: processedRecipeData.instructions?.length || 0,
+        needsLLMProcessing: needsSubstitution || needsScaling,
       });
 
-      // Save to database via API
+      // Save the processed recipe to database
       const backendUrl = process.env.EXPO_PUBLIC_API_URL!;
       const response = await fetch(`${backendUrl}/api/mise/recipes/${miseRecipeId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: session.user.id,
-          preparedRecipeData: modifiedRecipeData,
+          preparedRecipeData: processedRecipeData, // Save the processed version
           appliedChanges: appliedChangesData,
           finalYield: getScaledYieldText(originalRecipe?.recipeYield || recipe.recipeYield, selectedScaleFactor),
         }),
@@ -1526,7 +1607,7 @@ export default function RecipeSummaryScreen() {
         updateMiseRecipe(miseRecipeId, {
           scaleFactor: selectedScaleFactor,
           appliedChanges: appliedChanges,
-          modified_recipe_data: modifiedRecipeData,
+          modified_recipe_data: processedRecipeData, // Use processed version
         });
       }
 
@@ -1536,13 +1617,13 @@ export default function RecipeSummaryScreen() {
       // Invalidate mise cache to force fresh data fetch
       try {
         await AsyncStorage.removeItem('miseLastFetched');
-        console.log('[Summary] Invalidated mise cache after saving modifications');
+        console.log('[Summary] Invalidated mise cache after saving processed modifications');
       } catch (cacheError) {
         console.warn('[Summary] Failed to invalidate mise cache:', cacheError);
       }
       
       // Show success feedback
-      showError('Modifications Saved', 'Your changes have been saved for this cooking session. The grocery list will update when you return to your mise.', () => {
+      showError('Modifications Saved', 'Your changes have been processed and saved. The recipe instructions have been updated to reflect your modifications.', () => {
         hideError();
         // Navigate to mise screen instead of going back
         router.replace('/tabs/mise' as any);

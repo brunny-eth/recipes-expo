@@ -6,7 +6,6 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
-  Alert,
   AppState,
   AppStateStatus,
   InteractionManager,
@@ -20,6 +19,7 @@ import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useCooking } from '@/context/CookingContext';
+import { useAuth } from '@/context/AuthContext';
 import { COLORS, SPACING, RADIUS, OVERLAYS, SHADOWS } from '@/constants/theme';
 import { sectionHeaderText, bodyText, bodyStrongText, bodyTextLoose, captionText } from '@/constants/typography';
 import { CombinedParsedRecipe, StructuredIngredient } from '@/common/types';
@@ -36,6 +36,7 @@ import { abbreviateUnit } from '@/utils/format';
 export default function CookScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { session } = useAuth();
   const { state, initializeSessions, endSession, endAllSessions, switchRecipe, setScrollPosition, getCurrentScrollPosition, hasResumableSession, completeStep, uncompleteStep } = useCooking();
   
   const [isLoading, setIsLoading] = useState(true);
@@ -76,30 +77,45 @@ export default function CookScreen() {
     };
   }, []);
 
-  // Load recipes from mise on mount
+  // Load recipes from mise on mount - fetch fresh data from API
   useEffect(() => {
     const loadMiseRecipes = async () => {
       try {
         setIsLoading(true);
-        console.log('[CookScreen] 🔄 Starting to load mise recipes from AsyncStorage');
+        console.log('[CookScreen] 🔄 Starting to load fresh mise recipes from API');
         
         // Clear any existing cooking session to start fresh
         console.log('[CookScreen] 🧹 Clearing existing cooking sessions');
         await endAllSessions();
         
-        // Get mise recipes from AsyncStorage
-        console.log('[CookScreen] 📱 Reading miseRecipes from AsyncStorage');
-        const miseData = await AsyncStorage.getItem('miseRecipes');
-        
-        if (!miseData) {
-          console.log('[CookScreen] ❌ No mise data found in AsyncStorage');
+        // Fetch fresh mise data from API instead of using cached data
+        if (!session?.user) {
+          console.log('[CookScreen] ❌ No user session found');
           setRecipes([]);
           return;
         }
         
-        console.log('[CookScreen] 📦 Raw mise data from AsyncStorage:', miseData.length, 'characters');
-        const miseRecipes = JSON.parse(miseData);
-        console.log('[CookScreen] 📊 Parsed mise recipes count:', miseRecipes.length);
+        const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+        if (!backendUrl) {
+          throw new Error('API configuration error');
+        }
+        
+        const headers = {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        };
+        
+        console.log('[CookScreen] 📡 Fetching fresh mise recipes from API');
+        const response = await fetch(`${backendUrl}/api/mise/recipes?userId=${session.user.id}`, { headers });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch mise recipes: ${response.statusText}`);
+        }
+        
+        const recipesData = await response.json();
+        const miseRecipes = recipesData?.recipes || [];
+        
+        console.log('[CookScreen] 📊 Fresh mise recipes from API:', miseRecipes.length, 'recipes');
         console.log('[CookScreen] 📋 Mise recipes summary:', miseRecipes.map((mr: any) => ({
           id: mr.id,
           title: mr.prepared_recipe_data?.title || mr.original_recipe_data?.title,
@@ -109,7 +125,7 @@ export default function CookScreen() {
         })));
         
         if (miseRecipes.length === 0) {
-          console.log('[CookScreen] ❌ Mise recipes array is empty');
+          console.log('[CookScreen] ❌ No mise recipes found');
           setRecipes([]);
           return;
         }
@@ -163,21 +179,22 @@ export default function CookScreen() {
         
         setRecipes(recipeList);
         
-        // Initialize all sessions with eager loading using mise recipes
+        // Initialize all sessions with eager loading using fresh mise recipes
         if (miseRecipes.length > 0) {
-          console.log('[CookScreen] 🚀 Initializing cooking sessions for', miseRecipes.length, 'recipes with eager loading');
+          console.log('[CookScreen] 🚀 Initializing cooking sessions for', miseRecipes.length, 'recipes with fresh data');
           
           // Initialize all sessions at once with full recipe data
           initializeSessions(miseRecipes);
           
-          console.log('[CookScreen] ✅ All cooking sessions initialized with full recipe data');
+          console.log('[CookScreen] ✅ All cooking sessions initialized with fresh recipe data');
         } else {
           console.log('[CookScreen] ❌ No valid recipes found to start cooking sessions');
         }
       } catch (error) {
         console.error('[CookScreen] 💥 Error loading mise recipes:', error);
         console.error('[CookScreen] 💥 Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-        Alert.alert('Error', 'Failed to load recipes from mise');
+        // Show error in console instead of alert for simplicity
+        console.error('[CookScreen] 💥 Failed to load recipes from mise:', error);
       } finally {
         setIsLoading(false);
         console.log('[CookScreen] 🏁 Finished loading mise recipes, isLoading set to false');
@@ -202,24 +219,7 @@ export default function CookScreen() {
     return () => subscription?.remove();
   }, []);
 
-  const handleEndSession = () => {
-    Alert.alert(
-      'End Cooking Session',
-      'Are you sure you want to end your cooking session? This will clear all progress.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'End Session',
-          style: 'destructive',
-          onPress: async () => {
-            // End all active sessions and clear storage
-            await endAllSessions();
-            router.replace('/tabs/mise');
-          },
-        },
-      ]
-    );
-  };
+
 
   const handleRecipeSwitch = (recipeId: string) => {
     console.time(`[CookScreen] ⏱️ handleRecipeSwitch-${recipeId}`);
@@ -328,16 +328,10 @@ export default function CookScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.emptyContainer}>
           <MaterialCommunityIcons name="chef-hat" size={64} color={COLORS.textMuted} />
-          <Text style={styles.emptyTitle}>No Active Cooking Session</Text>
+          <Text style={styles.emptyTitle}>No Recipes to Cook</Text>
           <Text style={styles.emptyText}>
-            Start a cooking session from your mise to begin cooking multiple recipes.
+            Add recipes to your mise to start cooking.
           </Text>
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={() => router.replace('/tabs/mise')}
-          >
-            <Text style={styles.primaryButtonText}>Go to Mise</Text>
-          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -345,23 +339,9 @@ export default function CookScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header with session controls */}
+      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textDark} />
-        </TouchableOpacity>
-        
         <Text style={styles.headerTitle}>Cooking Session</Text>
-        
-        <TouchableOpacity
-          style={styles.endButton}
-          onPress={handleEndSession}
-        >
-          <Text style={styles.endButtonText}>End</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Recipe Switcher */}
@@ -518,27 +498,15 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingHorizontal: SPACING.pageHorizontal,
     paddingVertical: SPACING.md,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.divider,
   },
-  backButton: {
-    padding: SPACING.xs,
-  },
   headerTitle: {
     ...sectionHeaderText,
-    flex: 1,
     textAlign: 'center',
-  },
-  endButton: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
-  },
-  endButtonText: {
-    ...bodyStrongText,
-    color: COLORS.error,
   },
   content: {
     flex: 1,
@@ -559,18 +527,7 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     textAlign: 'center',
   },
-  primaryButton: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.sm,
-    alignItems: 'center',
-    marginTop: SPACING.md,
-  },
-  primaryButtonText: {
-    ...bodyStrongText,
-    color: COLORS.white,
-  },
+
   tooltipBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',

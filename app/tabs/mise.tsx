@@ -868,13 +868,9 @@ export default function MiseScreen() {
           style={styles.cookingSessionButton}
           onPress={() => router.push('/tabs/mise/cook')}
         >
-          <MaterialCommunityIcons 
-            name="chef-hat" 
-            size={20} 
-            color={COLORS.white} 
-          />
+        
           <Text style={styles.cookingSessionButtonText}>
-            {hasResumableSession() ? 'Resume Cooking Session' : 'Start Cooking Session'}
+            Cook now!
           </Text>
         </TouchableOpacity>
       )}
