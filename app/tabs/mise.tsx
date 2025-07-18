@@ -24,7 +24,6 @@ import {
   bodyText,
   bodyTextLoose,
   sectionHeaderText,
-  captionText,
   FONT,
 } from '@/constants/typography';
 import { SHADOWS } from '@/constants/theme';
