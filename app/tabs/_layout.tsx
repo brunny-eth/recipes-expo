@@ -51,9 +51,9 @@ const MemoizedTabsNavigator = React.memo(() => {
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="library"
         options={{
-          title: 'Explore',
+          title: 'Library',
           tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <MaterialCommunityIcons
               name="book-open-variant"
@@ -79,20 +79,6 @@ const MemoizedTabsNavigator = React.memo(() => {
         }}
       />
       <Tabs.Screen
-        name="saved"
-        options={{
-          title: 'Saved',
-          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
-            <MaterialCommunityIcons
-              name="bookmark-outline"
-              size={size}
-              color={color}
-            />
-          ),
-          unmountOnBlur: false,
-        }}
-      />
-      <Tabs.Screen
         name="settings"
         options={{
           title: 'Settings',
@@ -103,6 +89,22 @@ const MemoizedTabsNavigator = React.memo(() => {
               color={color}
             />
           ),
+          unmountOnBlur: false,
+        }}
+      />
+      
+      {/* Hidden tabs for backward compatibility */}
+      <Tabs.Screen
+        name="explore"
+        options={{
+          href: null, // Hide from tab bar
+          unmountOnBlur: false,
+        }}
+      />
+      <Tabs.Screen
+        name="saved"
+        options={{
+          href: null, // Hide from tab bar
           unmountOnBlur: false,
         }}
       />
