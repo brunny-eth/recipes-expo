@@ -421,7 +421,7 @@ export default function MiseScreen() {
   const invalidateMiseCache = async () => {
     try {
       await AsyncStorage.removeItem(MISE_CACHE_KEYS.LAST_FETCHED);
-      console.log('[MiseScreen] Invalidated mise cache.');
+      console.log('[MiseScreen] 🗑️ Invalidated mise cache.');
     } catch (error) {
       console.error('[MiseScreen] Failed to invalidate mise cache:', error);
     }
@@ -438,8 +438,12 @@ export default function MiseScreen() {
         miseRecipesCount: miseRecipes.length,
         groceryListCount: groceryList.length,
       });
+      
+      // Add specific log for navigation from summary
+      console.log('[MiseScreen] 🔄 Navigation check - forcing fresh data fetch');
+      
       // On focus, check if we need to refetch data
-      fetchMiseData();
+      fetchMiseData(true); // Force refresh when navigating to mise
     }, [fetchMiseData])
   );
 

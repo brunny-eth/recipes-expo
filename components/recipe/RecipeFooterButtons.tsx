@@ -20,6 +20,7 @@ type RecipeFooterButtonsProps = {
   handleRemoveFromSaved: () => void;
   handleSaveModifications: () => void;
   isSavingForLater?: boolean;
+  isSavingModifications?: boolean;
   entryPoint: string;
   hasModifications?: boolean;
   isAlreadyInMise?: boolean;
@@ -33,6 +34,7 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
   handleRemoveFromSaved,
   handleSaveModifications,
   isSavingForLater = false,
+  isSavingModifications = false,
   entryPoint,
   hasModifications = false,
   isAlreadyInMise = false,
@@ -40,7 +42,7 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
 
 
   const getMainButtonText = () => {
-    if (isRewriting) return 'Customizing instructions...';
+    if (isRewriting || isSavingModifications) return 'Processing modifications...';
     if (isScalingInstructions) return 'Making sure everything lines up...';
     
     if (isAlreadyInMise) return 'Already in mise';
@@ -65,7 +67,7 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
   };
 
   const isMainButtonDisabled = () => {
-    if (isRewriting || isScalingInstructions || isAlreadyInMise) return true;
+    if (isRewriting || isScalingInstructions || isSavingModifications || isAlreadyInMise) return true;
     
     // For mise entry point, disable if no modifications
     if (entryPoint === 'mise' && !hasModifications) {
@@ -94,7 +96,10 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
       default:
         return (
           <TouchableOpacity
-            style={styles.saveButton}
+            style={[
+              styles.saveButton,
+              isSavingForLater && styles.saveButtonDisabled
+            ]}
             onPress={handleSaveForLater}
             disabled={isSavingForLater}
           >
@@ -105,7 +110,12 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
                 style={{ marginRight: 8 }}
               />
             )}
-            <Text style={styles.saveButtonText}>Save for later</Text>
+            <Text style={[
+              styles.saveButtonText,
+              isSavingForLater && styles.saveButtonTextDisabled
+            ]}>
+              {isSavingForLater ? 'Processing modifications...' : 'Save for later'}
+            </Text>
           </TouchableOpacity>
         );
     }
@@ -121,7 +131,7 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
         onPress={getMainButtonHandler()}
         disabled={buttonDisabled}
       >
-        {(isRewriting || isScalingInstructions) && !isAlreadyInMise && (
+        {(isRewriting || isScalingInstructions || isSavingModifications) && !isAlreadyInMise && (
           <ActivityIndicator
             size="small"
             color={COLORS.white}

@@ -251,8 +251,9 @@ export default function RecipeSummaryScreen() {
   const [isScalingInstructions, setIsScalingInstructions] = useState(false);
   // Track loading state specifically for the "Save for later" action so we don't disable the primary button.
   const [isSavingForLater, setIsSavingForLater] = useState(false);
+  // Track loading state for saving modifications in mise entry point
+  const [isSavingModifications, setIsSavingModifications] = useState(false);
   const [isHelpModalVisible, setIsHelpModalVisible] = useState(false);
-  const [preparationComplete, setPreparationComplete] = useState(false);
   const [preparedRecipeData, setPreparedRecipeData] = useState<any>(null);
   const [selectedIngredientOriginalData, setSelectedIngredientOriginalData] =
     useState<StructuredIngredient | null>(null);
@@ -1217,9 +1218,18 @@ export default function RecipeSummaryScreen() {
         return;
       }
 
-      // Store the mise recipe ID for navigation
-      setPreparedRecipeData({ miseRecipeId: result.miseRecipe.id, ...finalRecipeData });
-      setPreparationComplete(true);
+      console.log('[Summary] 🚀 Navigating to mise tab after successful save');
+      console.log('[Summary] 📊 Save details:', {
+        recipeId: recipe.id,
+        recipeTitle: recipe.title,
+        miseRecipeId: result.miseRecipe.id,
+        hasModifications: needsSubstitution || needsScaling,
+        modificationsCount: appliedChanges.length,
+        scalingFactor: selectedScaleFactor,
+      });
+      
+      // Navigate directly to mise tab
+      router.replace('/tabs/mise' as any);
 
     } catch (saveError: any) {
       showError('Save Failed', `Couldn't save recipe to mise: ${saveError.message}`);
@@ -1232,7 +1242,6 @@ export default function RecipeSummaryScreen() {
   const handleGoToRecipeSteps = () => {
     if (!preparedRecipeData) return;
     
-    setPreparationComplete(false);
     router.push({
       pathname: '/recipe/steps',
       params: {
@@ -1257,12 +1266,10 @@ export default function RecipeSummaryScreen() {
   };
 
   const handleGoToMise = () => {
-    setPreparationComplete(false);
     router.replace('/tabs/mise' as any);
   };
 
   const handleGoHome = () => {
-    setPreparationComplete(false);
     router.replace('/tabs' as any);
   };
 
@@ -1412,8 +1419,6 @@ export default function RecipeSummaryScreen() {
         const saveResult = await saveResponse.json();
         if (!saveResponse.ok) throw new Error(saveResult.error || 'Failed to save modified recipe');
 
-
-        setPreparationComplete(false);
         router.replace('/tabs/saved' as any);
 
       } catch (error: any) {
@@ -1422,22 +1427,18 @@ export default function RecipeSummaryScreen() {
         showError('Save Failed', `Could not save modified recipe: ${error.message}`);
       }
     } else {
-      // No modifications, save original recipe
+      // No modifications, save original recipe (instant - no loading state needed)
       try {
-        setIsSavingForLater(true);
-      const { saveRecipe } = require('@/lib/savedRecipes');
-      const success = await saveRecipe(recipe.id);
-      if (success) {
-        setPreparationComplete(false);
-        router.replace('/tabs/saved' as any);
-      } else {
+        const { saveRecipe } = require('@/lib/savedRecipes');
+        const success = await saveRecipe(recipe.id);
+        if (success) {
+          router.replace('/tabs/saved' as any);
+        } else {
+          showError('Save Failed', 'Could not save recipe. Please try again.');
+        }
+      } catch (error) {
+        console.error('Error saving recipe:', error);
         showError('Save Failed', 'Could not save recipe. Please try again.');
-      }
-    } catch (error) {
-      console.error('Error saving recipe:', error);
-      showError('Save Failed', 'Could not save recipe. Please try again.');
-      } finally {
-        setIsSavingForLater(false);
       }
     }
   };
@@ -1484,6 +1485,7 @@ export default function RecipeSummaryScreen() {
 
       // Process modifications with LLM if needed
       if (needsSubstitution || needsScaling) {
+        setIsSavingModifications(true);
         console.log('[Summary] Processing modifications with LLM before saving...');
         
         // Get base recipe (use local modifications if available)
@@ -1622,16 +1624,23 @@ export default function RecipeSummaryScreen() {
         console.warn('[Summary] Failed to invalidate mise cache:', cacheError);
       }
       
-      // Show success feedback
-      showError('Modifications Saved', 'Your changes have been processed and saved. The recipe instructions have been updated to reflect your modifications.', () => {
-        hideError();
-        // Navigate to mise screen instead of going back
-        router.replace('/tabs/mise' as any);
+      console.log('[Summary] 🚀 Navigating to mise tab after successful modification save');
+      console.log('[Summary] 📊 Modification save details:', {
+        miseRecipeId,
+        recipeTitle: processedRecipeData.title,
+        hasModifications: needsSubstitution || needsScaling,
+        modificationsCount: appliedChanges.length,
+        scalingFactor: selectedScaleFactor,
       });
+      
+      // Navigate directly to mise tab (consistent with other entrypoints)
+      router.replace('/tabs/mise' as any);
 
     } catch (error: any) {
       console.error('[Summary] Failed to save modifications:', error);
       showError('Save Failed', `Could not save modifications: ${error.message}`);
+    } finally {
+      setIsSavingModifications(false);
     }
   };
 
@@ -1665,52 +1674,7 @@ export default function RecipeSummaryScreen() {
         />
       )}
       
-      {/* Success Modal */}
-      <Modal
-        visible={preparationComplete}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setPreparationComplete(false)}
-      >
-        <TouchableOpacity 
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setPreparationComplete(false)}
-        >
-          <TouchableOpacity 
-            style={styles.modalContent}
-            activeOpacity={1}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <MaterialCommunityIcons
-              name="check-circle"
-              size={48}
-              color={COLORS.success}
-              style={styles.successIcon}
-            />
-            <Text style={styles.modalTitle}>Added to your mise</Text>
-            <Text style={styles.modalMessage}>
-              This recipe is now added to your grocery list and ready for cooking.
-            </Text>
-            
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.secondaryButton]}
-                onPress={handleGoToMise}
-              >
-                <Text style={styles.secondaryButtonText}>Go to your mise</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[styles.modalButton, styles.secondaryButton]}
-                onPress={handleGoToRecipeSteps}
-              >
-                <Text style={styles.secondaryButtonText}>Cook this now</Text>
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
+
       
       <RecipeStepsHeader
         title={cleanTitle}
@@ -1883,6 +1847,7 @@ export default function RecipeSummaryScreen() {
         handleRemoveFromSaved={handleRemoveFromSaved}
         handleSaveModifications={handleSaveModifications}
         isSavingForLater={isSavingForLater}
+        isSavingModifications={isSavingModifications}
         entryPoint={entryPoint}
         hasModifications={hasModifications}
         isAlreadyInMise={isAlreadyInMise}
