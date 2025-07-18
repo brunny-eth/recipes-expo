@@ -36,7 +36,7 @@ import { abbreviateUnit } from '@/utils/format';
 export default function CookScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { state, startSession, startLazySession, loadRecipeDataIfNeeded, endSession, endAllSessions, switchRecipe, setScrollPosition, getCurrentScrollPosition, hasResumableSession, completeStep, uncompleteStep } = useCooking();
+  const { state, initializeSessions, endSession, endAllSessions, switchRecipe, setScrollPosition, getCurrentScrollPosition, hasResumableSession, completeStep, uncompleteStep } = useCooking();
   
   const [isLoading, setIsLoading] = useState(true);
   const [recipes, setRecipes] = useState<CombinedParsedRecipe[]>([]);
@@ -163,34 +163,14 @@ export default function CookScreen() {
         
         setRecipes(recipeList);
         
-        // Start fresh sessions for all recipes
-        if (recipeList.length > 0) {
-          console.log('[CookScreen] 🚀 Starting cooking sessions for', recipeList.length, 'recipes');
+        // Initialize all sessions with eager loading using mise recipes
+        if (miseRecipes.length > 0) {
+          console.log('[CookScreen] 🚀 Initializing cooking sessions for', miseRecipes.length, 'recipes with eager loading');
           
-          // Start first recipe immediately, others lazily
-          if (recipeList[0]) {
-            console.log('[CookScreen] 🥇 Starting immediate session for first recipe:', recipeList[0].title);
-            startSession(recipeList[0]);
-          }
+          // Initialize all sessions at once with full recipe data
+          initializeSessions(miseRecipes);
           
-          // Start lazy sessions for remaining recipes using mise IDs
-          if (recipeList.length > 1) {
-            console.log('[CookScreen] ⏳ Scheduling lazy sessions for remaining', recipeList.length - 1, 'recipes');
-            InteractionManager.runAfterInteractions(() => {
-              recipeList.slice(1).forEach((recipe: any, index: number) => {
-                const cookingSessionId = String(recipe.id); // This is now the mise ID
-                console.log('[CookScreen] 🔄 Starting lazy session:', {
-                  cookingSessionId,
-                  title: recipe.title,
-                  miseRecipeId: recipe.miseRecipeId,
-                  index: index + 1,
-                  totalRemaining: recipeList.length - 1,
-                });
-                startLazySession(cookingSessionId);
-              });
-              console.log('[CookScreen] ✅ All lazy sessions initiated');
-            });
-          }
+          console.log('[CookScreen] ✅ All cooking sessions initialized with full recipe data');
         } else {
           console.log('[CookScreen] ❌ No valid recipes found to start cooking sessions');
         }
@@ -241,7 +221,10 @@ export default function CookScreen() {
     );
   };
 
-  const handleRecipeSwitch = async (recipeId: string) => {
+  const handleRecipeSwitch = (recipeId: string) => {
+    console.time(`[CookScreen] ⏱️ handleRecipeSwitch-${recipeId}`);
+    console.log('[CookScreen] 🔄 Starting recipe switch to:', recipeId);
+    
     // Save current scroll position before switching
     if (state.activeRecipeId && scrollViewRef.current) {
       // Get current scroll position - this would need to be implemented
@@ -251,8 +234,10 @@ export default function CookScreen() {
     }
     
     switchRecipe(recipeId);
-    // Load recipe data if needed
-    await loadRecipeDataIfNeeded(recipeId);
+    // No need to load recipe data - all recipes are already loaded with eager loading
+    
+    console.log('[CookScreen] ✅ Recipe switch completed for:', recipeId);
+    console.timeEnd(`[CookScreen] ⏱️ handleRecipeSwitch-${recipeId}`);
     
     // Restore scroll position for new recipe
     const savedScrollY = getCurrentScrollPosition(recipeId);
@@ -384,7 +369,6 @@ export default function CookScreen() {
         recipes={state.activeRecipes}
         activeRecipeId={state.activeRecipeId || ''}
         onRecipeSwitch={handleRecipeSwitch}
-        loadRecipeDataIfNeeded={loadRecipeDataIfNeeded}
       />
 
       {/* Current Recipe Content */}

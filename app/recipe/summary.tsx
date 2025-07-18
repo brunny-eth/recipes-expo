@@ -1113,33 +1113,47 @@ export default function RecipeSummaryScreen() {
       })),
     });
 
-    console.log('[DEBUG] Preparing recipe for mise save:', {
-      finalRecipeData: {
-        title: finalRecipeData.title,
-        recipeYield: finalRecipeData.recipeYield,
-        ingredientGroups: finalRecipeData.ingredientGroups?.map(group => ({
-          name: group.name,
-          ingredients: group.ingredients?.map(ing => ({
-            name: ing.name,
-            amount: ing.amount,
-            unit: ing.unit,
-          })),
-        })),
-      },
-      appliedChangesData,
-      originalRecipeData: {
-        title: (originalRecipe || recipe).title,
-        recipeYield: (originalRecipe || recipe).recipeYield,
-        ingredientGroups: (originalRecipe || recipe).ingredientGroups?.map(group => ({
-          name: group.name,
-          ingredients: group.ingredients?.map(ing => ({
-            name: ing.name,
-            amount: ing.amount,
-            unit: ing.unit,
-          })),
-        })),
-      },
-    });
+          console.log('[DEBUG] 📋 Preparing recipe for mise save with comprehensive details:', {
+        recipeId: recipe.id,
+        entryPoint,
+        finalRecipeData: {
+          title: finalRecipeData.title,
+          recipeYield: finalRecipeData.recipeYield,
+          ingredientGroupsCount: finalRecipeData.ingredientGroups?.length || 0,
+          totalIngredients: finalRecipeData.ingredientGroups?.reduce((total, group) => 
+            total + (group.ingredients?.length || 0), 0) || 0,
+          instructionsCount: finalRecipeData.instructions?.length || 0,
+          hasImage: !!finalRecipeData.image,
+          hasSourceUrl: !!finalRecipeData.sourceUrl,
+          prepTime: finalRecipeData.prepTime,
+          cookTime: finalRecipeData.cookTime,
+        },
+        appliedChangesData: {
+          scalingFactor: appliedChangesData.scalingFactor,
+          ingredientChangesCount: appliedChangesData.ingredientChanges?.length || 0,
+          ingredientChanges: appliedChangesData.ingredientChanges?.map(change => ({
+            from: change.from,
+            to: change.to ? (typeof change.to === 'string' ? change.to : change.to.name) : null,
+            isRemoval: !change.to,
+            hasAmountData: change.to && typeof change.to === 'object' && !!change.to.amount,
+            hasUnitData: change.to && typeof change.to === 'object' && !!change.to.unit,
+            hasPreparationData: change.to && typeof change.to === 'object' && !!change.to.preparation,
+          })) || [],
+        },
+        originalRecipeData: {
+          title: (originalRecipe || recipe).title,
+          recipeYield: (originalRecipe || recipe).recipeYield,
+          ingredientGroupsCount: (originalRecipe || recipe).ingredientGroups?.length || 0,
+          totalOriginalIngredients: (originalRecipe || recipe).ingredientGroups?.reduce((total, group) => 
+            total + (group.ingredients?.length || 0), 0) || 0,
+          instructionsCount: (originalRecipe || recipe).instructions?.length || 0,
+        },
+        scalingInfo: {
+          selectedScaleFactor,
+          originalYieldValue,
+          finalYieldText: getScaledYieldText(originalRecipe?.recipeYield || recipe?.recipeYield, selectedScaleFactor),
+        },
+      });
 
     // Check authentication before saving
     if (!session?.user?.id) {

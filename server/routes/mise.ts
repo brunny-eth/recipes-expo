@@ -146,8 +146,23 @@ router.post('/save-recipe', async (req: Request, res: Response) => {
       originalRecipeId, 
       userId, 
       titleOverride,
-      finalYield 
-    }, 'Saving recipe to mise');
+      finalYield,
+      appliedChanges,
+      scalingFactor: appliedChanges?.scalingFactor,
+      ingredientChangesCount: appliedChanges?.ingredientChanges?.length || 0,
+      ingredientChanges: appliedChanges?.ingredientChanges?.map((change: any) => ({
+        from: change.from,
+        to: change.to ? (typeof change.to === 'string' ? change.to : change.to.name) : null,
+        hasAmountData: change.to && typeof change.to === 'object' && !!change.to.amount,
+        hasUnitData: change.to && typeof change.to === 'object' && !!change.to.unit,
+      })) || [],
+      recipeTitle: preparedRecipeData?.title,
+      originalRecipeTitle: originalRecipeData?.title,
+      preparedYield: preparedRecipeData?.recipeYield,
+      originalYield: originalRecipeData?.recipeYield,
+      ingredientGroupsCount: preparedRecipeData?.ingredientGroups?.length || 0,
+      instructionsCount: preparedRecipeData?.instructions?.length || 0,
+    }, 'Saving recipe to mise with detailed modifications');
 
     // Validation
     if (!userId || !originalRecipeId || !originalRecipeData || !preparedRecipeData || !appliedChanges) {
@@ -390,7 +405,32 @@ router.put('/recipes/:id', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Missing userId' });
     }
 
-    logger.info({ requestId, miseRecipeId: id, updates: req.body }, 'Updating mise recipe');
+    logger.info({ 
+      requestId, 
+      miseRecipeId: id, 
+      userId,
+      updates: {
+        titleOverride,
+        plannedDate,
+        displayOrder,
+        isCompleted,
+        finalYield,
+        hasNewPreparedData: !!preparedRecipeData,
+        hasNewAppliedChanges: !!appliedChanges,
+        scalingFactor: appliedChanges?.scalingFactor,
+        ingredientChangesCount: appliedChanges?.ingredientChanges?.length || 0,
+        ingredientChanges: appliedChanges?.ingredientChanges?.map((change: any) => ({
+          from: change.from,
+          to: change.to ? (typeof change.to === 'string' ? change.to : change.to.name) : null,
+          hasAmountData: change.to && typeof change.to === 'object' && !!change.to.amount,
+          hasUnitData: change.to && typeof change.to === 'object' && !!change.to.unit,
+        })) || [],
+        newRecipeTitle: preparedRecipeData?.title,
+        newRecipeYield: preparedRecipeData?.recipeYield,
+        newIngredientsCount: preparedRecipeData?.ingredientGroups?.length || 0,
+        newInstructionsCount: preparedRecipeData?.instructions?.length || 0,
+      }
+    }, 'Updating mise recipe with detailed modifications');
 
     // Build update object with only provided fields
     const updates: any = { updated_at: new Date().toISOString() };

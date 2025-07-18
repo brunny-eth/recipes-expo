@@ -281,6 +281,34 @@ export default function MiseScreen() {
       const fetchedRecipes = recipesData?.recipes || [];
       const categorizedGroceryList = convertToGroceryCategories(groceryData?.items || []);
 
+      // Log memory pressure for each recipe
+      console.log('[MiseScreen] 💾 Memory analysis for fetched recipes:');
+      fetchedRecipes.forEach((recipe: any, index: number) => {
+        const recipeJson = JSON.stringify(recipe);
+        const sizeInKB = (recipeJson.length / 1024).toFixed(2);
+        const preparedDataSize = recipe.prepared_recipe_data ? 
+          (JSON.stringify(recipe.prepared_recipe_data).length / 1024).toFixed(2) : '0';
+        const originalDataSize = recipe.original_recipe_data ? 
+          (JSON.stringify(recipe.original_recipe_data).length / 1024).toFixed(2) : '0';
+        
+        console.log(`[MiseScreen] 📊 Recipe ${index + 1}/${fetchedRecipes.length}:`, {
+          id: recipe.id,
+          title: recipe.title_override || recipe.prepared_recipe_data?.title || 'Unknown',
+          totalSizeKB: sizeInKB,
+          preparedDataKB: preparedDataSize,
+          originalDataKB: originalDataSize,
+          hasAppliedChanges: !!recipe.applied_changes,
+          ingredientGroupsCount: recipe.prepared_recipe_data?.ingredientGroups?.length || 0,
+          instructionsCount: recipe.prepared_recipe_data?.instructions?.length || 0,
+        });
+      });
+
+      const totalMemoryKB = fetchedRecipes.reduce((total: number, recipe: any) => {
+        return total + (JSON.stringify(recipe).length / 1024);
+      }, 0).toFixed(2);
+      
+      console.log(`[MiseScreen] 📈 Total memory usage: ${totalMemoryKB} KB for ${fetchedRecipes.length} recipes`);
+
       setMiseRecipes(fetchedRecipes);
       setGroceryList(categorizedGroceryList);
 

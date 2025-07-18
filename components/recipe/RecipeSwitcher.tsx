@@ -9,14 +9,12 @@ interface RecipeSwitcherProps {
   recipes: RecipeSession[];
   activeRecipeId: string;
   onRecipeSwitch: (recipeId: string) => void;
-  loadRecipeDataIfNeeded: (recipeId: string) => Promise<void>;
 }
 
 export default function RecipeSwitcher({ 
   recipes, 
   activeRecipeId, 
-  onRecipeSwitch,
-  loadRecipeDataIfNeeded
+  onRecipeSwitch
 }: RecipeSwitcherProps) {
   console.log('[RecipeSwitcher] 🔄 Rendering with props:', {
     recipesCount: recipes.length,
@@ -37,16 +35,8 @@ export default function RecipeSwitcher({
       title: recipe.recipe?.title || 'No title'
     });
 
-    // Always switch to the recipe
+    // Only switch to the recipe - let the parent handle data loading
     onRecipeSwitch(recipe.recipeId);
-    
-    // If the recipe is loading or has no data, trigger loading
-    if (recipe.isLoading || !recipe.recipe) {
-      console.log('[RecipeSwitcher] 🔄 Recipe needs loading, triggering loadRecipeDataIfNeeded');
-      if (loadRecipeDataIfNeeded) {
-        loadRecipeDataIfNeeded(recipe.recipeId);
-      }
-    }
   };
 
   return (

@@ -4,12 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CombinedParsedRecipe } from '../common/types';
 import { useAuth } from './AuthContext';
 
-// Cache management constants
-const COOKING_CACHE_KEYS = {
-  RECIPE_PREFIX: 'cookingRecipe_',
-  LAST_FETCHED_PREFIX: 'cookingRecipeLastFetched_',
-};
-const CACHE_DURATION_MS = 6 * 60 * 60 * 1000; // 6 hours (same as mise)
+
 
 // Types
 export type RecipeSession = {
@@ -33,10 +28,7 @@ type CookingState = {
 };
 
 type CookingAction =
-  | { type: 'START_SESSION'; payload: { recipe: CombinedParsedRecipe } }
-  | { type: 'START_LAZY_SESSION'; payload: { recipeId: string } }
-  | { type: 'LOAD_RECIPE_DATA'; payload: { recipeId: string; recipe: CombinedParsedRecipe } }
-  | { type: 'SET_RECIPE_LOADING'; payload: { recipeId: string; isLoading: boolean } }
+  | { type: 'INITIALIZE_SESSIONS'; payload: { recipes: CombinedParsedRecipe[]; activeRecipeId?: string } }
   | { type: 'END_SESSION'; payload: { recipeId: string } }
   | { type: 'SWITCH_RECIPE'; payload: { recipeId: string } }
   | { type: 'COMPLETE_STEP'; payload: { recipeId: string; stepId: string } }
@@ -50,9 +42,7 @@ type CookingAction =
 
 type CookingContextType = {
   state: CookingState;
-  startSession: (recipe: CombinedParsedRecipe) => void;
-  startLazySession: (recipeId: string) => void;
-  loadRecipeDataIfNeeded: (recipeId: string) => Promise<void>;
+  initializeSessions: (miseRecipes: any[]) => void;
   endSession: (recipeId: string) => void;
   endAllSessions: () => void;
   switchRecipe: (recipeId: string) => void;
@@ -65,7 +55,6 @@ type CookingContextType = {
   setScrollPosition: (recipeId: string, position: number) => void;
   getCurrentScrollPosition: (recipeId: string) => number;
   hasResumableSession: () => boolean;
-  invalidateRecipeCache: (recipeId: string) => Promise<void>;
 };
 
 const initialState: CookingState = {
@@ -88,107 +77,49 @@ function cookingReducer(state: CookingState, action: CookingAction): CookingStat
   });
 
   switch (action.type) {
-    case 'START_SESSION': {
-      // Generate a unique string ID for the session
-      const recipeId = String(action.payload.recipe.id || Date.now());
-      console.log('[CookingContext] 🚀 Starting session for recipe:', {
-        recipeId,
-        title: action.payload.recipe.title,
-        hasInstructions: !!action.payload.recipe.instructions,
-        instructionsCount: action.payload.recipe.instructions?.length || 0
+    case 'INITIALIZE_SESSIONS': {
+      console.log('[CookingContext] 🚀 Initializing all cooking sessions with eager loading:', {
+        recipesCount: action.payload.recipes.length,
+        activeRecipeId: action.payload.activeRecipeId,
+        recipeIds: action.payload.recipes.map(r => r.id)
       });
       
-      const newRecipe: RecipeSession = {
-        recipeId,
-        recipe: action.payload.recipe, // Keep original recipe unchanged
-        completedSteps: [],
-        activeTimers: [],
-        scrollPosition: 0,
-        isLoading: false,
-      };
+      const newRecipes: RecipeSession[] = action.payload.recipes.map(recipe => {
+        const recipeId = String(recipe.id);
+        
+        console.log('[CookingContext] 📋 Creating session for recipe:', {
+          recipeId,
+          title: recipe.title,
+          hasInstructions: !!recipe.instructions,
+          instructionsCount: recipe.instructions?.length || 0,
+          hasIngredientGroups: !!recipe.ingredientGroups,
+          ingredientGroupsCount: recipe.ingredientGroups?.length || 0,
+        });
+        
+        return {
+          recipeId,
+          recipe, // Full recipe data immediately available
+          completedSteps: [],
+          activeTimers: [],
+          scrollPosition: 0,
+          isLoading: false, // No loading needed - data is already here
+        };
+      });
       
       const newState = {
         ...state,
-        activeRecipes: [...state.activeRecipes, newRecipe],
-        activeRecipeId: recipeId,
-        sessionStartTime: state.sessionStartTime || Date.now(),
+        activeRecipes: newRecipes,
+        activeRecipeId: action.payload.activeRecipeId || newRecipes[0]?.recipeId || null,
+        sessionStartTime: Date.now(),
       };
       
-      console.log('[CookingContext] ✅ Session started, new state:', {
+      console.log('[CookingContext] ✅ All sessions initialized:', {
         activeRecipesCount: newState.activeRecipes.length,
         activeRecipeId: newState.activeRecipeId,
         sessionStartTime: newState.sessionStartTime
       });
       
       return newState;
-    }
-
-    case 'START_LAZY_SESSION': {
-      console.log('[CookingContext] ⏳ Starting lazy session for recipe ID:', action.payload.recipeId);
-      
-      const newRecipe: RecipeSession = {
-        recipeId: action.payload.recipeId,
-        recipe: null, // Will be loaded later
-        completedSteps: [],
-        activeTimers: [],
-        scrollPosition: 0,
-        isLoading: true,
-      };
-      
-      const newState = {
-        ...state,
-        activeRecipes: [...state.activeRecipes, newRecipe],
-        activeRecipeId: state.activeRecipeId || action.payload.recipeId,
-      };
-      
-      console.log('[CookingContext] ✅ Lazy session started:', {
-        recipeId: action.payload.recipeId,
-        activeRecipesCount: newState.activeRecipes.length,
-        activeRecipeId: newState.activeRecipeId
-      });
-      
-      return newState;
-    }
-
-    case 'LOAD_RECIPE_DATA': {
-      console.log('[CookingContext] 📥 Loading recipe data for:', {
-        recipeId: action.payload.recipeId,
-        title: action.payload.recipe.title,
-        hasInstructions: !!action.payload.recipe.instructions,
-        instructionsCount: action.payload.recipe.instructions?.length || 0
-      });
-      
-      const newState = {
-        ...state,
-        activeRecipes: state.activeRecipes.map(recipe =>
-          recipe.recipeId === action.payload.recipeId
-            ? {
-                ...recipe,
-                recipe: action.payload.recipe,
-                isLoading: false,
-              }
-            : recipe
-        ),
-      };
-      
-      console.log('[CookingContext] ✅ Recipe data loaded for:', action.payload.recipeId);
-      return newState;
-    }
-
-    case 'SET_RECIPE_LOADING': {
-      console.log('[CookingContext] 📥 Setting recipe loading state:', {
-        recipeId: action.payload.recipeId,
-        isLoading: action.payload.isLoading,
-      });
-      
-      return {
-        ...state,
-        activeRecipes: state.activeRecipes.map(recipe =>
-          recipe.recipeId === action.payload.recipeId
-            ? { ...recipe, isLoading: action.payload.isLoading }
-            : recipe
-        ),
-      };
     }
 
     case 'SET_SCROLL_POSITION': {
@@ -309,63 +240,7 @@ function cookingReducer(state: CookingState, action: CookingAction): CookingStat
   }
 }
 
-// Cache management functions
-const getCachedRecipe = async (recipeId: string): Promise<{ recipe: any; shouldFetch: boolean }> => {
-  try {
-    const [cachedRecipeStr, lastFetchedStr] = await Promise.all([
-      AsyncStorage.getItem(`${COOKING_CACHE_KEYS.RECIPE_PREFIX}${recipeId}`),
-      AsyncStorage.getItem(`${COOKING_CACHE_KEYS.LAST_FETCHED_PREFIX}${recipeId}`),
-    ]);
 
-    if (!cachedRecipeStr || !lastFetchedStr) {
-      console.log('[CookingContext] No cached recipe found for:', recipeId);
-      return { recipe: null, shouldFetch: true };
-    }
-
-    const lastFetched = parseInt(lastFetchedStr, 10);
-    const now = Date.now();
-    const timeSinceLastFetch = now - lastFetched;
-
-    if (timeSinceLastFetch >= CACHE_DURATION_MS) {
-      console.log('[CookingContext] Cache expired for recipe:', recipeId, 
-        `(${Math.round(timeSinceLastFetch / (60 * 60 * 1000))}h old)`);
-      return { recipe: null, shouldFetch: true };
-    }
-
-    const cachedRecipe = JSON.parse(cachedRecipeStr);
-    const hoursLeft = Math.round((CACHE_DURATION_MS - timeSinceLastFetch) / (60 * 60 * 1000) * 10) / 10;
-    console.log('[CookingContext] Using cached recipe:', recipeId, `(${hoursLeft}h left)`);
-    return { recipe: cachedRecipe, shouldFetch: false };
-  } catch (error) {
-    console.error('[CookingContext] Error loading cached recipe:', recipeId, error);
-    return { recipe: null, shouldFetch: true };
-  }
-};
-
-const cacheRecipe = async (recipeId: string, recipe: any): Promise<void> => {
-  try {
-    const now = Date.now().toString();
-    await Promise.all([
-      AsyncStorage.setItem(`${COOKING_CACHE_KEYS.RECIPE_PREFIX}${recipeId}`, JSON.stringify(recipe)),
-      AsyncStorage.setItem(`${COOKING_CACHE_KEYS.LAST_FETCHED_PREFIX}${recipeId}`, now),
-    ]);
-    console.log('[CookingContext] Cached recipe:', recipeId);
-  } catch (error) {
-    console.error('[CookingContext] Error caching recipe:', recipeId, error);
-  }
-};
-
-const invalidateRecipeCache = async (recipeId: string): Promise<void> => {
-  try {
-    await Promise.all([
-      AsyncStorage.removeItem(`${COOKING_CACHE_KEYS.RECIPE_PREFIX}${recipeId}`),
-      AsyncStorage.removeItem(`${COOKING_CACHE_KEYS.LAST_FETCHED_PREFIX}${recipeId}`),
-    ]);
-    console.log('[CookingContext] Invalidated cache for recipe:', recipeId);
-  } catch (error) {
-    console.error('[CookingContext] Error invalidating cache for recipe:', recipeId, error);
-  }
-};
 
 // Provider Component
 export function CookingProvider({ children }: { children: React.ReactNode }) {
@@ -461,143 +336,57 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
     saveState();
   }, [state]);
 
-  const startSession = (recipe: CombinedParsedRecipe) => {
-    dispatch({ type: 'START_SESSION', payload: { recipe } });
-  };
+  const initializeSessions = (miseRecipes: any[]) => {
+    console.time(`[CookingContext] ⏱️ initializeSessions`);
+    console.log('[CookingContext] 🚀 Initializing cooking sessions with mise recipes:', {
+      recipesCount: miseRecipes.length,
+      recipeIds: miseRecipes.map(mr => mr.id),
+    });
 
-  const startLazySession = (recipeId: string) => {
-    dispatch({ type: 'START_LAZY_SESSION', payload: { recipeId } });
-  };
-
-  const loadRecipeDataIfNeeded = async (recipeId: string): Promise<void> => {
-    console.log('[CookingContext] 🔍 loadRecipeDataIfNeeded called for:', recipeId);
-    
-    const existingRecipe = state.activeRecipes.find(r => r.recipeId === recipeId);
-    if (!existingRecipe) {
-      console.warn('[CookingContext] ⚠️ Recipe not found in active recipes:', recipeId);
-      return;
-    }
-    
-    if (existingRecipe.recipe) {
-      console.log('[CookingContext] ✅ Recipe data already loaded for:', recipeId);
-      return;
-    }
-    
-    console.log('[CookingContext] 📥 Loading recipe data for:', recipeId);
-
-    try {
-      dispatch({ type: 'SET_RECIPE_LOADING', payload: { recipeId, isLoading: true } });
-      
-      // Check authentication
-      if (!session?.user?.id || !session?.access_token) {
-        console.error('[CookingContext] ❌ No authenticated session found');
-        dispatch({ type: 'SET_RECIPE_LOADING', payload: { recipeId, isLoading: false } });
-        return;
-      }
-      
-      // Check cache first
-      const { recipe: cachedRecipe, shouldFetch } = await getCachedRecipe(recipeId);
-      
-      let miseRecipe = cachedRecipe;
-      
-      if (shouldFetch) {
-        console.log('[CookingContext] 🌐 Fetching fresh recipe data from API for:', recipeId);
-        
-        const backendUrl = process.env.EXPO_PUBLIC_API_URL;
-        if (!backendUrl) {
-          throw new Error('API configuration error. Please check your environment variables.');
-        }
-        
-        const headers = {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        };
-        
-        const apiUrl = `${backendUrl}/api/mise/recipes/${recipeId}?userId=${session.user.id}`;
-        console.log('[CookingContext] 🌐 Making API request:', {
-          url: apiUrl,
-          method: 'GET',
-          hasAuthToken: !!session.access_token,
-          userId: session.user.id,
-          recipeId,
-        });
-        
-        // Fetch single recipe from API
-        const response = await fetch(apiUrl, { headers });
-        
-        if (!response.ok) {
-          // Get more detailed error information
-          let errorMessage = `Failed to fetch recipe: ${response.status} ${response.statusText}`;
-          try {
-            const errorBody = await response.json();
-            errorMessage += ` - ${errorBody.error || 'Unknown error'}`;
-          } catch (jsonError) {
-            // If we can't parse the error response, just use the status
-          }
-          console.error('[CookingContext] 🌐 API Error Details:', {
-            status: response.status,
-            statusText: response.statusText,
-            url: `${backendUrl}/api/mise/recipes/${recipeId}?userId=${session.user.id}`,
-            headers: headers,
-          });
-          throw new Error(errorMessage);
-        }
-        
-        const result = await response.json();
-        miseRecipe = result.recipe;
-        
-        if (!miseRecipe) {
-          throw new Error('Recipe not found in API response');
-        }
-        
-        // Cache the fresh data
-        await cacheRecipe(recipeId, miseRecipe);
-        console.log('[CookingContext] ✅ Fresh recipe data fetched and cached for:', recipeId);
-      }
-      
-      console.log('[CookingContext] ✅ Found mise recipe:', {
-        id: miseRecipe.id,
-        title: miseRecipe.prepared_recipe_data?.title || miseRecipe.original_recipe_data?.title,
-        hasLocalMods: !!miseRecipe.local_modifications,
-        hasPreparedData: !!miseRecipe.prepared_recipe_data,
-        hasOriginalData: !!miseRecipe.original_recipe_data,
-      });
-      
+    // Convert mise recipes to full recipe objects using prepared_recipe_data
+    const recipes: CombinedParsedRecipe[] = miseRecipes.map(miseRecipe => {
       const recipeData = miseRecipe.local_modifications?.modified_recipe_data || 
                        miseRecipe.prepared_recipe_data || 
                        miseRecipe.original_recipe_data;
       
       if (!recipeData) {
-        console.error('[CookingContext] ❌ No recipe data found in mise recipe:', recipeId);
-        dispatch({ type: 'SET_RECIPE_LOADING', payload: { recipeId, isLoading: false } });
-        return;
+        console.error('[CookingContext] ❌ No recipe data found for mise recipe:', miseRecipe.id);
+        return null;
       }
-      
+
       // Create the recipe object with mise ID as primary ID
       const recipe = {
         ...recipeData,
-        id: recipeId, // Use the mise ID as the primary ID
+        id: String(miseRecipe.id), // Use the mise ID as the primary ID
         originalRecipeId: recipeData.id, // Keep original recipe ID for reference
         miseRecipeId: miseRecipe.id, // Keep mise recipe ID for reference
       };
-      
-      console.log('[CookingContext] ✅ Loaded recipe data for mise ID:', {
-        recipeId,
+
+      console.log('[CookingContext] 📋 Processed mise recipe:', {
         miseRecipeId: miseRecipe.id,
-        originalRecipeId: recipeData.id,
+        recipeId: recipe.id,
         title: recipe.title,
         hasInstructions: !!recipe.instructions,
         instructionsCount: recipe.instructions?.length || 0,
-        hasIngredients: !!recipe.ingredientGroups,
+        hasIngredientGroups: !!recipe.ingredientGroups,
         ingredientGroupsCount: recipe.ingredientGroups?.length || 0,
+                 totalIngredients: recipe.ingredientGroups?.reduce((total: number, group: any) => 
+           total + (group.ingredients?.length || 0), 0) || 0,
       });
-      
-      dispatch({ type: 'LOAD_RECIPE_DATA', payload: { recipeId, recipe } });
-    } catch (error) {
-      console.error('[CookingContext] 💥 Error loading recipe data:', error);
-      console.error('[CookingContext] 💥 Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-      dispatch({ type: 'SET_RECIPE_LOADING', payload: { recipeId, isLoading: false } });
-    }
+
+      return recipe;
+    }).filter(Boolean) as CombinedParsedRecipe[];
+
+         // Initialize all sessions with full recipe data
+     dispatch({ 
+       type: 'INITIALIZE_SESSIONS', 
+       payload: { 
+         recipes,
+         activeRecipeId: recipes[0]?.id ? String(recipes[0].id) : undefined // Set first recipe as active
+       } 
+     });
+    
+    console.timeEnd(`[CookingContext] ⏱️ initializeSessions`);
   };
 
   const endSession = (recipeId: string) => {
@@ -628,7 +417,10 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
   };
 
   const switchRecipe = (recipeId: string) => {
+    console.time(`[CookingContext] ⏱️ switchRecipe-${recipeId}`);
+    console.log('[CookingContext] 🔄 Switching to recipe:', recipeId);
     dispatch({ type: 'SWITCH_RECIPE', payload: { recipeId } });
+    console.timeEnd(`[CookingContext] ⏱️ switchRecipe-${recipeId}`);
   };
 
   const completeStep = (recipeId: string, stepId: string) => {
@@ -669,17 +461,13 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
     return state.activeRecipes.length > 0;
   };
 
-  const invalidateRecipeCacheForContext = async (recipeId: string): Promise<void> => {
-    await invalidateRecipeCache(recipeId);
-  };
+
 
   return (
     <CookingContext.Provider
       value={{
         state,
-        startSession,
-        startLazySession,
-        loadRecipeDataIfNeeded,
+        initializeSessions,
         endSession,
         endAllSessions,
         switchRecipe,
@@ -692,7 +480,6 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
         setScrollPosition,
         getCurrentScrollPosition,
         hasResumableSession,
-        invalidateRecipeCache: invalidateRecipeCacheForContext,
       }}
     >
       {children}
