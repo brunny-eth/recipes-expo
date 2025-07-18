@@ -893,17 +893,8 @@ export default function RecipeSummaryScreen() {
       const needsSubstitution = appliedChanges.length > 0;
     const needsScaling = selectedScaleFactor !== 1;
 
-      // Check if we have local modifications to use as base
-      const getMiseRecipe = (globalThis as any).getMiseRecipe;
-      let baseRecipe = recipe;
-      
-      if (getMiseRecipe) {
-        const miseRecipe = getMiseRecipe(miseRecipeId);
-        if (miseRecipe?.local_modifications?.modified_recipe_data) {
-
-          baseRecipe = miseRecipe.local_modifications.modified_recipe_data;
-        }
-      }
+      // Use the recipe data directly (local modifications removed)
+      const baseRecipe = recipe;
       
       // If there are new modifications on this screen, apply them
       if (needsSubstitution || needsScaling) {
@@ -1488,16 +1479,8 @@ export default function RecipeSummaryScreen() {
         setIsSavingModifications(true);
         console.log('[Summary] Processing modifications with LLM before saving...');
         
-        // Get base recipe (use local modifications if available)
-        const getMiseRecipe = (globalThis as any).getMiseRecipe;
-        let baseRecipe = recipe;
-        
-        if (getMiseRecipe) {
-          const miseRecipe = getMiseRecipe(miseRecipeId);
-          if (miseRecipe?.local_modifications?.modified_recipe_data) {
-            baseRecipe = miseRecipe.local_modifications.modified_recipe_data;
-          }
-        }
+        // Use the recipe data directly (local modifications removed)
+        const baseRecipe = recipe;
 
         // Flatten all ingredients from ingredient groups for scaling
         const allIngredients: StructuredIngredient[] = [];
@@ -1603,26 +1586,10 @@ export default function RecipeSummaryScreen() {
         throw new Error(errorResult.error || `Update failed (Status: ${response.status})`);
       }
 
-      // Also update local state for immediate UI feedback
-      const updateMiseRecipe = (globalThis as any).updateMiseRecipe;
-      if (updateMiseRecipe) {
-        updateMiseRecipe(miseRecipeId, {
-          scaleFactor: selectedScaleFactor,
-          appliedChanges: appliedChanges,
-          modified_recipe_data: processedRecipeData, // Use processed version
-        });
-      }
+      // Local state updates removed - mise.tsx will fetch fresh data on focus
 
       // Reset modifications state
       setHasModifications(false);
-      
-      // Invalidate mise cache to force fresh data fetch
-      try {
-        await AsyncStorage.removeItem('miseLastFetched');
-        console.log('[Summary] Invalidated mise cache after saving processed modifications');
-      } catch (cacheError) {
-        console.warn('[Summary] Failed to invalidate mise cache:', cacheError);
-      }
       
       console.log('[Summary] 🚀 Navigating to mise tab after successful modification save');
       console.log('[Summary] 📊 Modification save details:', {

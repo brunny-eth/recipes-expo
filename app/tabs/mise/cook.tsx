@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
   Modal,
   Pressable,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
@@ -151,6 +151,7 @@ export default function CookScreen() {
             id: cookingSessionId, // Use mise ID as the cooking session ID
             originalRecipeId: recipeData.id, // Keep original recipe ID for reference
             miseRecipeId: miseRecipe.id, // Keep mise recipe ID for reference
+            title: miseRecipe.title_override || recipeData.title, // Use title_override if available
           };
           
           console.log('[CookScreen] ✅ Processed recipe:', {
@@ -203,6 +204,92 @@ export default function CookScreen() {
 
     loadMiseRecipes();
   }, []);
+
+  // Refresh data when screen comes into focus for consistency with mise.tsx
+  useFocusEffect(
+    useCallback(() => {
+      const timestamp = new Date().toISOString();
+      console.log(`[CookScreen] 🎯 useFocusEffect triggered at ${timestamp}`);
+      
+      // Always fetch fresh data when screen comes into focus
+      console.log('[CookScreen] 🔄 Navigation check - fetching fresh data');
+      
+      const refreshMiseRecipes = async () => {
+        try {
+          console.log('[CookScreen] 🔄 Starting to refresh mise recipes from API');
+          
+          // Clear any existing cooking session to start fresh
+          await endAllSessions();
+          
+          // Fetch fresh mise data from API
+          if (!session?.user) {
+            console.log('[CookScreen] ❌ No user session found');
+            setRecipes([]);
+            return;
+          }
+          
+          const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+          if (!backendUrl) {
+            throw new Error('API configuration error');
+          }
+          
+          const headers = {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          };
+          
+          const response = await fetch(`${backendUrl}/api/mise/recipes?userId=${session.user.id}`, { headers });
+          
+          if (!response.ok) {
+            throw new Error(`Failed to fetch mise recipes: ${response.statusText}`);
+          }
+          
+          const recipesData = await response.json();
+          const miseRecipes = recipesData?.recipes || [];
+          
+          console.log('[CookScreen] 📊 Refreshed mise recipes from API:', miseRecipes.length, 'recipes');
+          
+          if (miseRecipes.length === 0) {
+            console.log('[CookScreen] ❌ No mise recipes found after refresh');
+            setRecipes([]);
+            return;
+          }
+          
+          // Extract recipe data from mise recipes
+          const recipeList = miseRecipes.map((miseRecipe: any) => {
+            const recipeData = miseRecipe.prepared_recipe_data || miseRecipe.original_recipe_data;
+            
+            if (!recipeData) {
+              console.error('[CookScreen] ❌ No recipe data found for mise recipe:', miseRecipe.id);
+              return null;
+            }
+            
+            const cookingSessionId = String(miseRecipe.id);
+            
+            return {
+              ...recipeData,
+              id: cookingSessionId,
+              originalRecipeId: recipeData.id,
+              miseRecipeId: miseRecipe.id,
+              title: miseRecipe.title_override || recipeData.title,
+            };
+          }).filter(Boolean);
+          
+          setRecipes(recipeList);
+          
+          // Initialize all sessions with fresh data
+          if (miseRecipes.length > 0) {
+            console.log('[CookScreen] 🚀 Re-initializing cooking sessions with fresh data');
+            initializeSessions(miseRecipes);
+          }
+        } catch (error) {
+          console.error('[CookScreen] 💥 Error refreshing mise recipes:', error);
+        }
+      };
+      
+      refreshMiseRecipes();
+    }, [session?.user?.id, session?.access_token]) // Removed function dependencies that change on every render
+  );
 
   // Handle app state changes for timer management
   useEffect(() => {

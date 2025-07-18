@@ -36,12 +36,7 @@ import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
 import { parseServingsValue } from '@/utils/recipeUtils';
 import { useCooking } from '@/context/CookingContext';
 
-const MISE_CACHE_KEYS = {
-  LAST_FETCHED: 'miseLastFetched',
-  RECIPES: 'miseRecipes',
-  GROCERY: 'miseGroceryList',
-};
-const CACHE_DURATION_MS = 6 * 60 * 60 * 1000; // 6 hours
+// Cache removed - always fetch fresh data for consistency
 
 // Types matching the mise database structure
 type MiseRecipe = {
@@ -117,71 +112,7 @@ export default function MiseScreen() {
   const [error, setError] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState<'recipes' | 'grocery'>('recipes');
 
-  // --- Caching Strategy ---
-  const lastSessionIdRef = useRef<string | null>(null);
-
-  // Initialize session ID on first render to prevent cache invalidation
-  useEffect(() => {
-    const currentSessionId = session?.user?.id || null;
-    if (lastSessionIdRef.current === null) {
-      lastSessionIdRef.current = currentSessionId;
-      console.log('[MiseScreen] 🔧 Initialized session ID:', currentSessionId);
-    }
-  }, [session?.user?.id]);
-
-  // Add updateMiseRecipe function for local modifications
-  const updateMiseRecipe = useCallback((recipeId: string, modifications: { scaleFactor?: number; appliedChanges?: any[]; modified_recipe_data?: ParsedRecipe }) => {
-    console.log('[MiseScreen] 🔄 updateMiseRecipe called with local modifications for recipe:', recipeId, modifications);
-    
-    setMiseRecipes(prev => prev.map(recipe => {
-      if (recipe.id === recipeId) {
-        const updated = {
-          ...recipe,
-          local_modifications: {
-            ...recipe.local_modifications,
-            ...modifications,
-          }
-        };
-        console.log('[MiseScreen] 📝 Recipe updated locally:', {
-          recipeId,
-          hasLocalMods: !!updated.local_modifications,
-          localModKeys: Object.keys(updated.local_modifications || {}),
-        });
-        return updated;
-      }
-      return recipe;
-    }));
-
-    // Note: Grocery list refresh will be triggered when user navigates back to mise screen
-    console.log('[MiseScreen] 💡 Local modifications saved, grocery list will refresh on next focus');
-  }, []);
-
-  // Make updateMiseRecipe available to other screens via a context or pass it down
-  // For now, we'll store it in a ref so it can be accessed by other components
-  const updateMiseRecipeRef = useRef(updateMiseRecipe);
-  updateMiseRecipeRef.current = updateMiseRecipe;
-
-  // Add getMiseRecipe function for other screens to access mise data
-  const getMiseRecipe = useCallback((recipeId: string) => {
-    const recipe = miseRecipes.find(r => r.id === recipeId);
-    console.log('[MiseScreen] 🔍 getMiseRecipe called for ID:', recipeId, 'Found:', !!recipe);
-    return recipe;
-  }, [miseRecipes]);
-
-  // Make the function available globally (temporary solution)
-  useEffect(() => {
-    console.log('[MiseScreen] 🌐 Setting up global mise functions');
-    // Store the update function in a way that can be accessed by other screens
-    (globalThis as any).updateMiseRecipe = updateMiseRecipe;
-    (globalThis as any).getMiseRecipe = getMiseRecipe;
-    
-    return () => {
-      // Clean up on unmount
-      console.log('[MiseScreen] 🧹 Cleaning up global mise functions');
-      delete (globalThis as any).updateMiseRecipe;
-      delete (globalThis as any).getMiseRecipe;
-    };
-  }, [updateMiseRecipe, getMiseRecipe]);
+  // Removed caching strategy - always fetch fresh data for consistency
 
   // Component Mount/Unmount logging
   useEffect(() => {
@@ -193,90 +124,7 @@ export default function MiseScreen() {
     };
   }, []);
 
-  const loadCachedMiseData = useCallback(
-    async (): Promise<{
-      recipes: MiseRecipe[] | null;
-      grocery: GroceryCategory[] | null;
-      shouldFetch: boolean;
-    }> => {
-      try {
-        const [lastFetchedStr, cachedRecipesStr, cachedGroceryStr] = await Promise.all([
-          AsyncStorage.getItem(MISE_CACHE_KEYS.LAST_FETCHED),
-          AsyncStorage.getItem(MISE_CACHE_KEYS.RECIPES),
-          AsyncStorage.getItem(MISE_CACHE_KEYS.GROCERY),
-        ]);
-
-        const currentSessionId = session?.user?.id || null;
-        const storedSessionId = lastSessionIdRef.current;
-
-        // 🔍 DEBUGGING: Log session comparison
-        console.log('[MiseScreen] 🔍 Session comparison:', {
-          currentSessionId,
-          storedSessionId,
-          areEqual: currentSessionId === storedSessionId,
-          sessionExists: !!session?.user?.id,
-        });
-
-        if (currentSessionId !== storedSessionId) {
-          console.log('[MiseScreen] Session changed - will fetch');
-          lastSessionIdRef.current = currentSessionId;
-          return { recipes: null, grocery: null, shouldFetch: true };
-        }
-        
-        // 🔍 DEBUGGING: Log cache existence
-        console.log('[MiseScreen] 🔍 Cache existence check:', {
-          hasLastFetched: !!lastFetchedStr,
-          hasRecipes: !!cachedRecipesStr,
-          hasGrocery: !!cachedGroceryStr,
-          recipesSize: cachedRecipesStr ? `${(cachedRecipesStr.length / 1024).toFixed(1)}KB` : 'N/A',
-          grocerySize: cachedGroceryStr ? `${(cachedGroceryStr.length / 1024).toFixed(1)}KB` : 'N/A',
-        });
-        
-        if (!lastFetchedStr || !cachedRecipesStr || !cachedGroceryStr) {
-          console.log('[MiseScreen] No complete cached data found - will fetch');
-          return { recipes: null, grocery: null, shouldFetch: true };
-        }
-  
-        const lastFetched = parseInt(lastFetchedStr, 10);
-        const now = Date.now();
-        const timeSinceLastFetch = now - lastFetched;
-
-        // 🔍 DEBUGGING: Log cache age
-        console.log('[MiseScreen] 🔍 Cache age check:', {
-          lastFetched: new Date(lastFetched).toISOString(),
-          now: new Date(now).toISOString(),
-          timeSinceLastFetchMs: timeSinceLastFetch,
-          timeSinceLastFetchHours: (timeSinceLastFetch / (60 * 60 * 1000)).toFixed(2),
-          cacheDurationHours: (CACHE_DURATION_MS / (60 * 60 * 1000)).toFixed(1),
-          isExpired: timeSinceLastFetch >= CACHE_DURATION_MS,
-        });
-  
-        if (timeSinceLastFetch >= CACHE_DURATION_MS) {
-          console.log(
-            `[MiseScreen] Cache expired (${Math.round(
-              timeSinceLastFetch / (60 * 60 * 1000)
-            )}h old) - will fetch`
-          );
-          return { recipes: null, grocery: null, shouldFetch: true };
-        }
-  
-        try {
-          const recipes = JSON.parse(cachedRecipesStr) as MiseRecipe[];
-          const grocery = JSON.parse(cachedGroceryStr) as GroceryCategory[];
-          const hoursLeft = Math.round((CACHE_DURATION_MS - timeSinceLastFetch) / (60 * 60 * 1000) * 10) / 10;
-          console.log(`[MiseScreen] ✅ Using cached data (${recipes.length} recipes, ${hoursLeft}h left)`);
-          return { recipes, grocery, shouldFetch: false };
-        } catch (parseError) {
-          console.error('[MiseScreen] Error parsing cached data - will fetch:', parseError);
-          return { recipes: null, grocery: null, shouldFetch: true };
-        }
-      } catch (error) {
-        console.error('[MiseScreen] Error loading cached data - will fetch as fallback:', error);
-        return { recipes: null, grocery: null, shouldFetch: true };
-      }
-    },
-    [session]
-  );
+  // Removed loadCachedMiseData function - always fetch fresh data
 
   const fetchMiseDataFromAPI = useCallback(async () => {
     const startTime = performance.now();
@@ -357,19 +205,7 @@ export default function MiseScreen() {
       setMiseRecipes(fetchedRecipes);
       setGroceryList(categorizedGroceryList);
 
-      // Cache the fresh data
-      try {
-        const now = Date.now().toString();
-        await Promise.all([
-          AsyncStorage.setItem(MISE_CACHE_KEYS.LAST_FETCHED, now),
-          AsyncStorage.setItem(MISE_CACHE_KEYS.RECIPES, JSON.stringify(fetchedRecipes)),
-          AsyncStorage.setItem(MISE_CACHE_KEYS.GROCERY, JSON.stringify(categorizedGroceryList)),
-        ]);
-        console.log('[MiseScreen] Stored fresh mise data in cache.');
-        console.log('[MiseScreen] Caching grocery list data:', JSON.stringify(categorizedGroceryList, null, 2));
-      } catch (storageError) {
-        console.warn('[MiseScreen] Failed to store cache data:', storageError);
-      }
+      // Cache removed - always fetch fresh data for consistency
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load mise data';
@@ -382,50 +218,11 @@ export default function MiseScreen() {
     }
   }, [session?.user?.id, session?.access_token]);
 
-  const fetchMiseData = useCallback(async (forceRefresh = false) => {
-    console.log('[MiseScreen] 🎯 fetchMiseData called', { 
-      forceRefresh,
-      sessionExists: !!session?.user?.id,
-      currentSessionId: session?.user?.id,
-      storedSessionId: lastSessionIdRef.current,
-    });
-    
-    if (!forceRefresh) {
-      console.log('[MiseScreen] 🔍 Checking cache before API call...');
-      const { recipes, grocery, shouldFetch } = await loadCachedMiseData();
-      
-      if (!shouldFetch && recipes && grocery) {
-        console.log('[MiseScreen] ✅ Using cached data - no fetch needed');
-        setMiseRecipes(recipes);
-        setGroceryList(grocery);
-        setIsLoading(false);
-        return;
-      }
-      
-      console.log('[MiseScreen] 🔄 Cache validation result:', {
-        shouldFetch,
-        hasRecipes: !!recipes,
-        hasGrocery: !!grocery,
-        recipesCount: recipes?.length || 0,
-        groceryCount: grocery?.length || 0,
-      });
-    } else {
-      console.log('[MiseScreen] 🔄 Force refresh requested - skipping cache');
-    }
-
-    console.log('[MiseScreen] 📡 Cache miss, expired, or refresh forced - fetching fresh data');
+  // Simplified - always fetch fresh data from API
+  const fetchMiseData = useCallback(async () => {
+    console.log('[MiseScreen] 🎯 fetchMiseData called - always fetching fresh data');
     await fetchMiseDataFromAPI();
-  }, [loadCachedMiseData, fetchMiseDataFromAPI, session?.user?.id]);
-
-  // Use this to manually invalidate cache, e.g., after adding/deleting recipe
-  const invalidateMiseCache = async () => {
-    try {
-      await AsyncStorage.removeItem(MISE_CACHE_KEYS.LAST_FETCHED);
-      console.log('[MiseScreen] 🗑️ Invalidated mise cache.');
-    } catch (error) {
-      console.error('[MiseScreen] Failed to invalidate mise cache:', error);
-    }
-  };
+  }, [fetchMiseDataFromAPI]);
 
   useFocusEffect(
     useCallback(() => {
@@ -434,16 +231,13 @@ export default function MiseScreen() {
       console.log('[MiseScreen] 🔍 Focus effect context:', {
         sessionExists: !!session?.user?.id,
         currentSessionId: session?.user?.id,
-        storedSessionId: lastSessionIdRef.current,
         miseRecipesCount: miseRecipes.length,
         groceryListCount: groceryList.length,
       });
       
-      // Add specific log for navigation from summary
-      console.log('[MiseScreen] 🔄 Navigation check - forcing fresh data fetch');
-      
-      // On focus, check if we need to refetch data
-      fetchMiseData(true); // Force refresh when navigating to mise
+      // Always fetch fresh data when screen comes into focus
+      console.log('[MiseScreen] 🔄 Navigation check - fetching fresh data');
+      fetchMiseData();
     }, [fetchMiseData])
   );
 
@@ -471,9 +265,6 @@ export default function MiseScreen() {
       setMiseRecipes((prev) =>
         prev.map((r) => (r.id === recipeId ? { ...r, is_completed: isCompleted } : r))
       );
-      
-      // Invalidate cache after completing/uncompleting
-      await invalidateMiseCache();
       
       console.log(`[MiseScreen] Recipe ${recipeId} completion status updated to ${isCompleted}`);
     } catch (err) {
@@ -509,9 +300,6 @@ export default function MiseScreen() {
       }
 
       setMiseRecipes((prev) => prev.filter((r) => r.id !== recipeId));
-      
-      // Invalidate cache after deleting
-      await invalidateMiseCache();
 
       console.log(`[MiseScreen] Recipe ${recipeId} deleted successfully.`);
     } catch (err) {
@@ -765,7 +553,7 @@ export default function MiseScreen() {
           <Text style={styles.emptySubtext}>{error}</Text>
           <TouchableOpacity
             style={styles.retryButton}
-            onPress={() => fetchMiseData(true)}
+            onPress={() => fetchMiseData()}
           >
             <Text style={styles.retryButtonText}>Try Again</Text>
           </TouchableOpacity>
