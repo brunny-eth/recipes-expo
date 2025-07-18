@@ -25,6 +25,7 @@ import { useErrorModal } from '@/context/ErrorModalContext';
 import ScreenHeader from '@/components/ScreenHeader';
 import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
 import { parseServingsValue } from '@/utils/recipeUtils';
+import { unsaveRecipe } from '@/lib/savedRecipes';
 
 // Types for saved recipes
 type SavedRecipe = {
@@ -346,6 +347,25 @@ export default function LibraryScreen() {
     });
   }, [router]);
 
+  // Handle removing saved recipe
+  const handleRemoveSavedRecipe = useCallback(async (recipeId: number, recipeTitle: string) => {
+    console.log('[LibraryScreen] Removing saved recipe:', recipeId, recipeTitle);
+    
+    try {
+      const success = await unsaveRecipe(recipeId);
+      if (success) {
+        console.log('[LibraryScreen] Successfully removed saved recipe:', recipeId);
+        // Refresh the saved recipes list
+        await fetchSavedRecipes();
+      } else {
+        showError('Remove Failed', 'Could not remove recipe from saved. Please try again.');
+      }
+    } catch (error) {
+      console.error('[LibraryScreen] Error removing saved recipe:', error);
+      showError('Remove Failed', 'Could not remove recipe from saved. Please try again.');
+    }
+  }, [fetchSavedRecipes, showError]);
+
   // Render explore recipe item
   const renderExploreItem = useCallback(({ item }: { item: ParsedRecipe }) => {
     const imageUrl = item.image || item.thumbnailUrl;
@@ -394,31 +414,42 @@ export default function LibraryScreen() {
     const servingsCount = parseServingsValue(recipeData.recipeYield);
 
     return (
-      <TouchableOpacity
-        style={[styles.savedCard, styles.cardWithMinHeight]}
-        onPress={() => navigateToSavedRecipe(item)}
-        activeOpacity={0.7}
-      >
-        {imageUrl && (
-          <FastImage
-            source={{ uri: imageUrl }}
-            style={styles.savedCardImage}
-            resizeMode="cover"
-          />
-        )}
-        <View style={styles.savedCardTextContainer}>
-          <Text style={styles.savedCardTitle} numberOfLines={2}>
-            {displayTitle}
-          </Text>
-          {servingsCount && (
-            <Text style={styles.servingsText}>
-              (servings: {servingsCount})
-            </Text>
+      <View style={[styles.savedCard, styles.cardWithMinHeight]}>
+        <TouchableOpacity
+          style={styles.savedCardContent}
+          onPress={() => navigateToSavedRecipe(item)}
+          activeOpacity={0.7}
+        >
+          {imageUrl && (
+            <FastImage
+              source={{ uri: imageUrl }}
+              style={styles.savedCardImage}
+              resizeMode="cover"
+            />
           )}
-        </View>
-      </TouchableOpacity>
+          <View style={styles.savedCardTextContainer}>
+            <Text style={styles.savedCardTitle} numberOfLines={2}>
+              {displayTitle}
+            </Text>
+            {servingsCount && (
+              <Text style={styles.servingsText}>
+                (servings: {servingsCount})
+              </Text>
+            )}
+          </View>
+        </TouchableOpacity>
+        
+        {/* Trash icon */}
+        <TouchableOpacity
+          style={styles.trashIcon}
+          onPress={() => handleRemoveSavedRecipe(item.base_recipe_id, displayTitle || 'Unknown Recipe')}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons name="trash-can" size={16} color={COLORS.textMuted} />
+        </TouchableOpacity>
+      </View>
     );
-  }, [navigateToSavedRecipe]);
+  }, [navigateToSavedRecipe, handleRemoveSavedRecipe]);
 
   // Render explore content
   const renderExploreContent = () => {
@@ -779,7 +810,6 @@ const styles = StyleSheet.create({
   
   // Saved card styles
   savedCard: {
-    flexDirection: 'row',
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.sm,
     padding: 12,
@@ -789,7 +819,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 2,
+    position: 'relative',
+  } as ViewStyle,
+  savedCardContent: {
+    flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+  } as ViewStyle,
+  trashIcon: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    padding: 4,
   } as ViewStyle,
   cardWithMinHeight: {
     minHeight: 75,

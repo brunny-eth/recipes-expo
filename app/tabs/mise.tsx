@@ -233,12 +233,19 @@ export default function MiseScreen() {
         currentSessionId: session?.user?.id,
         miseRecipesCount: miseRecipes.length,
         groceryListCount: groceryList.length,
+        canGoBack: router.canGoBack(),
       });
       
-      // Always fetch fresh data when screen comes into focus
+      // UX improvement: Skip API call if coming from cook screen (no edits possible)
+      if (router.canGoBack() && miseRecipes.length > 0) {
+        console.log('[MiseScreen] 🎯 Navigation from cook screen detected - skipping API call');
+        return;
+      }
+      
+      // Fetch fresh data when screen comes into focus (first load or from other screens)
       console.log('[MiseScreen] 🔄 Navigation check - fetching fresh data');
       fetchMiseData();
-    }, [fetchMiseData])
+    }, [fetchMiseData, router, miseRecipes.length])
   );
 
 
@@ -416,66 +423,74 @@ export default function MiseScreen() {
     const displayTitle = item.title_override || item.prepared_recipe_data.title;
 
     return (
-      <TouchableOpacity
-        style={[styles.card, styles.cardWithMinHeight]}
-        onPress={() => {
-          console.log('[MiseScreen] 🚀 Attempting to navigate to summary for recipe:', {
-            recipeId: item.id,
-            title: displayTitle,
-            hasPreparedData: !!item.prepared_recipe_data,
-            preparedDataKeys: Object.keys(item.prepared_recipe_data || {}),
-            finalYield: item.final_yield,
-            hasAppliedChanges: !!item.applied_changes,
-            appliedChanges: item.applied_changes,
-          });
-          
-          // Navigate to recipe summary with the prepared recipe data and mise entry point
-          router.push({
-            pathname: '/recipe/summary',
-            params: {
-              recipeData: JSON.stringify(item.prepared_recipe_data),
-              entryPoint: 'mise',
-              miseRecipeId: item.id, // Pass the mise recipe ID for future reference
-              finalYield: item.final_yield.toString(),
-              // Pass title_override for correct title display
-              ...(item.title_override && {
-                titleOverride: item.title_override
-              }),
-              // Pass applied changes so the summary can restore the correct scaling factor
-              ...(item.applied_changes && {
-                appliedChanges: JSON.stringify(item.applied_changes)
-              }),
-              // Pass original recipe data for consistent scaling
-              ...(item.original_recipe_data && {
-                originalRecipeData: JSON.stringify(item.original_recipe_data)
-              }),
-            },
-          });
-          
-          console.log('[MiseScreen] ✅ Navigation to summary completed');
-        }}
-      >
-        {imageUrl && (
-          <FastImage
-            source={{ uri: imageUrl }}
-            style={styles.cardImage}
-          />
-        )}
-        <View style={styles.cardTextContainer}>
-          <Text style={styles.cardTitle} numberOfLines={2}>
-            {displayTitle}
-          </Text>
-          {(() => {
-            const servingsCount = parseServingsValue(item.prepared_recipe_data.recipeYield);
-            return servingsCount ? (
-              <Text style={styles.servingsText}>(servings: {servingsCount})</Text>
-            ) : null;
-          })()}
-        </View>
-        <TouchableOpacity style={styles.deleteButton} onPress={() => handleDeleteRecipe(item.id)}>
-          <MaterialCommunityIcons name="delete-outline" size={20} color={COLORS.error} />
+      <View style={[styles.card, styles.cardWithMinHeight]}>
+        <TouchableOpacity
+          style={styles.cardContent}
+          onPress={() => {
+            console.log('[MiseScreen] 🚀 Attempting to navigate to summary for recipe:', {
+              recipeId: item.id,
+              title: displayTitle,
+              hasPreparedData: !!item.prepared_recipe_data,
+              preparedDataKeys: Object.keys(item.prepared_recipe_data || {}),
+              finalYield: item.final_yield,
+              hasAppliedChanges: !!item.applied_changes,
+              appliedChanges: item.applied_changes,
+            });
+            
+            // Navigate to recipe summary with the prepared recipe data and mise entry point
+            router.push({
+              pathname: '/recipe/summary',
+              params: {
+                recipeData: JSON.stringify(item.prepared_recipe_data),
+                entryPoint: 'mise',
+                miseRecipeId: item.id, // Pass the mise recipe ID for future reference
+                finalYield: item.final_yield.toString(),
+                // Pass title_override for correct title display
+                ...(item.title_override && {
+                  titleOverride: item.title_override
+                }),
+                // Pass applied changes so the summary can restore the correct scaling factor
+                ...(item.applied_changes && {
+                  appliedChanges: JSON.stringify(item.applied_changes)
+                }),
+                // Pass original recipe data for consistent scaling
+                ...(item.original_recipe_data && {
+                  originalRecipeData: JSON.stringify(item.original_recipe_data)
+                }),
+              },
+            });
+            
+            console.log('[MiseScreen] ✅ Navigation to summary completed');
+          }}
+        >
+          {imageUrl && (
+            <FastImage
+              source={{ uri: imageUrl }}
+              style={styles.cardImage}
+            />
+          )}
+          <View style={styles.cardTextContainer}>
+            <Text style={styles.cardTitle} numberOfLines={2}>
+              {displayTitle}
+            </Text>
+            {(() => {
+              const servingsCount = parseServingsValue(item.prepared_recipe_data.recipeYield);
+              return servingsCount ? (
+                <Text style={styles.servingsText}>(servings: {servingsCount})</Text>
+              ) : null;
+            })()}
+          </View>
         </TouchableOpacity>
-      </TouchableOpacity>
+        
+        {/* Trash icon */}
+        <TouchableOpacity
+          style={styles.trashIcon}
+          onPress={() => handleDeleteRecipe(item.id)}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons name="trash-can" size={16} color={COLORS.textMuted} />
+        </TouchableOpacity>
+      </View>
     );
   }, [handleDeleteRecipe, router]);
 
@@ -839,7 +854,6 @@ const styles = StyleSheet.create({
 
   // New card styles to match saved.tsx
   card: {
-    flexDirection: 'row',
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.sm,
     padding: 12,
@@ -849,7 +863,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 2,
+    position: 'relative',
+  } as ViewStyle,
+  cardContent: {
+    flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+  } as ViewStyle,
+  trashIcon: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    padding: 4,
   } as ViewStyle,
   cardWithMinHeight: {
     minHeight: 75,

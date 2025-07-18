@@ -19,6 +19,7 @@ type RecipeFooterButtonsProps = {
   handleSaveForLater: () => void;
   handleRemoveFromSaved: () => void;
   handleSaveModifications: () => void;
+  handleCookNow: () => void;
   isSavingForLater?: boolean;
   isSavingModifications?: boolean;
   entryPoint: string;
@@ -33,6 +34,7 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
   handleSaveForLater,
   handleRemoveFromSaved,
   handleSaveModifications,
+  handleCookNow,
   isSavingForLater = false,
   isSavingModifications = false,
   entryPoint,
@@ -85,10 +87,10 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
         return (
           <TouchableOpacity
             style={styles.saveButton}
-            onPress={handleRemoveFromSaved}
+            onPress={handleCookNow}
             disabled={isSavingForLater}
           >
-            <Text style={styles.saveButtonText}>Remove from saved</Text>
+            <Text style={styles.saveButtonText}>Cook now</Text>
           </TouchableOpacity>
         );
       case 'mise':

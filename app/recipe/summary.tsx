@@ -1454,6 +1454,11 @@ export default function RecipeSummaryScreen() {
     }
   };
 
+  const handleCookNow = () => {
+    // Placeholder for future implementation
+    console.log('[Summary] Cook now button pressed (placeholder)');
+  };
+
   const handleSaveModifications = async () => {
     if (entryPoint !== 'mise' || !miseRecipeId || !recipe) {
       console.error('[Summary] handleSaveModifications: Invalid entry point or missing data');
@@ -1813,6 +1818,7 @@ export default function RecipeSummaryScreen() {
         handleSaveForLater={handleSaveForLater}
         handleRemoveFromSaved={handleRemoveFromSaved}
         handleSaveModifications={handleSaveModifications}
+        handleCookNow={handleCookNow}
         isSavingForLater={isSavingForLater}
         isSavingModifications={isSavingModifications}
         entryPoint={entryPoint}
