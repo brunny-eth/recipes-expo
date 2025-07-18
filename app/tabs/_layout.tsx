@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { StyleSheet, Platform } from 'react-native';
+import { StyleSheet, Platform, View, Text } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons'; 
 import { COLORS } from '@/constants/theme';
 import { captionText } from '@/constants/typography';
@@ -17,7 +17,34 @@ const styles = StyleSheet.create({
     ...captionText,
     fontSize: 11,
   },
+  tabBarItem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+  },
+  tabBarText: {
+    ...captionText,
+    fontSize: 11,
+    textAlign: 'center',
+    width: 70,
+  },
 });
+
+// Helper function to create tab bar icon with label above icon
+const createTabBarIcon = (iconName: string, label: string) => {
+  return ({ color, focused }: { color: string; focused: boolean }) => (
+    <View style={styles.tabBarItem}>
+      <Text style={[styles.tabBarText, { color }]} numberOfLines={1}>
+        {label}
+      </Text>
+      <MaterialCommunityIcons
+        name={iconName as any}
+        size={22}
+        color={color}
+      />
+    </View>
+  );
+};
 
 /**
  * Stable, memoized tabs navigator component that prevents remounting when parent re-renders.
@@ -34,19 +61,18 @@ const MemoizedTabsNavigator = React.memo(() => {
         tabBarStyle: styles.tabBar,
         headerShown: false,
         tabBarLabelStyle: styles.tabBarLabel,
+        tabBarItemStyle: {
+          width: 'auto',
+          minWidth: 85,
+        },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Prep',
-          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
-            <MaterialCommunityIcons
-              name="silverware-fork-knife"
-              size={size}
-              color={color}
-            />
-          ),
+          title: 'Start',
+          tabBarIcon: createTabBarIcon('silverware-fork-knife', 'Start'),
+          tabBarLabel: () => null,
           unmountOnBlur: false,
         }}
       />
@@ -54,13 +80,8 @@ const MemoizedTabsNavigator = React.memo(() => {
         name="library"
         options={{
           title: 'Library',
-          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
-            <MaterialCommunityIcons
-              name="book-open-variant"
-              size={size}
-              color={color}
-            />
-          ),
+          tabBarIcon: createTabBarIcon('book-open-variant', 'Library'),
+          tabBarLabel: () => null,
           unmountOnBlur: false,
         }}
       />
@@ -68,13 +89,8 @@ const MemoizedTabsNavigator = React.memo(() => {
         name="mise"
         options={{
           title: 'Mise',
-          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
-            <MaterialCommunityIcons
-              name="chef-hat"
-              size={size}
-              color={color}
-            />
-          ),
+          tabBarIcon: createTabBarIcon('chef-hat', 'Mise'),
+          tabBarLabel: () => null,
           unmountOnBlur: false,
         }}
       />
@@ -82,13 +98,8 @@ const MemoizedTabsNavigator = React.memo(() => {
         name="settings"
         options={{
           title: 'Settings',
-          tabBarIcon: ({ color, size }: { color: string; size: number }) => (
-            <MaterialCommunityIcons
-              name="food-variant"
-              size={size}
-              color={color}
-            />
-          ),
+          tabBarIcon: createTabBarIcon('food-variant', 'Settings'),
+          tabBarLabel: () => null,
           unmountOnBlur: false,
         }}
       />

@@ -48,7 +48,7 @@ export default function LibraryScreen() {
   const { showError } = useErrorModal();
   
   // Tab state
-  const [selectedTab, setSelectedTab] = useState<'explore' | 'saved'>('explore');
+  const [selectedTab, setSelectedTab] = useState<'explore' | 'saved'>('saved');
   
   // Explore recipes state
   const [exploreRecipes, setExploreRecipes] = useState<ParsedRecipe[]>([]);
@@ -85,16 +85,24 @@ export default function LibraryScreen() {
 
       const lastFetched = parseInt(lastFetchedStr, 10);
       const now = Date.now();
+      const sixHours = 6 * 60 * 60 * 1000; // 6 hours in milliseconds  
       const timeSinceLastFetch = now - lastFetched;
-      const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
 
-      if (timeSinceLastFetch >= CACHE_DURATION) {
-        console.log('[LibraryScreen] Explore cache expired');
+      if (timeSinceLastFetch >= sixHours) {
+        console.log(`[LibraryScreen] Cache expired (${Math.round(timeSinceLastFetch / (60 * 60 * 1000))}h old) - will fetch`);
         return { recipes: null, shouldFetch: true };
       }
 
       const recipes = JSON.parse(cachedRecipesStr) as ParsedRecipe[];
-      console.log(`[LibraryScreen] Using cached explore recipes (${recipes.length} recipes)`);
+      const hoursLeft = Math.round((sixHours - timeSinceLastFetch) / (60 * 60 * 1000) * 10) / 10;
+      
+      // If cache is empty (0 recipes), treat it as invalid and fetch fresh data
+      if (recipes.length === 0) {
+        console.log(`[LibraryScreen] Cache has 0 recipes (${hoursLeft}h left) - will fetch fresh data`);
+        return { recipes: null, shouldFetch: true };
+      }
+      
+      console.log(`[LibraryScreen] Using cached recipes (${recipes.length} recipes, ${hoursLeft}h left)`);
       return { recipes, shouldFetch: false };
     } catch (error) {
       console.error('[LibraryScreen] Error loading cached explore data:', error);
@@ -102,9 +110,10 @@ export default function LibraryScreen() {
     }
   }, []);
 
-  // Fetch explore recipes from API (matching original explore.tsx)
-  const fetchExploreRecipes = useCallback(async () => {
-    console.log('[LibraryScreen] Fetching explore recipes from API');
+  // Fetch explore recipes from API (matching original explore.tsx naming)
+  const fetchExploreRecipesFromAPI = useCallback(async () => {
+    const startTime = performance.now();
+    console.log(`[PERF: LibraryScreen] Start fetchExploreRecipesFromAPI at ${startTime.toFixed(2)}ms`);
     
     const backendUrl = process.env.EXPO_PUBLIC_API_URL;
     if (!backendUrl) {
@@ -145,21 +154,29 @@ export default function LibraryScreen() {
       setExploreError(errorMessage);
     } finally {
       setIsExploreLoading(false);
+      const totalTime = performance.now() - startTime;
+      console.log(`[PERF: LibraryScreen] Total fetchExploreRecipesFromAPI duration: ${totalTime.toFixed(2)}ms`);
     }
   }, []);
 
-  // Load explore recipes
-  const loadExploreRecipes = useCallback(async () => {
+  // Main fetch function with AsyncStorage caching (matching original explore.tsx)
+  const fetchExploreRecipes = useCallback(async () => {
+    console.log('[LibraryScreen] fetchExploreRecipes called - checking cache');
+    
     const { recipes, shouldFetch } = await loadCachedExploreRecipes();
     
     if (!shouldFetch && recipes) {
+      // Use cached recipes immediately
+      console.log('[LibraryScreen] Using cached recipes - no fetch needed');
       setExploreRecipes(recipes);
       setIsExploreLoading(false);
       return;
     }
-    
-    await fetchExploreRecipes();
-  }, [loadCachedExploreRecipes, fetchExploreRecipes]);
+
+    // Need to fetch fresh data
+    console.log('[LibraryScreen] Cache miss or expired - fetching fresh data');
+    await fetchExploreRecipesFromAPI();
+  }, [loadCachedExploreRecipes, fetchExploreRecipesFromAPI]);
 
   // Fetch saved recipes
   const fetchSavedRecipes = useCallback(async () => {
@@ -216,21 +233,77 @@ export default function LibraryScreen() {
   useFocusEffect(
     useCallback(() => {
       console.log('[LibraryScreen] Focus effect triggered');
-      loadExploreRecipes();
+      fetchExploreRecipes();
       fetchSavedRecipes();
-    }, [loadExploreRecipes, fetchSavedRecipes])
+    }, [fetchExploreRecipes, fetchSavedRecipes])
   );
 
   // Handle refresh
   const handleRefresh = useCallback(async () => {
+    console.log('[LibraryScreen] Pull-to-refresh triggered');
     setRefreshing(true);
+    
     if (selectedTab === 'explore') {
-      await fetchExploreRecipes();
+      // Restore original sophisticated refresh behavior for explore
+      setExploreError(null);
+      
+      const startTime = Date.now();
+      
+      try {
+        // Keep existing recipes visible while fetching new ones
+        // Only update state when we have new data
+        const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+        if (!backendUrl) {
+          throw new Error('API configuration error. Please check your environment variables.');
+        }
+
+        const apiUrl = `${backendUrl}/api/recipes/explore-random`;
+        console.log(`[LibraryScreen] Refreshing from: ${apiUrl}`);
+        
+        const response = await fetch(apiUrl);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch explore recipes: ${response.statusText}`);
+        }
+
+        const recipes = await response.json();
+        console.log(`[LibraryScreen] Refreshed ${recipes?.length || 0} explore recipes from API.`);
+        
+        // Store cache data first
+        try {
+          const now = Date.now().toString();
+          await Promise.all([
+            AsyncStorage.setItem('exploreLastFetched', now),
+            AsyncStorage.setItem('exploreRecipes', JSON.stringify(recipes || []))
+          ]);
+          console.log('[LibraryScreen] Updated cache with fresh data');
+        } catch (storageError) {
+          console.warn('[LibraryScreen] Failed to store cache data:', storageError);
+        }
+        
+        // Ensure minimum 750ms delay for better UX
+        const elapsedTime = Date.now() - startTime;
+        const minDelay = 750;
+        const remainingDelay = Math.max(0, minDelay - elapsedTime);
+        
+        if (remainingDelay > 0) {
+          await new Promise(resolve => setTimeout(resolve, remainingDelay));
+        }
+        
+        // Update recipes AFTER the delay so content changes when spinner stops
+        setExploreRecipes(recipes || []);
+        
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load explore recipes';
+        console.error('[LibraryScreen] Error refreshing explore recipes:', err);
+        setExploreError(errorMessage);
+      }
     } else {
+      // Simple refresh for saved recipes
       await fetchSavedRecipes();
     }
+    
     setRefreshing(false);
-  }, [selectedTab, fetchExploreRecipes, fetchSavedRecipes]);
+  }, [selectedTab, fetchSavedRecipes]);
 
   // Handle image error
   const handleImageError = useCallback((recipeId: string) => {
@@ -522,20 +595,6 @@ export default function LibraryScreen() {
         <TouchableOpacity
           style={[
             styles.tabButton,
-            selectedTab === 'explore' && styles.tabButtonActive
-          ]}
-          onPress={() => setSelectedTab('explore')}
-        >
-          <Text style={[
-            styles.tabButtonText,
-            selectedTab === 'explore' && styles.tabButtonTextActive
-          ]}>
-            Explore ({exploreRecipes.length})
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.tabButton,
             selectedTab === 'saved' && styles.tabButtonActive
           ]}
           onPress={() => setSelectedTab('saved')}
@@ -547,12 +606,33 @@ export default function LibraryScreen() {
             Saved ({savedRecipes.length})
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            selectedTab === 'explore' && styles.tabButtonActive
+          ]}
+          onPress={() => setSelectedTab('explore')}
+        >
+          <Text style={[
+            styles.tabButtonText,
+            selectedTab === 'explore' && styles.tabButtonTextActive
+          ]}>
+            Explore 
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Subheading for explore tab */}
       {selectedTab === 'explore' && (
         <Text style={styles.subheading}>
-          Recipes the Meez community is cooking right now.
+          Recipes from the Meez community.
+        </Text>
+      )}
+
+      {/* Subheading for saved tab */}
+      {selectedTab === 'saved' && (
+        <Text style={styles.subheading}>
+          Recipes you're saving for later.
         </Text>
       )}
 
@@ -633,10 +713,11 @@ const styles = StyleSheet.create({
   subheading: {
     ...bodyText,
     fontSize: FONT.size.body,
+    fontWeight: '300',
     color: COLORS.textMuted,
     textAlign: 'center',
-    marginBottom: SPACING.lg,
-    marginTop: SPACING.sm,
+    marginBottom: SPACING.md,
+    marginTop: SPACING.xs,
   } as TextStyle,
   retryButton: {
     marginTop: SPACING.lg,

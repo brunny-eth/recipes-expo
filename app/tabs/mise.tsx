@@ -654,6 +654,22 @@ export default function MiseScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Subheading for recipes tab */}
+      {selectedTab === 'recipes' && (
+        <Text style={styles.subheading}>
+          Recipes you're getting ready to cook.
+        </Text>
+      )}
+
+      {/* Subheading for grocery tab */}
+      {selectedTab === 'grocery' && (
+        <Text style={styles.subheading}>
+          A grocery list for prepped recipes.
+        </Text>
+      )}
+
+      {renderContent()}
+
       {/* Cooking Session Button - only show on recipes tab */}
       {selectedTab === 'recipes' && miseRecipes.length > 0 && (
         <TouchableOpacity
@@ -666,8 +682,6 @@ export default function MiseScreen() {
           </Text>
         </TouchableOpacity>
       )}
-
-      {renderContent()}
       
       {/* Floating Action Button for sharing grocery list */}
       {selectedTab === 'grocery' && session && groceryList.length > 0 && (
@@ -951,13 +965,24 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.lg,
     borderRadius: RADIUS.sm,
-    marginBottom: SPACING.md,
+    marginHorizontal: SPACING.pageHorizontal,
+    marginBottom: SPACING.lg,
+    marginTop: SPACING.md,
     ...SHADOWS.small,
   } as ViewStyle,
   cookingSessionButtonText: {
     ...bodyStrongText,
     color: COLORS.white,
     marginLeft: SPACING.sm,
+  } as TextStyle,
+  subheading: {
+    ...bodyText,
+    fontSize: FONT.size.body,
+    fontWeight: '300',
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    marginBottom: SPACING.md,
+    marginTop: SPACING.xs,
   } as TextStyle,
 
 }); 
