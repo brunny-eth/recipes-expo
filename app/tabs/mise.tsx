@@ -120,25 +120,40 @@ export default function MiseScreen() {
   // --- Caching Strategy ---
   const lastSessionIdRef = useRef<string | null>(null);
 
+  // Initialize session ID on first render to prevent cache invalidation
+  useEffect(() => {
+    const currentSessionId = session?.user?.id || null;
+    if (lastSessionIdRef.current === null) {
+      lastSessionIdRef.current = currentSessionId;
+      console.log('[MiseScreen] 🔧 Initialized session ID:', currentSessionId);
+    }
+  }, [session?.user?.id]);
+
   // Add updateMiseRecipe function for local modifications
   const updateMiseRecipe = useCallback((recipeId: string, modifications: { scaleFactor?: number; appliedChanges?: any[]; modified_recipe_data?: ParsedRecipe }) => {
-    console.log('[MiseScreen] Updating local modifications for recipe:', recipeId, modifications);
+    console.log('[MiseScreen] 🔄 updateMiseRecipe called with local modifications for recipe:', recipeId, modifications);
     
     setMiseRecipes(prev => prev.map(recipe => {
       if (recipe.id === recipeId) {
-        return {
+        const updated = {
           ...recipe,
           local_modifications: {
             ...recipe.local_modifications,
             ...modifications,
           }
         };
+        console.log('[MiseScreen] 📝 Recipe updated locally:', {
+          recipeId,
+          hasLocalMods: !!updated.local_modifications,
+          localModKeys: Object.keys(updated.local_modifications || {}),
+        });
+        return updated;
       }
       return recipe;
     }));
 
     // Note: Grocery list refresh will be triggered when user navigates back to mise screen
-    console.log('[MiseScreen] Local modifications saved, grocery list will refresh on next focus');
+    console.log('[MiseScreen] 💡 Local modifications saved, grocery list will refresh on next focus');
   }, []);
 
   // Make updateMiseRecipe available to other screens via a context or pass it down
@@ -149,18 +164,20 @@ export default function MiseScreen() {
   // Add getMiseRecipe function for other screens to access mise data
   const getMiseRecipe = useCallback((recipeId: string) => {
     const recipe = miseRecipes.find(r => r.id === recipeId);
-    console.log('[MiseScreen] getMiseRecipe called for ID:', recipeId, 'Found:', !!recipe);
+    console.log('[MiseScreen] 🔍 getMiseRecipe called for ID:', recipeId, 'Found:', !!recipe);
     return recipe;
   }, [miseRecipes]);
 
   // Make the function available globally (temporary solution)
   useEffect(() => {
+    console.log('[MiseScreen] 🌐 Setting up global mise functions');
     // Store the update function in a way that can be accessed by other screens
     (globalThis as any).updateMiseRecipe = updateMiseRecipe;
     (globalThis as any).getMiseRecipe = getMiseRecipe;
     
     return () => {
       // Clean up on unmount
+      console.log('[MiseScreen] 🧹 Cleaning up global mise functions');
       delete (globalThis as any).updateMiseRecipe;
       delete (globalThis as any).getMiseRecipe;
     };
@@ -168,9 +185,11 @@ export default function MiseScreen() {
 
   // Component Mount/Unmount logging
   useEffect(() => {
-    console.log('[MiseScreen] Component DID MOUNT');
+    const timestamp = new Date().toISOString();
+    console.log(`[MiseScreen] 🚀 Component DID MOUNT at ${timestamp}`);
     return () => {
-      console.log('[MiseScreen] Component WILL UNMOUNT');
+      const unmountTimestamp = new Date().toISOString();
+      console.log(`[MiseScreen] 💀 Component WILL UNMOUNT at ${unmountTimestamp}`);
     };
   }, []);
 
@@ -190,11 +209,28 @@ export default function MiseScreen() {
         const currentSessionId = session?.user?.id || null;
         const storedSessionId = lastSessionIdRef.current;
 
+        // 🔍 DEBUGGING: Log session comparison
+        console.log('[MiseScreen] 🔍 Session comparison:', {
+          currentSessionId,
+          storedSessionId,
+          areEqual: currentSessionId === storedSessionId,
+          sessionExists: !!session?.user?.id,
+        });
+
         if (currentSessionId !== storedSessionId) {
           console.log('[MiseScreen] Session changed - will fetch');
           lastSessionIdRef.current = currentSessionId;
           return { recipes: null, grocery: null, shouldFetch: true };
         }
+        
+        // 🔍 DEBUGGING: Log cache existence
+        console.log('[MiseScreen] 🔍 Cache existence check:', {
+          hasLastFetched: !!lastFetchedStr,
+          hasRecipes: !!cachedRecipesStr,
+          hasGrocery: !!cachedGroceryStr,
+          recipesSize: cachedRecipesStr ? `${(cachedRecipesStr.length / 1024).toFixed(1)}KB` : 'N/A',
+          grocerySize: cachedGroceryStr ? `${(cachedGroceryStr.length / 1024).toFixed(1)}KB` : 'N/A',
+        });
         
         if (!lastFetchedStr || !cachedRecipesStr || !cachedGroceryStr) {
           console.log('[MiseScreen] No complete cached data found - will fetch');
@@ -204,6 +240,16 @@ export default function MiseScreen() {
         const lastFetched = parseInt(lastFetchedStr, 10);
         const now = Date.now();
         const timeSinceLastFetch = now - lastFetched;
+
+        // 🔍 DEBUGGING: Log cache age
+        console.log('[MiseScreen] 🔍 Cache age check:', {
+          lastFetched: new Date(lastFetched).toISOString(),
+          now: new Date(now).toISOString(),
+          timeSinceLastFetchMs: timeSinceLastFetch,
+          timeSinceLastFetchHours: (timeSinceLastFetch / (60 * 60 * 1000)).toFixed(2),
+          cacheDurationHours: (CACHE_DURATION_MS / (60 * 60 * 1000)).toFixed(1),
+          isExpired: timeSinceLastFetch >= CACHE_DURATION_MS,
+        });
   
         if (timeSinceLastFetch >= CACHE_DURATION_MS) {
           console.log(
@@ -218,7 +264,7 @@ export default function MiseScreen() {
           const recipes = JSON.parse(cachedRecipesStr) as MiseRecipe[];
           const grocery = JSON.parse(cachedGroceryStr) as GroceryCategory[];
           const hoursLeft = Math.round((CACHE_DURATION_MS - timeSinceLastFetch) / (60 * 60 * 1000) * 10) / 10;
-          console.log(`[MiseScreen] Using cached data (${recipes.length} recipes, ${hoursLeft}h left)`);
+          console.log(`[MiseScreen] ✅ Using cached data (${recipes.length} recipes, ${hoursLeft}h left)`);
           return { recipes, grocery, shouldFetch: false };
         } catch (parseError) {
           console.error('[MiseScreen] Error parsing cached data - will fetch:', parseError);
@@ -241,7 +287,7 @@ export default function MiseScreen() {
       setIsLoading(false);
       setMiseRecipes([]);
       setGroceryList([]);
-      setError('Please log in to access your mise en place.');
+      setError('Please log in to access your mise.');
       return;
     }
 
@@ -337,23 +383,39 @@ export default function MiseScreen() {
   }, [session?.user?.id, session?.access_token]);
 
   const fetchMiseData = useCallback(async (forceRefresh = false) => {
-    console.log('[MiseScreen] fetchMiseData called', { forceRefresh });
+    console.log('[MiseScreen] 🎯 fetchMiseData called', { 
+      forceRefresh,
+      sessionExists: !!session?.user?.id,
+      currentSessionId: session?.user?.id,
+      storedSessionId: lastSessionIdRef.current,
+    });
     
     if (!forceRefresh) {
+      console.log('[MiseScreen] 🔍 Checking cache before API call...');
       const { recipes, grocery, shouldFetch } = await loadCachedMiseData();
       
       if (!shouldFetch && recipes && grocery) {
-        console.log('[MiseScreen] Using cached data - no fetch needed');
+        console.log('[MiseScreen] ✅ Using cached data - no fetch needed');
         setMiseRecipes(recipes);
         setGroceryList(grocery);
         setIsLoading(false);
         return;
       }
+      
+      console.log('[MiseScreen] 🔄 Cache validation result:', {
+        shouldFetch,
+        hasRecipes: !!recipes,
+        hasGrocery: !!grocery,
+        recipesCount: recipes?.length || 0,
+        groceryCount: grocery?.length || 0,
+      });
+    } else {
+      console.log('[MiseScreen] 🔄 Force refresh requested - skipping cache');
     }
 
-    console.log('[MiseScreen] Cache miss, expired, or refresh forced - fetching fresh data');
+    console.log('[MiseScreen] 📡 Cache miss, expired, or refresh forced - fetching fresh data');
     await fetchMiseDataFromAPI();
-  }, [loadCachedMiseData, fetchMiseDataFromAPI]);
+  }, [loadCachedMiseData, fetchMiseDataFromAPI, session?.user?.id]);
 
   // Use this to manually invalidate cache, e.g., after adding/deleting recipe
   const invalidateMiseCache = async () => {
@@ -367,7 +429,15 @@ export default function MiseScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      console.log('[MiseScreen] 🎯 useFocusEffect triggered');
+      const timestamp = new Date().toISOString();
+      console.log(`[MiseScreen] 🎯 useFocusEffect triggered at ${timestamp}`);
+      console.log('[MiseScreen] 🔍 Focus effect context:', {
+        sessionExists: !!session?.user?.id,
+        currentSessionId: session?.user?.id,
+        storedSessionId: lastSessionIdRef.current,
+        miseRecipesCount: miseRecipes.length,
+        groceryListCount: groceryList.length,
+      });
       // On focus, check if we need to refetch data
       fetchMiseData();
     }, [fetchMiseData])
@@ -665,7 +735,7 @@ export default function MiseScreen() {
             size={48}
             color={COLORS.lightGray}
           />
-          <Text style={styles.emptyText}>Log in to see your mise en place</Text>
+          <Text style={styles.emptyText}>Log in to see your mise</Text>
           <Text style={styles.emptySubtext}>
             Your mise recipes and shopping list will appear here once you're logged in.
           </Text>

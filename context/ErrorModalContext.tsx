@@ -121,20 +121,37 @@ export const ErrorModalProvider: React.FC<{ children: ReactNode }> = ({
     // Add granular logging for useCallback recreation
     console.log('[ErrorModalContext] hideError useCallback recreated. Empty dependencies array - should be stable.');
     
+    // Prevent multiple rapid calls
+    if (!visibleRef.current) {
+      console.log('[ErrorModalContext] hideError called but modal already hidden - ignoring');
+      return;
+    }
+    
+    // Immediately mark as hidden to prevent duplicate calls
+    visibleRef.current = false;
+    
     requestAnimationFrame(() => {
       console.log('[ErrorModalContext] State update: setVisible(false)');
       setVisible(false);
-      // Use ref.current to access the latest modalData
-      if (modalDataRef.current?.onDismissCallback) {
-        console.log('[GlobalErrorModal] Executing onDismissCallback.');
-        modalDataRef.current.onDismissCallback();
+      
+      // Store callback reference before clearing data
+      const callbackToExecute = modalDataRef.current?.onDismissCallback;
+      
+      // Clear modal data immediately to prevent re-triggering
+      console.log('[ErrorModalContext] State update: setModalData(null) - clearing modal data');
+      setModalData(null);
+      
+      // Execute callback after a delay to prevent immediate re-triggering
+      if (callbackToExecute) {
+        setTimeout(() => {
+          console.log('[ErrorModalContext] Executing onDismissCallback after delay');
+          try {
+            callbackToExecute();
+          } catch (error) {
+            console.error('[ErrorModalContext] Error in onDismissCallback:', error);
+          }
+        }, 100); // Short delay to break the cycle
       }
-
-      // Safely clear data after the hide animation is complete
-      setTimeout(() => {
-        console.log('[ErrorModalContext] State update: setModalData(null) - clearing modal data');
-        setModalData(null);
-      }, 500);
     });
   }, []); // Empty dependency array - function is now truly stable
 
