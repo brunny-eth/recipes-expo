@@ -80,9 +80,7 @@ export default function StepsScreen() {
   const { session } = useAuth();
   const { markFreeRecipeUsed } = useFreeUsage();
 
-  // State for save modified recipe functionality
-  const [isLoadingSave, setIsLoadingSave] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+
   const [isLoadingComplete, setIsLoadingComplete] = useState(false);
 
   // State to hold the original recipe data (if needed for reference)
@@ -279,83 +277,7 @@ export default function StepsScreen() {
     };
   }, [session, markFreeRecipeUsed]); // Dependencies to ensure it reacts to auth state changes and function stability
 
-  // Function to handle saving the modified recipe
-  const handleSaveModifiedRecipe = async () => {
-    setSaveError(null); // Clear any previous errors
-    setIsLoadingSave(true);
 
-    if (!modifiedRecipe || !originalRecipeId || !appliedChanges || !session?.user?.id) {
-      const errorMessage = 'Missing data to save the modified recipe. Please ensure all modifications are applied and you are logged in.';
-      setSaveError(errorMessage);
-      showError('Save Failed', errorMessage);
-      setIsLoadingSave(false);
-      return;
-    }
-
-    try {
-      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
-      if (!backendUrl) {
-        throw new Error('Backend API URL is not configured.');
-      }
-
-      const payload = {
-        originalRecipeId: originalRecipeId,
-        userId: session.user.id,
-        modifiedRecipeData: modifiedRecipe, // The fully reconstructed recipe
-        appliedChanges: appliedChanges, // The metadata about changes
-      };
-
-      console.log('[StepsScreen] Saving modified recipe:', {
-        originalRecipeId,
-        userId: session.user.id,
-        title: modifiedRecipe.title,
-        changesCount: appliedChanges.ingredientChanges.length,
-        scalingFactor: appliedChanges.scalingFactor,
-        hasImage: !!modifiedRecipe.image,
-        hasThumbnail: !!modifiedRecipe.thumbnailUrl,
-        imageUrl: modifiedRecipe.image || 'MISSING',
-      });
-
-      const response = await fetch(`${backendUrl}/api/recipes/save-modified`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        const errorMsg = data.error || `Failed to save modified recipe: ${response.statusText}`;
-        setSaveError(errorMsg);
-        showError('Save Failed', errorMsg);
-        return;
-      }
-
-      console.log('[StepsScreen] Modified recipe saved successfully:', data);
-
-      // Show success message
-      showError('Recipe Saved!', `${modifiedRecipe.title} has been saved to your collection.`);
-
-      // Navigate to the saved recipes screen
-      router.push('/tabs/saved');
-
-    } catch (error) {
-      const errMsg = (error as Error).message || 'An unexpected error occurred while saving the recipe.';
-      setSaveError(errMsg);
-      showError('Save Failed', errMsg);
-      console.error('[StepsScreen] Error saving modified recipe:', error);
-    } finally {
-      setIsLoadingSave(false);
-    }
-  };
-
-  // Helper function to check if recipe has been modified
-  const hasModifications = () => {
-    if (!appliedChanges) return false;
-    return appliedChanges.ingredientChanges.length > 0; // Only allow saving if ingredients were substituted/removed
-  };
 
   // --- Lifted Timer Logic ---
   const formatTime = (seconds: number) => {
@@ -646,9 +568,7 @@ export default function StepsScreen() {
     }
   };
 
-  const handleSaveRecipePress = () => {
-    handleSaveModifiedRecipe();
-  };
+
 
   return (
     <SafeAreaView style={styles.container}>
@@ -823,16 +743,9 @@ export default function StepsScreen() {
       <StepsFooterButtons
         onTimersPress={handleTimersPress}
         onRecipeTipsPress={handleRecipeTipsPress}
-        onSaveRecipePress={handleSaveRecipePress}
-        isSaving={isLoadingSave}
-        hasModifications={!!(hasModifications() && modifiedRecipe && originalRecipeId && appliedChanges && session?.user?.id)}
         hasRecipeTips={!!modifiedRecipe?.tips}
       />
-      {saveError && (
-        <View style={styles.saveErrorContainer}>
-          <Text style={styles.saveErrorText}>{saveError}</Text>
-        </View>
-      )}
+
 
       <ToolsModal
         isVisible={isToolsPanelVisible}
@@ -1213,17 +1126,7 @@ const styles = StyleSheet.create({
     ...bodyStrongText,
     color: COLORS.white,
   } as TextStyle,
-  saveErrorText: {
-    ...captionText,
-    color: COLORS.error,
-    marginTop: SPACING.xs,
-    textAlign: 'center',
-  } as TextStyle,
-  saveErrorContainer: {
-    paddingHorizontal: SPACING.pageHorizontal,
-    paddingBottom: SPACING.sm,
-    alignItems: 'center',
-  } as ViewStyle,
+
   completeButton: {
     flexDirection: 'row',
     alignItems: 'center',

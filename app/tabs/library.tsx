@@ -326,13 +326,19 @@ export default function LibraryScreen() {
   // Navigate to saved recipe
   const navigateToSavedRecipe = useCallback((savedRecipe: SavedRecipe) => {
     const recipeData = savedRecipe.processed_recipes_cache?.recipe_data;
-    if (!recipeData) return;
+    if (!recipeData || !savedRecipe.processed_recipes_cache) return;
+
+    // Create a complete recipe object by merging the ID with the recipe_data
+    const recipeWithId = {
+      ...recipeData,
+      id: savedRecipe.processed_recipes_cache.id,
+    };
 
     console.log('[LibraryScreen] Navigating to saved recipe:', recipeData.title);
     router.push({
       pathname: '/recipe/summary',
       params: {
-        recipeData: JSON.stringify(recipeData),
+        recipeData: JSON.stringify(recipeWithId), // Now includes the ID
         entryPoint: 'saved',
         ...(savedRecipe.title_override && {
           titleOverride: savedRecipe.title_override

@@ -253,6 +253,8 @@ export default function RecipeSummaryScreen() {
   const [isSavingForLater, setIsSavingForLater] = useState(false);
   // Track loading state for saving modifications in mise entry point
   const [isSavingModifications, setIsSavingModifications] = useState(false);
+  // Track loading state for cook now button
+  const [isCookingNow, setIsCookingNow] = useState(false);
   const [isHelpModalVisible, setIsHelpModalVisible] = useState(false);
   const [preparedRecipeData, setPreparedRecipeData] = useState<any>(null);
   const [selectedIngredientOriginalData, setSelectedIngredientOriginalData] =
@@ -1454,9 +1456,128 @@ export default function RecipeSummaryScreen() {
     }
   };
 
-  const handleCookNow = () => {
-    // Placeholder for future implementation
-    console.log('[Summary] Cook now button pressed (placeholder)');
+  const handleCookNow = async () => {
+    console.log('[Summary] Cook now button pressed');
+    
+    // Only allow from saved entrypoint
+    if (entryPoint !== 'saved') {
+      console.log('[Summary] Cook now only available from saved entrypoint');
+      return;
+    }
+    
+    if (!recipe || !scaledIngredients) {
+      console.error('[Summary] Cannot cook now, essential data is missing.');
+      return;
+    }
+
+    const needsScaling = selectedScaleFactor !== 1;
+    const needsSubstitution = appliedChanges.length > 0;
+    const hasModifications = needsScaling || needsSubstitution;
+
+    console.log('[Summary] Cook now modifications check:', {
+      needsScaling,
+      needsSubstitution,
+      hasModifications,
+      scaleFactor: selectedScaleFactor,
+      changesCount: appliedChanges.length,
+    });
+
+    setIsCookingNow(true);
+
+    try {
+      let finalInstructions = recipe.instructions || [];
+      let newTitle: string | null = null;
+
+      if (hasModifications) {
+        console.log('[Summary] Modifications detected, calling modify-instructions endpoint');
+        
+        // Check removal limit
+        const removalCount = appliedChanges.filter((c) => !c.to).length;
+        if (removalCount > 2) {
+          showError('Limit Reached', 'You can only remove up to 2 ingredients per recipe.');
+          setIsCookingNow(false);
+          return;
+        }
+
+        // Flatten all ingredients from ingredient groups for scaling
+        const allIngredients: StructuredIngredient[] = [];
+        if (recipe.ingredientGroups) {
+          recipe.ingredientGroups.forEach(group => {
+            if (group.ingredients && Array.isArray(group.ingredients)) {
+              allIngredients.push(...group.ingredients);
+            }
+          });
+        }
+
+        // Call modify-instructions API
+        const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+        if (!backendUrl) {
+          throw new Error('Backend API URL is not configured.');
+        }
+
+        const response = await fetch(`${backendUrl}/api/recipes/modify-instructions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            originalInstructions: recipe.instructions || [],
+            substitutions: appliedChanges.map((change) => ({
+              from: change.from,
+              to: change.to ? change.to.name : null,
+            })),
+            originalIngredients: allIngredients,
+            scaledIngredients: scaledIngredients || [],
+            scalingFactor: selectedScaleFactor,
+            skipTitleUpdate: !!params.titleOverride,
+          }),
+        });
+
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || `Modification failed (Status: ${response.status})`);
+        if (!result.modifiedInstructions) throw new Error('Invalid format for modified instructions.');
+
+        finalInstructions = result.modifiedInstructions;
+
+        // Capture new title if suggested by LLM
+        if (result.newTitle && result.newTitle.trim() !== '') {
+          newTitle = result.newTitle;
+        }
+
+        console.log('[Summary] Successfully modified instructions for cook now');
+      }
+
+      // Create the recipe for steps
+      const recipeForSteps = {
+        ...recipe,
+        title: newTitle || recipe.title,
+        recipeYield: getScaledYieldText(recipe.recipeYield, selectedScaleFactor),
+        instructions: finalInstructions,
+        ingredientGroups: scaledIngredientGroups,
+      };
+
+      console.log('[Summary] Navigating to steps with recipe data:', {
+        title: recipeForSteps.title,
+        hasModifications,
+        instructionsCount: finalInstructions.length,
+      });
+
+      // Navigate to steps
+      router.push({
+        pathname: '/recipe/steps',
+        params: {
+          recipeData: JSON.stringify(recipeForSteps),
+          // Pass title_override if available
+          ...(params.titleOverride && {
+            titleOverride: params.titleOverride
+          }),
+        },
+      });
+
+    } catch (error: any) {
+      console.error('[Summary] Error in cook now:', error);
+      showError('Cook Now Failed', `Could not start cooking: ${error.message}`);
+    } finally {
+      setIsCookingNow(false);
+    }
   };
 
   const handleSaveModifications = async () => {
@@ -1821,6 +1942,7 @@ export default function RecipeSummaryScreen() {
         handleCookNow={handleCookNow}
         isSavingForLater={isSavingForLater}
         isSavingModifications={isSavingModifications}
+        isCookingNow={isCookingNow}
         entryPoint={entryPoint}
         hasModifications={hasModifications}
         isAlreadyInMise={isAlreadyInMise}

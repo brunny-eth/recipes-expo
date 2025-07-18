@@ -22,6 +22,7 @@ type RecipeFooterButtonsProps = {
   handleCookNow: () => void;
   isSavingForLater?: boolean;
   isSavingModifications?: boolean;
+  isCookingNow?: boolean;
   entryPoint: string;
   hasModifications?: boolean;
   isAlreadyInMise?: boolean;
@@ -37,6 +38,7 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
   handleCookNow,
   isSavingForLater = false,
   isSavingModifications = false,
+  isCookingNow = false,
   entryPoint,
   hasModifications = false,
   isAlreadyInMise = false,
@@ -86,11 +88,26 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
       case 'saved':
         return (
           <TouchableOpacity
-            style={styles.saveButton}
+            style={[
+              styles.saveButton,
+              isCookingNow && styles.saveButtonDisabled
+            ]}
             onPress={handleCookNow}
-            disabled={isSavingForLater}
+            disabled={isCookingNow}
           >
-            <Text style={styles.saveButtonText}>Cook now</Text>
+            {isCookingNow && (
+              <ActivityIndicator
+                size="small"
+                color={COLORS.primary}
+                style={{ marginRight: 8 }}
+              />
+            )}
+            <Text style={[
+              styles.saveButtonText,
+              isCookingNow && styles.saveButtonTextDisabled
+            ]}>
+              {isCookingNow ? 'Starting...' : 'Cook now'}
+            </Text>
           </TouchableOpacity>
         );
       case 'mise':

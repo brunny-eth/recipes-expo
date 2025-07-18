@@ -6,7 +6,6 @@ import {
   StyleSheet,
   ViewStyle,
   TextStyle,
-  ActivityIndicator,
 } from 'react-native';
 import { bodyStrongText } from '@/constants/typography';
 import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
@@ -14,18 +13,12 @@ import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
 type StepsFooterButtonsProps = {
   onTimersPress: () => void;
   onRecipeTipsPress: () => void;
-  onSaveRecipePress: () => void;
-  isSaving?: boolean;
-  hasModifications?: boolean;
   hasRecipeTips?: boolean;
 };
 
 const StepsFooterButtons: React.FC<StepsFooterButtonsProps> = ({
   onTimersPress,
   onRecipeTipsPress,
-  onSaveRecipePress,
-  isSaving = false,
-  hasModifications = false,
   hasRecipeTips = false,
 }) => {
   return (
@@ -47,25 +40,7 @@ const StepsFooterButtons: React.FC<StepsFooterButtonsProps> = ({
           </TouchableOpacity>
         )}
         
-        <TouchableOpacity
-          style={[
-            styles.button,
-            isSaving && styles.buttonDisabled,
-          ]}
-          onPress={onSaveRecipePress}
-          disabled={isSaving || !hasModifications}
-        >
-          {isSaving ? (
-            <ActivityIndicator
-              size="small"
-              color={COLORS.white}
-              style={{ marginRight: 4 }}
-            />
-          ) : null}
-          <Text style={styles.buttonText}>
-            {isSaving ? 'Saving...' : 'Save Recipe'}
-          </Text>
-        </TouchableOpacity>
+
       </View>
     </View>
   );
@@ -94,10 +69,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm,
     backgroundColor: COLORS.primary,
   } as ViewStyle,
-  buttonDisabled: {
-    backgroundColor: COLORS.gray,
-    opacity: 0.6,
-  } as ViewStyle,
+
   buttonText: {
     ...bodyStrongText,
     color: COLORS.white,
