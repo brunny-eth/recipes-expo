@@ -627,27 +627,22 @@ export default function LibraryScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScreenHeader title="Recipe library" />
       
-      {/* Tab selector - matching mise.tsx pattern */}
+      {/* Tab selector - underline style */}
       <View style={styles.tabContainer}>
         <TouchableOpacity
-          style={[
-            styles.tabButton,
-            selectedTab === 'saved' && styles.tabButtonActive
-          ]}
+          style={styles.tabButton}
           onPress={() => setSelectedTab('saved')}
         >
           <Text style={[
             styles.tabButtonText,
             selectedTab === 'saved' && styles.tabButtonTextActive
           ]}>
-            Saved ({savedRecipes.length})
+            Saved
           </Text>
+          {selectedTab === 'saved' && <View style={styles.tabUnderline} />}
         </TouchableOpacity>
         <TouchableOpacity
-          style={[
-            styles.tabButton,
-            selectedTab === 'explore' && styles.tabButtonActive
-          ]}
+          style={styles.tabButton}
           onPress={() => setSelectedTab('explore')}
         >
           <Text style={[
@@ -656,6 +651,7 @@ export default function LibraryScreen() {
           ]}>
             Explore 
           </Text>
+          {selectedTab === 'explore' && <View style={styles.tabUnderline} />}
         </TouchableOpacity>
       </View>
 
@@ -686,35 +682,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.pageHorizontal,
   } as ViewStyle,
   
-  // Tab styles - matching mise.tsx
+  // Tab styles - underline style like ESPN+
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: COLORS.surface,
-    borderRadius: 999, // Fully rounded pill shape
-    padding: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.surface,
     marginBottom: SPACING.md,
   } as ViewStyle,
   tabButton: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
     alignItems: 'center',
-    borderRadius: 999, // Fully rounded pill shape
-    backgroundColor: COLORS.white, // White background for inactive tabs
+    position: 'relative',
+    backgroundColor: COLORS.background,
   } as ViewStyle,
-  tabButtonActive: {
+  tabUnderline: {
+    position: 'absolute',
+    bottom: 2,
+    height: 2,
+    width: '60%',
     backgroundColor: COLORS.primary,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3, // For Android shadow
+    borderRadius: 1,
   } as ViewStyle,
   tabButtonText: {
     ...bodyStrongText,
-    color: COLORS.primary, // Burnt orange text for inactive tabs
+    color: COLORS.textMuted,
+    fontSize: FONT.size.body,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase' as const,
   } as TextStyle,
   tabButtonTextActive: {
-    color: COLORS.white,
+    color: COLORS.textDark,
   } as TextStyle,
   
   // Content styles

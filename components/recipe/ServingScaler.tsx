@@ -53,7 +53,7 @@ const ServingScaler: React.FC<ServingScalerProps> = ({
           if (selectedScaleFactor === 1.0) {
             const formattedYield = formatRecipeYield(recipeYield);
             return formattedYield
-              ? `This recipe makes ${formattedYield}. Scale it up or down here.`
+              ? `This recipe makes ${formattedYield}.`
               : `This recipe doesn't specify servings amount, but we can still scale amounts up or down if you'd like.`;
           }
 
@@ -106,6 +106,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT.family.inter,
     fontSize: FONT.size.caption,
     color: COLORS.textMuted,
+    marginTop: SPACING.xs,
     marginBottom: SPACING.sm, // Use small spacing for consistency
     lineHeight: 18,
     textAlign: 'left',

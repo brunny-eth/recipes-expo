@@ -37,7 +37,6 @@ import RecipeMatchSelectionModal from '@/components/RecipeMatchSelectionModal';
 import { CombinedParsedRecipe } from '@/common/types';
 import { useRecipeSubmission } from '@/hooks/useRecipeSubmission';
 import { detectInputType } from '../../server/utils/detectInputType';
-import ChefUnderline from '@/components/ChefUnderline';
 
 // Custom hook for interval management
 const useInterval = (callback: () => void, delay: number | null) => {
@@ -337,18 +336,9 @@ export default function HomeScreen() {
   const [hasInputBeenFocused, setHasInputBeenFocused] = useState(false);
   const [hasUserTyped, setHasUserTyped] = useState(false);
 
-  const subheaderOpacity = useRef(new Animated.Value(1)).current;
-
   const handleInputFocus = useCallback(() => {
     setIsInputFocused(true);
     setHasInputBeenFocused(true);
-    
-    // Fade out subheaders
-    Animated.timing(subheaderOpacity, {
-      toValue: 0,
-      duration: 150,
-      useNativeDriver: true,
-    }).start();
     
     // Typewriter effect for second prompt on first focus
     if (!hasUserTyped && recipeUrl === '' && !hasInputBeenFocused) {
@@ -369,20 +359,11 @@ export default function HomeScreen() {
         }, 500); // 500ms delay before typewriter
       });
     }
-  }, [subheaderOpacity, hasUserTyped, recipeUrl, hasInputBeenFocused, typewriterEffect, placeholderOpacity]);
+  }, [hasUserTyped, recipeUrl, hasInputBeenFocused, typewriterEffect, placeholderOpacity]);
 
   const handleInputBlur = useCallback(() => {
     setIsInputFocused(false);
-    
-    // Only fade subheaders back in if we're not submitting (i.e., user is staying on home screen)
-    if (!isSubmitting) {
-      Animated.timing(subheaderOpacity, {
-        toValue: 1,
-        duration: 150,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [subheaderOpacity, isSubmitting]);
+  }, []);
 
   // Track if user has typed
   const handleChangeText = (text: string) => {
@@ -413,11 +394,11 @@ export default function HomeScreen() {
       }}
     >
       <Image
-        source={require('@/assets/images/meez_logo.webp')}
+        source={require('@/assets/images/meezblue_underline.png')}
         resizeMode="contain"
         style={{
-          width: 220,
-          height: 120,
+          width: 400,
+          height: 200,
           alignSelf: 'center',
         }}
       />
@@ -449,15 +430,13 @@ export default function HomeScreen() {
         <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
           <View style={styles.contentContainer}>
             <View style={styles.headerContainer}>
-              <Text style={styles.mainFeatureText}>Home base for home cooks</Text>
-              <ChefUnderline color="rgba(199,91,42,0.5)" />
+              <Text style={styles.mainFeatureText}>Prep and cook, your way</Text>
             </View>
-            <Animated.View style={[styles.secondaryTextContainer, { opacity: subheaderOpacity }]}>
+            <View style={styles.secondaryTextContainer}>
               <Text style={styles.subheadingText}>
-                Meez clears clutter so you can make meals{"\n\n"}
-                <Text style={styles.subheadingText}>Swap out ingredients, save recipes, and plan across multiple dishes</Text>
+                Customize recipes, skip distractions, and cook without the clutter
               </Text>
-            </Animated.View>
+            </View>
           </View>
 
           <KeyboardAvoidingView
@@ -532,28 +511,14 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     alignItems: 'center',
-    marginTop: SPACING.xxs - 20,
+    marginTop: SPACING.xxs,
   },
   headerContainer: {
     alignItems: 'center',
     marginBottom: SPACING.xxl,
-  },
-  chefUnderline: {
-    alignItems: 'center',
-    marginTop: SPACING.xs,
-  },
-  underlineMain: {
-    width: 120,
-    height: 3,
-    backgroundColor: COLORS.primary,
-    borderRadius: 2,
-  },
-  underlineAccent: {
-    width: 60,
-    height: 2,
-    backgroundColor: COLORS.accent,
-    borderRadius: 1,
-    marginTop: 2,
+    maxWidth: 340,
+    alignSelf: 'center',
+    paddingHorizontal: SPACING.md,
   },
   keyboardAvoidingView: {
     flex: 1,
@@ -585,8 +550,9 @@ const styles = StyleSheet.create({
   secondaryTextContainer: {
     alignItems: 'center',
     marginBottom: SPACING.lg,
-    maxWidth: 360,
+    maxWidth: 340,
     alignSelf: 'center',
+    paddingHorizontal: SPACING.md,
   },
   secondaryText: {
     fontFamily: FONT.family.inter,

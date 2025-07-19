@@ -4,7 +4,7 @@
     "slug": "meez",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/meezrecipes_icon.png",
     "scheme": "meez",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -33,7 +33,7 @@
     "web": {
       "bundler": "metro",
       "output": "single",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/meezrecipes_icon.png"
     },
     "plugins": [
       "expo-router",

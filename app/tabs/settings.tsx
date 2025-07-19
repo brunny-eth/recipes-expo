@@ -35,7 +35,7 @@ function AuthStatus() {
 }
 
 export default function SettingsScreen() {
-  const { signOut, isAuthenticated } = useAuth();
+  const { signOut, isAuthenticated, session } = useAuth();
   const insets = useSafeAreaInsets();
 
   // Component Mount/Unmount logging
@@ -62,19 +62,6 @@ export default function SettingsScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScreenHeader title="Settings" />
-
-      <View style={styles.authContainer}>
-        {isAuthenticated ? (
-          <AuthStatus />
-        ) : (
-          <TouchableOpacity
-            onPress={() => router.push('/login')}
-            style={styles.loginButton}
-          >
-            <Text style={styles.loginButtonText}>Log In or Sign Up</Text>
-          </TouchableOpacity>
-        )}
-      </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -106,14 +93,31 @@ export default function SettingsScreen() {
           </View>
         )}
 
-        {isAuthenticated && (
-          <TouchableOpacity style={styles.signOutButton} onPress={signOut}>
-            <Text style={styles.signOutButtonText}>Sign Out</Text>
-          </TouchableOpacity>
-        )}
-
         <Text style={styles.versionText}>Version 1.0.0</Text>
       </ScrollView>
+
+      {/* Bottom section with auth status and sign out button */}
+      <View style={[styles.bottomSection, { paddingBottom: insets.bottom + SPACING.md }]}>
+        {isAuthenticated ? (
+          <>
+            <View style={styles.authStatusContainer}>
+              <Text style={styles.authStatusText}>
+                {`Logged in as ${session?.user?.email}`}
+              </Text>
+            </View>
+            <TouchableOpacity style={styles.signOutButton} onPress={signOut}>
+              <Text style={styles.signOutButtonText}>Sign Out</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <TouchableOpacity
+            onPress={() => router.push('/login')}
+            style={styles.loginButton}
+          >
+            <Text style={styles.loginButtonText}>Log In or Sign Up</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 }
@@ -191,5 +195,11 @@ const styles = StyleSheet.create({
   } as TextStyle,
   scrollContent: {
     paddingBottom: SPACING.xl,
+  } as ViewStyle,
+  bottomSection: {
+    paddingHorizontal: SPACING.pageHorizontal,
+    paddingTop: SPACING.lg,
+    borderTopWidth: BORDER_WIDTH.default,
+    borderTopColor: COLORS.lightGray,
   } as ViewStyle,
 });

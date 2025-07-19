@@ -224,6 +224,40 @@ export default function MiseScreen() {
     await fetchMiseDataFromAPI();
   }, [fetchMiseDataFromAPI]);
 
+  // Silent grocery list refresh without affecting recipes display
+  const refreshGroceryListOnly = useCallback(async () => {
+    if (!session?.user?.id || !session.access_token) return;
+    
+    try {
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+      if (!backendUrl) return;
+      
+      console.log('[MiseScreen] 🛒 Silently refreshing grocery list');
+      
+      const groceryResponse = await fetch(
+        `${backendUrl}/api/mise/grocery-list?userId=${session.user.id}`, 
+        {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (groceryResponse.ok) {
+        const groceryData = await groceryResponse.json();
+        const categorizedGroceryList = convertToGroceryCategories(groceryData?.items || []);
+        setGroceryList(categorizedGroceryList); // Only update grocery list, no loading states
+        console.log('[MiseScreen] ✅ Grocery list silently refreshed after recipe deletion');
+      } else {
+        console.warn('[MiseScreen] Failed to refresh grocery list:', groceryResponse.statusText);
+      }
+    } catch (error) {
+      console.warn('[MiseScreen] Failed to refresh grocery list after deletion:', error);
+      // Fail silently - recipe deletion was successful, just grocery refresh failed
+    }
+  }, [session?.user?.id, session?.access_token]);
+
   useFocusEffect(
     useCallback(() => {
       const timestamp = new Date().toISOString();
@@ -306,7 +340,11 @@ export default function MiseScreen() {
         throw new Error(errorMessage);
       }
 
+      // Update local recipes state immediately for instant UI feedback
       setMiseRecipes((prev) => prev.filter((r) => r.id !== recipeId));
+
+      // Silently refresh grocery list to ensure it reflects the deletion
+      await refreshGroceryListOnly();
 
       console.log(`[MiseScreen] Recipe ${recipeId} deleted successfully.`);
     } catch (err) {
@@ -314,7 +352,7 @@ export default function MiseScreen() {
       console.error('[MiseScreen] Error deleting recipe:', err);
       showError('Error', errorMessage);
     }
-  }, [session, showError]);
+  }, [session, showError, refreshGroceryListOnly]);
 
   // Handle grocery item toggle
   const handleGroceryToggle = useCallback((categoryName: string, itemIndex: number) => {
@@ -419,7 +457,6 @@ export default function MiseScreen() {
 
   // Render recipe item
   const renderRecipeItem = useCallback(({ item }: { item: MiseRecipe }) => {
-    const imageUrl = item.prepared_recipe_data.image || item.prepared_recipe_data.thumbnailUrl;
     const displayTitle = item.title_override || item.prepared_recipe_data.title;
 
     return (
@@ -463,12 +500,6 @@ export default function MiseScreen() {
             console.log('[MiseScreen] ✅ Navigation to summary completed');
           }}
         >
-          {imageUrl && (
-            <FastImage
-              source={{ uri: imageUrl }}
-              style={styles.cardImage}
-            />
-          )}
           <View style={styles.cardTextContainer}>
             <Text style={styles.cardTitle} numberOfLines={2}>
               {displayTitle}
@@ -637,27 +668,22 @@ export default function MiseScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScreenHeader title="Your prep station" />
       
-      {/* Tab selector */}
+      {/* Tab selector - underline style */}
       <View style={styles.tabContainer}>
         <TouchableOpacity
-          style={[
-            styles.tabButton,
-            selectedTab === 'recipes' && styles.tabButtonActive
-          ]}
+          style={styles.tabButton}
           onPress={() => setSelectedTab('recipes')}
         >
           <Text style={[
             styles.tabButtonText,
             selectedTab === 'recipes' && styles.tabButtonTextActive
           ]}>
-            Recipes ({miseRecipes.length})
+            Recipes
           </Text>
+          {selectedTab === 'recipes' && <View style={styles.tabUnderline} />}
         </TouchableOpacity>
         <TouchableOpacity
-          style={[
-            styles.tabButton,
-            selectedTab === 'grocery' && styles.tabButtonActive
-          ]}
+          style={styles.tabButton}
           onPress={() => setSelectedTab('grocery')}
         >
           <Text style={[
@@ -666,6 +692,7 @@ export default function MiseScreen() {
           ]}>
             Shopping List
           </Text>
+          {selectedTab === 'grocery' && <View style={styles.tabUnderline} />}
         </TouchableOpacity>
       </View>
 
@@ -673,13 +700,6 @@ export default function MiseScreen() {
       {selectedTab === 'recipes' && (
         <Text style={styles.subheading}>
           Recipes you're getting ready to cook.
-        </Text>
-      )}
-
-      {/* Subheading for grocery tab */}
-      {selectedTab === 'grocery' && (
-        <Text style={styles.subheading}>
-          A grocery list for prepped recipes.
         </Text>
       )}
 
@@ -720,34 +740,38 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     paddingHorizontal: SPACING.pageHorizontal,
   } as ViewStyle,
+  // Tab styles - underline style like ESPN+
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: COLORS.surface,
-    borderRadius: 999, // Fully rounded pill shape
-    padding: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.surface,
     marginBottom: SPACING.md,
   } as ViewStyle,
   tabButton: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
     alignItems: 'center',
-    borderRadius: 999, // Fully rounded pill shape
-    backgroundColor: COLORS.white, // White background for inactive tabs
+    position: 'relative',
+    backgroundColor: COLORS.background,
   } as ViewStyle,
-  tabButtonActive: {
+  tabUnderline: {
+    position: 'absolute',
+    bottom: 2,
+    height: 2,
+    width: '60%',
     backgroundColor: COLORS.primary,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3, // For Android shadow
+    borderRadius: 1,
   } as ViewStyle,
   tabButtonText: {
     ...bodyStrongText,
-    color: COLORS.primary, // Burnt orange text for inactive tabs
+    color: COLORS.textMuted,
+    fontSize: FONT.size.body,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase' as const,
   } as TextStyle,
   tabButtonTextActive: {
-    color: COLORS.white,
+    color: COLORS.textDark,
   } as TextStyle,
   listContent: {
     paddingTop: SPACING.sm,

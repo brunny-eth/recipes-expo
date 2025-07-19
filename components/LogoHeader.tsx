@@ -27,7 +27,7 @@ LogoHeader.displayName = 'LogoHeader';
 const styles = StyleSheet.create({
   logoContainer: {
     alignItems: 'center',
-    paddingTop: 80,
+    paddingTop: 24,
     marginBottom: SPACING.md,
   },
 });

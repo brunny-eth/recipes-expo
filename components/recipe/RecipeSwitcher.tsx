@@ -11,6 +11,12 @@ interface RecipeSwitcherProps {
   onRecipeSwitch: (recipeId: string) => void;
 }
 
+// Helper function to truncate title to 15 characters + ellipses
+const truncateTitle = (title: string, maxLength: number = 15): string => {
+  if (title.length <= maxLength) return title;
+  return title.substring(0, maxLength) + '...';
+};
+
 export default function RecipeSwitcher({ 
   recipes, 
   activeRecipeId, 
@@ -39,45 +45,67 @@ export default function RecipeSwitcher({
     onRecipeSwitch(recipe.recipeId);
   };
 
+  // Single recipe case - show with underline
+  if (recipes.length === 1) {
+    const recipe = recipes[0];
+    const recipeTitle = recipe.recipe?.title || 'Loading...';
+    const truncatedTitle = truncateTitle(recipeTitle);
+
+    return (
+      <View style={styles.container}>
+        <View style={styles.singleRecipeContainer}>
+          <Text style={styles.singleRecipeTitle}>
+            {truncatedTitle}
+          </Text>
+          <View style={styles.singleRecipeUnderline} />
+        </View>
+      </View>
+    );
+  }
+
+  // Multiple recipes case - horizontal scrolling with underlines
   return (
     <View style={styles.container}>
       <View style={styles.tabContainer}>
-        {recipes.map((recipe, index) => {
-          const isActive = recipe.recipeId === activeRecipeId;
-          const recipeTitle = recipe.recipe?.title || 'Loading...';
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContainer}
+        >
+          {recipes.map((recipe, index) => {
+            const isActive = recipe.recipeId === activeRecipeId;
+            const recipeTitle = recipe.recipe?.title || 'Loading...';
+            const truncatedTitle = truncateTitle(recipeTitle);
 
-          console.log('[RecipeSwitcher] 🎨 Rendering recipe button:', {
-            key: recipe.recipeId,
-            title: recipeTitle,
-            isActive,
-            isLoading: recipe.isLoading,
-            hasRecipe: !!recipe.recipe,
-          });
+            console.log('[RecipeSwitcher] 🎨 Rendering recipe button:', {
+              key: recipe.recipeId,
+              title: recipeTitle,
+              truncatedTitle,
+              isActive,
+              isLoading: recipe.isLoading,
+              hasRecipe: !!recipe.recipe,
+            });
 
-          return (
-            <TouchableOpacity
-              key={recipe.recipeId}
-              style={[
-                styles.tabButton,
-                isActive && styles.tabButtonActive,
-                recipes.length === 1 && styles.singleTabButton,
-              ]}
-              onPress={() => handleRecipePress(recipe)}
-              activeOpacity={0.8}
-            >
-              <Text 
-                style={[
-                  styles.tabButtonText,
-                  isActive && styles.tabButtonTextActive,
-                ]}
-                numberOfLines={1}
-                ellipsizeMode="tail"
+            return (
+              <TouchableOpacity
+                key={recipe.recipeId}
+                style={styles.tabButton}
+                onPress={() => handleRecipePress(recipe)}
+                activeOpacity={0.8}
               >
-                {recipeTitle}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+                <Text 
+                  style={[
+                    styles.tabButtonText,
+                    isActive && styles.tabButtonTextActive,
+                  ]}
+                >
+                  {truncatedTitle}
+                </Text>
+                {isActive && <View style={styles.tabUnderline} />}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
     </View>
   );
@@ -85,50 +113,67 @@ export default function RecipeSwitcher({
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: SPACING.pageHorizontal,
+    paddingHorizontal: 0, // Remove horizontal padding to start tabs at screen edge
     paddingVertical: SPACING.sm,
   },
+  
+  // Single recipe styles
+  singleRecipeContainer: {
+    alignItems: 'center',
+    paddingVertical: 8,
+    position: 'relative',
+  },
+  singleRecipeTitle: {
+    ...bodyStrongText,
+    color: COLORS.textDark,
+    fontSize: FONT.size.body,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase' as const,
+  },
+  singleRecipeUnderline: {
+    position: 'absolute',
+    bottom: -2,
+    height: 2,
+    width: '60%',
+    backgroundColor: COLORS.primary,
+    borderRadius: 1,
+  },
+  
+  // Multiple recipes styles - underline style like ESPN+
   tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.surface,
-    borderRadius: 999, // Fully rounded pill shape
-    padding: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.surface,
+    backgroundColor: COLORS.background,
+  },
+  scrollContainer: {
+    paddingLeft: SPACING.pageHorizontal, // Start with standard page padding on left
+    paddingRight: SPACING.sm, // Smaller padding on right to show overflow
   },
   tabButton: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: SPACING.xs,
+    paddingVertical: 16,
+    paddingHorizontal: 12, // Reduced from 16 to make tabs tighter
     alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 999, // Fully rounded pill shape
-    backgroundColor: COLORS.white, // White background for inactive tabs
-    minWidth: 0, // Allow button to shrink
+    position: 'relative',
+    backgroundColor: COLORS.background,
+    minWidth: 60, // Reduced from 80 to allow more tabs visible
   },
-  tabButtonActive: {
+  tabUnderline: {
+    position: 'absolute',
+    bottom: 2,
+    height: 2,
+    width: '100%', // Fill entire tab width instead of 60%
     backgroundColor: COLORS.primary,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3, // For Android shadow
-  },
-  singleTabButton: {
-    // When there's only one recipe, make it look more like a header
-    backgroundColor: COLORS.primary,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderRadius: 1,
   },
   tabButtonText: {
     ...bodyStrongText,
-    color: COLORS.primary, // Burnt orange text for inactive tabs
+    color: COLORS.textMuted,
+    fontSize: FONT.size.body,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase' as const,
     textAlign: 'center',
-    fontSize: FONT.size.caption, // Smaller text for better fit
-    lineHeight: FONT.size.caption + 2, // Tighter line height
   },
   tabButtonTextActive: {
-    color: COLORS.white,
+    color: COLORS.textDark,
   },
 }); 

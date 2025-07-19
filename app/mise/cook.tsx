@@ -25,7 +25,7 @@ import { sectionHeaderText, bodyText, bodyStrongText, bodyTextLoose, captionText
 import { CombinedParsedRecipe, StructuredIngredient } from '@/common/types';
 import RecipeSwitcher from '@/components/recipe/RecipeSwitcher';
 import StepItem from '@/components/recipe/StepItem';
-import RecipeStepsHeader from '@/components/recipe/RecipeStepsHeader';
+
 import { 
   StepCompletionState, 
   isStepCompleted, 
@@ -435,24 +435,13 @@ export default function CookScreen() {
     );
   }
 
-  // Get the current recipe title for the header
-  const headerRecipe = state.activeRecipes.find(
-    recipe => recipe.recipeId === state.activeRecipeId
-  );
-  const currentRecipeTitle = headerRecipe?.recipe?.title || "Cooking Session";
+
 
   return (
     <PanGestureHandler onHandlerStateChange={handleSwipeGesture}>
       <SafeAreaView style={styles.container}>
         
-        <RecipeStepsHeader
-          title={currentRecipeTitle}
-          imageUrl={null}
-          recipe={headerRecipe?.recipe}
-        />
 
-        {/* Sharp divider to separate title from content */}
-        <View style={styles.titleDivider} />
 
         {/* Recipe Switcher */}
         <View style={styles.recipeSwitcherContainer}>
@@ -587,14 +576,9 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: COLORS.background,
   },
-  titleDivider: {
-    height: BORDER_WIDTH.hairline,
-    backgroundColor: COLORS.divider,
-    marginHorizontal: 0,
-  },
+
   recipeSwitcherContainer: {
-    paddingHorizontal: SPACING.pageHorizontal,
-    paddingVertical: SPACING.sm,
+    // Padding now handled within RecipeSwitcher component
   },
   loadingContainer: {
     flex: 1,

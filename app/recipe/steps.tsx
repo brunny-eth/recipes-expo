@@ -1157,7 +1157,7 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#F16A2A',
+    backgroundColor: '#109DF0',
     borderRadius: 2,
   } as ViewStyle,
 

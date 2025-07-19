@@ -1,10 +1,10 @@
 export const COLORS = {
-  primary: '#B05B3B', // Primary Accent: burnt orange
-  primaryLight: '#D7AD9D', // A lighter shade of primary for backgrounds/hovers
-  secondary: '#5C6B73', // Tertiary/Border for secondary or disabled states
-  accent: '#E1572A', // A brighter, more vibrant orange for active states
+  primary: '#109DF0', // Primary Accent: burnt orange
+  primaryLight: '#e6f4fd', // A lighter shade of primary for backgrounds/hovers
+  secondary: '#7a8c99', // Tertiary/Border for secondary or disabled states
+  accent: '#9253E0', // A brighter, more vibrant orange for active states
 
-  background: '#F5F3EC', // Main app background
+  background: '#eeece5', // Main app background
   white: '#FFFFFF',
   black: '#000000',
 

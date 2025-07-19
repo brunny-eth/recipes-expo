@@ -1823,7 +1823,7 @@ export default function RecipeSummaryScreen() {
                   width: '100%',
                   height: 150,
                   borderRadius: RADIUS.md,
-                  marginBottom: SPACING.md,
+                  marginBottom: SPACING.xs,
                 }}
                 resizeMode="cover"
               />
@@ -1834,7 +1834,11 @@ export default function RecipeSummaryScreen() {
         })()}
         {/* Short description left-aligned, outside columns */}
         {recipe.shortDescription && (
-          <Text style={styles.shortDescriptionHeaderLeft}>{recipe.shortDescription}</Text>
+          <Text style={styles.shortDescriptionHeaderLeft}>
+            {recipe.shortDescription.endsWith('.') 
+              ? recipe.shortDescription.slice(0, -1) 
+              : recipe.shortDescription}
+          </Text>
         )}
         {/* Two-column layout for meta info */}
         {(recipe.prepTime || recipe.cookTime || detectedAllergens.length > 0) && (
@@ -1860,33 +1864,19 @@ export default function RecipeSummaryScreen() {
           </View>
         )}
 
-        {/* Remove More About This Recipe section and its divider */}
-        {/* <CollapsibleSection ... /> and <View style={styles.divider} /> removed */}
 
-        {/* Divider above Adjust servings */}
-        <View style={styles.divider} />
-
-        <CollapsibleSection
-          title="Adjust servings"
-          isExpanded={isRecipeSizeExpanded}
-          onToggle={() => setIsRecipeSizeExpanded(!isRecipeSizeExpanded)}
-        >
+                <View style={{ marginTop: SPACING.xxl }}>
+          <Text style={styles.sectionTitle}>Adjust servings</Text>
           <ServingScaler
             selectedScaleFactor={selectedScaleFactor}
             handleScaleFactorChange={handleScaleFactorChange}
             recipeYield={originalRecipe?.recipeYield || recipe?.recipeYield}
             originalYieldValue={originalYieldValue}
           />
-        </CollapsibleSection>
+        </View>
 
-        {/* Divider between Adjust servings and Swap or remove ingredients */}
-        <View style={styles.divider} />
-
-        <CollapsibleSection
-          title="Swap or remove ingredients"
-          isExpanded={isIngredientsExpanded}
-          onToggle={() => setIsIngredientsExpanded(!isIngredientsExpanded)}
-        >
+        <View style={{ marginTop: SPACING.xxl }}>
+          <Text style={styles.sectionTitle}>Swap ingredients</Text>
           {selectedScaleFactor !== 1 && (
             <Text style={styles.ingredientsSubtext}>
               {(() => {
@@ -1903,7 +1893,7 @@ export default function RecipeSummaryScreen() {
               })()}
             </Text>
           )}
-          <View style={{marginTop: SPACING.sm}}>
+          <View style={{marginTop: SPACING.xs, paddingLeft: SPACING.md}}>
             <IngredientList
               ingredientGroups={scaledIngredientGroups}
               selectedScaleFactor={selectedScaleFactor}
@@ -1915,7 +1905,7 @@ export default function RecipeSummaryScreen() {
               isViewingSavedRecipe={isViewingSavedRecipe}
             />
           </View>
-        </CollapsibleSection>
+        </View>
       </ScrollView>
 
       {/* Move Visit Source to the bottom, above action buttons */}
@@ -2004,6 +1994,13 @@ const styles = StyleSheet.create({
     ...sectionHeaderText,
     color: COLORS.textDark,
     textAlign: 'left',
+  } as TextStyle,
+  sectionTitle: {
+    ...sectionHeaderText,
+    fontFamily: FONT.family.interSemiBold,
+    color: COLORS.textDark,
+    textAlign: 'left',
+    marginBottom: SPACING.xs,
   } as TextStyle,
   centeredStatusContainer: {
     flex: 1,
@@ -2137,13 +2134,13 @@ const styles = StyleSheet.create({
   },
   shortDescriptionHeaderLeft: {
     fontFamily: FONT.family.inter,
-    fontSize: FONT.size.caption, // Use caption size for smaller text
-    color: COLORS.textMuted, // Use muted color for caption effect
-    textAlign: 'left',
-    marginTop: 0.5, // Bring caption even closer to image
-    marginBottom: SPACING.md, // Add more space below caption
-    marginHorizontal: 0,
-    paddingHorizontal: 0,
+    fontSize: FONT.size.body,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    marginTop: SPACING.xxs,
+    marginBottom: SPACING.lg,
+    marginHorizontal: SPACING.md, // Add horizontal margins to make container smaller
+    paddingHorizontal: SPACING.md, // Add padding for tighter text wrapping
     lineHeight: FONT.lineHeight.compact,
   },
   metaInfoContainer: {

@@ -233,8 +233,9 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   ingredientName: {
     ...bodyStrongText,
+    fontSize: FONT.size.smBody,
     color: COLORS.textDark,
-    lineHeight: 24,
+    lineHeight: 20,
     flex: 1,
     marginRight: SPACING.sm, // Consistent spacing from text to button area
   } as TextStyle,
@@ -261,7 +262,7 @@ const styles = StyleSheet.create({
   } as TextStyle,
   ingredientQuantityParenthetical: {
     ...bodyTextLoose,
-    fontSize: FONT.size.bodyMedium,
+    fontSize: FONT.size.caption,
     color: COLORS.darkGray,
   } as TextStyle,
   revertButton: {
@@ -284,7 +285,7 @@ const styles = StyleSheet.create({
   bulletContainer: {
     width: ICON_SIZE.md,
     height: ICON_SIZE.md,
-    marginRight: SPACING.smLg,
+    marginRight: SPACING.sm,
     justifyContent: 'center',
     alignItems: 'center',
   } as ViewStyle,
