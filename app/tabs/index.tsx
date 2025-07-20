@@ -80,15 +80,11 @@ export default function HomeScreen() {
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const logoTranslateY = useRef(new Animated.Value(-30)).current;
 
-  // Placeholder animation
-  const placeholderOpacity = useRef(new Animated.Value(1)).current;
-
   // Placeholder rotation state
   const [displayedPlaceholder, setDisplayedPlaceholder] = useState('');
   const [isTypingPlaceholder, setIsTypingPlaceholder] = useState(false);
 
-  const firstPrompt = "What do you want to cook today?";
-  const secondPrompt = "Try 'mac and cheese' or 'www...'";
+  const firstPrompt = "Try 'www...' or 'mac and cheese'";
 
   // Typewriter effect for placeholder
   const typewriterEffect = useCallback((text: string, onComplete?: () => void) => {
@@ -105,7 +101,7 @@ export default function HomeScreen() {
         setIsTypingPlaceholder(false);
         onComplete?.();
       }
-    }, 50); // 50ms per character for smooth typewriter effect
+    }, 60); // 50ms per character for smooth typewriter effect
 
     return () => clearInterval(interval);
   }, []);
@@ -116,7 +112,7 @@ export default function HomeScreen() {
     setDisplayedPlaceholder(""); // Start with empty placeholder
     typewriterTimeout = setTimeout(() => {
       typewriterEffect(firstPrompt);
-    }, 3000); // 400ms initial delay
+    }, 2500); // 2500ms initial delay
     return () => clearTimeout(typewriterTimeout);
   }, []);
 
@@ -333,33 +329,11 @@ export default function HomeScreen() {
     }
   };
 
-  const [hasInputBeenFocused, setHasInputBeenFocused] = useState(false);
   const [hasUserTyped, setHasUserTyped] = useState(false);
 
   const handleInputFocus = useCallback(() => {
     setIsInputFocused(true);
-    setHasInputBeenFocused(true);
-    
-    // Typewriter effect for second prompt on first focus
-    if (!hasUserTyped && recipeUrl === '' && !hasInputBeenFocused) {
-      setDisplayedPlaceholder(""); // Clear placeholder before typewriter
-      Animated.timing(placeholderOpacity, {
-        toValue: 0,
-        duration: 0,
-        useNativeDriver: true,
-      }).start(() => {
-        setTimeout(() => {
-          typewriterEffect(secondPrompt, () => {
-            Animated.timing(placeholderOpacity, {
-              toValue: 1,
-              duration: 500,
-              useNativeDriver: true,
-            }).start();
-          });
-        }, 500); // 500ms delay before typewriter
-      });
-    }
-  }, [hasUserTyped, recipeUrl, hasInputBeenFocused, typewriterEffect, placeholderOpacity]);
+  }, []);
 
   const handleInputBlur = useCallback(() => {
     setIsInputFocused(false);
@@ -373,14 +347,10 @@ export default function HomeScreen() {
     }
   };
 
-  // Placeholder logic
+  // Placeholder logic - show first prompt until user starts typing
   let placeholder = '';
-  if (isInputFocused) {
-    if (hasUserTyped) {
-      placeholder = '';
-    } else {
-      placeholder = displayedPlaceholder;
-    }
+  if (hasUserTyped) {
+    placeholder = '';
   } else {
     placeholder = displayedPlaceholder;
   }
@@ -434,7 +404,7 @@ export default function HomeScreen() {
             </View>
             <View style={styles.secondaryTextContainer}>
               <Text style={styles.subheadingText}>
-                Customize recipes, skip distractions, and cook without the clutter
+                Paste a link or a recipe idea. Customize it, skip distractions, and cook without clutter.
               </Text>
             </View>
           </View>
