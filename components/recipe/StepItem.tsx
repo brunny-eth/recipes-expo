@@ -7,7 +7,8 @@ import { StructuredIngredient } from '@/common/types';
 import { 
   generateIngredientSearchTerms, 
   getUniqueSearchTermItems, 
-  escapeRegex 
+  escapeRegex,
+  debugIngredientSearchTerms
 } from '@/utils/stepUtils';
 
 interface StepItemProps {
@@ -45,8 +46,18 @@ export default function StepItem({
       );
     }
 
+    // Debug: Log the search terms being generated
+    if (__DEV__) {
+      debugIngredientSearchTerms(ingredients);
+    }
+
     const searchTermsWithIng = generateIngredientSearchTerms(ingredients);
     const uniqueSearchTermItems = getUniqueSearchTermItems(searchTermsWithIng);
+
+    if (__DEV__) {
+      console.log(`[StepItem] 📝 Step: "${step}"`);
+      console.log(`[StepItem] 🎯 Unique search terms: [${uniqueSearchTermItems.map(item => `"${item.searchTerm}"`).join(', ')}]`);
+    }
 
     if (uniqueSearchTermItems.length === 0) {
       return (
@@ -66,6 +77,10 @@ export default function StepItem({
     );
     const parts = step.split(regex);
 
+    if (__DEV__) {
+      console.log(`[StepItem] ✂️ Split parts: [${parts.map(part => `"${part}"`).join(', ')}]`);
+    }
+
     return (
       <Text style={[
         styles.stepText,
@@ -79,6 +94,9 @@ export default function StepItem({
               (item) => new RegExp(item.searchTerm, 'i').test(part),
             );
             if (matchedItem && onIngredientPress) {
+              if (__DEV__) {
+                console.log(`[StepItem] ✅ Matched: "${part}" → "${matchedItem.ingredient.name}"`);
+              }
               return (
                 <Text
                   key={index}

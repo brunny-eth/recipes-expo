@@ -62,7 +62,9 @@ Rules:
 3. If an ingredient could fit multiple categories, choose the one where the ingredient is most commonly found in a grocery store.
 4. For prepared or processed items, categorize based on where they're typically found in stores (frozen, pantry, etc).
 5. Fresh ingredients, like fresh herbs or fresh produce, should be categorized as "Produce".
-6. Exclude all forms of salt and all forms of black pepper from the categories and simply ignore them. 
+6. Fresh herbs (like cilantro, basil, parsley, mint, fresh chopped herbs) should be categorized as "Produce".
+7. Dried herbs and spices should be categorized as "Spices & Herbs".
+8. Salt and black pepper should be categorized as "Spices & Herbs".
 
 Return your response as a JSON object where each ingredient name is a key and its category is the value.
 
@@ -71,7 +73,10 @@ Example:
   "chicken breast": "Meat & Seafood",
   "milk": "Dairy & Eggs",
   "onions": "Produce",
-  "olive oil": "Pantry"
+  "olive oil": "Pantry",
+  "fresh cilantro": "Produce",
+  "dried oregano": "Spices & Herbs",
+  "salt": "Spices & Herbs"
 }`;
 
     const userPrompt = `Categorize these ingredients: ${ingredientList}`;
@@ -112,6 +117,22 @@ Example:
       ...item,
       grocery_category: categories[item.item_name] || getBasicGroceryCategory(item.item_name)
     }));
+    
+    // Debug specific problematic ingredients
+    const problematicIngredients = ['fresh chopped herbs', 'cilantro', 'basil'];
+    problematicIngredients.forEach(ingredient => {
+      const llmCategory = categories[ingredient];
+      const basicCategory = getBasicGroceryCategory(ingredient);
+      const finalCategory = llmCategory || basicCategory;
+      logger.info({ 
+        requestId, 
+        ingredient,
+        llmCategory,
+        basicCategory,
+        finalCategory,
+        hasLLMCategory: !!llmCategory
+      }, 'Debug: Categorization for problematic ingredient');
+    });
     
     logger.info({ requestId, categorizedCount: Object.keys(categories).length }, 'Successfully categorized ingredients with LLM');
     return categorizedItems;
@@ -232,14 +253,65 @@ router.post('/save-recipe', async (req: Request, res: Response) => {
       try {
         logger.info({ requestId, miseRecipeId: miseRecipe.id }, 'Starting background LLM categorization');
         
+        logger.info({ 
+          requestId, 
+          miseRecipeId: miseRecipe.id,
+          recipeTitle: preparedRecipeData.title,
+          ingredientGroupsCount: preparedRecipeData.ingredientGroups?.length || 0
+        }, 'Background: Processing recipe for grocery categorization');
+        
+        // Log all ingredients before formatting
+        if (preparedRecipeData.ingredientGroups) {
+          preparedRecipeData.ingredientGroups.forEach((group: IngredientGroup, groupIndex: number) => {
+            if (group.ingredients) {
+              group.ingredients.forEach((ingredient: StructuredIngredient, ingIndex: number) => {
+                logger.info({ 
+                  requestId, 
+                  miseRecipeId: miseRecipe.id,
+                  groupIndex,
+                  ingIndex,
+                  ingredient: {
+                    name: ingredient.name,
+                    amount: ingredient.amount,
+                    unit: ingredient.unit,
+                    preparation: ingredient.preparation,
+                    grocery_category: (ingredient as any).grocery_category
+                  }
+                }, 'Background: Raw ingredient before grocery formatting');
+              });
+            }
+          });
+        }
+        
         const groceryItems = formatIngredientsForGroceryList(
           preparedRecipeData,
           `mise_${miseRecipe.id}`,
           undefined
         );
         
+        logger.info({ 
+          requestId, 
+          miseRecipeId: miseRecipe.id,
+          formattedItemsCount: groceryItems.length,
+          formattedItems: groceryItems.map(item => ({
+            item_name: item.item_name,
+            original_ingredient_text: item.original_ingredient_text,
+            grocery_category: item.grocery_category
+          }))
+        }, 'Background: Formatted grocery items before LLM categorization');
+        
         // Attempt LLM categorization (with automatic fallback to basic)
         const categorizedItems = await categorizeIngredientsWithServerLLM(groceryItems, requestId);
+        
+        logger.info({ 
+          requestId, 
+          miseRecipeId: miseRecipe.id,
+          categorizedItemsCount: categorizedItems.length,
+          categorizedItems: categorizedItems.map(item => ({
+            item_name: item.item_name,
+            grocery_category: item.grocery_category
+          }))
+        }, 'Background: Items after LLM categorization');
         
         // Update the prepared recipe data with categorized ingredients
         const updatedRecipeData = {
@@ -251,9 +323,21 @@ router.post('/save-recipe', async (req: Request, res: Response) => {
                 item.item_name === ingredient.name || 
                 item.original_ingredient_text.includes(ingredient.name)
               );
+              const finalCategory = matchingItem?.grocery_category || getBasicGroceryCategory(ingredient.name);
+              
+              logger.info({ 
+                requestId, 
+                miseRecipeId: miseRecipe.id,
+                ingredientName: ingredient.name,
+                matchingItemName: matchingItem?.item_name,
+                llmCategory: matchingItem?.grocery_category,
+                basicCategory: getBasicGroceryCategory(ingredient.name),
+                finalCategory
+              }, 'Background: Categorizing ingredient in recipe data');
+              
               return {
                 ...ingredient,
-                grocery_category: matchingItem?.grocery_category || getBasicGroceryCategory(ingredient.name)
+                grocery_category: finalCategory
               };
             })
           }))
@@ -264,16 +348,15 @@ router.post('/save-recipe', async (req: Request, res: Response) => {
           .from('user_mise_recipes')
           .update({ prepared_recipe_data: updatedRecipeData })
           .eq('id', miseRecipe.id);
-          
+
         if (updateError) {
-          logger.error({ requestId, miseRecipeId: miseRecipe.id, err: updateError }, 'Failed to update recipe with categorized ingredients');
+          logger.error({ requestId, miseRecipeId: miseRecipe.id, err: updateError }, 'Background: Failed to update recipe with categorized ingredients');
         } else {
-          logger.info({ requestId, miseRecipeId: miseRecipe.id, categorizedCount: categorizedItems.length }, 'Successfully updated recipe with LLM categorization');
+          logger.info({ requestId, miseRecipeId: miseRecipe.id }, 'Background: Successfully updated recipe with categorized ingredients');
         }
-        
-      } catch (error) {
-        logger.warn({ requestId, miseRecipeId: miseRecipe.id, err: error }, 'Background LLM categorization failed - will use basic categorization when grocery list is viewed');
-        // Don't throw - this is background processing and shouldn't affect the user experience
+      } catch (err) {
+        const error = err as Error;
+        logger.error({ requestId, miseRecipeId: miseRecipe.id, err: error }, 'Background: Error in LLM categorization');
       }
     });
 
@@ -534,6 +617,8 @@ router.get('/grocery-list', async (req: Request, res: Response) => {
       return res.status(500).json({ error: 'Failed to fetch recipes' });
     }
 
+    logger.info({ requestId, recipeCount: miseRecipes?.length || 0 }, 'Found mise recipes for grocery list generation');
+
     // Extract ingredients from all recipes and create grocery items
     let allGroceryItems: any[] = [];
     
@@ -541,12 +626,55 @@ router.get('/grocery-list', async (req: Request, res: Response) => {
       const recipe = miseRecipe.prepared_recipe_data as CombinedParsedRecipe;
       const shoppingListId = `mise_${Date.now()}`;
       
+      logger.info({ 
+        requestId, 
+        miseRecipeId: miseRecipe.id, 
+        recipeTitle: recipe.title,
+        ingredientGroupsCount: recipe.ingredientGroups?.length || 0 
+      }, 'Processing recipe for grocery list');
+      
+      // Log all ingredients before formatting
+      if (recipe.ingredientGroups) {
+        recipe.ingredientGroups.forEach((group, groupIndex) => {
+          if (group.ingredients) {
+            group.ingredients.forEach((ingredient, ingIndex) => {
+              logger.info({ 
+                requestId, 
+                miseRecipeId: miseRecipe.id,
+                groupIndex,
+                ingIndex,
+                ingredient: {
+                  name: ingredient.name,
+                  amount: ingredient.amount,
+                  unit: ingredient.unit,
+                  preparation: ingredient.preparation,
+                  grocery_category: (ingredient as any).grocery_category
+                }
+              }, 'Raw ingredient before grocery formatting');
+            });
+          }
+        });
+      }
+      
       // Format ingredients for this recipe
       const recipeGroceryItems = formatIngredientsForGroceryList(
         recipe,
         shoppingListId,
         undefined
       );
+      
+      logger.info({ 
+        requestId, 
+        miseRecipeId: miseRecipe.id,
+        formattedItemsCount: recipeGroceryItems.length,
+        formattedItems: recipeGroceryItems.map(item => ({
+          item_name: item.item_name,
+          original_ingredient_text: item.original_ingredient_text,
+          quantity_amount: item.quantity_amount,
+          quantity_unit: item.quantity_unit,
+          grocery_category: item.grocery_category
+        }))
+      }, 'Formatted grocery items for recipe');
       
       // Add source information
       const itemsWithSource = recipeGroceryItems.map((item: any) => ({
@@ -558,14 +686,57 @@ router.get('/grocery-list', async (req: Request, res: Response) => {
       allGroceryItems.push(...itemsWithSource);
     }
 
+    logger.info({ 
+      requestId, 
+      totalGroceryItems: allGroceryItems.length,
+      allItems: allGroceryItems.map(item => ({
+        item_name: item.item_name,
+        original_ingredient_text: item.original_ingredient_text,
+        grocery_category: item.grocery_category
+      }))
+    }, 'All grocery items before aggregation');
+
     // Aggregate the grocery list
     const aggregatedItems = aggregateGroceryList(allGroceryItems);
 
+    logger.info({ 
+      requestId, 
+      aggregatedItemsCount: aggregatedItems.length,
+      aggregatedItems: aggregatedItems.map(item => ({
+        item_name: item.item_name,
+        original_ingredient_text: item.original_ingredient_text,
+        grocery_category: item.grocery_category
+      }))
+    }, 'Aggregated grocery items');
+
     // Use pre-categorized data when available, with fallback to basic categorization
-    const categorizedItems = aggregatedItems.map((item: any) => ({
-      ...item,
-      grocery_category: item.grocery_category || getBasicGroceryCategory(item.item_name)
-    }));
+    const categorizedItems = aggregatedItems.map((item: any) => {
+      const originalCategory = item.grocery_category;
+      const basicCategory = getBasicGroceryCategory(item.item_name);
+      const finalCategory = item.grocery_category || basicCategory;
+      
+      logger.info({ 
+        requestId, 
+        item_name: item.item_name,
+        original_category: originalCategory,
+        basic_category: basicCategory,
+        final_category: finalCategory
+      }, 'Categorizing grocery item');
+      
+      return {
+        ...item,
+        grocery_category: finalCategory
+      };
+    });
+
+    logger.info({ 
+      requestId, 
+      categorizedItemsCount: categorizedItems.length,
+      categorizedItems: categorizedItems.map(item => ({
+        item_name: item.item_name,
+        grocery_category: item.grocery_category
+      }))
+    }, 'Final categorized grocery items');
 
     // --- NEW: Fetch persistent checked states ---
     const { data: checkedStates, error: checkedStatesError } = await supabaseAdmin
@@ -611,14 +782,16 @@ router.get('/grocery-list', async (req: Request, res: Response) => {
       is_checked: checkedStatesMap.get(normalizeName(item.item_name)) || false,
     }));
 
-
     logger.info({ 
       requestId, 
       totalItems: finalItems.length, 
-      recipeCount: miseRecipes?.length || 0 
+      recipeCount: miseRecipes?.length || 0,
+      finalItems: finalItems.map(item => ({
+        item_name: item.item_name,
+        grocery_category: item.grocery_category,
+        is_checked: item.is_checked
+      }))
     }, 'Successfully created aggregated grocery list with persistent states');
-
-    logger.info({ requestId, finalItems }, 'Sending cleaned grocery list data to frontend');
 
     res.json({
       items: finalItems,

@@ -74,10 +74,19 @@ type GroceryCategory = {
 
 // Convert flat grocery items array to categorized format
 const convertToGroceryCategories = (items: any[]): GroceryCategory[] => {
+  console.log('[MiseScreen] 🔄 Starting convertToGroceryCategories with items:', items.length);
+  
   const categories: { [key: string]: GroceryItem[] } = {};
   
   items.forEach((item, index) => {
     const categoryName = item.grocery_category || 'Other';
+    
+    console.log(`[MiseScreen] 📝 Processing item ${index + 1}:`, {
+      item_name: item.item_name,
+      original_category: item.grocery_category,
+      final_category: categoryName,
+      original_ingredient_text: item.original_ingredient_text
+    });
     
     if (!categories[categoryName]) {
       categories[categoryName] = [];
@@ -94,10 +103,20 @@ const convertToGroceryCategories = (items: any[]): GroceryCategory[] => {
   });
   
   // Convert to array format expected by UI
-  return Object.entries(categories).map(([categoryName, items]) => ({
+  const result = Object.entries(categories).map(([categoryName, items]) => ({
     name: categoryName,
     items: items,
   }));
+  
+  console.log('[MiseScreen] ✅ Final categorized result:', {
+    categoryCount: result.length,
+    categories: result.map(cat => ({
+      name: cat.name,
+      itemCount: cat.items.length
+    }))
+  });
+  
+  return result;
 };
 
 export default function MiseScreen() {
@@ -153,6 +172,8 @@ export default function MiseScreen() {
         'Content-Type': 'application/json',
       };
 
+      console.log('[MiseScreen] 🛒 Starting grocery list fetch...');
+
       // Fetch both recipes and grocery list in parallel
       const [recipesResponse, groceryResponse] = await Promise.all([
         fetch(`${backendUrl}/api/mise/recipes?userId=${session.user.id}`, { headers }),
@@ -172,7 +193,31 @@ export default function MiseScreen() {
       ]);
 
       const fetchedRecipes = recipesData?.recipes || [];
+      
+      console.log('[MiseScreen] 📦 Raw grocery data received:', {
+        itemsCount: groceryData?.items?.length || 0,
+        items: groceryData?.items?.map((item: any) => ({
+          item_name: item.item_name,
+          grocery_category: item.grocery_category,
+          original_ingredient_text: item.original_ingredient_text
+        })) || []
+      });
+
       const categorizedGroceryList = convertToGroceryCategories(groceryData?.items || []);
+      
+      console.log('[MiseScreen] 🎯 Converted grocery categories:', {
+        categoryCount: categorizedGroceryList.length,
+        categories: categorizedGroceryList.map(cat => ({
+          name: cat.name,
+          itemCount: cat.items.length,
+          items: cat.items.map(item => ({
+            name: item.name,
+            category: item.category,
+            amount: item.amount,
+            unit: item.unit
+          }))
+        }))
+      });
 
       // Log memory pressure for each recipe
       console.log('[MiseScreen] 💾 Memory analysis for fetched recipes:');

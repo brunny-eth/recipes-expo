@@ -1,5 +1,6 @@
 import { CombinedParsedRecipe, StructuredIngredient } from '../common/types';
 import { parseIngredientDisplayName } from './ingredientHelpers';
+import { parseAmountString } from './recipeUtils';
 
 export interface GroceryListItem {
   item_name: string;
@@ -26,19 +27,31 @@ export function formatIngredientsForGroceryList(
   const groceryItems: GroceryListItem[] = [];
   let orderIndex = 0;
 
+  console.log('[groceryHelpers] 🛒 Starting grocery list formatting for recipe:', recipe.title);
+
   // Process each ingredient group from the final recipe
   if (recipe.ingredientGroups) {
     for (const group of recipe.ingredientGroups) {
+      console.log(`[groceryHelpers] 📦 Processing ingredient group: "${group.name}"`);
+      
       for (const ingredient of group.ingredients) {
         const originalText = `${ingredient.amount || ''} ${ingredient.unit || ''} ${ingredient.name}`.trim();
         const parsedName = parseIngredientDisplayName(ingredient.name);
         
-        console.log(`Formatted ingredient: ${parsedName.baseName}`);
+        console.log(`[groceryHelpers] 🥬 Processing ingredient:`, {
+          originalName: ingredient.name,
+          parsedBaseName: parsedName.baseName,
+          originalText,
+          amount: ingredient.amount,
+          unit: ingredient.unit,
+          existingCategory: (ingredient as any).grocery_category
+        });
+        
         // Create grocery list item from final ingredient
-        groceryItems.push({
+        const groceryItem = {
           item_name: parsedName.baseName, // Use base name without substitution text
           original_ingredient_text: originalText,
-          quantity_amount: ingredient.amount ? parseFloat(ingredient.amount) : null,
+          quantity_amount: parseAmountString(ingredient.amount), // Use proper amount parsing
           quantity_unit: ingredient.unit || null,
           grocery_category: (ingredient as any).grocery_category || null, // Use pre-categorized data if available
           is_checked: false,
@@ -46,11 +59,41 @@ export function formatIngredientsForGroceryList(
           recipe_id: recipe.id || null,
           user_saved_recipe_id: userSavedRecipeId || null,
           source_recipe_title: recipe.title || 'Unknown Recipe'
+        };
+        
+        console.log(`[groceryHelpers] ✅ Created grocery item:`, {
+          item_name: groceryItem.item_name,
+          original_ingredient_text: groceryItem.original_ingredient_text,
+          quantity_amount: groceryItem.quantity_amount,
+          quantity_unit: groceryItem.quantity_unit,
+          grocery_category: groceryItem.grocery_category,
+          basicCategory: getBasicGroceryCategory(groceryItem.item_name)
         });
+        
+        groceryItems.push(groceryItem);
       }
     }
   }
 
+  console.log(`[groceryHelpers] 🎯 Finished formatting ${groceryItems.length} grocery items`);
+  
+  // Debug specific problematic ingredients
+  const problematicIngredients = ['fresh chopped herbs', 'cilantro', 'basil'];
+  problematicIngredients.forEach(ingredient => {
+    const category = getBasicGroceryCategory(ingredient);
+    console.log(`[groceryHelpers] 🔍 Debug categorization for "${ingredient}": ${category}`);
+    
+    // Test hasExactWord function
+    const hasHerbs = new RegExp(`\\bherbs\\b`, 'i').test(ingredient);
+    const hasCilantro = new RegExp(`\\bcilantro\\b`, 'i').test(ingredient);
+    const hasFresh = new RegExp(`\\bfresh\\b`, 'i').test(ingredient);
+    console.log(`[groceryHelpers] 🔍 Regex tests for "${ingredient}":`, {
+      hasHerbs,
+      hasCilantro,
+      hasFresh
+    });
+  });
+  
   return groceryItems;
 }
 
@@ -63,125 +106,152 @@ export function formatIngredientsForGroceryList(
 export function getBasicGroceryCategory(ingredientName: string): string {
   const name = ingredientName.toLowerCase().trim();
   
+  // Helper function to check for exact word matches or word boundaries
+  const hasExactWord = (text: string, word: string): boolean => {
+    const regex = new RegExp(`\\b${word}\\b`, 'i');
+    return regex.test(text);
+  };
+  
+  // Helper function to check for exact phrase matches
+  const hasExactPhrase = (text: string, phrase: string): boolean => {
+    return text.includes(phrase.toLowerCase());
+  };
+  
   // PRIORITY 1: Spices & Herbs (most specific - check powders, dried, etc. first)
   // This prevents "onion powder" or "garlic powder" from being categorized as Produce
-  if (name.includes('powder') || name.includes('dried') || name.includes('ground') ||
-      name.includes('salt') || name.includes('pepper') || name.includes('paprika') ||
-      name.includes('cumin') || name.includes('oregano') || name.includes('thyme') ||
-      name.includes('rosemary') || name.includes('cinnamon') || name.includes('vanilla') ||
-      name.includes('turmeric') || name.includes('ginger powder') || name.includes('onion powder') ||
-      name.includes('garlic powder') || name.includes('chili powder') || name.includes('curry powder') ||
-      name.includes('bay leaves') || name.includes('nutmeg') || name.includes('allspice') ||
-      name.includes('cardamom') || name.includes('cloves') || name.includes('fennel seeds') ||
-      name.includes('coriander') || name.includes('mustard seed') || name.includes('sesame seeds') ||
-      name.includes('poppy seeds') || name.includes('caraway') || name.includes('dill') ||
-      name.includes('sage') || name.includes('marjoram') || name.includes('tarragon') ||
-      name.includes('red pepper flakes') || name.includes('crushed red pepper') ||
-      name.includes('smoked paprika') || name.includes('garlic granules') || name.includes('onion flakes')) {
+  if (hasExactPhrase(name, 'powder') || hasExactPhrase(name, 'dried') || 
+      hasExactWord(name, 'salt') || hasExactWord(name, 'pepper') || hasExactPhrase(name, 'paprika') || 
+      hasExactWord(name, 'cumin') || hasExactWord(name, 'oregano') || hasExactWord(name, 'thyme') || 
+      hasExactWord(name, 'rosemary') || hasExactWord(name, 'cinnamon') || hasExactWord(name, 'vanilla') || 
+      hasExactWord(name, 'turmeric') || hasExactPhrase(name, 'ginger powder') || hasExactPhrase(name, 'onion powder') || 
+      hasExactPhrase(name, 'garlic powder') || hasExactPhrase(name, 'chili powder') || hasExactPhrase(name, 'curry powder') || 
+      hasExactPhrase(name, 'bay leaves') || hasExactWord(name, 'nutmeg') || hasExactWord(name, 'allspice') || 
+      hasExactWord(name, 'cardamom') || hasExactWord(name, 'cloves') || hasExactPhrase(name, 'fennel seeds') || 
+      hasExactWord(name, 'coriander') || hasExactPhrase(name, 'mustard seed') || hasExactPhrase(name, 'sesame seeds') || 
+      hasExactPhrase(name, 'poppy seeds') || hasExactWord(name, 'caraway') || hasExactWord(name, 'dill') || 
+      hasExactWord(name, 'sage') || hasExactWord(name, 'marjoram') || hasExactWord(name, 'tarragon') || 
+      hasExactPhrase(name, 'red pepper flakes') || hasExactPhrase(name, 'crushed red pepper') || 
+      hasExactPhrase(name, 'smoked paprika') || hasExactPhrase(name, 'garlic granules') || hasExactPhrase(name, 'onion flakes') ||
+      hasExactPhrase(name, 'ground cinnamon') || hasExactPhrase(name, 'ground ginger') || 
+      hasExactPhrase(name, 'ground nutmeg') || hasExactPhrase(name, 'ground allspice') ||
+      hasExactPhrase(name, 'ground cloves') || hasExactPhrase(name, 'ground coriander') ||
+      hasExactPhrase(name, 'ground cumin') || hasExactPhrase(name, 'ground turmeric')) {
     return 'Spices & Herbs';
   }
   
-  // PRIORITY 2: Condiments & Sauces (specific liquid/paste items)
-  if (name.includes('sauce') || name.includes('ketchup') || name.includes('mustard') ||
-      name.includes('mayo') || name.includes('mayonnaise') || name.includes('dressing') ||
-      name.includes('soy sauce') || name.includes('hot sauce') || name.includes('pickle') ||
-      name.includes('relish') || name.includes('sriracha') || name.includes('worcestershire') ||
-      name.includes('barbecue sauce') || name.includes('bbq sauce') || name.includes('teriyaki') ||
-      name.includes('tahini') || name.includes('pesto') || name.includes('salsa') ||
-      name.includes('hummus') || name.includes('jam') || name.includes('jelly') ||
-      name.includes('honey') || name.includes('maple syrup') || name.includes('syrup') ||
-      name.includes('molasses') || name.includes('agave') || name.includes('tomato paste') ||
-      name.includes('tomato sauce') || name.includes('marinara') || name.includes('alfredo')) {
+  // PRIORITY 2: Meat & Seafood (moved up to catch ground meats before generic "ground")
+  if (hasExactWord(name, 'chicken') || hasExactWord(name, 'beef') || hasExactWord(name, 'pork') ||
+      hasExactWord(name, 'fish') || hasExactWord(name, 'salmon') || hasExactWord(name, 'shrimp') ||
+      hasExactWord(name, 'bacon') || hasExactWord(name, 'turkey') || hasExactWord(name, 'lamb') ||
+      hasExactPhrase(name, 'ground beef') || hasExactPhrase(name, 'ground turkey') || hasExactPhrase(name, 'ground chicken') ||
+      hasExactPhrase(name, 'ground pork') || hasExactPhrase(name, 'ground lamb') || hasExactPhrase(name, 'ground bison') ||
+      hasExactWord(name, 'steak') || hasExactWord(name, 'roast') || hasExactWord(name, 'tenderloin') ||
+      hasExactWord(name, 'ribs') || hasExactWord(name, 'chops') || hasExactWord(name, 'ham') ||
+      hasExactWord(name, 'sausage') || hasExactWord(name, 'chorizo') || hasExactWord(name, 'pepperoni') ||
+      hasExactWord(name, 'tuna') || hasExactWord(name, 'cod') || hasExactWord(name, 'halibut') ||
+      hasExactWord(name, 'tilapia') || hasExactPhrase(name, 'mahi mahi') || hasExactWord(name, 'crab') ||
+      hasExactWord(name, 'lobster') || hasExactWord(name, 'scallops') || hasExactWord(name, 'mussels') ||
+      hasExactWord(name, 'clams') || hasExactWord(name, 'oysters') || hasExactWord(name, 'duck') ||
+      hasExactWord(name, 'venison') || hasExactWord(name, 'bison')) {
+    return 'Meat & Seafood';
+  }
+  
+  // PRIORITY 3: Condiments & Sauces (specific liquid/paste items)
+  if (hasExactWord(name, 'sauce') || hasExactWord(name, 'ketchup') || hasExactWord(name, 'mustard') ||
+      hasExactWord(name, 'mayo') || hasExactWord(name, 'mayonnaise') || hasExactWord(name, 'dressing') ||
+      hasExactPhrase(name, 'soy sauce') || hasExactPhrase(name, 'hot sauce') || hasExactWord(name, 'pickle') ||
+      hasExactWord(name, 'relish') || hasExactWord(name, 'sriracha') || hasExactWord(name, 'worcestershire') ||
+      hasExactPhrase(name, 'barbecue sauce') || hasExactPhrase(name, 'bbq sauce') || hasExactWord(name, 'teriyaki') ||
+      hasExactWord(name, 'tahini') || hasExactWord(name, 'pesto') || hasExactWord(name, 'salsa') ||
+      hasExactWord(name, 'hummus') || hasExactWord(name, 'jam') || hasExactWord(name, 'jelly') ||
+      hasExactWord(name, 'honey') || hasExactPhrase(name, 'maple syrup') || hasExactWord(name, 'syrup') ||
+      hasExactWord(name, 'molasses') || hasExactWord(name, 'agave') || hasExactPhrase(name, 'tomato paste') ||
+      hasExactPhrase(name, 'tomato sauce') || hasExactWord(name, 'marinara') || hasExactWord(name, 'alfredo')) {
     return 'Condiments & Sauces';
   }
   
-  // PRIORITY 3: Pantry Staples (non-perishable dry goods, oils, vinegars)
-  if (name.includes('flour') || name.includes('sugar') || name.includes('rice') ||
-      name.includes('pasta') || name.includes('oil') || name.includes('vinegar') ||
-      name.includes('beans') || name.includes('lentils') || name.includes('oats') ||
-      name.includes('quinoa') || name.includes('stock') || name.includes('broth') ||
-      name.includes('coconut oil') || name.includes('olive oil') || name.includes('vegetable oil') ||
-      name.includes('canola oil') || name.includes('sesame oil') || name.includes('avocado oil') ||
-      name.includes('balsamic vinegar') || name.includes('apple cider vinegar') || name.includes('white vinegar') ||
-      name.includes('red wine vinegar') || name.includes('brown sugar') || name.includes('powdered sugar') ||
-      name.includes('coconut sugar') || name.includes('baking powder') || name.includes('baking soda') ||
-      name.includes('cornstarch') || name.includes('arrowroot') || name.includes('tapioca') ||
-      name.includes('breadcrumbs') || name.includes('panko') || name.includes('crackers') ||
-      name.includes('cereal') || name.includes('granola') || name.includes('nuts') ||
-      name.includes('almonds') || name.includes('walnuts') || name.includes('pecans') ||
-      name.includes('cashews') || name.includes('peanuts') || name.includes('pine nuts') ||
-      name.includes('chickpeas') || name.includes('black beans') || name.includes('kidney beans') ||
-      name.includes('navy beans') || name.includes('split peas') || name.includes('barley') ||
-      name.includes('bulgur') || name.includes('couscous') || name.includes('millet')) {
+  // PRIORITY 4: Pantry Staples (non-perishable dry goods, oils, vinegars)
+  if (hasExactWord(name, 'flour') || hasExactWord(name, 'sugar') || hasExactWord(name, 'rice') ||
+      hasExactWord(name, 'pasta') || hasExactWord(name, 'oil') || hasExactWord(name, 'vinegar') ||
+      hasExactWord(name, 'beans') || hasExactWord(name, 'lentils') || hasExactWord(name, 'oats') ||
+      hasExactWord(name, 'quinoa') || hasExactWord(name, 'stock') || hasExactWord(name, 'broth') ||
+      hasExactPhrase(name, 'coconut oil') || hasExactPhrase(name, 'olive oil') || hasExactPhrase(name, 'vegetable oil') ||
+      hasExactPhrase(name, 'canola oil') || hasExactPhrase(name, 'sesame oil') || hasExactPhrase(name, 'avocado oil') ||
+      hasExactPhrase(name, 'balsamic vinegar') || hasExactPhrase(name, 'apple cider vinegar') || hasExactPhrase(name, 'white vinegar') ||
+      hasExactPhrase(name, 'red wine vinegar') || hasExactPhrase(name, 'brown sugar') || hasExactPhrase(name, 'powdered sugar') ||
+      hasExactPhrase(name, 'coconut sugar') || hasExactPhrase(name, 'baking powder') || hasExactPhrase(name, 'baking soda') ||
+      hasExactWord(name, 'cornstarch') || hasExactWord(name, 'arrowroot') || hasExactWord(name, 'tapioca') ||
+      hasExactWord(name, 'breadcrumbs') || hasExactWord(name, 'panko') || hasExactWord(name, 'crackers') ||
+      hasExactWord(name, 'cereal') || hasExactWord(name, 'granola') || hasExactWord(name, 'nuts') ||
+      hasExactWord(name, 'almonds') || hasExactWord(name, 'walnuts') || hasExactWord(name, 'pecans') ||
+      hasExactWord(name, 'cashews') || hasExactWord(name, 'peanuts') || hasExactPhrase(name, 'pine nuts') ||
+      hasExactWord(name, 'chickpeas') || hasExactPhrase(name, 'black beans') || hasExactPhrase(name, 'kidney beans') ||
+      hasExactPhrase(name, 'navy beans') || hasExactPhrase(name, 'split peas') || hasExactWord(name, 'barley') ||
+      hasExactWord(name, 'bulgur') || hasExactWord(name, 'couscous') || hasExactWord(name, 'millet')) {
     return 'Pantry';
   }
   
-  // PRIORITY 4: Dairy & Eggs (refrigerated dairy products)
-  if (name.includes('milk') || name.includes('cheese') || name.includes('butter') ||
-      name.includes('cream') || name.includes('yogurt') || name.includes('egg') ||
-      name.includes('cottage cheese') || name.includes('sour cream') || name.includes('cream cheese') ||
-      name.includes('ricotta') || name.includes('mozzarella') || name.includes('cheddar') ||
-      name.includes('parmesan') || name.includes('feta') || name.includes('goat cheese') ||
-      name.includes('swiss cheese') || name.includes('brie') || name.includes('camembert') ||
-      name.includes('blue cheese') || name.includes('heavy cream') || name.includes('half and half') ||
-      name.includes('buttermilk') || name.includes('greek yogurt') || name.includes('kefir')) {
+  // PRIORITY 5: Dairy & Eggs (refrigerated dairy products)
+  if (hasExactWord(name, 'milk') || hasExactWord(name, 'cheese') || hasExactWord(name, 'butter') ||
+      hasExactWord(name, 'cream') || hasExactWord(name, 'yogurt') || hasExactWord(name, 'egg') ||
+      hasExactPhrase(name, 'cottage cheese') || hasExactPhrase(name, 'sour cream') || hasExactPhrase(name, 'cream cheese') ||
+      hasExactWord(name, 'ricotta') || hasExactWord(name, 'mozzarella') || hasExactWord(name, 'cheddar') ||
+      hasExactWord(name, 'parmesan') || hasExactWord(name, 'feta') || hasExactPhrase(name, 'goat cheese') ||
+      hasExactPhrase(name, 'swiss cheese') || hasExactWord(name, 'brie') || hasExactWord(name, 'camembert') ||
+      hasExactPhrase(name, 'blue cheese') || hasExactPhrase(name, 'heavy cream') || hasExactPhrase(name, 'half and half') ||
+      hasExactWord(name, 'buttermilk') || hasExactPhrase(name, 'greek yogurt') || hasExactWord(name, 'kefir') ||
+      hasExactPhrase(name, 'salted butter') || hasExactPhrase(name, 'unsalted butter')) {
     return 'Dairy & Eggs';
-  }
-  
-  // PRIORITY 5: Meat & Seafood (fresh proteins)
-  if (name.includes('chicken') || name.includes('beef') || name.includes('pork') ||
-      name.includes('fish') || name.includes('salmon') || name.includes('shrimp') ||
-      name.includes('bacon') || name.includes('turkey') || name.includes('lamb') ||
-      name.includes('ground beef') || name.includes('ground turkey') || name.includes('ground chicken') ||
-      name.includes('steak') || name.includes('roast') || name.includes('tenderloin') ||
-      name.includes('ribs') || name.includes('chops') || name.includes('ham') ||
-      name.includes('sausage') || name.includes('chorizo') || name.includes('pepperoni') ||
-      name.includes('tuna') || name.includes('cod') || name.includes('halibut') ||
-      name.includes('tilapia') || name.includes('mahi mahi') || name.includes('crab') ||
-      name.includes('lobster') || name.includes('scallops') || name.includes('mussels') ||
-      name.includes('clams') || name.includes('oysters') || name.includes('duck') ||
-      name.includes('venison') || name.includes('bison')) {
-    return 'Meat & Seafood';
   }
   
   // PRIORITY 6: Produce (fresh fruits, vegetables, fresh herbs)
   // Now checked AFTER spices to prevent "onion powder" from matching "onion"
   // Fresh herbs are specifically qualified to distinguish from dried spices
-  if ((name.includes('onion') && !name.includes('powder') && !name.includes('flakes')) ||
-      (name.includes('garlic') && !name.includes('powder') && !name.includes('granules')) ||
-      name.includes('tomato') || name.includes('bell pepper') || name.includes('jalapeño') ||
-      name.includes('lettuce') || name.includes('spinach') || name.includes('kale') ||
-      name.includes('carrot') || name.includes('celery') || name.includes('potato') ||
-      name.includes('sweet potato') || name.includes('broccoli') || name.includes('cauliflower') ||
-      name.includes('cucumber') || name.includes('zucchini') || name.includes('squash') ||
-      name.includes('eggplant') || name.includes('mushroom') || name.includes('avocado') ||
-      name.includes('apple') || name.includes('banana') || name.includes('orange') ||
-      name.includes('lemon') || name.includes('lime') || name.includes('strawberry') ||
-      name.includes('blueberry') || name.includes('raspberry') || name.includes('blackberry') ||
-      (name.includes('basil') && (name.includes('fresh') || name.includes('leaves'))) ||
-      (name.includes('parsley') && (name.includes('fresh') || name.includes('leaves'))) ||
-      (name.includes('cilantro') && (name.includes('fresh') || name.includes('leaves'))) ||
-      (name.includes('mint') && (name.includes('fresh') || name.includes('leaves'))) ||
-      name.includes('green onion') || name.includes('scallion') || name.includes('leek') ||
-      name.includes('shallot') || name.includes('ginger') || name.includes('asparagus') ||
-      name.includes('brussels sprouts') || name.includes('cabbage') || name.includes('corn') ||
-      name.includes('peas') || name.includes('green beans') || name.includes('artichoke')) {
+  if ((hasExactWord(name, 'onion') && !hasExactPhrase(name, 'onion powder') && !hasExactPhrase(name, 'onion flakes')) ||
+      (hasExactWord(name, 'garlic') && !hasExactPhrase(name, 'garlic powder') && !hasExactPhrase(name, 'garlic granules')) ||
+      hasExactWord(name, 'tomato') || hasExactPhrase(name, 'bell pepper') || hasExactWord(name, 'jalapeño') ||
+      hasExactWord(name, 'lettuce') || hasExactWord(name, 'spinach') || hasExactWord(name, 'kale') ||
+      hasExactWord(name, 'carrot') || hasExactWord(name, 'celery') || hasExactWord(name, 'potato') ||
+      hasExactPhrase(name, 'sweet potato') || hasExactWord(name, 'broccoli') || hasExactWord(name, 'cauliflower') ||
+      hasExactWord(name, 'cucumber') || hasExactWord(name, 'zucchini') || hasExactWord(name, 'squash') ||
+      hasExactWord(name, 'eggplant') || hasExactWord(name, 'mushroom') || hasExactWord(name, 'avocado') ||
+      hasExactWord(name, 'apple') || hasExactWord(name, 'banana') || hasExactWord(name, 'orange') ||
+      hasExactWord(name, 'lemon') || hasExactWord(name, 'lime') || hasExactWord(name, 'strawberry') ||
+      hasExactWord(name, 'blueberry') || hasExactWord(name, 'raspberry') || hasExactWord(name, 'blackberry') ||
+      // Fresh herbs - more comprehensive coverage
+      (hasExactWord(name, 'basil') && (hasExactWord(name, 'fresh') || hasExactWord(name, 'leaves'))) ||
+      (hasExactWord(name, 'parsley') && (hasExactWord(name, 'fresh') || hasExactWord(name, 'leaves'))) ||
+      (hasExactWord(name, 'cilantro') && (hasExactWord(name, 'fresh') || hasExactWord(name, 'leaves'))) ||
+      (hasExactWord(name, 'mint') && (hasExactWord(name, 'fresh') || hasExactWord(name, 'leaves'))) ||
+      (hasExactWord(name, 'rosemary') && (hasExactWord(name, 'fresh') || hasExactWord(name, 'sprigs'))) ||
+      (hasExactWord(name, 'thyme') && (hasExactWord(name, 'fresh') || hasExactWord(name, 'sprigs'))) ||
+      (hasExactWord(name, 'oregano') && (hasExactWord(name, 'fresh') || hasExactWord(name, 'leaves'))) ||
+      (hasExactWord(name, 'sage') && (hasExactWord(name, 'fresh') || hasExactWord(name, 'leaves'))) ||
+      // Generic herb terms (when fresh)
+      (hasExactWord(name, 'herbs') && (hasExactWord(name, 'fresh') || hasExactPhrase(name, 'chopped herbs'))) ||
+      // Standalone fresh herbs (without explicit "fresh" but common fresh forms)
+      hasExactWord(name, 'cilantro') || hasExactWord(name, 'basil') || hasExactWord(name, 'parsley') || 
+      hasExactWord(name, 'mint') || hasExactWord(name, 'dill') || hasExactWord(name, 'chives') ||
+      hasExactPhrase(name, 'green onion') || hasExactWord(name, 'scallion') || hasExactWord(name, 'leek') ||
+      hasExactWord(name, 'shallot') || hasExactWord(name, 'ginger') || hasExactWord(name, 'asparagus') ||
+      hasExactPhrase(name, 'brussels sprouts') || hasExactWord(name, 'cabbage') || hasExactWord(name, 'corn') ||
+      hasExactWord(name, 'peas') || hasExactPhrase(name, 'green beans') || hasExactWord(name, 'artichoke')) {
     return 'Produce';
   }
   
   // PRIORITY 7: Frozen Foods (explicitly frozen items)
-  if (name.includes('frozen')) {
+  if (hasExactWord(name, 'frozen')) {
     return 'Frozen';
   }
   
   // PRIORITY 8: Bakery (fresh baked goods)
-  if (name.includes('bread') || name.includes('bagel') || name.includes('roll') ||
-      name.includes('baguette') || name.includes('croissant') || name.includes('muffin') ||
-      name.includes('tortilla') || name.includes('pita') || name.includes('naan')) {
+  if (hasExactWord(name, 'bread') || hasExactWord(name, 'bagel') || hasExactWord(name, 'roll') ||
+      hasExactWord(name, 'baguette') || hasExactWord(name, 'croissant') || hasExactWord(name, 'muffin') ||
+      hasExactWord(name, 'tortilla') || hasExactWord(name, 'pita') || hasExactWord(name, 'naan')) {
     return 'Bakery';
   }
   
-  // Default fallback to Other for unmatched items
+  // Default fallback
   return 'Other';
 }
 
