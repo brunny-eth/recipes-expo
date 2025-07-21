@@ -295,30 +295,150 @@ export const coerceToIngredientGroups = (
 };
 
 /**
- * Parses ingredient display names to handle removal and substitution text
- * This is the consolidated version that handles both "(removed)" and "(substituted for X)" patterns
+ * Enhanced ingredient display name parser that handles complex cases
+ * This is the critical first step for canonical representation
  */
 export function parseIngredientDisplayName(name: string): {
   baseName: string;
   isRemoved: boolean;
   substitutedFor?: string;
 } {
+  let workingName = name.trim();
+
   // Handle removed ingredients: "ingredient (removed)"
-  const removedMatch = name.match(/^(.*?)\s*\(removed\)$/i);
+  const removedMatch = workingName.match(/^(.*?)\s*\(removed\)$/i);
   if (removedMatch) {
-    return { baseName: removedMatch[1].trim(), isRemoved: true };
+    return { 
+      baseName: parseCanonicalIngredientName(removedMatch[1].trim()), 
+      isRemoved: true 
+    };
   }
 
   // Handle substituted ingredients: "new ingredient (substituted for original ingredient)"
-  const substitutedMatch = name.match(/^(.*?)\s*\(substituted for (.+?)\)$/i);
+  const substitutedMatch = workingName.match(/^(.*?)\s*\(substituted for (.+?)\)$/i);
   if (substitutedMatch) {
     return {
-      baseName: substitutedMatch[1].trim(),
+      baseName: parseCanonicalIngredientName(substitutedMatch[1].trim()),
       isRemoved: false,
       substitutedFor: substitutedMatch[2].trim(),
     };
   }
 
-  // No special formatting found, return the original name
-  return { baseName: name.trim(), isRemoved: false };
+  // No special formatting found, parse the canonical name
+  return { 
+    baseName: parseCanonicalIngredientName(workingName), 
+    isRemoved: false 
+  };
+}
+
+/**
+ * Parses a raw ingredient name to extract the canonical ingredient name
+ * Handles disjunctive phrases, unit separation, and common patterns
+ */
+function parseCanonicalIngredientName(name: string): string {
+  let workingName = name.toLowerCase().trim();
+  
+  // Handle disjunctive phrases: "tamari or soy sauce" -> prefer first option
+  // Common patterns: "A or B", "A/B", "A, or B"
+  const disjunctivePatterns = [
+    /^([^,\/]+?)\s+or\s+.+$/i,           // "tamari or soy sauce"
+    /^([^,\/]+?)\s*\/\s*.+$/i,           // "tamari/soy sauce"
+    /^([^,\/]+?),\s*or\s+.+$/i,          // "tamari, or soy sauce"
+  ];
+  
+  for (const pattern of disjunctivePatterns) {
+    const match = workingName.match(pattern);
+    if (match) {
+      workingName = match[1].trim();
+      break;
+    }
+  }
+  
+  // Handle unit-name confusion patterns
+  // "9 cloves garlic" -> "garlic" (unit should be parsed elsewhere)
+  // "garlic cloves" -> "garlic"
+  // "chicken breasts" -> "chicken" (but keep "chicken breasts" as it's more specific)
+  
+  // Common unit words that should be removed from ingredient names
+  const unitWords = [
+    'cloves?', 'clove', 'pieces?', 'piece', 'slices?', 'slice',
+    'strips?', 'strip', 'stalks?', 'stalk', 'sprigs?', 'sprig',
+    'bunches?', 'bunch', 'heads?', 'head', 'ears?', 'ear'
+  ];
+  
+  // Remove unit words when they appear at the end
+  // "garlic cloves" -> "garlic", but keep "chicken breasts" as "chicken breasts"
+  const unitPattern = new RegExp(`\\s+(${unitWords.join('|')})$`, 'i');
+  const unitMatch = workingName.match(unitPattern);
+  if (unitMatch) {
+    // Special cases where we want to keep the unit as part of the name
+    const keepUnitCases = [
+      'chicken breast', 'chicken thigh', 'pork chop', 'beef roast',
+      'lamb chop', 'fish fillet', 'turkey breast'
+    ];
+    
+    const potentialName = workingName.replace(unitPattern, '').trim();
+    const fullName = workingName;
+    
+    // Check if this is a case where we should keep the unit
+    const shouldKeepUnit = keepUnitCases.some(keepCase => 
+      fullName.includes(keepCase) || potentialName.length < 3
+    );
+    
+    if (!shouldKeepUnit) {
+      workingName = potentialName;
+    }
+  }
+  
+  // Remove common preparation words that don't affect aggregation
+  const preparationWords = [
+    'fresh', 'frozen', 'dried', 'canned', 'bottled',
+    'chopped', 'diced', 'minced', 'sliced', 'grated',
+    'whole', 'ground', 'crushed', 'organic', 'raw'
+  ];
+  
+  // Only remove preparation words if they're at the beginning
+  const prepPattern = new RegExp(`^(${preparationWords.join('|')})\\s+`, 'i');
+  workingName = workingName.replace(prepPattern, '');
+  
+  // Handle specific common cases for better canonicalization
+  const canonicalMappings: { [key: string]: string } = {
+    // Garlic variations
+    'garlic clove': 'garlic',
+    'clove garlic': 'garlic',
+    'cloves garlic': 'garlic',
+    'garlic cloves': 'garlic',
+    
+    // Onion variations  
+    'onion': 'onion',
+    'onions': 'onion',
+    'yellow onion': 'onion',
+    'white onion': 'onion',
+    
+    // Common ingredient standardizations
+    'scallion': 'green onion',
+    'scallions': 'green onion',
+    'spring onion': 'green onion',
+    'spring onions': 'green onion',
+    
+    // Herb standardizations
+    'cilantro': 'cilantro',
+    'fresh cilantro': 'cilantro',
+    'coriander leaves': 'cilantro',
+  };
+  
+  // Apply canonical mappings
+  if (canonicalMappings[workingName]) {
+    workingName = canonicalMappings[workingName];
+  }
+  
+  // Final cleanup
+  workingName = workingName.trim();
+  
+  // Ensure we don't return an empty string
+  if (!workingName) {
+    return name.trim(); // Fallback to original
+  }
+  
+  return workingName;
 }

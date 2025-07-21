@@ -137,23 +137,6 @@ export function formatIngredientsForGroceryList(
 
   console.log(`[groceryHelpers] 🎯 Finished formatting ${groceryItems.length} grocery items`);
   
-  // Debug specific problematic ingredients
-  const problematicIngredients = ['fresh chopped herbs', 'cilantro', 'basil'];
-  problematicIngredients.forEach(ingredient => {
-    const category = getBasicGroceryCategory(ingredient);
-    console.log(`[groceryHelpers] 🔍 Debug categorization for "${ingredient}": ${category}`);
-    
-    // Test hasExactWord function
-    const hasHerbs = new RegExp(`\\bherbs\\b`, 'i').test(ingredient);
-    const hasCilantro = new RegExp(`\\bcilantro\\b`, 'i').test(ingredient);
-    const hasFresh = new RegExp(`\\bfresh\\b`, 'i').test(ingredient);
-    console.log(`[groceryHelpers] 🔍 Regex tests for "${ingredient}":`, {
-      hasHerbs,
-      hasCilantro,
-      hasFresh
-    });
-  });
-  
   return groceryItems;
 }
 

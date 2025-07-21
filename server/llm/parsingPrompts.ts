@@ -44,7 +44,7 @@ The response must be exactly one object with the following shape:
 **CRITICAL PARSING RULES (All rules are equally important):**
 
 1.  **Comprehensive Ingredient Extraction**: This is paramount. You **MUST** extract all ingredients, including those mentioned only within instruction steps, and place them in 'ingredientGroups'.
-2.  **Ingredient Grouping:** When a recipe has distinct logical sections for ingredients (e.g., "For the Sauce", "Salad Dressing", "Meatball Mixture", "Tzatziki", "Garnish"), group ingredients appropriately under a concise, descriptive "ingredientGroup" name. If no distinct sections are present, use a single group named "Main".
+2.  **Ingredient Grouping:** When a recipe has distinct logical sections for ingredients (e.g., "For the Sauce", "Salad Dressing", "Meatball Mixture", "Tzatziki", "Garnish"), group ingredients appropriately under a concise, descriptive "ingredientGroup" name. If no distinct sections are present, use a single group named "Main". If there are ingredients for serving, place them in a group named "Serving".
 -  If an instruction step contains a vague phrase like "all ingredients" or "all sauce ingredients," expand the instruction by including a comma-separated list of the relevant ingredients from the corresponding ingredientGroup's ingredients array.
 3.  Output ONLY the requested JSON object. Do NOT include any additional text or explanations.
 4.  **No Inference; Use Null**: If a value for a field is not explicitly found in the provided text, you MUST use 'null'. Do not infer or generate information.

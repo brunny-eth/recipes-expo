@@ -4,7 +4,7 @@ import logger from '../lib/logger';
 import { CombinedParsedRecipe, IngredientGroup, StructuredIngredient } from '../../common/types';
 import { formatIngredientsForGroceryList, categorizeIngredients, getBasicGroceryCategory } from '../../utils/groceryHelpers';
 
-import { aggregateGroceryList } from '../../utils/ingredientAggregation';
+import { aggregateGroceryList, normalizeName } from '../../utils/ingredientAggregation';
 import { runDefaultLLM } from '../llm/adapters';
 import { stripMarkdownFences } from '../utils/stripMarkdownFences';
 
@@ -696,8 +696,39 @@ router.get('/grocery-list', async (req: Request, res: Response) => {
       }))
     }, 'All grocery items before aggregation');
 
-    // Aggregate the grocery list
-    const aggregatedItems = aggregateGroceryList(allGroceryItems);
+    // Filter out common household staples that users unlikely need to buy
+    const EXCLUDED_ITEMS = new Set([
+      'salt', 'pepper', 'black pepper', 'white pepper',
+      'water', 'tap water', 'cold water', 'warm water', 'hot water',
+      'cooking spray', 'non-stick spray', 'oil spray',
+      'ice', 'ice cube', 'ice cubes'
+    ]);
+    
+    const filteredGroceryItems = allGroceryItems.filter(item => {
+      // Use the same normalization as aggregation for consistency
+      const normalizedItem = normalizeName(item.item_name);
+      const shouldExclude = EXCLUDED_ITEMS.has(normalizedItem);
+      
+      if (shouldExclude) {
+        logger.info({ 
+          requestId, 
+          item_name: item.item_name,
+          normalized_name: normalizedItem
+        }, 'Excluding common household item from grocery list');
+      }
+      
+      return !shouldExclude;
+    });
+    
+    logger.info({ 
+      requestId, 
+      originalCount: allGroceryItems.length,
+      filteredCount: filteredGroceryItems.length,
+      excludedCount: allGroceryItems.length - filteredGroceryItems.length
+    }, 'Applied exclusion filter for household staples');
+
+    // Aggregate the filtered grocery list
+    const aggregatedItems = aggregateGroceryList(filteredGroceryItems);
 
     logger.info({ 
       requestId, 
@@ -848,15 +879,6 @@ router.post('/grocery-item-state', async (req: Request, res: Response) => {
     res.status(500).json({ error: error.message || 'Internal server error' });
   }
 });
-
-// Helper function to normalize name (can be moved to a shared util if needed)
-function normalizeName(name: string): string {
-  let normalized = name.toLowerCase().trim();
-  if (normalized.endsWith('s')) {
-    normalized = normalized.slice(0, -1);
-  }
-  return normalized;
-}
 
 
 export { router as miseRouter }; 

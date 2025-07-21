@@ -5,14 +5,51 @@ import { parse, toFraction } from 'fraction.js';
  * Normalizes an ingredient name for consistent aggregation.
  * - Converts to lowercase
  * - Removes extra whitespace
+ * - Removes irrelevant adjectives (but keeps important ones like "toasted")
  * - Makes singular (simple implementation)
  */
-function normalizeName(name: string): string {
+export function normalizeName(name: string): string {
   let normalized = name.toLowerCase().trim();
-  // Simple pluralization check - not exhaustive but covers common cases
-  if (normalized.endsWith('s')) {
-    normalized = normalized.slice(0, -1);
+  
+  // Remove truly irrelevant adjectives that don't affect shopping/aggregation
+  // NOTE: Deliberately NOT including "toasted" as it's a meaningful distinction
+  const irrelevantAdjectives = [
+    'large', 'small', 'medium', 'extra-large', 'jumbo', 'mini',
+    'fresh', 'frozen', 'organic', 'free-range', 'grass-fed',
+    'whole', 'chopped', 'diced', 'minced', 'sliced', 'grated',
+    'peeled', 'unpeeled', 'skinless', 'boneless',
+    'raw', 'cooked', 'steamed', 'roasted', 'grilled'
+  ];
+  
+  // Remove irrelevant adjectives (word boundaries to avoid partial matches)
+  const adjectivePattern = new RegExp(`\\b(${irrelevantAdjectives.join('|')})\\s+`, 'gi');
+  normalized = normalized.replace(adjectivePattern, '');
+  
+  // Handle common unit words that might still be in the name
+  // This is a safety net in case parseIngredientDisplayName didn't catch them
+  const residualUnits = ['clove', 'cloves', 'piece', 'pieces'];
+  const residualUnitPattern = new RegExp(`\\s+(${residualUnits.join('|')})$`, 'i');
+  normalized = normalized.replace(residualUnitPattern, '');
+  
+  // Clean up extra spaces
+  normalized = normalized.replace(/\s+/g, ' ').trim();
+  
+  // Simple pluralization check - remove trailing 's' but be careful with exceptions
+  const pluralExceptions = [
+    'beans', 'peas', 'lentils', 'oats', 'grits', 'grains',
+    'noodles', 'brussels sprouts', 'green beans',
+    'sesame seeds', 'sunflower seeds', 'pumpkin seeds'
+  ];
+  
+  // Only singularize if it's not an exception and ends with 's'
+  if (normalized.endsWith('s') && !pluralExceptions.includes(normalized)) {
+    // Additional check: don't singularize if it would create a very short word
+    const singular = normalized.slice(0, -1);
+    if (singular.length >= 3) {
+      normalized = singular;
+    }
   }
+  
   return normalized;
 }
 
@@ -86,12 +123,22 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
     return [];
   }
 
+  console.log(`[aggregateGroceryList] 🔄 Starting aggregation with ${items.length} items`);
   const aggregatedMap = new Map<string, GroceryListItem>();
 
   for (const item of items) {
     const normalizedItemName = normalizeName(item.item_name);
     const normalizedUnit = normalizeUnit(item.quantity_unit);
     const key = `${normalizedItemName}|${normalizedUnit}`;
+
+    // Log the normalization process
+    console.log(`[aggregateGroceryList] 📝 Processing item:`, {
+      original_name: item.item_name,
+      normalized_name: normalizedItemName,
+      original_unit: item.quantity_unit,
+      normalized_unit: normalizedUnit,
+      aggregation_key: key
+    });
 
     const existing = aggregatedMap.get(key);
     
@@ -100,14 +147,23 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
       const existingAmount = parseQuantity(existing.quantity_amount);
       const currentAmount = parseQuantity(item.quantity_amount);
 
+      console.log(`[aggregateGroceryList] 🔗 Combining with existing item:`, {
+        existing_amount: existingAmount,
+        current_amount: currentAmount,
+        existing_unit: existing.quantity_unit,
+        current_unit: item.quantity_unit
+      });
+
       if (existingAmount !== null && currentAmount !== null) {
         const total = existingAmount + currentAmount;
         // The quantity_amount should always be a number for further processing.
         // Conversion to a fraction string should happen on the frontend.
         existing.quantity_amount = total;
+        console.log(`[aggregateGroceryList] ➕ Combined amounts: ${existingAmount} + ${currentAmount} = ${total}`);
       } else if (currentAmount !== null) {
         // If existing had no amount but the new one does, use the new one.
         existing.quantity_amount = currentAmount;
+        console.log(`[aggregateGroceryList] ➡️ Using current amount: ${currentAmount}`);
       }
       
       // Append original text for reference
@@ -118,6 +174,8 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
       // If an item with the same name but different unit exists, create a new entry
       const newKey = `${normalizedItemName}|${normalizedUnit}|${aggregatedMap.size}`;
       
+      console.log(`[aggregateGroceryList] ➕ Adding new item with key: ${existing ? newKey : key}`);
+      
       // When adding a new item, store its unit in the canonical form
       const newItem = { ...item };
       newItem.quantity_unit = normalizedUnit;
@@ -125,5 +183,8 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
     }
   }
 
-  return Array.from(aggregatedMap.values());
+  const result = Array.from(aggregatedMap.values());
+  console.log(`[aggregateGroceryList] ✅ Aggregation complete: ${items.length} items → ${result.length} items`);
+  
+  return result;
 } 
