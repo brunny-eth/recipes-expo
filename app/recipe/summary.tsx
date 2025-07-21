@@ -2139,8 +2139,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: SPACING.xxs,
     marginBottom: SPACING.lg,
-    marginHorizontal: SPACING.md, // Add horizontal margins to make container smaller
-    paddingHorizontal: SPACING.md, // Add padding for tighter text wrapping
+    marginHorizontal: SPACING.xs, // Reduced for wider text area
+    paddingHorizontal: SPACING.xs, // Reduced for wider text area
     lineHeight: FONT.lineHeight.compact,
   },
   metaInfoContainer: {

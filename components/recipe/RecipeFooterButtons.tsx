@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.pageHorizontal,
     paddingTop: SPACING.md,
     paddingBottom: SPACING.xxl,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.background,
     borderTopWidth: BORDER_WIDTH.hairline,
     borderTopColor: COLORS.divider,
   } as ViewStyle,

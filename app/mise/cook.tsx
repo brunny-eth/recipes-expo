@@ -11,6 +11,7 @@ import {
   InteractionManager,
   Modal,
   Pressable,
+  FlatList,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -20,11 +21,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useCooking } from '@/context/CookingContext';
 import { useAuth } from '@/context/AuthContext';
+import { useErrorModal } from '@/context/ErrorModalContext';
 import { COLORS, SPACING, RADIUS, OVERLAYS, SHADOWS, BORDER_WIDTH } from '@/constants/theme';
 import { sectionHeaderText, bodyText, bodyStrongText, bodyTextLoose, captionText } from '@/constants/typography';
 import { CombinedParsedRecipe, StructuredIngredient } from '@/common/types';
 import RecipeSwitcher from '@/components/recipe/RecipeSwitcher';
 import StepItem from '@/components/recipe/StepItem';
+import ToolsModal from '@/components/ToolsModal';
+import MiniTimerDisplay from '@/components/MiniTimerDisplay';
+import StepsFooterButtons from '@/components/recipe/StepsFooterButtons';
+import { ActiveTool } from '@/components/ToolsModal';
 
 import { 
   StepCompletionState, 
@@ -38,6 +44,7 @@ export default function CookScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { session } = useAuth();
+  const { showError } = useErrorModal();
   const { state, initializeSessions, endSession, endAllSessions, switchRecipe, setScrollPosition, getCurrentScrollPosition, hasResumableSession, completeStep, uncompleteStep } = useCooking();
   
   const [isLoading, setIsLoading] = useState(true);
@@ -49,6 +56,21 @@ export default function CookScreen() {
   const [selectedIngredient, setSelectedIngredient] = useState<StructuredIngredient | null>(null);
   const [isTooltipVisible, setIsTooltipVisible] = useState(false);
   // --- End Ingredient Tooltip State ---
+
+  // --- Timer State (Persistent Across Recipes) ---
+  const [timerTimeRemaining, setTimerTimeRemaining] = useState(0);
+  const [isTimerActive, setIsTimerActive] = useState(false);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // --- End Timer State ---
+
+  // --- Tools Modal State ---
+  const [isToolsPanelVisible, setIsToolsPanelVisible] = useState(false);
+  const [initialToolToShow, setInitialToolToShow] = useState<ActiveTool>(null);
+  // --- End Tools Modal State ---
+
+  // --- Recipe Tips Modal State ---
+  const [isRecipeTipsModalVisible, setIsRecipeTipsModalVisible] = useState(false);
+  // --- End Recipe Tips Modal State ---
 
   // Add scroll position throttling
   const scrollPositionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -69,11 +91,14 @@ export default function CookScreen() {
     }
   };
 
-  // Cleanup timeout on unmount
+  // Cleanup timeout and timer on unmount
   useEffect(() => {
     return () => {
       if (scrollPositionTimeoutRef.current) {
         clearTimeout(scrollPositionTimeoutRef.current);
+      }
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
       }
     };
   }, []);
@@ -407,6 +432,99 @@ export default function CookScreen() {
   };
   // --- End Ingredient Tooltip Logic ---
 
+  // --- Timer Functions ---
+  const formatTime = (timeInSeconds: number): string => {
+    const hours = Math.floor(timeInSeconds / 3600);
+    const minutes = Math.floor((timeInSeconds % 3600) / 60);
+    const seconds = timeInSeconds % 60;
+
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const handleTimerAddSeconds = (seconds: number) => {
+    setTimerTimeRemaining(prev => prev + seconds);
+  };
+
+  const handleTimerStartPause = () => {
+    if (isTimerActive) {
+      // Pause timer
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+      setIsTimerActive(false);
+    } else {
+      // Start timer
+      if (timerTimeRemaining > 0) {
+        setIsTimerActive(true);
+        timerIntervalRef.current = setInterval(() => {
+          setTimerTimeRemaining(prev => {
+            if (prev <= 1) {
+              // Timer finished
+              setIsTimerActive(false);
+              if (timerIntervalRef.current) {
+                clearInterval(timerIntervalRef.current);
+                timerIntervalRef.current = null;
+              }
+              // Show notification when timer finishes
+              showError('Timer', "Time's up!");
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      }
+    }
+  };
+
+  const handleTimerReset = () => {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    setIsTimerActive(false);
+    setTimerTimeRemaining(0);
+  };
+  // --- End Timer Functions ---
+
+  // --- Tools Modal Functions ---
+  const openToolsModal = (tool: ActiveTool) => {
+    setInitialToolToShow(tool);
+    setIsToolsPanelVisible(true);
+  };
+
+  const closeToolsModal = () => {
+    setIsToolsPanelVisible(false);
+    setInitialToolToShow(null);
+  };
+
+  const handleTimersPress = () => {
+    openToolsModal('timer');
+  };
+
+  const handleAIChatPress = () => {
+    openToolsModal('aiChat');
+  };
+
+  const handleMiniTimerPress = () => {
+    openToolsModal('timer');
+  };
+  // --- End Tools Modal Functions ---
+
+  // --- Recipe Tips Functions ---
+  const handleRecipeTipsPress = () => {
+    const currentRecipe = state.activeRecipes.find(
+      recipe => recipe.recipeId === state.activeRecipeId
+    );
+    if (currentRecipe?.recipe?.tips) {
+      setIsRecipeTipsModalVisible(true);
+    }
+  };
+  // --- End Recipe Tips Functions ---
+
   const currentRecipe = state.activeRecipes.find(
     recipe => recipe.recipeId === state.activeRecipeId
   );
@@ -559,6 +677,94 @@ export default function CookScreen() {
           </Pressable>
         </Modal>
 
+        {/* Footer Buttons */}
+        <StepsFooterButtons
+          onTimersPress={handleTimersPress}
+          onAIChatPress={handleAIChatPress}
+          onRecipeTipsPress={handleRecipeTipsPress}
+          hasRecipeTips={!!currentRecipe?.recipe?.tips}
+        />
+
+        {/* Tools Modal */}
+        <ToolsModal
+          isVisible={isToolsPanelVisible}
+          onClose={closeToolsModal}
+          initialTool={initialToolToShow}
+          timerTimeRemaining={timerTimeRemaining}
+          isTimerActive={isTimerActive}
+          formatTime={formatTime}
+          handleTimerAddSeconds={handleTimerAddSeconds}
+          handleTimerStartPause={handleTimerStartPause}
+          handleTimerReset={handleTimerReset}
+          recipeInstructions={currentRecipe?.recipe?.instructions || []}
+          recipeSubstitutions={currentRecipe?.recipe?.substitutions_text || null}
+        />
+
+        {/* Mini Timer Display */}
+        {!isToolsPanelVisible && isTimerActive && timerTimeRemaining > 0 && (
+          <MiniTimerDisplay
+            timeRemaining={timerTimeRemaining}
+            formatTime={formatTime}
+            onPress={handleMiniTimerPress}
+          />
+        )}
+
+        {/* Recipe Tips Modal */}
+        <Modal
+          visible={isRecipeTipsModalVisible}
+          animationType="fade"
+          transparent={true}
+          onRequestClose={() => setIsRecipeTipsModalVisible(false)}
+        >
+          <Pressable
+            style={styles.recipeTipsModalOverlay}
+            onPress={() => setIsRecipeTipsModalVisible(false)}
+          >
+            <Pressable style={styles.recipeTipsModalContent}>
+              <View style={styles.recipeTipsHeader}>
+                <View style={styles.recipeTipsHeaderContent}>
+                  <MaterialCommunityIcons
+                    name="lightbulb-outline"
+                    size={24}
+                    color={COLORS.primary}
+                  />
+                  <Text style={styles.recipeTipsTitle}>Recipe Tips</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={() => setIsRecipeTipsModalVisible(false)}
+                >
+                  <MaterialCommunityIcons
+                    name="close"
+                    size={24}
+                    color={COLORS.textMuted}
+                  />
+                </TouchableOpacity>
+              </View>
+              
+              <FlatList
+                style={styles.recipeTipsList}
+                data={currentRecipe?.recipe?.tips?.split(/\.\s+|\n+/).filter(tip => tip.trim()) || []}
+                keyExtractor={(item, index) => index.toString()}
+                renderItem={({ item, index }) => (
+                  <View style={styles.tipItem}>
+                    <View style={styles.tipNumberContainer}>
+                      <Text style={styles.tipNumber}>{index + 1}</Text>
+                    </View>
+                    <View style={styles.tipContent}>
+                      <Text style={styles.recipeTipsText}>
+                        {item.trim()}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+                showsVerticalScrollIndicator={true}
+                contentContainerStyle={styles.recipeTipsListContent}
+              />
+            </Pressable>
+          </Pressable>
+        </Modal>
+
       </SafeAreaView>
     </PanGestureHandler>
   );
@@ -669,5 +875,83 @@ const styles = StyleSheet.create({
   tooltipPreparationText: {
     ...bodyTextLoose,
     color: COLORS.textMuted,
+  },
+
+  // --- Recipe Tips Modal Styles ---
+  recipeTipsModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.pageHorizontal,
+  },
+  recipeTipsModalContent: {
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.lg,
+    width: '100%',
+    maxWidth: 400,
+    height: '70%',
+    ...SHADOWS.large,
+  },
+  recipeTipsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    borderBottomWidth: BORDER_WIDTH.hairline,
+    borderBottomColor: COLORS.divider,
+  },
+  recipeTipsHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  recipeTipsTitle: {
+    ...bodyStrongText,
+    color: COLORS.textDark,
+    fontSize: 18,
+  },
+  closeButton: {
+    padding: SPACING.xs,
+  },
+  recipeTipsList: {
+    flex: 1,
+    minHeight: 0,
+  },
+  recipeTipsListContent: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    paddingBottom: SPACING.lg,
+    flexGrow: 1,
+  },
+  tipItem: {
+    flexDirection: 'row',
+    marginBottom: SPACING.lg,
+    alignItems: 'flex-start',
+  },
+  tipNumberContainer: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: COLORS.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.md,
+    marginTop: 2,
+  },
+  tipNumber: {
+    ...bodyStrongText,
+    color: COLORS.primary,
+    fontSize: 14,
+  },
+  tipContent: {
+    flex: 1,
+  },
+  recipeTipsText: {
+    ...bodyTextLoose,
+    color: COLORS.textDark,
+    lineHeight: 24,
+    fontSize: 16,
   },
 }); 

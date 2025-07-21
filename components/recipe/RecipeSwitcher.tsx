@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, SHADOWS, BORDER_WIDTH } from '@/constants/theme';
@@ -22,25 +22,32 @@ export default function RecipeSwitcher({
   activeRecipeId, 
   onRecipeSwitch
 }: RecipeSwitcherProps) {
-  console.log('[RecipeSwitcher] 🔄 Rendering with props:', {
-    recipesCount: recipes.length,
-    activeRecipeId,
-    recipeKeys: recipes.map(r => ({ key: r.recipeId, title: r.recipe?.title, isLoading: r.isLoading }))
-  });
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  // Auto-scroll to active tab when activeRecipeId changes
+  useEffect(() => {
+    if (recipes.length > 1 && activeRecipeId && scrollViewRef.current) {
+      const activeIndex = recipes.findIndex(r => r.recipeId === activeRecipeId);
+      if (activeIndex !== -1) {
+        // Ultra-simple approach: position active tab near the left
+        const tabWidth = 84;
+        const targetScrollX = Math.max(0, (activeIndex * tabWidth) - 40); // 40px from left edge
+        
+        setTimeout(() => {
+          scrollViewRef.current?.scrollTo({ 
+            x: targetScrollX, 
+            animated: true 
+          });
+        }, 100);
+      }
+    }
+  }, [activeRecipeId, recipes.length]);
 
   if (recipes.length === 0) {
-    console.log('[RecipeSwitcher] ❌ No recipes to display');
     return null;
   }
 
   const handleRecipePress = (recipe: RecipeSession) => {
-    console.log('[RecipeSwitcher] 👆 Recipe card pressed:', {
-      recipeId: recipe.recipeId,
-      isLoading: recipe.isLoading,
-      hasRecipeData: !!recipe.recipe,
-      title: recipe.recipe?.title || 'No title'
-    });
-
     // Only switch to the recipe - let the parent handle data loading
     onRecipeSwitch(recipe.recipeId);
   };
@@ -68,6 +75,7 @@ export default function RecipeSwitcher({
     <View style={styles.container}>
       <View style={styles.tabContainer}>
         <ScrollView 
+          ref={scrollViewRef}
           horizontal 
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.scrollContainer}
@@ -76,15 +84,6 @@ export default function RecipeSwitcher({
             const isActive = recipe.recipeId === activeRecipeId;
             const recipeTitle = recipe.recipe?.title || 'Loading...';
             const truncatedTitle = truncateTitle(recipeTitle);
-
-            console.log('[RecipeSwitcher] 🎨 Rendering recipe button:', {
-              key: recipe.recipeId,
-              title: recipeTitle,
-              truncatedTitle,
-              isActive,
-              isLoading: recipe.isLoading,
-              hasRecipe: !!recipe.recipe,
-            });
 
             return (
               <TouchableOpacity
