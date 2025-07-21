@@ -663,21 +663,40 @@ router.get('/grocery-list', async (req: Request, res: Response) => {
         undefined
       );
       
+      // Apply on-the-fly ingredient name reprocessing for existing recipes
+      // This ensures new parsing logic is applied even to old mise recipes
+      const reprocessedGroceryItems = recipeGroceryItems.map(item => {
+        const { parseIngredientDisplayName } = require('../../utils/ingredientHelpers');
+        const reprocessedName = parseIngredientDisplayName(item.item_name);
+        
+        logger.info({ 
+          requestId, 
+          miseRecipeId: miseRecipe.id,
+          original_item_name: item.item_name,
+          reprocessed_name: reprocessedName.baseName
+        }, 'Reprocessing ingredient name with new logic');
+        
+        return {
+          ...item,
+          item_name: reprocessedName.baseName
+        };
+      });
+      
       logger.info({ 
         requestId, 
         miseRecipeId: miseRecipe.id,
-        formattedItemsCount: recipeGroceryItems.length,
-        formattedItems: recipeGroceryItems.map(item => ({
+        formattedItemsCount: reprocessedGroceryItems.length,
+        formattedItems: reprocessedGroceryItems.map(item => ({
           item_name: item.item_name,
           original_ingredient_text: item.original_ingredient_text,
           quantity_amount: item.quantity_amount,
           quantity_unit: item.quantity_unit,
           grocery_category: item.grocery_category
         }))
-      }, 'Formatted grocery items for recipe');
+      }, 'Formatted grocery items for recipe (after reprocessing)');
       
       // Add source information
-      const itemsWithSource = recipeGroceryItems.map((item: any) => ({
+      const itemsWithSource = reprocessedGroceryItems.map((item: any) => ({
         ...item,
         source_mise_recipe_id: miseRecipe.id,
         source_recipe_title: miseRecipe.title_override || recipe.title || 'Unknown Recipe',
@@ -729,6 +748,29 @@ router.get('/grocery-list', async (req: Request, res: Response) => {
 
     // Aggregate the filtered grocery list
     const aggregatedItems = aggregateGroceryList(filteredGroceryItems);
+
+    // Debug specific problematic cases
+    const problematicItems = ['garlic', 'tamari', 'avocado'];
+    problematicItems.forEach(itemName => {
+      const matchingItems = aggregatedItems.filter(item => 
+        item.item_name.toLowerCase().includes(itemName.toLowerCase())
+      );
+      
+      if (matchingItems.length > 0) {
+        logger.info({ 
+          requestId, 
+          searchTerm: itemName,
+          matchingCount: matchingItems.length,
+          matchingItems: matchingItems.map(item => ({
+            item_name: item.item_name,
+            grocery_category: item.grocery_category,
+            quantity_amount: item.quantity_amount,
+            quantity_unit: item.quantity_unit,
+            original_ingredient_text: item.original_ingredient_text
+          }))
+        }, 'Debug: Found matching items for problematic ingredient');
+      }
+    });
 
     logger.info({ 
       requestId, 
