@@ -354,6 +354,24 @@ function parseCanonicalIngredientName(name: string): string {
     }
   }
   
+  // Handle complex ingredient lists with slashes: "fresh chopped herbs scallions/cilantro"
+  // Extract the main ingredient type before the slash
+  const complexSlashPattern = /^(.*?)\s+([^\/\s]+)\/([^\/\s]+)$/i;
+  const complexMatch = workingName.match(complexSlashPattern);
+  if (complexMatch) {
+    const baseDescription = complexMatch[1].trim(); // "fresh chopped herbs"
+    const option1 = complexMatch[2].trim(); // "scallions"
+    const option2 = complexMatch[3].trim(); // "cilantro"
+    
+    // For herbs, prefer the base description without the specific options
+    if (baseDescription.includes('herb')) {
+      workingName = baseDescription;
+    } else {
+      // Otherwise, prefer the first option
+      workingName = option1;
+    }
+  }
+  
   // Handle unit-name confusion patterns
   // "9 cloves garlic" -> "garlic" (unit should be parsed elsewhere)
   // "garlic cloves" -> "garlic"

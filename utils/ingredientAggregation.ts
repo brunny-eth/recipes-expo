@@ -101,8 +101,8 @@ function parseQuantity(amount: number | string | null): number | null {
 }
 
 /**
- * A very simple unit compatibility check.
- * In a real-world scenario, this would involve a comprehensive conversion library.
+ * Enhanced unit compatibility check that handles volume and weight conversions.
+ * Groups units by type (volume, weight, count) for proper aggregation.
  */
 function areUnitsCompatible(unit1: string | null, unit2: string | null): boolean {
   const normalizedUnit1 = normalizeUnit(unit1);
@@ -111,7 +111,37 @@ function areUnitsCompatible(unit1: string | null, unit2: string | null): boolean
   if (normalizedUnit1 === null && normalizedUnit2 === null) return true;
   if (normalizedUnit1 === null || normalizedUnit2 === null) return false;
 
-  return normalizedUnit1 === normalizedUnit2;
+  // If units are exactly the same, they're compatible
+  if (normalizedUnit1 === normalizedUnit2) return true;
+
+  // Define unit groups that can be converted between each other
+  const volumeUnits = new Set([
+    'teaspoon', 'tablespoon', 'cup', 'milliliter', 'liter',
+    'fluid_ounce', 'pint', 'quart', 'gallon'
+  ]);
+  
+  const weightUnits = new Set([
+    'gram', 'kilogram', 'ounce', 'pound'
+  ]);
+  
+  const countUnits = new Set([
+    'clove', 'piece', 'pinch', 'dash'
+  ]);
+
+  // Check if both units are in the same group
+  if (volumeUnits.has(normalizedUnit1) && volumeUnits.has(normalizedUnit2)) {
+    return true; // Both are volume units
+  }
+  
+  if (weightUnits.has(normalizedUnit1) && weightUnits.has(normalizedUnit2)) {
+    return true; // Both are weight units
+  }
+  
+  if (countUnits.has(normalizedUnit1) && countUnits.has(normalizedUnit2)) {
+    return true; // Both are count units
+  }
+
+  return false; // Units are not compatible
 }
 
 /**

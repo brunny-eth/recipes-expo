@@ -256,7 +256,7 @@ export function getBasicGroceryCategory(ingredientName: string): string {
       hasExactWord(name, 'lettuce') || hasExactWord(name, 'spinach') || hasExactWord(name, 'kale') ||
       hasExactWord(name, 'carrot') || hasExactWord(name, 'celery') || hasExactWord(name, 'potato') ||
       hasExactPhrase(name, 'sweet potato') || hasExactWord(name, 'broccoli') || hasExactWord(name, 'cauliflower') ||
-      hasExactWord(name, 'cucumber') || hasExactWord(name, 'zucchini') || hasExactWord(name, 'squash') ||
+      hasExactWord(name, 'cucumber') || hasExactWord(name, 'cucumbers') || hasExactWord(name, 'zucchini') || hasExactWord(name, 'squash') ||
       hasExactWord(name, 'eggplant') || hasExactWord(name, 'mushroom') || hasExactWord(name, 'avocado') ||
       hasExactWord(name, 'apple') || hasExactWord(name, 'banana') || hasExactWord(name, 'orange') ||
       hasExactWord(name, 'lemon') || hasExactWord(name, 'lime') || hasExactWord(name, 'strawberry') ||
@@ -282,8 +282,8 @@ export function getBasicGroceryCategory(ingredientName: string): string {
     return 'Produce';
   }
   
-  // PRIORITY 7: Frozen Foods (explicitly frozen items)
-  if (hasExactWord(name, 'frozen')) {
+  // PRIORITY 7: Frozen Foods (explicitly frozen items or commonly frozen items)
+  if (hasExactWord(name, 'frozen') || hasExactWord(name, 'edamame')) {
     return 'Frozen';
   }
   
