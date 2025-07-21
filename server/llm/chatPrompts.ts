@@ -6,16 +6,18 @@ export interface ChatContext {
 }
 
 /**
- * Builds the system prompt for AI chat with optional recipe context.
+ * Builds the system prompt for AI chat with recipe context.
  * Creates a conversational, helpful cooking assistant that can reference
  * the current recipe when relevant but isn't limited to it.
  */
-export function buildChatSystemPrompt(recipeContext?: ChatContext): Content[] {
-  const basePrompt = `You are a friendly, smart cooking assistant that helps users while they cook. You're concise, clear, and great at explaining cooking techniques and helping troubleshoot.`;
+export function buildChatSystemPrompt(recipeContext: ChatContext): Content[] {
+  const basePrompt = `You are a friendly, smart cooking assistant that helps users while they cook. You're concise, clear, and great at explaining cooking techniques and helping troubleshoot.
 
-  if (!recipeContext) {
-    return [{ role: "user", parts: [{ text: basePrompt }] }];
-  }
+CRITICAL RULES:
+1. Keep your responses under 75 characters total
+2. NEVER use markdown formatting like **bold**, *italic*, bullet points, or any special characters
+3. Write ONLY in plain text with no formatting whatsoever
+4. Do not use asterisks, dashes, or any decorative characters`;
 
   let contextText = basePrompt + "\n\n";
   contextText += "The user is currently cooking this recipe:\n\n";
@@ -31,17 +33,4 @@ export function buildChatSystemPrompt(recipeContext?: ChatContext): Content[] {
   contextText += "\nYou can refer to this recipe as needed, but also feel free to answer general cooking questions.";
 
   return [{ role: "user", parts: [{ text: contextText }] }];
-}
-
-/**
- * Alternative system prompt for more general cooking assistance
- * when no specific recipe context is available.
- */
-export function buildGeneralCookingPrompt(): Content[] {
-  return [{
-    role: "user", 
-    parts: [{ 
-      text: `You are a friendly, smart cooking assistant that helps users with cooking questions and techniques. You're concise, clear, and great at explaining cooking concepts, troubleshooting, and providing helpful tips.` 
-    }]
-  }];
 } 

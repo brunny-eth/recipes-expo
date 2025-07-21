@@ -49,9 +49,14 @@ router.post('/chat', async (req: Request, res: Response) => {
     let historyForApi: Content[] = [...history];
     let promptForApi = userMessage;
 
-    // Add system prompt for first message or when recipe context is provided
+    // Add system prompt for first message
     if (history.length === 0) {
-        const systemPrompt = buildChatSystemPrompt(recipeContext);
+        // Provide default recipe context if none is provided
+        const defaultRecipeContext = recipeContext || {
+            instructions: ["No specific recipe context available"],
+            substitutions: null
+        };
+        const systemPrompt = buildChatSystemPrompt(defaultRecipeContext);
         historyForApi = [...systemPrompt, ...historyForApi];
     }
 

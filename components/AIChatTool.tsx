@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Platform,
   Keyboard,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { COLORS } from '@/constants/theme';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -35,12 +36,14 @@ export default function AIChatTool({
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'intro-message',
-      text: "Ask me anything about cooking generally or your recipe specifically.",
+      text: "What can I help you with?\n\nTry asking me about the recipe or cooking in general.",
       sender: 'bot',
     },
   ]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const flatListRef = useRef<FlatList>(null);
+  const screenHeight = Dimensions.get('window').height;
 
   const handleSend = async () => {
     if (inputText.trim() === '' || isLoading) return;
@@ -91,6 +94,13 @@ export default function AIChatTool({
         error: botResponseText.startsWith('Error:'),
       };
       setMessages((prevMessages) => [newBotMessage, ...prevMessages]);
+      
+      // Auto-scroll to bottom after a short delay to ensure content is rendered
+      setTimeout(() => {
+        if (flatListRef.current) {
+          flatListRef.current.scrollToEnd({ animated: true });
+        }
+      }, 100);
     } else {
       const errorBotMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -127,15 +137,28 @@ export default function AIChatTool({
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+      onLayout={(event) => {
+        console.log('[AIChatTool] Container layout:', {
+          width: event.nativeEvent.layout.width,
+          height: event.nativeEvent.layout.height,
+          x: event.nativeEvent.layout.x,
+          y: event.nativeEvent.layout.y,
+        });
+      }}
     >
       <FlatList
-        data={messages}
+        ref={flatListRef}
+        data={[...messages].reverse()}
         renderItem={renderMessageItem}
         keyExtractor={(item) => item.id}
-        style={styles.messageList}
+        style={[
+          styles.messageList,
+          { height: screenHeight * 0.75 } // Increased height for better scrolling
+        ]}
         contentContainerStyle={styles.messageListContent}
-        inverted
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator={true}
+        scrollEnabled={true}
+
       />
       {isLoading && (
         <View style={styles.loadingOverlay}>
@@ -147,7 +170,7 @@ export default function AIChatTool({
           style={styles.input}
           value={inputText}
           onChangeText={setInputText}
-          placeholder="Ask me anything about cooking!"
+          placeholder=""
           placeholderTextColor={COLORS.darkGray}
           multiline
           editable={!isLoading}
@@ -163,6 +186,7 @@ export default function AIChatTool({
             color={isLoading ? COLORS.darkGray : COLORS.primary}
           />
         </TouchableOpacity>
+
       </View>
     </KeyboardAvoidingView>
   );
@@ -179,9 +203,11 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingVertical: 15,
+    minHeight: 0,
   },
   messageListContent: {
     paddingBottom: 20,
+    paddingTop: 10,
     flexGrow: 1,
   },
   messageBubble: {
@@ -258,4 +284,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 10,
   },
+
 }); 

@@ -74,6 +74,7 @@ export default function ToolsModal({
             handleStartPause={handleTimerStartPause}
             handleReset={handleTimerReset}
             formatTime={formatTime}
+            onClose={onClose}
           />
         );
       case 'units':
@@ -81,6 +82,11 @@ export default function ToolsModal({
       case 'help':
         return <HelpTool recipeInstructions={recipeInstructions} />;
       case 'aiChat':
+        console.log('[ToolsModal] Rendering AIChatTool with props:', {
+          hasRecipeInstructions: !!recipeInstructions,
+          instructionsCount: recipeInstructions?.length || 0,
+          hasSubstitutions: !!recipeSubstitutions,
+        });
         return <AIChatTool recipeInstructions={recipeInstructions} recipeSubstitutions={recipeSubstitutions} />;
       default:
         return (
@@ -124,6 +130,13 @@ export default function ToolsModal({
                 activeTool === 'help' && styles.toolContentContainerHelpActive,
                 activeTool === 'aiChat' && styles.toolContentContainerAIChatActive,
               ]}
+              onLayout={(event) => {
+                console.log('[ToolsModal] Tool content container layout:', {
+                  width: event.nativeEvent.layout.width,
+                  height: event.nativeEvent.layout.height,
+                  activeTool,
+                });
+              }}
             >
               {renderToolContent()}
             </View>
@@ -147,6 +160,7 @@ const styles = StyleSheet.create({
   modalView: {
     width: '100%',
     maxWidth: 450,
+    maxHeight: '90%',
     backgroundColor: COLORS.white,
     borderRadius: 20,
     paddingTop: 50,
@@ -182,7 +196,8 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
   },
   toolContentContainerAIChatActive: {
-    minHeight: 500,
+    minHeight: 600,
+    maxHeight: '80%',
     width: '100%',
     justifyContent: 'flex-start',
     alignItems: 'stretch',

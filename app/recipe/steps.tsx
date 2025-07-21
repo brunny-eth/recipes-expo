@@ -21,6 +21,8 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
+import * as Haptics from 'expo-haptics';
 import {
   COLORS,
   OVERLAYS,
@@ -572,10 +574,29 @@ export default function StepsScreen() {
     }
   };
 
+  const handleSwipeGesture = (event: any) => {
+    if (event.nativeEvent.state === State.END) {
+      const { translationX, velocityX } = event.nativeEvent;
+      
+      // Swipe from left edge to go back
+      if (translationX > 100 && velocityX > 300) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        // Check if we can go back properly, otherwise navigate to mise as fallback
+        if (router.canGoBack()) {
+          router.back();
+        } else {
+          // Navigate back to mise tab
+          router.navigate('/tabs/mise' as any);
+        }
+      }
+    }
+  };
+
 
 
   return (
-    <SafeAreaView style={styles.container}>
+    <PanGestureHandler onHandlerStateChange={handleSwipeGesture}>
+      <SafeAreaView style={styles.container}>
       <RecipeStepsHeader title={recipeTitle} imageUrl={recipeImageUrl} />
 
       <Modal
@@ -810,40 +831,60 @@ export default function StepsScreen() {
       {/* Recipe Tips Modal */}
       <Modal
         visible={isRecipeTipsModalVisible}
-        animationType="slide"
+        animationType="fade"
+        transparent={true}
         onRequestClose={() => setIsRecipeTipsModalVisible(false)}
       >
-        <SafeAreaView style={styles.recipeTipsModalContainer}>
-          <View style={styles.recipeTipsHeader}>
-            <Text style={styles.recipeTipsTitle}>Recipe Tips</Text>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setIsRecipeTipsModalVisible(false)}
-            >
-              <MaterialCommunityIcons
-                name="close"
-                size={24}
-                color={COLORS.white}
-              />
-            </TouchableOpacity>
-          </View>
-          <FlatList
-            style={styles.recipeTipsList}
-            data={modifiedRecipe?.tips?.split(/\.\s+|\n+/).filter(tip => tip.trim()) || []}
-            keyExtractor={(item, index) => index.toString()}
-            renderItem={({ item }) => (
-              <View style={styles.tipItem}>
-                <Text style={styles.recipeTipsText}>
-                  • {item.trim()}.
-                </Text>
+        <Pressable
+          style={styles.recipeTipsModalOverlay}
+          onPress={() => setIsRecipeTipsModalVisible(false)}
+        >
+          <Pressable style={styles.recipeTipsModalContent}>
+            <View style={styles.recipeTipsHeader}>
+              <View style={styles.recipeTipsHeaderContent}>
+                <MaterialCommunityIcons
+                  name="lightbulb-outline"
+                  size={24}
+                  color={COLORS.primary}
+                />
+                <Text style={styles.recipeTipsTitle}>Recipe Tips</Text>
               </View>
-            )}
-            showsVerticalScrollIndicator={true}
-            contentContainerStyle={styles.recipeTipsListContent}
-          />
-        </SafeAreaView>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setIsRecipeTipsModalVisible(false)}
+              >
+                <MaterialCommunityIcons
+                  name="close"
+                  size={24}
+                  color={COLORS.textMuted}
+                />
+              </TouchableOpacity>
+            </View>
+            
+            <FlatList
+              style={styles.recipeTipsList}
+              data={modifiedRecipe?.tips?.split(/\.\s+|\n+/).filter(tip => tip.trim()) || []}
+              keyExtractor={(item, index) => index.toString()}
+              renderItem={({ item, index }) => (
+                <View style={styles.tipItem}>
+                  <View style={styles.tipNumberContainer}>
+                    <Text style={styles.tipNumber}>{index + 1}</Text>
+                  </View>
+                  <View style={styles.tipContent}>
+                    <Text style={styles.recipeTipsText}>
+                      {item.trim()}
+                    </Text>
+                  </View>
+                </View>
+              )}
+              showsVerticalScrollIndicator={true}
+              contentContainerStyle={styles.recipeTipsListContent}
+            />
+          </Pressable>
+        </Pressable>
       </Modal>
-    </SafeAreaView>
+      </SafeAreaView>
+    </PanGestureHandler>
   );
 }
 
@@ -1047,16 +1088,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   } as TextStyle,
   // --- Recipe Tips Modal Styles ---
-  recipeTipsModalContainer: {
+  recipeTipsModalOverlay: {
     flex: 1,
-    backgroundColor: COLORS.white,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.pageHorizontal,
   } as ViewStyle,
-  recipeTipsContainer: {
+  recipeTipsModalContent: {
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
-    width: '90%',
+    width: '100%',
     maxWidth: 400,
-    height: '60%',
+    height: '70%',
     ...SHADOWS.large,
   } as ViewStyle,
   recipeTipsHeader: {
@@ -1065,45 +1109,61 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
-    backgroundColor: COLORS.primary,
-    borderTopLeftRadius: RADIUS.lg,
-    borderTopRightRadius: RADIUS.lg,
+    borderBottomWidth: BORDER_WIDTH.hairline,
+    borderBottomColor: COLORS.divider,
+  } as ViewStyle,
+  recipeTipsHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
   } as ViewStyle,
   recipeTipsTitle: {
     ...bodyStrongText,
-    color: COLORS.white,
-    flex: 1,
+    color: COLORS.textDark,
+    fontSize: 18,
   } as TextStyle,
   closeButton: {
     padding: SPACING.xs,
   } as ViewStyle,
-  recipeTipsScrollView: {
-    flex: 1,
-    maxHeight: '100%',
-  } as ViewStyle,
   recipeTipsList: {
     flex: 1,
-  } as ViewStyle,
-  recipeTipsContent: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    paddingBottom: SPACING.lg,
-    flexGrow: 1,
+    minHeight: 0,
   } as ViewStyle,
   recipeTipsListContent: {
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
     paddingBottom: SPACING.lg,
+    flexGrow: 1,
+  } as ViewStyle,
+  tipItem: {
+    flexDirection: 'row',
+    marginBottom: SPACING.lg,
+    alignItems: 'flex-start',
+  } as ViewStyle,
+  tipNumberContainer: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: COLORS.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.md,
+    marginTop: 2,
+  } as ViewStyle,
+  tipNumber: {
+    ...bodyStrongText,
+    color: COLORS.primary,
+    fontSize: 14,
+  } as TextStyle,
+  tipContent: {
+    flex: 1,
   } as ViewStyle,
   recipeTipsText: {
     ...bodyTextLoose,
     color: COLORS.textDark,
-    lineHeight: 28,
-    fontSize: 17,
+    lineHeight: 24,
+    fontSize: 16,
   } as TextStyle,
-  tipItem: {
-    marginBottom: SPACING.md,
-  } as ViewStyle,
   // --- Save Button Styles ---
   saveButtonContainer: {
     position: 'absolute',

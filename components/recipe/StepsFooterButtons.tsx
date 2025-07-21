@@ -44,10 +44,10 @@ const StepsFooterButtons: React.FC<StepsFooterButtonsProps> = ({
       {hasRecipeTips && (
         <View style={styles.buttonRow}>
           <TouchableOpacity
-            style={styles.button}
+            style={styles.recipeTipsButton}
             onPress={onRecipeTipsPress}
           >
-            <Text style={styles.buttonText}>Recipe Tips</Text>
+            <Text style={styles.recipeTipsButtonText}>Recipe Tips</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -57,9 +57,13 @@ const StepsFooterButtons: React.FC<StepsFooterButtonsProps> = ({
 
 const styles = StyleSheet.create({
   footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     paddingHorizontal: SPACING.pageHorizontal,
     paddingTop: SPACING.md,
-    paddingBottom: SPACING.lg,
+    paddingBottom: SPACING.xxl,
     backgroundColor: COLORS.white,
     borderTopWidth: BORDER_WIDTH.hairline,
     borderTopColor: COLORS.divider,
@@ -69,7 +73,7 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     marginBottom: SPACING.sm,
   } as ViewStyle,
-  button: {
+  recipeTipsButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
@@ -77,11 +81,13 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.sm,
     borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
   } as ViewStyle,
-  buttonText: {
+  recipeTipsButtonText: {
     ...bodyStrongText,
-    color: COLORS.white,
+    color: COLORS.primary,
     fontSize: 14,
   } as TextStyle,
   timerButton: {

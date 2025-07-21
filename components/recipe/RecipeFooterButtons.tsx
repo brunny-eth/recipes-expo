@@ -168,10 +168,16 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
 
 const styles = StyleSheet.create({
   footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     paddingHorizontal: SPACING.pageHorizontal,
     paddingTop: SPACING.md,
-    paddingBottom: 0,
+    paddingBottom: SPACING.xxl,
     backgroundColor: COLORS.white,
+    borderTopWidth: BORDER_WIDTH.hairline,
+    borderTopColor: COLORS.divider,
   } as ViewStyle,
   nextButton: {
     backgroundColor: COLORS.primary,
