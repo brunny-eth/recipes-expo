@@ -2,6 +2,66 @@ import { CombinedParsedRecipe, StructuredIngredient } from '../common/types';
 import { parseIngredientDisplayName } from './ingredientHelpers';
 import { parseAmountString } from './recipeUtils';
 
+/**
+ * Converts decimal amounts to readable fractions for grocery list display
+ */
+export function formatAmountForGroceryDisplay(amount: number | null): string | null {
+  if (amount === null || amount === 0) {
+    return null;
+  }
+
+  // Common fractions that are easy to read
+  const commonFractions: { [key: number]: string } = {
+    0.125: '⅛',
+    0.25: '¼',
+    0.375: '⅜',
+    0.5: '½',
+    0.625: '⅝',
+    0.75: '¾',
+    0.875: '⅞',
+    0.33: '⅓',
+    0.67: '⅔',
+    0.2: '⅕',
+    0.4: '⅖',
+    0.6: '⅗',
+    0.8: '⅘',
+  };
+
+  // Check if it's a whole number
+  if (Number.isInteger(amount)) {
+    return amount.toString();
+  }
+
+  // Check if it's a common fraction
+  const rounded = Math.round(amount * 1000) / 1000; // Round to 3 decimal places
+  if (commonFractions[rounded]) {
+    return commonFractions[rounded];
+  }
+
+  // Check for mixed numbers (e.g., 1.5 = 1 ½)
+  const wholePart = Math.floor(amount);
+  const decimalPart = amount - wholePart;
+  const roundedDecimal = Math.round(decimalPart * 1000) / 1000;
+  
+  if (wholePart > 0 && commonFractions[roundedDecimal]) {
+    return `${wholePart} ${commonFractions[roundedDecimal]}`;
+  }
+
+  // For other decimals, try to find a close fraction
+  const tolerance = 0.01;
+  for (const [decimal, fraction] of Object.entries(commonFractions)) {
+    if (Math.abs(rounded - parseFloat(decimal)) < tolerance) {
+      if (wholePart > 0) {
+        return `${wholePart} ${fraction}`;
+      }
+      return fraction;
+    }
+  }
+
+  // If no good fraction found, return the original decimal as a string
+  return amount.toString();
+}
+
 export interface GroceryListItem {
   item_name: string;
   original_ingredient_text: string;

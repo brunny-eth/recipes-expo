@@ -35,6 +35,7 @@ import ScreenHeader from '@/components/ScreenHeader';
 import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
 import { parseServingsValue } from '@/utils/recipeUtils';
 import { useCooking } from '@/context/CookingContext';
+import { formatIngredientsForGroceryList, getBasicGroceryCategory, formatAmountForGroceryDisplay } from '@/utils/groceryHelpers';
 
 // Cache removed - always fetch fresh data for consistency
 
@@ -589,7 +590,7 @@ export default function MiseScreen() {
             styles.groceryItemText,
             groceryItem.checked && styles.groceryItemChecked
           ]}>
-            {groceryItem.amount ? `${groceryItem.amount}` : ''}
+            {groceryItem.amount ? `${formatAmountForGroceryDisplay(groceryItem.amount)}` : ''}
             {groceryItem.unit ? ` ${groceryItem.unit}` : ''}
             {groceryItem.amount || groceryItem.unit ? ' ' : ''}
             {groceryItem.name}
