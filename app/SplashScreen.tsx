@@ -57,7 +57,7 @@ function SplashScreenMeez({ onFinish }: { onFinish: () => void }) {
     const finishTimeout = setTimeout(() => {
       console.log('[SplashScreenMeez] Animation sequence complete, calling onFinish');
       onFinish();
-    }, 2000); // Reduced from 3 seconds to 2 seconds for faster testing
+    }, 2500); 
 
     // FALLBACK TIMEOUT: Force app to continue after 5 seconds to prevent getting stuck
     const fallbackTimeout = setTimeout(() => {
@@ -101,7 +101,7 @@ function SplashScreenMeez({ onFinish }: { onFinish: () => void }) {
           </Animated.View>
         </View>
         <View style={styles.taglineContainer}>
-          <Animated.Text style={[styles.tagline, { opacity: taglineOpacity }]}>Mise en place for the at-home chef</Animated.Text>
+          <Animated.Text style={[styles.tagline, { opacity: taglineOpacity }]}>Mise en place for the home cook</Animated.Text>
         </View>
       </View>
     </ReanimatedAnimated.View>
@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
   },
   taglineContainer: {
     width: '100%',
-    maxWidth: 300,
+    maxWidth: 330,
     alignItems: 'center',
     justifyContent: 'center',
   },

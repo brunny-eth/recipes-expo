@@ -400,12 +400,16 @@ export default function HomeScreen() {
         <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
           <View style={styles.contentContainer}>
             <View style={styles.headerContainer}>
-              <Text style={styles.mainFeatureText}>Prep and cook, your way</Text>
+              <View style={{ width: '90%', maxWidth: 340, alignSelf: 'center' }}>
+                <Text style={styles.mainFeatureText}>Home base for home cooks</Text>
+              </View>
             </View>
             <View style={styles.secondaryTextContainer}>
-              <Text style={styles.subheadingText}>
-                Paste a link or a recipe idea. Customize it, skip distractions, and cook without clutter.
-              </Text>
+              <View style={{ width: '90%', maxWidth: 340, alignSelf: 'center' }}>
+                <Text style={styles.subheadingText}>
+                  Paste a link or recipe idea to get started.
+                </Text>
+              </View>
             </View>
           </View>
 
@@ -485,10 +489,11 @@ const styles = StyleSheet.create({
   },
   headerContainer: {
     alignItems: 'center',
-    marginBottom: SPACING.xxl,
-    maxWidth: 340,
+    marginBottom: SPACING.xxxl,
+    maxWidth: 365,
     alignSelf: 'center',
     paddingHorizontal: SPACING.md,
+    marginTop: -SPACING.lg,
   },
   keyboardAvoidingView: {
     flex: 1,
@@ -520,7 +525,7 @@ const styles = StyleSheet.create({
   secondaryTextContainer: {
     alignItems: 'center',
     marginBottom: SPACING.lg,
-    maxWidth: 340,
+    maxWidth: 365,
     alignSelf: 'center',
     paddingHorizontal: SPACING.md,
   },

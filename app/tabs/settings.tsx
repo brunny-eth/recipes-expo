@@ -8,11 +8,14 @@ import {
   ViewStyle,
   TextStyle,
   Linking,
+  Alert,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Updates from 'expo-updates';
 import {
   bodyText,
   bodyStrongText,
@@ -89,6 +92,31 @@ export default function SettingsScreen() {
               onPress={() => router.push('/debug' as any)}
             >
               <Text style={styles.linkText}>Open Debug Menu</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.linkRow}
+              onPress={async () => {
+                try {
+                  await AsyncStorage.removeItem('hasLaunched');
+                  Alert.alert(
+                    'Welcome Screen Reset',
+                    'The welcome screen has been reset. The app will now reload.',
+                    [
+                      {
+                        text: 'OK',
+                        onPress: () => {
+                          Updates.reloadAsync();
+                        },
+                      },
+                    ],
+                  );
+                } catch (error) {
+                  console.error('Failed to reset welcome screen:', error);
+                  Alert.alert('Error', 'Failed to reset welcome screen');
+                }
+              }}
+            >
+              <Text style={styles.linkText}>Reset Welcome Screen</Text>
             </TouchableOpacity>
           </View>
         )}

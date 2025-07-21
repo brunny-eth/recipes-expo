@@ -241,10 +241,11 @@ function RootLayoutNav() {
   }, []); // Empty dependencies to ensure stable reference
 
   // === FINAL SPLASH SCREEN HIDE LOGIC ===
-  // Hide native splash only when everything is ready and we're showing the main app
+  // Hide native splash as soon as custom splash is done and next content is ready
   useEffect(() => {
-    if (isReadyToRender && splashAnimationComplete && !isFirstLaunch) {
-      console.log('[RootLayoutNav][Effect: hideNativeSplash] Hiding native splash (SplashScreen.hideAsync).');
+    if (splashAnimationComplete && isReadyToRender) {
+      console.log('[RootLayoutNav][Effect: hideNativeSplash] Hiding native splash - next content ready to render:', 
+        isFirstLaunch ? 'WelcomeScreen' : 'AppNavigators');
       SplashScreen.hideAsync();
     }
   }, [isReadyToRender, splashAnimationComplete, isFirstLaunch]);
@@ -262,19 +263,26 @@ function RootLayoutNav() {
     
     // 2. If app is ready AND splash animation is complete AND it's the first launch, show Welcome Screen
     if (isFirstLaunch === true) {
-      console.log('[RootLayoutNav][useMemo] Returning WelcomeScreen');
-      return <WelcomeScreen onDismiss={handleWelcomeDismiss} />;
+      console.log('[RootLayoutNav][useMemo] Returning WelcomeScreen with fade-in animation');
+      return (
+        <Animated.View 
+          style={{ flex: 1, backgroundColor: COLORS.background }}
+          entering={FadeIn.duration(400)}
+        >
+          <WelcomeScreen onDismiss={handleWelcomeDismiss} />
+        </Animated.View>
+      );
     }
 
     // 3. Otherwise, app is ready AND splash animation is complete AND it's not the first launch (or welcome dismissed), show main app
-    console.log('[RootLayoutNav][useMemo] Returning AppNavigators');
+    console.log('[RootLayoutNav][useMemo] Returning AppNavigators with fade-in animation');
     return (
       <Animated.View 
         style={{ 
           flex: 1,
           backgroundColor: COLORS.background,
         }}
-        entering={FadeIn.duration(400).delay(100)}
+        entering={FadeIn.duration(400)}
       >
         <StatusBar style="dark" />
         <AppNavigators />
