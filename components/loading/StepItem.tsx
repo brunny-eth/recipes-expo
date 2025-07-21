@@ -26,7 +26,7 @@ const stateConfig = {
     subtextColor: COLORS.textSubtle,
   },
   complete: {
-    labelColor: COLORS.accent,
+    labelColor: COLORS.primary,
     subtextColor: COLORS.textSubtle,
   },
 };

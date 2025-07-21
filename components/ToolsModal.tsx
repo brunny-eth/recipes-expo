@@ -21,9 +21,10 @@ import { COLORS } from '@/constants/theme';
 import TimerTool from './TimerTool';
 import UnitsTool from './UnitsTool';
 import HelpTool from './HelpTool';
+import AIChatTool from './AIChatTool';
 import { sectionHeaderText } from '@/constants/typography';
 
-export type ActiveTool = 'timer' | 'units' | 'help' | null;
+export type ActiveTool = 'timer' | 'units' | 'help' | 'aiChat' | null;
 
 interface ToolsModalProps {
   isVisible: boolean;
@@ -79,6 +80,8 @@ export default function ToolsModal({
         return <UnitsTool />;
       case 'help':
         return <HelpTool recipeInstructions={recipeInstructions} />;
+      case 'aiChat':
+        return <AIChatTool recipeInstructions={recipeInstructions} recipeSubstitutions={recipeSubstitutions} />;
       default:
         return (
           <View style={styles.placeholderContainer}>
@@ -119,6 +122,7 @@ export default function ToolsModal({
               style={[
                 styles.toolContentContainer,
                 activeTool === 'help' && styles.toolContentContainerHelpActive,
+                activeTool === 'aiChat' && styles.toolContentContainerAIChatActive,
               ]}
             >
               {renderToolContent()}
@@ -142,12 +146,12 @@ const styles = StyleSheet.create({
   },
   modalView: {
     width: '100%',
-    maxWidth: 400,
+    maxWidth: 450,
     backgroundColor: COLORS.white,
     borderRadius: 20,
-    paddingTop: 45,
-    paddingBottom: 25,
-    paddingHorizontal: 25,
+    paddingTop: 50,
+    paddingBottom: 30,
+    paddingHorizontal: 30,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: {
@@ -173,6 +177,12 @@ const styles = StyleSheet.create({
   },
   toolContentContainerHelpActive: {
     minHeight: 450,
+    width: '100%',
+    justifyContent: 'flex-start',
+    alignItems: 'stretch',
+  },
+  toolContentContainerAIChatActive: {
+    minHeight: 500,
     width: '100%',
     justifyContent: 'flex-start',
     alignItems: 'stretch',

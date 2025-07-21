@@ -23,7 +23,7 @@ import { normalizeError } from '@/utils/normalizeError';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import { CombinedParsedRecipe as ParsedRecipe } from '../../common/types';
 import { FONT } from '@/constants/typography';
-import LogoHeaderLayout from '../LogoHeaderLayout';
+import { Image } from 'react-native';
 import { getErrorMessage, getNetworkErrorMessage } from '../../utils/errorMessages';
 import { ParseErrorCode } from '../../common/types/errors';
 
@@ -298,16 +298,21 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
   if (loadingMode === 'checklist') {
     return (
       <View style={{ flex: 1 }}>
-        <LogoHeaderLayout>
-          {!hideChecklist && (
-            <View style={styles.contentWrapper}>
-              <Text style={styles.tagline}>{getTagline()}</Text>
-              <View style={styles.checklistContainer}>
-                <ChecklistProgress isFinished={isParsingFinished} inputType={inputType} />
-              </View>
+        <View style={styles.logoContainer}>
+          <Image
+            source={require('@/assets/images/meezblue_underline.webp')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+        </View>
+        {!hideChecklist && (
+          <View style={styles.contentWrapper}>
+            <Text style={styles.tagline}>{getTagline()}</Text>
+            <View style={styles.checklistContainer}>
+              <ChecklistProgress isFinished={isParsingFinished} inputType={inputType} />
             </View>
-          )}
-        </LogoHeaderLayout>
+          </View>
+        )}
         {(showSpinner || checkmarkShown) && (
           <View 
             style={styles.overlayContainer}
@@ -346,16 +351,13 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
   }
 
   return (
-    <LogoHeaderLayout>
-      <View style={styles.logoContainer}>
-        <Text style={styles.loadingText}>Loading....</Text>
-        <View style={styles.loadingIndicator} />
-        <Text style={styles.loadingHint}>
-          just a moment while we transform the recipe into something more
-          useful...
-        </Text>
-      </View>
-    </LogoHeaderLayout>
+    <View style={styles.logoContainer}>
+      <Image
+        source={require('@/assets/images/meezblue_underline.webp')}
+        style={styles.logo}
+        resizeMode="contain"
+      />
+    </View>
   );
 };
 
@@ -369,7 +371,15 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   logoContainer: {
     alignItems: 'center',
+    paddingTop: 24,
+    marginBottom: SPACING.md,
   } as ViewStyle,
+  logo: {
+    width: 220,
+    height: 120,
+    marginBottom: SPACING.md,
+    alignSelf: 'center',
+  } as ImageStyle,
   tagline: {
     fontSize: FONT.size.smBody,
     fontFamily: FONT.family.inter,

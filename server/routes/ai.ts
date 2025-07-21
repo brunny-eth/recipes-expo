@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import logger from '../lib/logger';
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold, Content } from "@google/generative-ai";
 import OpenAI from 'openai';
+import { buildChatSystemPrompt } from '../llm/chatPrompts';
 
 // Initialize the Google AI client using the secure, backend-only environment variable.
 const googleApiKey = process.env.GOOGLE_API_KEY;
@@ -48,20 +49,10 @@ router.post('/chat', async (req: Request, res: Response) => {
     let historyForApi: Content[] = [...history];
     let promptForApi = userMessage;
 
-    if (history.length === 0 && recipeContext) {
-        let contextText = "You are a friendly and helpful recipe assistant. \n";
-        contextText += "The user is currently working on the following recipe:\n\n";
-        contextText += "Instructions:\n";
-        recipeContext.instructions.forEach((step: string, index: number) => {
-            contextText += `${index + 1}. ${step}\n`;
-        });
-        if (recipeContext.substitutions) {
-            contextText += `\nNotes on substitutions: ${recipeContext.substitutions}\n`;
-        }
-        contextText += "\n--- END OF RECIPE CONTEXT ---\n\n";
-        contextText += "Now, please answer the user's question about this recipe. Be concise and helpful.\n";
-
-        historyForApi = [{ role: "user", parts: [{ text: contextText }] }];
+    // Add system prompt for first message or when recipe context is provided
+    if (history.length === 0) {
+        const systemPrompt = buildChatSystemPrompt(recipeContext);
+        historyForApi = [...systemPrompt, ...historyForApi];
     }
 
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp", safetySettings });
