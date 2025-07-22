@@ -108,11 +108,9 @@ export function normalizeName(name: string): string {
     'salted', 'unsalted', 'low-sodium', 'lower-sodium', 'toasted'
   ];
   
-  adjectivesToRemove.forEach(adj => {
-    // Use word boundaries to avoid partial matches (e.g., 'raw' in 'strawberry')
-    const pattern = new RegExp(`\\b${adj}\\b`, 'gi');
-    normalized = normalized.replace(pattern, '');
-  });
+  // Create a regex pattern that matches any of the adjectives as whole words
+  const pattern = new RegExp(`\\b(${adjectivesToRemove.join('|')})\\b`, 'gi');
+  normalized = normalized.replace(pattern, '');
 
   // Clean up extra spaces that may have been left by removing adjectives
   normalized = normalized.replace(/\s+/g, ' ').trim();
@@ -150,25 +148,35 @@ export function normalizeName(name: string): string {
 }
 
 /**
- * A dictionary to normalize common units to a canonical form.
+ * A dictionary to normalize common units to the canonical short-form
+ * required by the `units.ts` conversion utility.
  */
 const unitDictionary: { [key: string]: string } = {
-  'tsp': 'teaspoon', 'tsps': 'teaspoon', 'teaspoon': 'teaspoon', 'teaspoons': 'teaspoon',
-  'tbsp': 'tablespoon', 'tbsps': 'tablespoon', 'tablespoon': 'tablespoon', 'tablespoons': 'tablespoon',
-  'oz': 'ounce', 'ounces': 'ounce',
-  'lb': 'pound', 'lbs': 'pound', 'pound': 'pound', 'pounds': 'pound',
-  'g': 'gram', 'grams': 'gram',
-  'kg': 'kilogram', 'kgs': 'kilogram', 'kilogram': 'kilogram', 'kilograms': 'kilogram',
-  'ml': 'milliliter', 'milliliters': 'milliliter',
-  'l': 'liter', 'liters': 'liter',
-  'clove': 'clove', 'cloves': 'clove',
-  'cup': 'cup', 'cups': 'cup',
-  'pinch': 'pinch', 'pinches': 'pinch',
-  'dash': 'dash', 'dashes': 'dash',
+  // Teaspoon
+  tsp: 'tsp', tsps: 'tsp', teaspoon: 'tsp', teaspoons: 'tsp',
+  // Tablespoon
+  tbsp: 'tbsp', tbsps: 'tbsp', tablespoon: 'tbsp', tablespoons: 'tbsp',
+  // Ounce
+  oz: 'oz', ounces: 'oz', 'fl oz': 'fl_oz', 'fluid ounce': 'fl_oz', 'fluid ounces': 'fl_oz',
+  // Pound
+  lb: 'lb', lbs: 'lb', pound: 'lb', pounds: 'lb',
+  // Gram
+  g: 'g', gram: 'g', grams: 'g',
+  // Kilogram
+  kg: 'kg', kgs: 'kg', kilogram: 'kg', kilograms: 'kg',
+  // Milliliter
+  ml: 'ml', milliliter: 'ml', milliliters: 'ml',
+  // Liter
+  l: 'l', liter: 'l', liters: 'l',
+  // Count
+  clove: 'clove', cloves: 'clove',
+  cup: 'cup', cups: 'cup',
+  pinch: 'pinch', pinches: 'pinch',
+  dash: 'dash', dashes: 'dash',
 };
 
 /**
- * Normalizes a unit to its canonical form using the dictionary.
+ * Normalizes a unit to its canonical short-form.
  * Returns null if the unit is not found or is empty.
  */
 function normalizeUnit(unit: string | null): string | null {
