@@ -36,6 +36,7 @@ import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
 import { parseServingsValue } from '@/utils/recipeUtils';
 import { useCooking } from '@/context/CookingContext';
 import { formatIngredientsForGroceryList, getBasicGroceryCategory, formatAmountForGroceryDisplay } from '@/utils/groceryHelpers';
+import { getUnitDisplayName } from '@/utils/units';
 
 // Cache removed - always fetch fresh data for consistency
 
@@ -472,8 +473,9 @@ export default function MiseScreen() {
         // Add items with clear checkbox intent
         category.items.forEach(item => {
           const checkbox = item.checked ? '✓' : '□';
-          const amount = item.amount ? `${item.amount}` : '';
-          const unit = item.unit ? ` ${item.unit}` : '';
+          const amount = item.amount ? `${formatAmountForGroceryDisplay(item.amount)}` : '';
+          const unitDisplay = getUnitDisplayName(item.unit as any, item.amount || 1);
+          const unit = unitDisplay ? ` ${unitDisplay}` : '';
           const displayText = `${amount}${unit} ${item.name}`.trim();
           
           plainText += `${checkbox} ${displayText}\n`;
@@ -597,7 +599,10 @@ export default function MiseScreen() {
             groceryItem.checked && styles.groceryItemChecked
           ]}>
             {groceryItem.amount ? `${formatAmountForGroceryDisplay(groceryItem.amount)}` : ''}
-            {groceryItem.unit ? ` ${groceryItem.unit}` : ''}
+            {(() => {
+              const unitDisplay = getUnitDisplayName(groceryItem.unit as any, groceryItem.amount || 1);
+              return unitDisplay ? ` ${unitDisplay}` : '';
+            })()}
             {groceryItem.amount || groceryItem.unit ? ' ' : ''}
             {groceryItem.name}
           </Text>

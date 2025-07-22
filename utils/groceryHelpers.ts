@@ -1,76 +1,20 @@
 import { CombinedParsedRecipe, StructuredIngredient } from '../common/types';
 import { parseIngredientDisplayName } from './ingredientHelpers';
 import { parseAmountString } from './recipeUtils';
-import { parse, toFraction } from 'fraction.js';
-import { convertUnits, availableUnits } from './units';
+import { parse } from 'fraction.js';
+import { formatMeasurement } from './format';
+import { convertUnits, availableUnits, Unit, getUnitDisplayName } from './units';
 
 /**
  * Converts decimal amounts to readable fractions for grocery list display
  */
 export function formatAmountForGroceryDisplay(amount: number | null): string | null {
-  console.log('[groceryHelpers] 🔢 Formatting amount:', amount);
   if (amount === null || amount === 0) {
     return null;
   }
 
-  // Common fractions that are easy to read
-  const commonFractions: { [key: number]: string } = {
-    0.125: '⅛',
-    0.25: '¼',
-    0.375: '⅜',
-    0.5: '½',
-    0.625: '⅝',
-    0.75: '¾',
-    0.875: '⅞',
-    0.33: '⅓',
-    0.67: '⅔',
-    0.2: '⅕',
-    0.4: '⅖',
-    0.6: '⅗',
-    0.8: '⅘',
-  };
-
-  // Check if it's a whole number
-  if (Number.isInteger(amount)) {
-    console.log('[groceryHelpers] 🔢 Whole number:', amount.toString());
-    return amount.toString();
-  }
-
-  // Check if it's a common fraction
-  const rounded = Math.round(amount * 1000) / 1000; // Round to 3 decimal places
-  if (commonFractions[rounded]) {
-    console.log('[groceryHelpers] 🔢 Common fraction:', commonFractions[rounded]);
-    return commonFractions[rounded];
-  }
-
-  // Check for mixed numbers (e.g., 1.5 = 1 ½)
-  const wholePart = Math.floor(amount);
-  const decimalPart = amount - wholePart;
-  const roundedDecimal = Math.round(decimalPart * 1000) / 1000;
-  
-  if (wholePart > 0 && commonFractions[roundedDecimal]) {
-    const result = `${wholePart} ${commonFractions[roundedDecimal]}`;
-    console.log('[groceryHelpers] 🔢 Mixed number:', result);
-    return result;
-  }
-
-  // For other decimals, try to find a close fraction
-  const tolerance = 0.01;
-  for (const [decimal, fraction] of Object.entries(commonFractions)) {
-    if (Math.abs(rounded - parseFloat(decimal)) < tolerance) {
-      if (wholePart > 0) {
-        const result = `${wholePart} ${fraction}`;
-        console.log('[groceryHelpers] 🔢 Approximate mixed number:', result);
-        return result;
-      }
-      console.log('[groceryHelpers] 🔢 Approximate fraction:', fraction);
-      return fraction;
-    }
-  }
-
-  // If no good fraction found, return the original decimal as a string
-  console.log('[groceryHelpers] 🔢 Using decimal:', amount.toString());
-  return amount.toString();
+  // Use the existing formatMeasurement function which already handles fractions properly
+  return formatMeasurement(amount);
 }
 
 export interface GroceryListItem {
@@ -132,17 +76,19 @@ export function normalizeName(name: string): string {
     normalized = 'garlic';
   }
   
-  // Handle sesame seed variations - normalize all to "sesame seed"
-  if (normalized === 'sesame seed' || normalized === 'sesame seeds') {
-    console.log('[groceryHelpers] 🌱 SESAME MATCH! Converting:', normalized, '→ sesame seed');
-    normalized = 'sesame seed';
+  // Handle egg variations - normalize all to "eggs" (plural is more common for shopping)
+  if (normalized === 'egg' || normalized === 'eggs') {
+    console.log('[groceryHelpers] 🥚 EGG MATCH! Converting:', normalized, '→ eggs');
+    normalized = 'eggs';
   }
   
   // Simple pluralization check - remove trailing 's' but be careful with exceptions
   const pluralExceptions = [
     'beans', 'peas', 'lentils', 'oats', 'grits', 'grains',
     'noodles', 'brussels sprouts', 'green beans',
-    'sesame seeds', 'sunflower seeds', 'pumpkin seeds'
+    'sesame seeds', 'sunflower seeds', 'pumpkin seeds',
+    'blueberries', 'strawberries', 'raspberries', 'blackberries', 'cranberries',
+    'eggs'
   ];
   
   // Only singularize if it's not an exception and ends with 's'
@@ -168,23 +114,24 @@ const unitDictionary: { [key: string]: string } = {
   // Tablespoon
   tbsp: 'tbsp', tbsps: 'tbsp', tablespoon: 'tbsp', tablespoons: 'tbsp',
   'Tbsp': 'tbsp', 'Tbsps': 'tbsp',
-  // Ounce
-  oz: 'oz', ounces: 'oz', 'fl oz': 'fl_oz', 'fluid ounce': 'fl_oz', 'fluid ounces': 'fl_oz',
-  // Pound
-  lb: 'lb', lbs: 'lb', pound: 'lb', pounds: 'lb',
-  // Gram
-  g: 'g', gram: 'g', grams: 'g',
-  // Kilogram
-  kg: 'kg', kgs: 'kg', kilogram: 'kg', kilograms: 'kg',
-  // Milliliter
-  ml: 'ml', milliliter: 'ml', milliliters: 'ml',
-  // Liter
-  l: 'l', liter: 'l', liters: 'l',
-  // Count
-  clove: 'clove', cloves: 'clove',
-  cup: 'cup', cups: 'cup',
-  pinch: 'pinch', pinches: 'pinch',
-  dash: 'dash', dashes: 'dash',
+  // Volume units (match units.ts)
+  'fl oz': 'fl_oz', 'fluid ounce': 'fl_oz', 'fluid ounces': 'fl_oz',
+  'fl. oz': 'fl_oz', 'fl.oz': 'fl_oz', 'floz': 'fl_oz',
+  'cup': 'cup', 'cups': 'cup',
+  'pint': 'pint', 'pints': 'pint', 'pt': 'pint',
+  'quart': 'quart', 'quarts': 'quart', 'qt': 'quart',
+  'gallon': 'gallon', 'gallons': 'gallon', 'gal': 'gallon',
+  'milliliter': 'ml', 'milliliters': 'ml', 'mL': 'ml',
+  'liter': 'liter', 'liters': 'liter', 'L': 'liter', 'l': 'liter',
+  // Count units
+  'clove': 'clove', 'cloves': 'clove',
+  'pinch': 'pinch', 'pinches': 'pinch',
+  'dash': 'dash', 'dashes': 'dash',
+  // Weight units (not converted, must match exactly)
+  'g': 'g', 'gram': 'g', 'grams': 'g',
+  'kg': 'kg', 'kgs': 'kg', 'kilogram': 'kg', 'kilograms': 'kg',
+  'oz': 'oz', 'ounce': 'oz', 'ounces': 'oz',
+  'lb': 'lb', 'lbs': 'lb', 'pound': 'lb', 'pounds': 'lb'
 };
 
 /**
@@ -275,11 +222,27 @@ function areUnitsCompatible(unit1: string | null, unit2: string | null): boolean
 
   // Define unit groups for non-convertible but similar types
   // Weight units can only be compatible with the SAME weight unit (no conversion available)
+  // Define unit groups that can be converted between each other
+  const volumeUnits = new Set([
+    'tsp', 'tbsp', 'cup', 'ml', 'liter',
+    'fl_oz', 'pint', 'quart', 'gallon'
+  ]);
+  
   const weightUnits = new Set(['gram', 'kilogram', 'ounce', 'pound']);
   
-  const countUnits = new Set([
-    'clove', 'piece', 'pinch', 'dash'
-  ]);
+  const countUnits = new Set(['clove', 'piece', 'pinch', 'dash']);
+
+  // Check if both units are volume units (these can be converted)
+  if (volumeUnits.has(normalizedUnit1) && volumeUnits.has(normalizedUnit2)) {
+    console.log('[groceryHelpers] ✅ Both are volume units - can convert:', {
+      unit1: normalizedUnit1,
+      unit2: normalizedUnit2,
+      unit1_in_set: volumeUnits.has(normalizedUnit1),
+      unit2_in_set: volumeUnits.has(normalizedUnit2),
+      volume_units: Array.from(volumeUnits)
+    });
+    return true;
+  }
 
   // Check if both units are weight units - only compatible if they're identical
   if (weightUnits.has(normalizedUnit1) && weightUnits.has(normalizedUnit2)) {
@@ -314,10 +277,15 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
   const groupedByName = new Map<string, GroceryListItem[]>();
   for (const item of items) {
     const normalizedName = normalizeName(item.item_name);
+    // Create a normalized copy of the item
+    const normalizedItem = {
+      ...item,
+      item_name: normalizedName // Use normalized name for grouping
+    };
     if (!groupedByName.has(normalizedName)) {
       groupedByName.set(normalizedName, []);
     }
-    groupedByName.get(normalizedName)!.push(item);
+    groupedByName.get(normalizedName)!.push(normalizedItem);
   }
 
   const finalAggregatedList: GroceryListItem[] = [];
@@ -371,26 +339,71 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
               const normalizedCompareUnit = normalizeUnit(compareItem.quantity_unit);
               
               if (normalizedBaseUnit && normalizedCompareUnit) {
-                const converted = convertUnits(compareAmount, normalizedCompareUnit as any, normalizedBaseUnit as any);
-                if (converted !== null) {
-                  const totalInBaseUnit = baseAmount + converted;
-                  const totalInCompareUnit = convertUnits(baseAmount, normalizedBaseUnit as any, normalizedCompareUnit as any);
+                // Always convert through milliliters as the base unit
+                const baseInMl = convertUnits(baseAmount, normalizedBaseUnit as any, 'ml');
+                const compareInMl = convertUnits(compareAmount, normalizedCompareUnit as any, 'ml');
+                
+                if (baseInMl !== null && compareInMl !== null) {
+                  const totalInMl = baseInMl + compareInMl;
+                  console.log('[groceryHelpers] 📊 Converting amounts:', {
+                    base: { amount: baseAmount, unit: normalizedBaseUnit, inMl: baseInMl },
+                    compare: { amount: compareAmount, unit: normalizedCompareUnit, inMl: compareInMl },
+                    total: { inMl: totalInMl }
+                  });
                   
-                  // Choose the unit that gives a more readable result
-                  // Prefer larger units when the result is more than 16 of the smaller unit
-                  if (totalInBaseUnit > 16 && totalInCompareUnit !== null && totalInCompareUnit < 4) {
-                    // Use the compare unit (larger unit)
-                    finalUnit = compareItem.quantity_unit;
-                    finalAmount = totalInCompareUnit;
-                  } else {
-                    // Use the base unit
-                    finalAmount = totalInBaseUnit;
+                  // Try converting to each unit in order of preference
+                  const preferredUnits: [Unit, number, number][] = [
+                    ['cup', 0.25, 4],      // 1/4 cup to 4 cups
+                    ['fl_oz', 1, 16],      // 1 fl oz to 16 fl oz
+                    ['tbsp', 1, 16],       // 1 tbsp to 16 tbsp
+                    ['tsp', 1, 16],        // 1 tsp to 16 tsp
+                    ['ml', 1, 1000]        // fallback to ml
+                  ];
+                  
+                  let bestUnit: Unit = 'ml';
+                  let bestAmount = totalInMl;
+                  
+                  for (const [unit, min, max] of preferredUnits) {
+                    const amount = convertUnits(totalInMl, 'ml', unit);
+                    if (amount !== null && amount >= min && amount <= max) {
+                      console.log('[groceryHelpers] 📊 Found suitable unit:', {
+                        unit,
+                        amount,
+                        min,
+                        max
+                      });
+                      bestUnit = unit;
+                      bestAmount = amount;
+                      break;
+                    }
                   }
+                  
+                  finalUnit = bestUnit.toString();
+                  finalAmount = bestAmount;
+                  
+                  console.log('[groceryHelpers] 📊 Final conversion:', {
+                    totalInMl,
+                    finalUnit,
+                    finalAmount,
+                    displayUnit: getUnitDisplayName(finalUnit as Unit, finalAmount)
+                  });
                 } else {
-                  finalAmount = baseAmount + compareAmount; // Fallback if conversion fails
+                  console.warn('[groceryHelpers] ⚠️ Unit conversion failed:', {
+                    baseUnit: normalizedBaseUnit,
+                    compareUnit: normalizedCompareUnit,
+                    baseAmount,
+                    compareAmount
+                  });
+                  // No fallback - if conversion fails, don't aggregate
+                  continue;
                 }
               } else {
-                finalAmount = baseAmount + compareAmount; // Fallback if normalization fails
+                console.warn('[groceryHelpers] ⚠️ Unit normalization failed:', {
+                  baseUnit: baseItem.quantity_unit,
+                  compareUnit: compareItem.quantity_unit
+                });
+                // No fallback - if normalization fails, don't aggregate
+                continue;
               }
             } else {
               finalAmount = baseAmount + compareAmount;
@@ -398,8 +411,8 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
             
             baseItem.quantity_amount = finalAmount;
             baseItem.quantity_unit = finalUnit;
-            // Keep the original display unit if we're using that unit, otherwise use the new unit
-            baseItem.display_unit = finalUnit === baseItem.quantity_unit ? baseItem.display_unit : compareItem.display_unit;
+            // Always use standardized display unit based on final amount
+            baseItem.display_unit = getUnitDisplayName(finalUnit as Unit, finalAmount);
             baseItem.original_ingredient_text += ` | ${compareItem.original_ingredient_text}`;
             processedIndices.add(j);
           }
@@ -462,13 +475,16 @@ export function formatIngredientsForGroceryList(
         // Standardize the unit immediately
         const standardizedUnit = normalizeUnit(ingredient.unit);
         
+        // Parse amount first to use for display unit
+        const amount = parseAmountString(ingredient.amount);
+        
         // Create grocery list item from final ingredient
         const groceryItem = {
           item_name: parsedName.baseName, // Use base name without substitution text
           original_ingredient_text: originalText,
-          quantity_amount: parseAmountString(ingredient.amount), // Use proper amount parsing
+          quantity_amount: amount, // Use proper amount parsing
           quantity_unit: standardizedUnit, // Use standardized unit internally
-          display_unit: ingredient.unit || null, // Keep original unit for display
+          display_unit: standardizedUnit ? getUnitDisplayName(standardizedUnit as Unit, amount || 1) : null,
           grocery_category: (ingredient as any).grocery_category || null, // Use pre-categorized data if available
           is_checked: false,
           order_index: orderIndex++,
