@@ -77,14 +77,19 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
     ingredient.name,
   );
 
-  // Debug undo button logic
-  if (ingredient.name.includes('butter') || ingredient.name.includes('sugar')) {
+  // Debug undo button logic for problematic ingredients
+  if (ingredient.name.includes('butter') || ingredient.name.includes('sugar') || 
+      ingredient.name.includes('flank') || ingredient.name.includes('paprika') ||
+      ingredient.name.includes('milk') || ingredient.name.includes('onion') ||
+      ingredient.name.includes('cherry tomatoes') || ingredient.name.includes('pickled')) {
     console.log(`[DEBUG] ${ingredient.name} undo logic:`, {
+      rawIngredientName: ingredient.name,
       isRemoved,
       substitutedFor,
       isViewingSavedRecipe,
       shouldShowRemovalUndo: isRemoved && !isViewingSavedRecipe,
       shouldShowSubstitutionUndo: substitutedFor && !isRemoved && !isViewingSavedRecipe,
+      parsedIngredient: parseIngredientDisplayName(ingredient.name)
     });
   }
 

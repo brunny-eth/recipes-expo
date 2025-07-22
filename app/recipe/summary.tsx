@@ -238,6 +238,8 @@ export default function RecipeSummaryScreen() {
   const [isSourceExpanded, setIsSourceExpanded] = useState(false);
   const [isRecipeSizeExpanded, setIsRecipeSizeExpanded] = useState(false);
   const [isDescriptionTextExpanded, setIsDescriptionTextExpanded] = useState(false);
+  // State to track if image failed to load
+  const [imageLoadFailed, setImageLoadFailed] = useState(false);
   const [isIngredientsExpanded, setIsIngredientsExpanded] = useState(false);
 
   const [originalYieldValue, setOriginalYieldValue] = useState<number | null>(
@@ -488,6 +490,9 @@ export default function RecipeSummaryScreen() {
           return;
         }
         setRecipe(parsed);
+        
+        // Reset image load failure state when new recipe is loaded
+        setImageLoadFailed(false);
         
         // Set original recipe data if available (for consistent scaling)
         if (params.originalRecipeData) {
@@ -748,9 +753,21 @@ export default function RecipeSummaryScreen() {
     setSelectedIngredientOriginalData(null);
     setProcessedSubstitutionsForModal(null);
 
+    console.log('[DEBUG] onApplySubstitution called with:', {
+      substitutionName: substitution.name,
+      isRemoval: substitution.name === 'Remove ingredient',
+      ingredientToSubstitute: ingredientToSubstitute.name,
+      currentAppliedChanges: appliedChanges,
+    });
+
     InteractionManager.runAfterInteractions(() => {
       if (substitution.name === 'Remove ingredient') {
         const currentRemovals = appliedChanges.filter((c) => !c.to).length;
+        console.log('[DEBUG] Removal limit check:', {
+          currentRemovals,
+          limit: 2,
+          willProceed: currentRemovals < 2,
+        });
         if (currentRemovals >= 2) {
           showError('Limit Reached', 'You can only remove up to 2 ingredients.');
           return;
@@ -808,6 +825,14 @@ export default function RecipeSummaryScreen() {
             },
       };
 
+      console.log('[DEBUG] Created newChange object:', {
+        isRemoval,
+        originalNameForSub,
+        substitutionName: substitution.name,
+        newChange,
+        willCreateRemoval: isRemoval ? 'YES - to: null' : 'NO - to: object',
+      });
+
       console.log('[DEBUG] Final substitution change object (with unscaled amount):', {
         newChange,
         toIngredient: newChange.to,
@@ -832,10 +857,14 @@ export default function RecipeSummaryScreen() {
           return updated;
         }
         const newAppliedChanges = [...prev, newChange];
-        console.log('[DEBUG] Added new substitution:', {
+        console.log('[DEBUG] Added new substitution/removal:', {
+          isRemoval,
+          ingredientName: originalNameForSub,
           previousChanges: prev,
           newChange,
           allChanges: newAppliedChanges,
+          previousCount: prev.length,
+          newCount: newAppliedChanges.length,
         });
         return newAppliedChanges;
       });
@@ -1804,9 +1833,12 @@ export default function RecipeSummaryScreen() {
             willRenderImage: !!imageUrl
           });
           
-          if (!imageUrl) {
-            console.log('[DEBUG] No image URL - collapsing image area');
-            return null; // Completely collapse when no image
+          if (!imageUrl || imageLoadFailed) {
+            console.log('[DEBUG] No image URL or image failed to load - collapsing image area', {
+              hasImageUrl: !!imageUrl,
+              imageLoadFailed
+            });
+            return null; // Completely collapse when no image or image fails to load
           }
 
           const sourceUrl = recipe.sourceUrl;
@@ -1837,6 +1869,10 @@ export default function RecipeSummaryScreen() {
                     borderRadius: RADIUS.md,
                   }}
                   resizeMode="cover"
+                  onError={() => {
+                    console.log('[DEBUG] Image failed to load, collapsing image area:', imageUrl);
+                    setImageLoadFailed(true);
+                  }}
                 />
               </TouchableOpacity>
             );
@@ -1851,6 +1887,10 @@ export default function RecipeSummaryScreen() {
                   marginBottom: SPACING.md,
                 }}
                 resizeMode="cover"
+                onError={() => {
+                  console.log('[DEBUG] Image failed to load, collapsing image area:', imageUrl);
+                  setImageLoadFailed(true);
+                }}
               />
             );
           }

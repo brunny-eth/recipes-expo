@@ -311,14 +311,39 @@ export function parseIngredientDisplayName(name: string): {
     return { baseName: '', substitutionText: null };
   }
 
+  // FIRST: Check for removal markers before any other processing
+  let isRemoved = false;
+  let originalName = name;
+  
+  // Check for "(removed)" parenthetical marker
+  if (name.includes('(removed)')) {
+    isRemoved = true;
+    originalName = name.replace(/\s*\(removed\)\s*/i, '').trim();
+    console.log('[ingredientHelpers] 🗑️ Found removal marker:', {
+      originalName: name,
+      cleanedName: originalName,
+      isRemoved
+    });
+  }
+  
+  // Check for "removed:" prefix marker
+  if (originalName.toLowerCase().includes('removed:')) {
+    isRemoved = true;
+    originalName = originalName.replace(/^removed:\s*/i, '').trim();
+    console.log('[ingredientHelpers] 🗑️ Found removal prefix:', {
+      cleanedName: originalName,
+      isRemoved
+    });
+  }
+
   // Split on substitution markers
   const substitutionMarkers = [' or ', ' (or ', ' / ', ' OR ', ' / ', '/'];
-  let baseName = name;
+  let baseName = originalName;
   let substitutionText = null;
 
   for (const marker of substitutionMarkers) {
-    if (name.includes(marker)) {
-      const parts = name.split(marker);
+    if (originalName.includes(marker)) {
+      const parts = originalName.split(marker);
       baseName = parts[0].trim();
       substitutionText = parts.slice(1).join(marker).trim();
       // Remove trailing parenthesis if present
@@ -334,23 +359,20 @@ export function parseIngredientDisplayName(name: string): {
     }
   }
 
-  // Clean up any remaining parenthetical notes
-  const parenMatch = baseName.match(/^(.*?)\s*\(.*\)\s*$/);
-  if (parenMatch) {
-    baseName = parenMatch[1].trim();
-    console.log('[ingredientHelpers] 🧹 Cleaned parenthetical:', baseName);
+  // Clean up any remaining parenthetical notes (but not removal markers)
+  if (!isRemoved) {
+    const parenMatch = baseName.match(/^(.*?)\s*\(.*\)\s*$/);
+    if (parenMatch) {
+      baseName = parenMatch[1].trim();
+      console.log('[ingredientHelpers] 🧹 Cleaned parenthetical:', baseName);
+    }
   }
 
   console.log('[ingredientHelpers] ✅ Parsed result:', {
     baseName,
-    substitutionText
+    substitutionText,
+    isRemoved
   });
-  
-  // Check if this is a removed ingredient
-  const isRemoved = baseName.toLowerCase().includes('removed:');
-  if (isRemoved) {
-    baseName = baseName.replace(/^removed:\s*/i, '').trim();
-  }
 
   // Check if this is a substituted ingredient
   const substitutedFor = substitutionText;
