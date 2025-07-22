@@ -95,6 +95,7 @@ export interface GroceryListItem {
  * - Makes singular (simple implementation)
  */
 export function normalizeName(name: string): string {
+  // Use console.log for frontend, but this will also work for backend Node.js
   console.log('[groceryHelpers] 🔄 Normalizing name:', name);
   let normalized = name.toLowerCase().trim();
   
@@ -114,12 +115,28 @@ export function normalizeName(name: string): string {
   
   // Handle common unit words that might still be in the name
   // This is a safety net in case parseIngredientDisplayName didn't catch them
-  const residualUnits = ['clove', 'cloves', 'piece', 'pieces'];
+  const residualUnits = ['clove', 'cloves', 'piece', 'pieces', 'head', 'heads', 'bunch', 'bunches'];
   const residualUnitPattern = new RegExp(`\\s+(${residualUnits.join('|')})$`, 'i');
   normalized = normalized.replace(residualUnitPattern, '');
   
+  // Also handle unit words at the beginning (like "garlic clove" -> "garlic")
+  const leadingUnitPattern = new RegExp(`^(${residualUnits.join('|')})\\s+`, 'i');
+  normalized = normalized.replace(leadingUnitPattern, '');
+  
   // Clean up extra spaces
   normalized = normalized.replace(/\s+/g, ' ').trim();
+  
+  // Handle complex herb patterns like "fresh chopped herbs scallions" -> "scallions"
+  if (normalized.includes('herbs') && (normalized.includes('scallion') || normalized.includes('cilantro') || normalized.includes('parsley'))) {
+    // Extract the specific herb from patterns like "fresh chopped herbs scallions"
+    if (normalized.includes('scallion')) {
+      normalized = 'scallion';
+    } else if (normalized.includes('cilantro')) {
+      normalized = 'cilantro';
+    } else if (normalized.includes('parsley')) {
+      normalized = 'parsley';
+    }
+  }
   
   // Simple pluralization check - remove trailing 's' but be careful with exceptions
   const pluralExceptions = [
@@ -454,20 +471,22 @@ export function getBasicGroceryCategory(ingredientName: string): string {
   // PRIORITY 3: Condiments & Sauces (specific liquid/paste items)
   if (hasExactWord(name, 'sauce') || hasExactWord(name, 'ketchup') || hasExactWord(name, 'mustard') ||
       hasExactWord(name, 'mayo') || hasExactWord(name, 'mayonnaise') || hasExactWord(name, 'dressing') ||
-      hasExactPhrase(name, 'soy sauce') || hasExactPhrase(name, 'hot sauce') || hasExactWord(name, 'pickle') ||
-      hasExactWord(name, 'relish') || hasExactWord(name, 'sriracha') || hasExactWord(name, 'worcestershire') ||
-      hasExactPhrase(name, 'barbecue sauce') || hasExactPhrase(name, 'bbq sauce') || hasExactWord(name, 'teriyaki') ||
-      hasExactWord(name, 'tahini') || hasExactWord(name, 'pesto') || hasExactWord(name, 'salsa') ||
-      hasExactWord(name, 'hummus') || hasExactWord(name, 'jam') || hasExactWord(name, 'jelly') ||
-      hasExactWord(name, 'honey') || hasExactPhrase(name, 'maple syrup') || hasExactWord(name, 'syrup') ||
-      hasExactWord(name, 'molasses') || hasExactWord(name, 'agave') || hasExactPhrase(name, 'tomato paste') ||
-      hasExactPhrase(name, 'tomato sauce') || hasExactWord(name, 'marinara') || hasExactWord(name, 'alfredo')) {
+      hasExactPhrase(name, 'soy sauce') || hasExactWord(name, 'tamari') || hasExactPhrase(name, 'hot sauce') || 
+      hasExactWord(name, 'pickle') || hasExactWord(name, 'relish') || hasExactWord(name, 'sriracha') || 
+      hasExactWord(name, 'worcestershire') || hasExactPhrase(name, 'barbecue sauce') || hasExactPhrase(name, 'bbq sauce') || 
+      hasExactWord(name, 'teriyaki') || hasExactWord(name, 'tahini') || hasExactWord(name, 'pesto') || 
+      hasExactWord(name, 'salsa') || hasExactWord(name, 'hummus') || hasExactWord(name, 'jam') || 
+      hasExactWord(name, 'jelly') || hasExactWord(name, 'honey') || hasExactPhrase(name, 'maple syrup') || 
+      hasExactWord(name, 'syrup') || hasExactWord(name, 'molasses') || hasExactWord(name, 'agave') || 
+      hasExactPhrase(name, 'tomato paste') || hasExactPhrase(name, 'tomato sauce') || hasExactWord(name, 'marinara') || 
+      hasExactWord(name, 'alfredo') || hasExactPhrase(name, 'chili paste') || hasExactPhrase(name, 'rice vinegar') ||
+      hasExactWord(name, 'vinegar')) {
     return 'Condiments & Sauces';
   }
   
-  // PRIORITY 4: Pantry Staples (non-perishable dry goods, oils, vinegars)
+  // PRIORITY 4: Pantry Staples (non-perishable dry goods, oils - but NOT vinegars which go to Condiments)
   if (hasExactWord(name, 'flour') || hasExactWord(name, 'sugar') || hasExactWord(name, 'rice') ||
-      hasExactWord(name, 'pasta') || hasExactWord(name, 'oil') || hasExactWord(name, 'vinegar') ||
+      hasExactWord(name, 'pasta') || hasExactWord(name, 'oil') ||
       hasExactWord(name, 'beans') || hasExactWord(name, 'lentils') || hasExactWord(name, 'oats') ||
       hasExactWord(name, 'quinoa') || hasExactWord(name, 'stock') || hasExactWord(name, 'broth') ||
       hasExactPhrase(name, 'coconut oil') || hasExactPhrase(name, 'olive oil') || hasExactPhrase(name, 'vegetable oil') ||
