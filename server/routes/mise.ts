@@ -820,6 +820,13 @@ router.get('/grocery-list', async (req: Request, res: Response) => {
       }))
     }, 'Successfully created aggregated grocery list with persistent states');
 
+    logger.info({ 
+      requestId, 
+      finalResponseItemCount: finalItems.length,
+      garlicItems: finalItems.filter((item: any) => item.item_name.toLowerCase().includes('garlic')),
+      sesameItems: finalItems.filter((item: any) => item.item_name.toLowerCase().includes('sesame'))
+    }, '🚨 FINAL RESPONSE TO FRONTEND');
+
     res.json({
       items: finalItems,
       sourceRecipes: miseRecipes?.map(r => ({

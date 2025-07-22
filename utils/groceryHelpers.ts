@@ -96,8 +96,6 @@ export interface GroceryListItem {
  * - Makes singular (simple implementation)
  */
 export function normalizeName(name: string): string {
-  // Temporarily enabling debug logging to troubleshoot
-  console.log('[groceryHelpers] 🔄 Normalizing name:', name);
   let normalized = name.toLowerCase().trim();
 
   // A more robust way to remove adjectives without brittle regex
@@ -155,7 +153,6 @@ export function normalizeName(name: string): string {
     }
   }
   
-  console.log('[groceryHelpers] ✨ Normalized result:', normalized);
   return normalized;
 }
 
@@ -302,14 +299,11 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
   const groupedByName = new Map<string, GroceryListItem[]>();
   for (const item of items) {
     const normalizedName = normalizeName(item.item_name);
-    console.log(`[groceryHelpers] 📊 Grouping "${item.item_name}" → "${normalizedName}"`);
     if (!groupedByName.has(normalizedName)) {
       groupedByName.set(normalizedName, []);
     }
     groupedByName.get(normalizedName)!.push(item);
   }
-  
-  console.log('[groceryHelpers] 📊 Final groups:', Array.from(groupedByName.entries()).map(([name, items]) => ({ name, count: items.length })));
 
   const finalAggregatedList: GroceryListItem[] = [];
 
@@ -388,6 +382,13 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
     input_items: items.length,
     output_items: finalAggregatedList.length,
     items_combined: items.length - finalAggregatedList.length
+  });
+
+  console.log('[groceryHelpers] 🚨 FINAL AGGREGATION RESULT:', {
+    input_count: items.length,
+    output_count: finalAggregatedList.length,
+    garlic_items: finalAggregatedList.filter(item => item.item_name.toLowerCase().includes('garlic')),
+    sesame_items: finalAggregatedList.filter(item => item.item_name.toLowerCase().includes('sesame'))
   });
 
   return finalAggregatedList;
