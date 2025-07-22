@@ -96,8 +96,8 @@ export interface GroceryListItem {
  * - Makes singular (simple implementation)
  */
 export function normalizeName(name: string): string {
-  // Commenting out to reduce Vercel log verbosity
-  // console.log('[groceryHelpers] 🔄 Normalizing name:', name);
+  // Temporarily enabling debug logging to troubleshoot
+  console.log('[groceryHelpers] 🔄 Normalizing name:', name);
   let normalized = name.toLowerCase().trim();
 
   // A more robust way to remove adjectives without brittle regex
@@ -129,11 +129,13 @@ export function normalizeName(name: string): string {
   
   // Handle garlic variations - normalize all to "garlic"
   if (normalized === 'garlic clove' || normalized === 'clove garlic' || normalized === 'garlic cloves' || normalized === 'cloves garlic') {
+    console.log('[groceryHelpers] 🧄 GARLIC MATCH! Converting:', normalized, '→ garlic');
     normalized = 'garlic';
   }
   
   // Handle sesame seed variations - normalize all to "sesame seed"
   if (normalized === 'sesame seed' || normalized === 'sesame seeds') {
+    console.log('[groceryHelpers] 🌱 SESAME MATCH! Converting:', normalized, '→ sesame seed');
     normalized = 'sesame seed';
   }
   
@@ -153,7 +155,7 @@ export function normalizeName(name: string): string {
     }
   }
   
-  // console.log('[groceryHelpers] ✨ Normalized result:', normalized);
+  console.log('[groceryHelpers] ✨ Normalized result:', normalized);
   return normalized;
 }
 
@@ -300,11 +302,14 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
   const groupedByName = new Map<string, GroceryListItem[]>();
   for (const item of items) {
     const normalizedName = normalizeName(item.item_name);
+    console.log(`[groceryHelpers] 📊 Grouping "${item.item_name}" → "${normalizedName}"`);
     if (!groupedByName.has(normalizedName)) {
       groupedByName.set(normalizedName, []);
     }
     groupedByName.get(normalizedName)!.push(item);
   }
+  
+  console.log('[groceryHelpers] 📊 Final groups:', Array.from(groupedByName.entries()).map(([name, items]) => ({ name, count: items.length })));
 
   const finalAggregatedList: GroceryListItem[] = [];
 
@@ -338,23 +343,30 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
             let finalAmount = baseAmount;
             
             if (baseItem.quantity_unit && compareItem.quantity_unit && baseItem.quantity_unit !== compareItem.quantity_unit) {
-              const converted = convertUnits(compareAmount, compareItem.quantity_unit as any, baseItem.quantity_unit as any);
-              if (converted !== null) {
-                const totalInBaseUnit = baseAmount + converted;
-                const totalInCompareUnit = convertUnits(baseAmount, baseItem.quantity_unit as any, compareItem.quantity_unit as any);
-                
-                // Choose the unit that gives a more readable result
-                // Prefer larger units when the result is more than 16 of the smaller unit
-                if (totalInBaseUnit > 16 && totalInCompareUnit !== null && totalInCompareUnit < 4) {
-                  // Use the compare unit (larger unit)
-                  finalUnit = compareItem.quantity_unit;
-                  finalAmount = totalInCompareUnit;
+              const normalizedBaseUnit = normalizeUnit(baseItem.quantity_unit);
+              const normalizedCompareUnit = normalizeUnit(compareItem.quantity_unit);
+              
+              if (normalizedBaseUnit && normalizedCompareUnit) {
+                const converted = convertUnits(compareAmount, normalizedCompareUnit as any, normalizedBaseUnit as any);
+                if (converted !== null) {
+                  const totalInBaseUnit = baseAmount + converted;
+                  const totalInCompareUnit = convertUnits(baseAmount, normalizedBaseUnit as any, normalizedCompareUnit as any);
+                  
+                  // Choose the unit that gives a more readable result
+                  // Prefer larger units when the result is more than 16 of the smaller unit
+                  if (totalInBaseUnit > 16 && totalInCompareUnit !== null && totalInCompareUnit < 4) {
+                    // Use the compare unit (larger unit)
+                    finalUnit = compareItem.quantity_unit;
+                    finalAmount = totalInCompareUnit;
+                  } else {
+                    // Use the base unit
+                    finalAmount = totalInBaseUnit;
+                  }
                 } else {
-                  // Use the base unit
-                  finalAmount = totalInBaseUnit;
+                  finalAmount = baseAmount + compareAmount; // Fallback if conversion fails
                 }
               } else {
-                finalAmount = baseAmount + compareAmount; // Fallback if conversion fails
+                finalAmount = baseAmount + compareAmount; // Fallback if normalization fails
               }
             } else {
               finalAmount = baseAmount + compareAmount;
