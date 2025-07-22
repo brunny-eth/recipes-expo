@@ -95,8 +95,8 @@ export interface GroceryListItem {
  * - Makes singular (simple implementation)
  */
 export function normalizeName(name: string): string {
-  // Use console.log for frontend, but this will also work for backend Node.js
-  console.log('[groceryHelpers] 🔄 Normalizing name:', name);
+  // Commenting out to reduce Vercel log verbosity
+  // console.log('[groceryHelpers] 🔄 Normalizing name:', name);
   let normalized = name.toLowerCase().trim();
   
   // Remove truly irrelevant adjectives that don't affect shopping/aggregation
@@ -154,7 +154,7 @@ export function normalizeName(name: string): string {
     }
   }
   
-  console.log('[groceryHelpers] ✨ Normalized result:', normalized);
+  // console.log('[groceryHelpers] ✨ Normalized result:', normalized);
   return normalized;
 }
 
@@ -283,35 +283,17 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     try {
-      console.info(`[groceryHelpers] 🔄 Processing item ${i + 1}/${items.length}:`, item.item_name);
-      
       const normalizedItemName = normalizeName(item.item_name);
       const normalizedUnit = normalizeUnit(item.quantity_unit);
       const key = `${normalizedItemName}|${normalizedUnit}`;
 
-      console.log('[groceryHelpers] 📝 Processing item:', {
-        index: i + 1,
-        original_name: item.item_name,
-        normalized_name: normalizedItemName,
-        original_unit: item.quantity_unit,
-        normalized_unit: normalizedUnit,
-        aggregation_key: key
-      });
-
       const existing = aggregatedMap.get(key);
       
       if (existing && areUnitsCompatible(existing.quantity_unit, item.quantity_unit)) {
-        console.log('[groceryHelpers] 🔗 Combining with existing item');
+        console.info(`[groceryHelpers] 🔗 Combining "${item.item_name}"`);
         // --- Combine Items ---
         const existingAmount = parseQuantity(existing.quantity_amount);
         const currentAmount = parseQuantity(item.quantity_amount);
-
-        console.log('[groceryHelpers] 🔢 Amounts to combine:', {
-          existing_amount: existingAmount,
-          current_amount: currentAmount,
-          existing_unit: existing.quantity_unit,
-          current_unit: item.quantity_unit
-        });
 
         if (existingAmount !== null && currentAmount !== null) {
           const total = existingAmount + currentAmount;
@@ -353,6 +335,11 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
     output_items: result.length,
     items_combined: items.length - result.length
   });
+  
+  // Log key successful aggregations for debugging
+  if (items.length - result.length > 0) {
+    console.info('[groceryHelpers] 🎯 Successfully aggregated duplicates!');
+  }
   
   return result;
 }
