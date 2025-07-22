@@ -604,9 +604,11 @@ router.get('/grocery-list', async (req: Request, res: Response) => {
     logger.info({ requestId, userId }, 'Fetching aggregated grocery list');
 
     // Get all active mise recipes for the user
+    logger.info({ requestId, userId, query: { user_id: userId, is_completed: false } }, 'Executing grocery list query with parameters');
+    
     const { data: miseRecipes, error: fetchError } = await supabaseAdmin
       .from('user_mise_recipes')
-      .select('id, prepared_recipe_data, title_override')
+      .select('id, prepared_recipe_data, title_override, user_id, is_completed, created_at')
       .eq('user_id', userId)
       .eq('is_completed', false);
 
@@ -615,7 +617,17 @@ router.get('/grocery-list', async (req: Request, res: Response) => {
       return res.status(500).json({ error: 'Failed to fetch recipes' });
     }
 
-    logger.info({ requestId, recipeCount: miseRecipes?.length || 0 }, 'Found mise recipes for grocery list generation');
+    logger.info({ 
+      requestId, 
+      recipeCount: miseRecipes?.length || 0,
+      foundRecipes: miseRecipes?.map(recipe => ({
+        id: recipe.id,
+        user_id: recipe.user_id,
+        is_completed: recipe.is_completed,
+        created_at: recipe.created_at,
+        title: recipe.prepared_recipe_data?.title || 'Unknown'
+      })) || []
+    }, 'Found mise recipes for grocery list generation');
 
     // Extract ingredients from all recipes and create grocery items
     let allGroceryItems: any[] = [];
