@@ -59,10 +59,9 @@ Rules:
 2. Be consistent - same ingredients should always go to the same category.
 3. If an ingredient could fit multiple categories, choose the one where the ingredient is most commonly found in a grocery store.
 4. For prepared or processed items, categorize based on where they're typically found in stores (frozen, pantry, etc).
-5. Fresh ingredients, like fresh herbs or fresh produce, should be categorized as "Produce".
-6. Fresh herbs (like cilantro, basil, parsley, mint, fresh chopped herbs) should be categorized as "Produce".
-7. Dried herbs and spices should be categorized as "Spices & Herbs".
-8. Salt and black pepper should be categorized as "Spices & Herbs".
+5. Fresh ingredients, like fresh herbs (like cilantro, basil, parsley, mint, fresh chopped herbs, or other similar) or fresh produce, should be categorized as "Produce".
+6. Dried herbs and spices should be categorized as "Spices & Herbs".
+7. Salt and black pepper should be categorized as "Spices & Herbs".
 
 Return your response as a JSON object where each ingredient name is a key and its category is the value.
 
@@ -98,6 +97,21 @@ Example:
     
     // Parse the LLM response
     const cleanedResponse = stripMarkdownFences(output);
+    
+    // Log raw LLM response for debugging
+    logger.info({ 
+      requestId, 
+      rawLLMResponse: output,
+      cleanedResponse,
+      problematicIngredients: items.filter(item => 
+        item.original_ingredient_text.toLowerCase().includes('egg') ||
+        item.original_ingredient_text.toLowerCase().includes('garlic') ||
+        item.original_ingredient_text.toLowerCase().includes('sesame')
+      ).map(item => ({
+        original_text: item.original_ingredient_text,
+        item_name: item.item_name
+      }))
+    }, '🤖 Raw LLM categorization response');
     
     let categories: { [ingredient: string]: string };
     try {

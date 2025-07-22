@@ -77,7 +77,8 @@ export interface GroceryListItem {
   item_name: string;
   original_ingredient_text: string;
   quantity_amount: number | null;
-  quantity_unit: string | null;
+  quantity_unit: string | null;  // Internal standardized unit (e.g., 'tbsp')
+  display_unit: string | null;   // User-friendly display unit (e.g., 'Tbsp' or 'tablespoon')
   grocery_category: string | null;
   is_checked: boolean;
   order_index: number;
@@ -397,6 +398,8 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
             
             baseItem.quantity_amount = finalAmount;
             baseItem.quantity_unit = finalUnit;
+            // Keep the original display unit if we're using that unit, otherwise use the new unit
+            baseItem.display_unit = finalUnit === baseItem.quantity_unit ? baseItem.display_unit : compareItem.display_unit;
             baseItem.original_ingredient_text += ` | ${compareItem.original_ingredient_text}`;
             processedIndices.add(j);
           }
@@ -456,12 +459,16 @@ export function formatIngredientsForGroceryList(
           existingCategory: (ingredient as any).grocery_category
         });
         
+        // Standardize the unit immediately
+        const standardizedUnit = normalizeUnit(ingredient.unit);
+        
         // Create grocery list item from final ingredient
         const groceryItem = {
           item_name: parsedName.baseName, // Use base name without substitution text
           original_ingredient_text: originalText,
           quantity_amount: parseAmountString(ingredient.amount), // Use proper amount parsing
-          quantity_unit: ingredient.unit || null,
+          quantity_unit: standardizedUnit, // Use standardized unit internally
+          display_unit: ingredient.unit || null, // Keep original unit for display
           grocery_category: (ingredient as any).grocery_category || null, // Use pre-categorized data if available
           is_checked: false,
           order_index: orderIndex++,
@@ -685,6 +692,7 @@ export function prepareForSupabaseInsert(
   original_ingredient_text: string;
   quantity_amount: number | null;
   quantity_unit: string | null;
+  display_unit: string | null;
   grocery_category: string | null;
   is_checked: boolean;
   order_index: number;
@@ -699,6 +707,7 @@ export function prepareForSupabaseInsert(
     original_ingredient_text: item.original_ingredient_text,
     quantity_amount: item.quantity_amount,
     quantity_unit: item.quantity_unit,
+    display_unit: item.display_unit || item.quantity_unit,
     grocery_category: item.grocery_category,
     is_checked: false,
     order_index: item.order_index,

@@ -97,7 +97,7 @@ const convertToGroceryCategories = (items: any[]): GroceryCategory[] => {
       id: item.id || `item_${index}`,
       name: item.item_name || item.name,
       amount: item.quantity_amount,
-      unit: item.quantity_unit,
+      unit: item.display_unit || item.quantity_unit, // Use display_unit if available
       category: categoryName,
       checked: item.is_checked || false,
     });

@@ -5,8 +5,6 @@ import { scraperClient, scraperApiKey } from '../lib/scraper';
 import { supabaseAdmin } from '../lib/supabaseAdmin';
 import { supabase } from '../lib/supabase';
 import { parseAndCacheRecipe } from '../services/parseRecipe';
-import { rewriteForSubstitution } from '../services/substitutionRewriter';
-import { scaleInstructions } from '../services/instructionScaling';
 import { modifyInstructions } from '../services/instructionModification';
 import { getAllRecipes, getRecipeById } from '../services/recipeDB';
 import { generateAndSaveEmbedding } from '../../utils/recipeEmbeddings';
@@ -170,84 +168,7 @@ router.get('/explore-random', async (req: Request, res: Response) => {
   }
 })
 
-// --- Rewrite Instructions Endpoint ---
-router.post('/rewrite-instructions', async (req: Request, res: Response) => {
-  try {
-    const { originalInstructions, substitutions } = req.body;
-    const requestId = (req as any).id;
 
-    logger.info({ requestId, body: req.body }, '[rewrite-instructions] Received body');
-
-    if (!originalInstructions || !Array.isArray(originalInstructions) || originalInstructions.length === 0) {
-      logger.warn({ requestId, route: req.originalUrl, method: req.method }, 'Missing or invalid original instructions');
-      return res.status(400).json({ error: 'Missing or invalid original instructions' });
-    }
-    if (!substitutions || !Array.isArray(substitutions)) {
-      logger.warn({ requestId, route: req.originalUrl, method: req.method }, 'Missing or invalid substitutions array');
-      return res.status(400).json({ error: 'Missing or invalid substitutions array' });
-    }
-
-    const { rewrittenInstructions, newTitle, error: rewriteError, usage, timeMs } = await rewriteForSubstitution(
-      originalInstructions,
-      substitutions,
-      requestId
-    );
-
-    if (rewriteError || !rewrittenInstructions) {
-      // rewriteForSubstitution service already logs details
-      logger.error({ requestId, route: req.originalUrl, method: req.method, errMessage: rewriteError || 'Result was null' }, `Failed to rewrite instructions with Gemini`);
-      return res.status(500).json({ error: `Failed to rewrite instructions: ${rewriteError || 'Unknown error'}` });
-    } else {
-      logger.info({ requestId, route: req.originalUrl, method: req.method, usage, timeMs }, 'Successfully rewrote instructions.');
-      res.json({ rewrittenInstructions, newTitle, usage, timeMs });
-    }
-
-  } catch (err) {
-    const error = err as Error;
-    logger.error({ requestId: (req as any).id, err: error, route: req.originalUrl, method: req.method, body: req.body }, 'Error in /rewrite-instructions route processing');
-    res.status(500).json({ error: error.message || 'An unknown server error occurred' });
-  }
-});
-
-// --- Scale Instructions Endpoint ---
-router.post('/scale-instructions', async (req: Request, res: Response) => {
-  try {
-    const { instructionsToScale, originalIngredients, scaledIngredients } = req.body;
-    const requestId = (req as any).id;
-
-    if (!Array.isArray(instructionsToScale) || !Array.isArray(originalIngredients) || !Array.isArray(scaledIngredients)) {
-      logger.warn({ requestId, route: req.originalUrl, method: req.method }, 'Invalid input: instructions, originalIngredients, and scaledIngredients must be arrays.');
-      return res.status(400).json({ error: 'Invalid input: instructions, originalIngredients, and scaledIngredients must be arrays.' });
-    }
-    if (instructionsToScale.length === 0) {
-      logger.info({ requestId, route: req.originalUrl, method: req.method }, "No instructions provided to scale, returning empty array.");
-      return res.json({ scaledInstructions: [] });
-    }
-    if (originalIngredients.length !== scaledIngredients.length) {
-      logger.warn({ requestId, route: req.originalUrl, method: req.method, originalLength: originalIngredients.length, scaledLength: scaledIngredients.length }, "Original and scaled ingredient lists have different lengths. Scaling might be inaccurate.");
-    }
-
-    const { scaledInstructions, error: scaleError, usage, timeMs } = await scaleInstructions(
-      instructionsToScale,
-      originalIngredients,
-      scaledIngredients,
-      requestId
-    );
-
-    if (scaleError || !scaledInstructions) {
-      logger.error({ requestId, route: req.originalUrl, method: req.method, errMessage: scaleError || 'Result was null' }, 'Failed to scale instructions with Gemini');
-      return res.status(500).json({ error: `Failed to scale instructions: ${scaleError || 'Unknown error'}` });
-    } else {
-      logger.info({ requestId, route: req.originalUrl, method: req.method, usage, timeMs }, 'Successfully scaled instructions.');
-      res.json({ scaledInstructions, usage, timeMs });
-    }
-
-  } catch (err) {
-    const error = err as Error;
-    logger.error({ requestId: (req as any).id, err: error, route: req.originalUrl, method: req.method, body: req.body }, 'Error in /scale-instructions route processing');
-    res.status(500).json({ error: error.message || 'Internal server error processing instruction scaling request.' });
-  }
-});
 
 // --- Unified Modify Instructions Endpoint ---
 router.post('/modify-instructions', async (req: Request, res: Response) => {
