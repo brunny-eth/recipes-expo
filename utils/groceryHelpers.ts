@@ -269,75 +269,89 @@ function areUnitsCompatible(unit1: string | null, unit2: string | null): boolean
  * Combines items with the same name and compatible units.
  */
 export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[] {
-  console.log('[groceryHelpers] 🔄 Starting aggregation with', items.length, 'items');
+  // Use structured logging that works in both frontend and backend
+  if (typeof console !== 'undefined' && console.info) {
+    console.info('[groceryHelpers] 🔄 Starting aggregation with', items.length, 'items');
+  }
   if (!items || items.length === 0) {
+    console.info('[groceryHelpers] ⚠️ No items to aggregate');
     return [];
   }
 
   const aggregatedMap = new Map<string, GroceryListItem>();
 
-  for (const item of items) {
-    const normalizedItemName = normalizeName(item.item_name);
-    const normalizedUnit = normalizeUnit(item.quantity_unit);
-    const key = `${normalizedItemName}|${normalizedUnit}`;
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    try {
+      console.info(`[groceryHelpers] 🔄 Processing item ${i + 1}/${items.length}:`, item.item_name);
+      
+      const normalizedItemName = normalizeName(item.item_name);
+      const normalizedUnit = normalizeUnit(item.quantity_unit);
+      const key = `${normalizedItemName}|${normalizedUnit}`;
 
-    console.log('[groceryHelpers] 📝 Processing item:', {
-      original_name: item.item_name,
-      normalized_name: normalizedItemName,
-      original_unit: item.quantity_unit,
-      normalized_unit: normalizedUnit,
-      aggregation_key: key
-    });
-
-    const existing = aggregatedMap.get(key);
-    
-    if (existing && areUnitsCompatible(existing.quantity_unit, item.quantity_unit)) {
-      console.log('[groceryHelpers] 🔗 Combining with existing item');
-      // --- Combine Items ---
-      const existingAmount = parseQuantity(existing.quantity_amount);
-      const currentAmount = parseQuantity(item.quantity_amount);
-
-      console.log('[groceryHelpers] 🔢 Amounts to combine:', {
-        existing_amount: existingAmount,
-        current_amount: currentAmount,
-        existing_unit: existing.quantity_unit,
-        current_unit: item.quantity_unit
+      console.log('[groceryHelpers] 📝 Processing item:', {
+        index: i + 1,
+        original_name: item.item_name,
+        normalized_name: normalizedItemName,
+        original_unit: item.quantity_unit,
+        normalized_unit: normalizedUnit,
+        aggregation_key: key
       });
 
-      if (existingAmount !== null && currentAmount !== null) {
-        const total = existingAmount + currentAmount;
-        // The quantity_amount should always be a number for further processing.
-        // Conversion to a fraction string should happen on the frontend.
-        existing.quantity_amount = total;
-        console.log('[groceryHelpers] ➕ Combined amounts:', total);
-      } else if (currentAmount !== null) {
-        // If existing had no amount but the new one does, use the new one.
-        existing.quantity_amount = currentAmount;
-        console.log('[groceryHelpers] ➡️ Using current amount:', currentAmount);
-      }
+      const existing = aggregatedMap.get(key);
       
-      // Append original text for reference
-      existing.original_ingredient_text += ` | ${item.original_ingredient_text}`;
+      if (existing && areUnitsCompatible(existing.quantity_unit, item.quantity_unit)) {
+        console.log('[groceryHelpers] 🔗 Combining with existing item');
+        // --- Combine Items ---
+        const existingAmount = parseQuantity(existing.quantity_amount);
+        const currentAmount = parseQuantity(item.quantity_amount);
 
-    } else {
-      console.log('[groceryHelpers] ➕ Adding new item');
-      // --- Add New Item ---
-      // If an item with the same name but different unit exists, create a new entry
-      const newKey = `${normalizedItemName}|${normalizedUnit}|${aggregatedMap.size}`;
-      
-      console.log('[groceryHelpers] 🔑 Using key:', existing ? newKey : key);
-      
-      // When adding a new item, store its unit in the canonical form
-      const newItem = { ...item };
-      newItem.quantity_unit = normalizedUnit;
-      aggregatedMap.set(existing ? newKey : key, newItem);
+        console.log('[groceryHelpers] 🔢 Amounts to combine:', {
+          existing_amount: existingAmount,
+          current_amount: currentAmount,
+          existing_unit: existing.quantity_unit,
+          current_unit: item.quantity_unit
+        });
+
+        if (existingAmount !== null && currentAmount !== null) {
+          const total = existingAmount + currentAmount;
+          // The quantity_amount should always be a number for further processing.
+          // Conversion to a fraction string should happen on the frontend.
+          existing.quantity_amount = total;
+          console.log('[groceryHelpers] ➕ Combined amounts:', total);
+        } else if (currentAmount !== null) {
+          // If existing had no amount but the new one does, use the new one.
+          existing.quantity_amount = currentAmount;
+          console.log('[groceryHelpers] ➡️ Using current amount:', currentAmount);
+        }
+        
+        // Append original text for reference
+        existing.original_ingredient_text += ` | ${item.original_ingredient_text}`;
+
+      } else {
+        console.log('[groceryHelpers] ➕ Adding new item');
+        // --- Add New Item ---
+        // If an item with the same name but different unit exists, create a new entry
+        const newKey = `${normalizedItemName}|${normalizedUnit}|${aggregatedMap.size}`;
+        
+        console.log('[groceryHelpers] 🔑 Using key:', existing ? newKey : key);
+        
+        // When adding a new item, store its unit in the canonical form
+        const newItem = { ...item };
+        newItem.quantity_unit = normalizedUnit;
+        aggregatedMap.set(existing ? newKey : key, newItem);
+      }
+    } catch (error) {
+      console.error(`[groceryHelpers] ❌ Error processing item ${i + 1}:`, item.item_name, error);
+      // Continue processing other items
     }
   }
 
   const result = Array.from(aggregatedMap.values());
-  console.log('[groceryHelpers] ✅ Aggregation complete:', {
+  console.info('[groceryHelpers] ✅ Aggregation complete:', {
     input_items: items.length,
-    output_items: result.length
+    output_items: result.length,
+    items_combined: items.length - result.length
   });
   
   return result;

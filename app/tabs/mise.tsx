@@ -173,17 +173,23 @@ export default function MiseScreen() {
         'Content-Type': 'application/json',
       };
 
-      console.log('[MiseScreen] 🛒 Starting grocery list fetch...');
+      console.log('[MiseScreen] 🛒 Starting sequential fetch to avoid race conditions...');
 
-      // Fetch both recipes and grocery list in parallel
-      const [recipesResponse, groceryResponse] = await Promise.all([
-        fetch(`${backendUrl}/api/mise/recipes?userId=${session.user.id}`, { headers }),
-        fetch(`${backendUrl}/api/mise/grocery-list?userId=${session.user.id}`, { headers }),
-      ]);
-
+      // First fetch recipes to ensure they exist
+      console.log('[MiseScreen] 📋 Step 1: Fetching recipes...');
+      const recipesResponse = await fetch(`${backendUrl}/api/mise/recipes?userId=${session.user.id}`, { headers });
+      
       if (!recipesResponse.ok) {
         throw new Error(`Failed to fetch mise recipes: ${recipesResponse.statusText}`);
       }
+      
+      // Small delay to ensure database consistency
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Then fetch grocery list based on those recipes
+      console.log('[MiseScreen] 🛒 Step 2: Fetching grocery list...');
+      const groceryResponse = await fetch(`${backendUrl}/api/mise/grocery-list?userId=${session.user.id}`, { headers });
+
       if (!groceryResponse.ok) {
         throw new Error(`Failed to fetch grocery list: ${groceryResponse.statusText}`);
       }
