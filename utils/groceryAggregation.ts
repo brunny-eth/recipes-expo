@@ -42,6 +42,7 @@ export interface GroceryListSummary {
  * Aggregates grocery list items by combining similar items and converting units
  */
 export function aggregateGroceryItems(items: GroceryListItem[]): CategorizedGroceryItems {
+  console.log('[groceryAggregation] 🔄 Starting aggregateGroceryItems with', items.length, 'items');
   const aggregatedItems: CategorizedGroceryItems = {};
   
   // Group items by category first
@@ -49,6 +50,7 @@ export function aggregateGroceryItems(items: GroceryListItem[]): CategorizedGroc
   
   for (const item of items) {
     const category = item.grocery_category || 'Other';
+    console.log(`[groceryAggregation] 📦 Processing item "${item.item_name}" into category "${category}"`);
     if (!itemsByCategory[category]) {
       itemsByCategory[category] = [];
     }
@@ -57,9 +59,11 @@ export function aggregateGroceryItems(items: GroceryListItem[]): CategorizedGroc
   
   // Process each category
   for (const [category, categoryItems] of Object.entries(itemsByCategory)) {
+    console.log(`[groceryAggregation] 🗂️ Aggregating category "${category}" with ${categoryItems.length} items`);
     aggregatedItems[category] = aggregateItemsInCategory(categoryItems);
   }
   
+  console.log('[groceryAggregation] ✅ Completed aggregation:', Object.keys(aggregatedItems).length, 'categories');
   return aggregatedItems;
 }
 
@@ -67,14 +71,17 @@ export function aggregateGroceryItems(items: GroceryListItem[]): CategorizedGroc
  * Aggregates items within a specific category
  */
 function aggregateItemsInCategory(items: GroceryListItem[]): AggregatedItem[] {
+  console.log('[groceryAggregation] 🔄 Starting aggregateItemsInCategory with', items.length, 'items');
   const itemMap = new Map<string, AggregatedItem>();
   
   for (const item of items) {
     const key = normalizeItemName(item.item_name);
+    console.log(`[groceryAggregation] 📝 Processing "${item.item_name}" (normalized: "${key}")`);
     
     if (itemMap.has(key)) {
       // Combine with existing item
       const existingItem = itemMap.get(key)!;
+      console.log(`[groceryAggregation] 🔗 Combining with existing item "${existingItem.item_name}"`);
       const combinedAmount = combineQuantities(
         existingItem.quantity_amount,
         existingItem.quantity_unit,
@@ -92,8 +99,16 @@ function aggregateItemsInCategory(items: GroceryListItem[]): AggregatedItem[] {
       existingItem.source_count += 1;
       existingItem.source_recipes.push(item.source_recipe_title);
       existingItem.combined_items.push(item);
+      
+      console.log(`[groceryAggregation] ✨ Combined result:`, {
+        item_name: existingItem.item_name,
+        quantity: existingItem.quantity_amount,
+        unit: existingItem.quantity_unit,
+        sources: existingItem.source_count
+      });
     } else {
       // Create new aggregated item
+      console.log(`[groceryAggregation] ➕ Creating new aggregated item for "${item.item_name}"`);
       const aggregatedItem: AggregatedItem = {
         item_name: item.item_name,
         quantity_amount: item.quantity_amount,
@@ -113,9 +128,12 @@ function aggregateItemsInCategory(items: GroceryListItem[]): AggregatedItem[] {
   }
   
   // Convert map to array and sort by item name
-  return Array.from(itemMap.values()).sort((a, b) => 
+  const result = Array.from(itemMap.values()).sort((a, b) => 
     a.item_name.localeCompare(b.item_name)
   );
+  
+  console.log('[groceryAggregation] ✅ Completed category aggregation:', result.length, 'unique items');
+  return result;
 }
 
 /**
@@ -151,6 +169,7 @@ function combineQuantities(
   amount2: number | null,
   unit2: string | null
 ): { amount: number | null; unit: string | null } {
+  console.log('[groceryAggregation] 🔢 Combining quantities:', { amount1, unit1, amount2, unit2 });
   
   // If either amount is null, return the non-null one or null
   if (amount1 === null && amount2 === null) {
@@ -165,7 +184,9 @@ function combineQuantities(
   
   // If units are the same, just add amounts
   if (unit1 === unit2) {
-    return { amount: amount1 + amount2, unit: unit1 };
+    const result = { amount: amount1 + amount2, unit: unit1 };
+    console.log('[groceryAggregation] ➕ Simple addition:', result);
+    return result;
   }
   
   // Try to convert units and combine
@@ -173,23 +194,22 @@ function combineQuantities(
     try {
       const convertedAmount = convertUnits(amount2, unit2 as Unit, unit1 as Unit);
       if (convertedAmount !== null) {
-        return { 
-          amount: amount1 + convertedAmount, 
-          unit: unit1 
-        };
+        const result = { amount: amount1 + convertedAmount, unit: unit1 };
+        console.log('[groceryAggregation] 🔄 Unit conversion successful:', result);
+        return result;
       }
     } catch (error) {
       // Conversion failed, keep them separate
-      console.warn(`Could not convert ${unit2} to ${unit1}:`, error);
+      console.warn(`[groceryAggregation] ⚠️ Could not convert ${unit2} to ${unit1}:`, error);
     }
   }
   
   // If conversion fails, return the larger amount or first one
-  if (amount1 >= amount2) {
-    return { amount: amount1, unit: unit1 };
-  } else {
-    return { amount: amount2, unit: unit2 };
-  }
+  const result = amount1 >= amount2 
+    ? { amount: amount1, unit: unit1 }
+    : { amount: amount2, unit: unit2 };
+  console.log('[groceryAggregation] ⚖️ Using larger amount:', result);
+  return result;
 }
 
 /**
@@ -221,6 +241,7 @@ export function generateGroceryListSummary(
   items: GroceryListItem[],
   shoppingListName?: string
 ): GroceryListSummary {
+  console.log('[groceryAggregation] 📊 Generating summary for', items.length, 'items');
   const aggregatedItems = aggregateGroceryItems(items);
   
   const totalItems = Object.values(aggregatedItems).reduce(
@@ -230,12 +251,20 @@ export function generateGroceryListSummary(
   
   const totalCategories = Object.keys(aggregatedItems).length;
   
-  return {
+  const result = {
     items: aggregatedItems,
     totalItems,
     totalCategories,
     shoppingListName
   };
+  
+  console.log('[groceryAggregation] 📋 Summary generated:', {
+    totalItems,
+    totalCategories,
+    categories: Object.keys(aggregatedItems)
+  });
+  
+  return result;
 }
 
 /**

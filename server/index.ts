@@ -6,7 +6,6 @@ import pinoHttp from 'pino-http'
 import logger from './lib/logger'
 import { recipeRouter } from './routes/recipes'
 import { aiRouter } from './routes/ai'
-import { groceryRouter } from './routes/grocery'
 import { miseRouter } from './routes/mise'
 
 const app = express()
@@ -21,7 +20,6 @@ app.get('/api/health', (_req, res) => {
 
 app.use('/api/recipes', recipeRouter)
 app.use('/api/ai', aiRouter)
-app.use('/api/grocery', groceryRouter)
 app.use('/api/mise', miseRouter)
 
 // 👇 Only run this if executed directly (e.g., via `ts-node server/index.ts`)

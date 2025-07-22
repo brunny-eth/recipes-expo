@@ -9,6 +9,7 @@ import { parse, toFraction } from 'fraction.js';
  * - Makes singular (simple implementation)
  */
 export function normalizeName(name: string): string {
+  console.log('[ingredientAggregation] 🔄 Normalizing name:', name);
   let normalized = name.toLowerCase().trim();
   
   // Remove truly irrelevant adjectives that don't affect shopping/aggregation
@@ -50,6 +51,7 @@ export function normalizeName(name: string): string {
     }
   }
   
+  console.log('[ingredientAggregation] ✨ Normalized result:', normalized);
   return normalized;
 }
 
@@ -76,9 +78,12 @@ const unitDictionary: { [key: string]: string } = {
  * Returns null if the unit is not found or is empty.
  */
 function normalizeUnit(unit: string | null): string | null {
+  console.log('[ingredientAggregation] 📏 Normalizing unit:', unit);
   if (!unit) return null;
   const lowerUnit = unit.toLowerCase().trim();
-  return unitDictionary[lowerUnit] || null;
+  const result = unitDictionary[lowerUnit] || null;
+  console.log('[ingredientAggregation] 📏 Normalized unit result:', result);
+  return result;
 }
 
 /**
@@ -86,14 +91,18 @@ function normalizeUnit(unit: string | null): string | null {
  * Returns null if parsing fails.
  */
 function parseQuantity(amount: number | string | null): number | null {
+  console.log('[ingredientAggregation] 🔢 Parsing quantity:', amount);
   if (typeof amount === 'number') {
     return amount;
   }
   if (typeof amount === 'string' && amount.trim() !== '') {
     try {
       // Use fraction.js to handle mixed numbers like "1 1/2"
-      return parse(amount.trim());
+      const result = parse(amount.trim());
+      console.log('[ingredientAggregation] 🔢 Parsed quantity result:', result);
+      return result;
     } catch (e) {
+      console.warn('[ingredientAggregation] ⚠️ Failed to parse quantity:', amount, e);
       return null; // Return null if parsing fails
     }
   }
@@ -105,6 +114,7 @@ function parseQuantity(amount: number | string | null): number | null {
  * Groups units by type (volume, weight, count) for proper aggregation.
  */
 function areUnitsCompatible(unit1: string | null, unit2: string | null): boolean {
+  console.log('[ingredientAggregation] 🔍 Checking unit compatibility:', { unit1, unit2 });
   const normalizedUnit1 = normalizeUnit(unit1);
   const normalizedUnit2 = normalizeUnit(unit2);
 
@@ -112,7 +122,10 @@ function areUnitsCompatible(unit1: string | null, unit2: string | null): boolean
   if (normalizedUnit1 === null || normalizedUnit2 === null) return false;
 
   // If units are exactly the same, they're compatible
-  if (normalizedUnit1 === normalizedUnit2) return true;
+  if (normalizedUnit1 === normalizedUnit2) {
+    console.log('[ingredientAggregation] ✅ Units are identical');
+    return true;
+  }
 
   // Define unit groups that can be converted between each other
   const volumeUnits = new Set([
@@ -130,17 +143,21 @@ function areUnitsCompatible(unit1: string | null, unit2: string | null): boolean
 
   // Check if both units are in the same group
   if (volumeUnits.has(normalizedUnit1) && volumeUnits.has(normalizedUnit2)) {
+    console.log('[ingredientAggregation] ✅ Both are volume units');
     return true; // Both are volume units
   }
   
   if (weightUnits.has(normalizedUnit1) && weightUnits.has(normalizedUnit2)) {
+    console.log('[ingredientAggregation] ✅ Both are weight units');
     return true; // Both are weight units
   }
   
   if (countUnits.has(normalizedUnit1) && countUnits.has(normalizedUnit2)) {
+    console.log('[ingredientAggregation] ✅ Both are count units');
     return true; // Both are count units
   }
 
+  console.log('[ingredientAggregation] ❌ Units are not compatible');
   return false; // Units are not compatible
 }
 
@@ -149,11 +166,11 @@ function areUnitsCompatible(unit1: string | null, unit2: string | null): boolean
  * Combines items with the same name and compatible units.
  */
 export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[] {
+  console.log('[ingredientAggregation] 🔄 Starting aggregation with', items.length, 'items');
   if (!items || items.length === 0) {
     return [];
   }
 
-  console.log(`[aggregateGroceryList] 🔄 Starting aggregation with ${items.length} items`);
   const aggregatedMap = new Map<string, GroceryListItem>();
 
   for (const item of items) {
@@ -161,8 +178,7 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
     const normalizedUnit = normalizeUnit(item.quantity_unit);
     const key = `${normalizedItemName}|${normalizedUnit}`;
 
-    // Log the normalization process
-    console.log(`[aggregateGroceryList] 📝 Processing item:`, {
+    console.log('[ingredientAggregation] 📝 Processing item:', {
       original_name: item.item_name,
       normalized_name: normalizedItemName,
       original_unit: item.quantity_unit,
@@ -173,11 +189,12 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
     const existing = aggregatedMap.get(key);
     
     if (existing && areUnitsCompatible(existing.quantity_unit, item.quantity_unit)) {
+      console.log('[ingredientAggregation] 🔗 Combining with existing item');
       // --- Combine Items ---
       const existingAmount = parseQuantity(existing.quantity_amount);
       const currentAmount = parseQuantity(item.quantity_amount);
 
-      console.log(`[aggregateGroceryList] 🔗 Combining with existing item:`, {
+      console.log('[ingredientAggregation] 🔢 Amounts to combine:', {
         existing_amount: existingAmount,
         current_amount: currentAmount,
         existing_unit: existing.quantity_unit,
@@ -189,22 +206,23 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
         // The quantity_amount should always be a number for further processing.
         // Conversion to a fraction string should happen on the frontend.
         existing.quantity_amount = total;
-        console.log(`[aggregateGroceryList] ➕ Combined amounts: ${existingAmount} + ${currentAmount} = ${total}`);
+        console.log('[ingredientAggregation] ➕ Combined amounts:', total);
       } else if (currentAmount !== null) {
         // If existing had no amount but the new one does, use the new one.
         existing.quantity_amount = currentAmount;
-        console.log(`[aggregateGroceryList] ➡️ Using current amount: ${currentAmount}`);
+        console.log('[ingredientAggregation] ➡️ Using current amount:', currentAmount);
       }
       
       // Append original text for reference
       existing.original_ingredient_text += ` | ${item.original_ingredient_text}`;
 
     } else {
+      console.log('[ingredientAggregation] ➕ Adding new item');
       // --- Add New Item ---
       // If an item with the same name but different unit exists, create a new entry
       const newKey = `${normalizedItemName}|${normalizedUnit}|${aggregatedMap.size}`;
       
-      console.log(`[aggregateGroceryList] ➕ Adding new item with key: ${existing ? newKey : key}`);
+      console.log('[ingredientAggregation] 🔑 Using key:', existing ? newKey : key);
       
       // When adding a new item, store its unit in the canonical form
       const newItem = { ...item };
@@ -214,7 +232,10 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
   }
 
   const result = Array.from(aggregatedMap.values());
-  console.log(`[aggregateGroceryList] ✅ Aggregation complete: ${items.length} items → ${result.length} items`);
+  console.log('[ingredientAggregation] ✅ Aggregation complete:', {
+    input_items: items.length,
+    output_items: result.length
+  });
   
   return result;
 } 

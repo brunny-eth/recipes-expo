@@ -6,6 +6,7 @@ import { parseAmountString } from './recipeUtils';
  * Converts decimal amounts to readable fractions for grocery list display
  */
 export function formatAmountForGroceryDisplay(amount: number | null): string | null {
+  console.log('[groceryHelpers] 🔢 Formatting amount:', amount);
   if (amount === null || amount === 0) {
     return null;
   }
@@ -29,12 +30,14 @@ export function formatAmountForGroceryDisplay(amount: number | null): string | n
 
   // Check if it's a whole number
   if (Number.isInteger(amount)) {
+    console.log('[groceryHelpers] 🔢 Whole number:', amount.toString());
     return amount.toString();
   }
 
   // Check if it's a common fraction
   const rounded = Math.round(amount * 1000) / 1000; // Round to 3 decimal places
   if (commonFractions[rounded]) {
+    console.log('[groceryHelpers] 🔢 Common fraction:', commonFractions[rounded]);
     return commonFractions[rounded];
   }
 
@@ -44,7 +47,9 @@ export function formatAmountForGroceryDisplay(amount: number | null): string | n
   const roundedDecimal = Math.round(decimalPart * 1000) / 1000;
   
   if (wholePart > 0 && commonFractions[roundedDecimal]) {
-    return `${wholePart} ${commonFractions[roundedDecimal]}`;
+    const result = `${wholePart} ${commonFractions[roundedDecimal]}`;
+    console.log('[groceryHelpers] 🔢 Mixed number:', result);
+    return result;
   }
 
   // For other decimals, try to find a close fraction
@@ -52,13 +57,17 @@ export function formatAmountForGroceryDisplay(amount: number | null): string | n
   for (const [decimal, fraction] of Object.entries(commonFractions)) {
     if (Math.abs(rounded - parseFloat(decimal)) < tolerance) {
       if (wholePart > 0) {
-        return `${wholePart} ${fraction}`;
+        const result = `${wholePart} ${fraction}`;
+        console.log('[groceryHelpers] 🔢 Approximate mixed number:', result);
+        return result;
       }
+      console.log('[groceryHelpers] 🔢 Approximate fraction:', fraction);
       return fraction;
     }
   }
 
   // If no good fraction found, return the original decimal as a string
+  console.log('[groceryHelpers] 🔢 Using decimal:', amount.toString());
   return amount.toString();
 }
 
@@ -84,10 +93,9 @@ export function formatIngredientsForGroceryList(
   shoppingListId: string,
   userSavedRecipeId?: string
 ): GroceryListItem[] {
+  console.log('[groceryHelpers] 🛒 Starting grocery list formatting for recipe:', recipe.title);
   const groceryItems: GroceryListItem[] = [];
   let orderIndex = 0;
-
-  console.log('[groceryHelpers] 🛒 Starting grocery list formatting for recipe:', recipe.title);
 
   // Process each ingredient group from the final recipe
   if (recipe.ingredientGroups) {
@@ -302,53 +310,17 @@ export function getBasicGroceryCategory(ingredientName: string): string {
  * Applies basic categorization to grocery items using simple pattern matching
  */
 export function categorizeIngredients(items: GroceryListItem[]): GroceryListItem[] {
-  return items.map(item => ({
-    ...item,
-    grocery_category: getBasicGroceryCategory(item.item_name)
-  }));
-}
-
-/**
- * Categorizes ingredients using the LLM endpoint for more accurate results
- */
-export async function categorizeIngredientsWithLLM(
-  items: GroceryListItem[]
-): Promise<GroceryListItem[]> {
-  if (items.length === 0) {
-    return items;
-  }
-
-  // Extract unique ingredient names
-  const ingredientNames = [...new Set(items.map(item => item.item_name))];
-  
-  try {
-    const response = await fetch('/api/grocery/categorize-ingredients', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        ingredients: ingredientNames
-      })
-    });
-
-    if (!response.ok) {
-      console.warn('LLM categorization failed, falling back to basic categorization');
-      return categorizeIngredients(items);
-    }
-
-    const { categories } = await response.json();
-    
-    // Apply LLM categories to items
-    return items.map(item => ({
+  console.log('[groceryHelpers] 🏷️ Starting basic categorization for', items.length, 'items');
+  const result = items.map(item => {
+    const category = getBasicGroceryCategory(item.item_name);
+    console.log(`[groceryHelpers] 📝 Categorized "${item.item_name}" as "${category}"`);
+    return {
       ...item,
-      grocery_category: categories[item.item_name] || getBasicGroceryCategory(item.item_name)
-    }));
-
-  } catch (error) {
-    console.warn('Error calling LLM categorization, falling back to basic:', error);
-    return categorizeIngredients(items);
-  }
+      grocery_category: category
+    };
+  });
+  console.log('[groceryHelpers] ✅ Completed basic categorization');
+  return result;
 }
 
 /**
@@ -377,7 +349,8 @@ export function prepareForSupabaseInsert(
   user_saved_recipe_id: string | null;
   source_recipe_title: string;
 }> {
-  return items.map(item => ({
+  console.log('[groceryHelpers] 💾 Preparing', items.length, 'items for database insertion');
+  const result = items.map(item => ({
     shopping_list_id: shoppingListId,
     item_name: item.item_name,
     original_ingredient_text: item.original_ingredient_text,
@@ -390,4 +363,6 @@ export function prepareForSupabaseInsert(
     user_saved_recipe_id: item.user_saved_recipe_id,
     source_recipe_title: item.source_recipe_title
   }));
+  console.log('[groceryHelpers] ✅ Items prepared for database');
+  return result;
 } 

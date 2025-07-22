@@ -295,40 +295,53 @@ export const coerceToIngredientGroups = (
 };
 
 /**
- * Enhanced ingredient display name parser that handles complex cases
- * This is the critical first step for canonical representation
+ * Parses an ingredient display name into its base name and any substitution text.
  */
-export function parseIngredientDisplayName(name: string): {
-  baseName: string;
-  isRemoved: boolean;
-  substitutedFor?: string;
-} {
-  let workingName = name.trim();
-
-  // Handle removed ingredients: "ingredient (removed)"
-  const removedMatch = workingName.match(/^(.*?)\s*\(removed\)$/i);
-  if (removedMatch) {
-    return { 
-      baseName: parseCanonicalIngredientName(removedMatch[1].trim()), 
-      isRemoved: true 
-    };
+export function parseIngredientDisplayName(name: string): { baseName: string; substitutionText: string | null } {
+  console.log('[ingredientHelpers] 🔄 Parsing ingredient name:', name);
+  
+  // Handle null/undefined input
+  if (!name) {
+    console.log('[ingredientHelpers] ⚠️ Empty ingredient name');
+    return { baseName: '', substitutionText: null };
   }
 
-  // Handle substituted ingredients: "new ingredient (substituted for original ingredient)"
-  const substitutedMatch = workingName.match(/^(.*?)\s*\(substituted for (.+?)\)$/i);
-  if (substitutedMatch) {
-    return {
-      baseName: parseCanonicalIngredientName(substitutedMatch[1].trim()),
-      isRemoved: false,
-      substitutedFor: substitutedMatch[2].trim(),
-    };
+  // Split on substitution markers
+  const substitutionMarkers = [' or ', ' (or ', ' / ', ' OR ', ' / ', '/'];
+  let baseName = name;
+  let substitutionText = null;
+
+  for (const marker of substitutionMarkers) {
+    if (name.includes(marker)) {
+      const parts = name.split(marker);
+      baseName = parts[0].trim();
+      substitutionText = parts.slice(1).join(marker).trim();
+      // Remove trailing parenthesis if present
+      if (substitutionText.endsWith(')')) {
+        substitutionText = substitutionText.slice(0, -1).trim();
+      }
+      console.log('[ingredientHelpers] 🔍 Found substitution:', {
+        marker,
+        baseName,
+        substitutionText
+      });
+      break;
+    }
   }
 
-  // No special formatting found, parse the canonical name
-  return { 
-    baseName: parseCanonicalIngredientName(workingName), 
-    isRemoved: false 
-  };
+  // Clean up any remaining parenthetical notes
+  const parenMatch = baseName.match(/^(.*?)\s*\(.*\)\s*$/);
+  if (parenMatch) {
+    baseName = parenMatch[1].trim();
+    console.log('[ingredientHelpers] 🧹 Cleaned parenthetical:', baseName);
+  }
+
+  console.log('[ingredientHelpers] ✅ Parsed result:', {
+    baseName,
+    substitutionText
+  });
+  
+  return { baseName, substitutionText };
 }
 
 /**
