@@ -108,21 +108,9 @@ export function normalizeName(name: string): string {
     'plus more for garnish', 'cooked', 'uncooked', 'raw', 'ripe', 'unripe', 'sweet', 'unsweetened',
     'salted', 'unsalted', 'low-sodium', 'lower-sodium', 'toasted'
   ];
-  const adjectivePattern = new RegExp(`\\b(${adjectivesToRemove.join('|')})\\b`, 'gi');
-  normalized = normalized.replace(adjectivePattern, '');
-  
-  // Handle common unit words that might still be in the name
-  // This is a safety net in case parseIngredientDisplayName didn't catch them
-  const residualUnits = ['clove', 'cloves', 'piece', 'pieces', 'head', 'heads', 'bunch', 'bunches'];
-  const residualUnitPattern = new RegExp(`\\s+(${residualUnits.join('|')})$`, 'i');
-  normalized = normalized.replace(residualUnitPattern, '');
-  
-  // Also handle unit words at the beginning (like "garlic clove" -> "garlic")
-  const leadingUnitPattern = new RegExp(`^(${residualUnits.join('|')})\\s+`, 'i');
-  normalized = normalized.replace(leadingUnitPattern, '');
-  
-  // Clean up extra spaces
-  normalized = normalized.replace(/\s+/g, ' ').trim();
+  // The previous regex \\b(${...})\\b was too strict. This one is more flexible.
+  const adjectivePattern = new RegExp(`(${adjectivesToRemove.join('|')})`, 'gi');
+  normalized = name.replace(adjectivePattern, '');
   
   // Handle complex herb patterns like "fresh chopped herbs scallions" -> "scallions"
   if (normalized.includes('herbs') && (normalized.includes('scallion') || normalized.includes('cilantro') || normalized.includes('parsley'))) {
@@ -219,8 +207,15 @@ function areUnitsCompatible(unit1: string | null, unit2: string | null): boolean
   const normalizedUnit1 = normalizeUnit(unit1);
   const normalizedUnit2 = normalizeUnit(unit2);
 
-  if (normalizedUnit1 === null && normalizedUnit2 === null) return true;
-  if (normalizedUnit1 === null || normalizedUnit2 === null) return false;
+  if (normalizedUnit1 === null && normalizedUnit2 === null) {
+    console.log('[groceryHelpers] ✅ Units are compatible (both null)');
+    return true;
+  }
+  
+  if (normalizedUnit1 === null || normalizedUnit2 === null) {
+    console.log(`[groceryHelpers] ❌ Units are not compatible (one is null): ${normalizedUnit1}, ${normalizedUnit2}`);
+    return false;
+  }
 
   // If units are exactly the same, they're compatible
   if (normalizedUnit1 === normalizedUnit2) {
@@ -236,6 +231,8 @@ function areUnitsCompatible(unit1: string | null, unit2: string | null): boolean
     console.log(`[groceryHelpers] ✅ Both units (${normalizedUnit1}, ${normalizedUnit2}) are convertible volume units`);
     return true;
   }
+  
+  console.log(`[groceryHelpers] ❌ Units are not convertible: ${normalizedUnit1}, ${normalizedUnit2}`);
 
   // Define unit groups for non-convertible but similar types
   const weightUnits = new Set(['gram', 'kilogram', 'ounce', 'pound']);
