@@ -632,87 +632,25 @@ router.get('/grocery-list', async (req: Request, res: Response) => {
     // Extract ingredients from all recipes and create grocery items
     let allGroceryItems: any[] = [];
     
+    // --- Step 1: Fetch all active mise recipes and extract their ingredients ---
     for (const miseRecipe of miseRecipes || []) {
       const recipe = miseRecipe.prepared_recipe_data as CombinedParsedRecipe;
-      const shoppingListId = `mise_${Date.now()}`;
-      
-      logger.info({ 
-        requestId, 
-        miseRecipeId: miseRecipe.id, 
-        recipeTitle: recipe.title,
-        ingredientGroupsCount: recipe.ingredientGroups?.length || 0 
-      }, 'Processing recipe for grocery list');
-      
-      // Log all ingredients before formatting
-      if (recipe.ingredientGroups) {
-        recipe.ingredientGroups.forEach((group, groupIndex) => {
-          if (group.ingredients) {
-            group.ingredients.forEach((ingredient, ingIndex) => {
-              logger.info({ 
-                requestId, 
-                miseRecipeId: miseRecipe.id,
-                groupIndex,
-                ingIndex,
-                ingredient: {
-                  name: ingredient.name,
-                  amount: ingredient.amount,
-                  unit: ingredient.unit,
-                  preparation: ingredient.preparation,
-                  grocery_category: (ingredient as any).grocery_category
-                }
-              }, 'Raw ingredient before grocery formatting');
-            });
-          }
-        });
-      }
-      
-      // Format ingredients for this recipe
-      const recipeGroceryItems = formatIngredientsForGroceryList(
-        recipe,
-        shoppingListId,
-        undefined
+      const recipeTitle =
+        miseRecipe.title_override || (miseRecipe.prepared_recipe_data as CombinedParsedRecipe).title;
+      const ingredientGroupsCount = (miseRecipe.prepared_recipe_data as CombinedParsedRecipe)
+        .ingredientGroups?.length;
+
+      logger.info(
+        { requestId, miseRecipeId: miseRecipe.id, recipeTitle, ingredientGroupsCount },
+        'Processing recipe for grocery list'
       );
-      
-      // Apply on-the-fly ingredient name reprocessing for existing recipes
-      // This ensures new parsing logic is applied even to old mise recipes
-      const reprocessedGroceryItems = recipeGroceryItems.map(item => {
-        const { parseIngredientDisplayName } = require('../../utils/ingredientHelpers');
-        const reprocessedName = parseIngredientDisplayName(item.item_name);
-        
-        logger.info({ 
-          requestId, 
-          miseRecipeId: miseRecipe.id,
-          original_item_name: item.item_name,
-          reprocessed_name: reprocessedName.baseName
-        }, 'Reprocessing ingredient name with new logic');
-        
-        return {
-          ...item,
-          item_name: reprocessedName.baseName
-        };
-      });
-      
-      logger.info({ 
-        requestId, 
-        miseRecipeId: miseRecipe.id,
-        formattedItemsCount: reprocessedGroceryItems.length,
-        formattedItems: reprocessedGroceryItems.map(item => ({
-          item_name: item.item_name,
-          original_ingredient_text: item.original_ingredient_text,
-          quantity_amount: item.quantity_amount,
-          quantity_unit: item.quantity_unit,
-          grocery_category: item.grocery_category
-        }))
-      }, 'Formatted grocery items for recipe (after reprocessing)');
-      
-      // Add source information
-      const itemsWithSource = reprocessedGroceryItems.map((item: any) => ({
-        ...item,
-        source_mise_recipe_id: miseRecipe.id,
-        source_recipe_title: miseRecipe.title_override || recipe.title || 'Unknown Recipe',
-      }));
-      
-      allGroceryItems.push(...itemsWithSource);
+
+      // --- Step 2: Format the ingredients from each recipe into a flat grocery list ---
+      const formattedItems = formatIngredientsForGroceryList(
+        recipe,
+        `mise_${miseRecipe.id}`
+      );
+      allGroceryItems.push(...formattedItems);
     }
 
     logger.info({ 

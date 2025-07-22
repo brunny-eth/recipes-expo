@@ -178,7 +178,7 @@ export default function MiseScreen() {
       // First fetch recipes to ensure they exist
       console.log('[MiseScreen] 📋 Step 1: Fetching recipes...');
       const recipesResponse = await fetch(`${backendUrl}/api/mise/recipes?userId=${session.user.id}`, { headers });
-      
+
       if (!recipesResponse.ok) {
         throw new Error(`Failed to fetch mise recipes: ${recipesResponse.statusText}`);
       }
