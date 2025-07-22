@@ -248,16 +248,22 @@ function areUnitsCompatible(unit1: string | null, unit2: string | null): boolean
   console.log(`[groceryHelpers] ❌ Units are not convertible: ${normalizedUnit1}, ${normalizedUnit2}`);
 
   // Define unit groups for non-convertible but similar types
+  // Weight units can only be compatible with the SAME weight unit (no conversion available)
   const weightUnits = new Set(['gram', 'kilogram', 'ounce', 'pound']);
   
   const countUnits = new Set([
     'clove', 'piece', 'pinch', 'dash'
   ]);
 
-  // Check if both units are in the same group
+  // Check if both units are weight units - only compatible if they're identical
   if (weightUnits.has(normalizedUnit1) && weightUnits.has(normalizedUnit2)) {
-    console.log('[groceryHelpers] ✅ Both are weight units');
-    return true; // Both are weight units
+    if (normalizedUnit1 === normalizedUnit2) {
+      console.log('[groceryHelpers] ✅ Both are identical weight units');
+      return true;
+    } else {
+      console.log('[groceryHelpers] ❌ Different weight units - no conversion available');
+      return false; // Different weight units cannot be converted
+    }
   }
   
   if (countUnits.has(normalizedUnit1) && countUnits.has(normalizedUnit2)) {

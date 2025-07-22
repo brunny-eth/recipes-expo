@@ -30,12 +30,12 @@ async function categorizeIngredientsWithServerLLM(
     return items;
   }
 
-  // Extract unique ingredient names
-  const ingredientNames = [...new Set(items.map(item => item.item_name))];
+  // Extract unique ingredient names from original text for better context
+  const ingredientTexts = [...new Set(items.map(item => item.original_ingredient_text))];
   
   try {
-    // Build the categorization prompt (same as grocery.ts)
-    const ingredientList = ingredientNames.map(ing => `"${ing}"`).join(', ');
+    // Build the categorization prompt using original ingredient text
+    const ingredientList = ingredientTexts.map(ing => `"${ing}"`).join(', ');
     
     const systemPrompt = `
 You are an expert grocery organizer. Categorize the following ingredients into appropriate grocery store sections.
@@ -79,7 +79,7 @@ Example:
 
     const userPrompt = `Categorize these ingredients: ${ingredientList}`;
     
-    logger.info({ requestId, ingredientCount: ingredientNames.length }, 'Sending categorization request to LLM');
+    logger.info({ requestId, ingredientCount: ingredientTexts.length }, 'Sending categorization request to LLM');
     
     const { output, error } = await runDefaultLLM({
       system: systemPrompt,
@@ -110,26 +110,32 @@ Example:
       }));
     }
     
-    // Apply LLM categories to items
+    // Apply LLM categories to items using original ingredient text as key
     const categorizedItems = items.map(item => ({
       ...item,
-      grocery_category: categories[item.item_name] || getBasicGroceryCategory(item.item_name)
+      grocery_category: categories[item.original_ingredient_text] || getBasicGroceryCategory(item.item_name)
     }));
     
-    // Debug specific problematic ingredients
-    const problematicIngredients = ['fresh chopped herbs', 'cilantro', 'basil'];
-    problematicIngredients.forEach(ingredient => {
-      const llmCategory = categories[ingredient];
-      const basicCategory = getBasicGroceryCategory(ingredient);
-      const finalCategory = llmCategory || basicCategory;
-      logger.info({ 
-        requestId, 
-        ingredient,
-        llmCategory,
-        basicCategory,
-        finalCategory,
-        hasLLMCategory: !!llmCategory
-      }, 'Debug: Categorization for problematic ingredient');
+    // Debug specific problematic ingredients (look for them in original ingredient text)
+    const problematicPatterns = ['herbs', 'cilantro', 'basil'];
+    problematicPatterns.forEach(pattern => {
+      const matchingItems = items.filter(item => 
+        item.original_ingredient_text.toLowerCase().includes(pattern)
+      );
+      matchingItems.forEach(item => {
+        const llmCategory = categories[item.original_ingredient_text];
+        const basicCategory = getBasicGroceryCategory(item.item_name);
+        const finalCategory = llmCategory || basicCategory;
+        logger.info({ 
+          requestId, 
+          ingredient: item.item_name,
+          originalText: item.original_ingredient_text,
+          llmCategory,
+          basicCategory,
+          finalCategory,
+          hasLLMCategory: !!llmCategory
+        }, 'Debug: Categorization for problematic ingredient');
+      });
     });
     
     logger.info({ requestId, categorizedCount: Object.keys(categories).length }, 'Successfully categorized ingredients with LLM');
