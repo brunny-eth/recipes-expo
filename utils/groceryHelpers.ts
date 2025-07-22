@@ -236,6 +236,20 @@ function areUnitsCompatible(unit1: string | null, unit2: string | null): boolean
     return true;
   }
   
+  // Special case: cloves and null are compatible for garlic aggregation
+  if ((normalizedUnit1 === 'clove' && normalizedUnit2 === null) || 
+      (normalizedUnit1 === null && normalizedUnit2 === 'clove')) {
+    console.log(`[groceryHelpers] ✅ Special case: clove and null are compatible for garlic`);
+    return true;
+  }
+  
+  // Special case: tablespoons and null are compatible for seeds/spices aggregation
+  if ((normalizedUnit1 === 'tbsp' && normalizedUnit2 === null) || 
+      (normalizedUnit1 === null && normalizedUnit2 === 'tbsp')) {
+    console.log(`[groceryHelpers] ✅ Special case: tbsp and null are compatible for seeds/spices`);
+    return true;
+  }
+  
   if (normalizedUnit1 === null || normalizedUnit2 === null) {
     console.log(`[groceryHelpers] ❌ Units are not compatible (one is null): ${normalizedUnit1}, ${normalizedUnit2}`);
     return false;
@@ -336,7 +350,22 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
             let finalUnit = baseItem.quantity_unit;
             let finalAmount = baseAmount;
             
-            if (baseItem.quantity_unit && compareItem.quantity_unit && baseItem.quantity_unit !== compareItem.quantity_unit) {
+            // Special case: Handle clove/null compatibility for garlic
+            if ((baseItem.quantity_unit === 'cloves' && compareItem.quantity_unit === null) ||
+                (baseItem.quantity_unit === null && compareItem.quantity_unit === 'cloves') ||
+                (normalizeUnit(baseItem.quantity_unit) === 'clove' && compareItem.quantity_unit === null) ||
+                (baseItem.quantity_unit === null && normalizeUnit(compareItem.quantity_unit) === 'clove')) {
+              // Use the cloves unit and add the amounts
+              finalUnit = baseItem.quantity_unit || compareItem.quantity_unit;
+              finalAmount = baseAmount + compareAmount;
+            } 
+            // Special case: Handle tbsp/null compatibility for seeds/spices
+            else if ((normalizeUnit(baseItem.quantity_unit) === 'tbsp' && compareItem.quantity_unit === null) ||
+                     (baseItem.quantity_unit === null && normalizeUnit(compareItem.quantity_unit) === 'tbsp')) {
+              // Use the tbsp unit and add the amounts
+              finalUnit = baseItem.quantity_unit || compareItem.quantity_unit;
+              finalAmount = baseAmount + compareAmount;
+            } else if (baseItem.quantity_unit && compareItem.quantity_unit && baseItem.quantity_unit !== compareItem.quantity_unit) {
               const normalizedBaseUnit = normalizeUnit(baseItem.quantity_unit);
               const normalizedCompareUnit = normalizeUnit(compareItem.quantity_unit);
               
