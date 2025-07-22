@@ -99,19 +99,24 @@ export function normalizeName(name: string): string {
   // Commenting out to reduce Vercel log verbosity
   // console.log('[groceryHelpers] 🔄 Normalizing name:', name);
   let normalized = name.toLowerCase().trim();
-  
-  // Remove truly irrelevant adjectives that don't affect shopping/aggregation
-  // but keep important ones like "toasted" for "toasted sesame seeds"
+
+  // A more robust way to remove adjectives without brittle regex
   const adjectivesToRemove = [
     'fresh', 'dried', 'ground', 'chopped', 'sliced', 'diced', 'minced', 'crushed', 'peeled', 'seeded',
     'large', 'medium', 'small', 'thin', 'thick', 'whole', 'optional', 'for garnish', 'to taste',
     'plus more for garnish', 'cooked', 'uncooked', 'raw', 'ripe', 'unripe', 'sweet', 'unsweetened',
     'salted', 'unsalted', 'low-sodium', 'lower-sodium', 'toasted'
   ];
-  // The previous regex \\b(${...})\\b was too strict. This one is more flexible.
-  const adjectivePattern = new RegExp(`(${adjectivesToRemove.join('|')})`, 'gi');
-  normalized = name.replace(adjectivePattern, '');
   
+  adjectivesToRemove.forEach(adj => {
+    // Use word boundaries to avoid partial matches (e.g., 'raw' in 'strawberry')
+    const pattern = new RegExp(`\\b${adj}\\b`, 'gi');
+    normalized = normalized.replace(pattern, '');
+  });
+
+  // Clean up extra spaces that may have been left by removing adjectives
+  normalized = normalized.replace(/\s+/g, ' ').trim();
+
   // Handle complex herb patterns like "fresh chopped herbs scallions" -> "scallions"
   if (normalized.includes('herbs') && (normalized.includes('scallion') || normalized.includes('cilantro') || normalized.includes('parsley'))) {
     // Extract the specific herb from patterns like "fresh chopped herbs scallions"
@@ -258,100 +263,72 @@ function areUnitsCompatible(unit1: string | null, unit2: string | null): boolean
 
 /**
  * Aggregates a list of grocery items.
- * Combines items with the same name and compatible units.
+ * This new implementation first groups by name, then attempts to combine units.
  */
 export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[] {
-  // Use structured logging that works in both frontend and backend
-  if (typeof console !== 'undefined' && console.info) {
-    console.info('[groceryHelpers] 🔄 Starting aggregation with', items.length, 'items');
-  }
   if (!items || items.length === 0) {
-    console.info('[groceryHelpers] ⚠️ No items to aggregate');
     return [];
   }
 
-  const aggregatedMap = new Map<string, GroceryListItem>();
+  // Step 1: Group all items by their normalized name.
+  const groupedByName = new Map<string, GroceryListItem[]>();
+  for (const item of items) {
+    const normalizedName = normalizeName(item.item_name);
+    if (!groupedByName.has(normalizedName)) {
+      groupedByName.set(normalizedName, []);
+    }
+    groupedByName.get(normalizedName)!.push(item);
+  }
 
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    try {
-      const normalizedItemName = normalizeName(item.item_name);
-      let normalizedUnit = normalizeUnit(item.quantity_unit);
+  const finalAggregatedList: GroceryListItem[] = [];
 
-      // HACK: When an ingredient like garlic is specified without a unit (e.g., "1 garlic"),
-      // the unit is parsed as null. We assume 'clove' to ensure it aggregates
-      // with items like "1 clove of garlic".
-      if (normalizedItemName === 'garlic' && normalizedUnit === null) {
-        console.log('[groceryHelpers] ⚠️ Normalizing null unit to "clove" for garlic');
-        normalizedUnit = 'clove';
-      }
-      
-      const key = `${normalizedItemName}|${normalizedUnit}`;
+  // Step 2: Iterate through each group and aggregate compatible units.
+  for (const [name, itemList] of groupedByName.entries()) {
+    if (itemList.length === 1) {
+      finalAggregatedList.push(itemList[0]);
+      continue;
+    }
 
-      const existing = aggregatedMap.get(key);
-      
-      if (existing) {
-        // If units are compatible, combine them.
-        if (areUnitsCompatible(existing.quantity_unit, item.quantity_unit)) {
-          console.info(`[groceryHelpers] 🔗 Combining "${item.item_name}"`);
+    const aggregatedItemsForGroup = [];
+    const processedIndices = new Set<number>();
 
-          const existingAmount = parseQuantity(existing.quantity_amount);
-          let currentAmount = parseQuantity(item.quantity_amount);
+    for (let i = 0; i < itemList.length; i++) {
+      if (processedIndices.has(i)) continue;
 
-          if (existingAmount === null || currentAmount === null) {
-            console.log('[groceryHelpers] ⚠️ Skipping combination due to null amount');
-          } else {
-            // Convert current amount to the existing item's unit
-            if (existing.quantity_unit && item.quantity_unit && existing.quantity_unit !== item.quantity_unit) {
-              const convertedAmount = convertUnits(currentAmount, item.quantity_unit as any, existing.quantity_unit as any);
-              if (convertedAmount !== null) {
-                console.log(`[groceryHelpers] 🔄 Converted ${currentAmount} ${item.quantity_unit} to ${convertedAmount} ${existing.quantity_unit}`);
-                currentAmount = convertedAmount;
-              } else {
-                console.log(`[groceryHelpers] ⚠️ Unit conversion failed for ${item.item_name}`);
-              }
+      let baseItem = { ...itemList[i] };
+      processedIndices.add(i);
+
+      for (let j = i + 1; j < itemList.length; j++) {
+        if (processedIndices.has(j)) continue;
+
+        const compareItem = itemList[j];
+        if (areUnitsCompatible(baseItem.quantity_unit, compareItem.quantity_unit)) {
+          const baseAmount = parseQuantity(baseItem.quantity_amount);
+          const compareAmount = parseQuantity(compareItem.quantity_amount);
+
+          if (baseAmount !== null && compareAmount !== null) {
+            let convertedAmount = compareAmount;
+            if (baseItem.quantity_unit && compareItem.quantity_unit && baseItem.quantity_unit !== compareItem.quantity_unit) {
+              convertedAmount = convertUnits(compareAmount, compareItem.quantity_unit as any, baseItem.quantity_unit as any) || 0;
             }
-            
-            const total = existingAmount + currentAmount;
-            existing.quantity_amount = total;
-            console.log(`[groceryHelpers] ➕ Combined amounts for "${item.item_name}", new total: ${total}`);
+            baseItem.quantity_amount = baseAmount + convertedAmount;
+            baseItem.original_ingredient_text += ` | ${compareItem.original_ingredient_text}`;
+            processedIndices.add(j);
           }
-          
-          // Append original text for reference
-          existing.original_ingredient_text += ` | ${item.original_ingredient_text}`;
-          aggregatedMap.set(key, existing); // Update the map with the combined item
-          continue; // Move to the next item
-        } else {
-          // Units are not compatible, create a new entry with a unique key
-          const newKey = `${key}|${aggregatedMap.size}`;
-          console.log(`[groceryHelpers] ⚠️ Incompatible units for "${item.item_name}". Adding as new item with key: ${newKey}`);
-          aggregatedMap.set(newKey, { ...item, quantity_unit: normalizedUnit });
-          continue;
         }
       }
-
-      // If no existing item, add as a new item.
-      aggregatedMap.set(key, { ...item, quantity_unit: normalizedUnit });
-
-    } catch (error) {
-      console.error(`[groceryHelpers] ❌ Error processing item ${i + 1}:`, item.item_name, error);
-      // Continue processing other items
+      aggregatedItemsForGroup.push(baseItem);
     }
+    finalAggregatedList.push(...aggregatedItemsForGroup);
   }
 
-  const result = Array.from(aggregatedMap.values());
-  console.info('[groceryHelpers] ✅ Aggregation complete:', {
+  console.log('[groceryHelpers] ✅ Aggregation complete:', {
     input_items: items.length,
-    output_items: result.length,
-    items_combined: items.length - result.length
+    output_items: finalAggregatedList.length,
+    items_combined: items.length - finalAggregatedList.length
   });
-  
-  // Log key successful aggregations for debugging
-  if (items.length - result.length > 0) {
-    console.info('[groceryHelpers] 🎯 Successfully aggregated duplicates!');
-  }
-  
-  return result;
+
+  return finalAggregatedList;
 }
 
 // === END AGGREGATION LOGIC ===
