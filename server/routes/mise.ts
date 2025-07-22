@@ -2,9 +2,7 @@ import { Router, Request, Response } from 'express';
 import { supabaseAdmin } from '../lib/supabaseAdmin';
 import logger from '../lib/logger';
 import { CombinedParsedRecipe, IngredientGroup, StructuredIngredient } from '../../common/types';
-import { formatIngredientsForGroceryList, categorizeIngredients, getBasicGroceryCategory } from '../../utils/groceryHelpers';
-
-import { aggregateGroceryList, normalizeName } from '../../utils/ingredientAggregation';
+import { formatIngredientsForGroceryList, categorizeIngredients, getBasicGroceryCategory, aggregateGroceryList, normalizeName } from '../../utils/groceryHelpers';
 import { runDefaultLLM } from '../llm/adapters';
 import { stripMarkdownFences } from '../utils/stripMarkdownFences';
 
