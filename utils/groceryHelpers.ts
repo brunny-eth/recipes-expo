@@ -127,6 +127,16 @@ export function normalizeName(name: string): string {
     }
   }
   
+  // Handle garlic variations - normalize all to "garlic"
+  if (normalized === 'garlic clove' || normalized === 'clove garlic' || normalized === 'garlic cloves' || normalized === 'cloves garlic') {
+    normalized = 'garlic';
+  }
+  
+  // Handle sesame seed variations - normalize all to "sesame seed"
+  if (normalized === 'sesame seed' || normalized === 'sesame seeds') {
+    normalized = 'sesame seed';
+  }
+  
   // Simple pluralization check - remove trailing 's' but be careful with exceptions
   const pluralExceptions = [
     'beans', 'peas', 'lentils', 'oats', 'grits', 'grains',
@@ -154,8 +164,10 @@ export function normalizeName(name: string): string {
 const unitDictionary: { [key: string]: string } = {
   // Teaspoon
   tsp: 'tsp', tsps: 'tsp', teaspoon: 'tsp', teaspoons: 'tsp',
+  'Tsp': 'tsp', 'Tsps': 'tsp',
   // Tablespoon
   tbsp: 'tbsp', tbsps: 'tbsp', tablespoon: 'tbsp', tablespoons: 'tbsp',
+  'Tbsp': 'tbsp', 'Tbsps': 'tbsp',
   // Ounce
   oz: 'oz', ounces: 'oz', 'fl oz': 'fl_oz', 'fluid ounce': 'fl_oz', 'fluid ounces': 'fl_oz',
   // Pound
@@ -322,10 +334,34 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
 
           if (baseAmount !== null && compareAmount !== null) {
             let convertedAmount = compareAmount;
+            let finalUnit = baseItem.quantity_unit;
+            let finalAmount = baseAmount;
+            
             if (baseItem.quantity_unit && compareItem.quantity_unit && baseItem.quantity_unit !== compareItem.quantity_unit) {
-              convertedAmount = convertUnits(compareAmount, compareItem.quantity_unit as any, baseItem.quantity_unit as any) || 0;
+              const converted = convertUnits(compareAmount, compareItem.quantity_unit as any, baseItem.quantity_unit as any);
+              if (converted !== null) {
+                const totalInBaseUnit = baseAmount + converted;
+                const totalInCompareUnit = convertUnits(baseAmount, baseItem.quantity_unit as any, compareItem.quantity_unit as any);
+                
+                // Choose the unit that gives a more readable result
+                // Prefer larger units when the result is more than 16 of the smaller unit
+                if (totalInBaseUnit > 16 && totalInCompareUnit !== null && totalInCompareUnit < 4) {
+                  // Use the compare unit (larger unit)
+                  finalUnit = compareItem.quantity_unit;
+                  finalAmount = totalInCompareUnit;
+                } else {
+                  // Use the base unit
+                  finalAmount = totalInBaseUnit;
+                }
+              } else {
+                finalAmount = baseAmount + compareAmount; // Fallback if conversion fails
+              }
+            } else {
+              finalAmount = baseAmount + compareAmount;
             }
-            baseItem.quantity_amount = baseAmount + convertedAmount;
+            
+            baseItem.quantity_amount = finalAmount;
+            baseItem.quantity_unit = finalUnit;
             baseItem.original_ingredient_text += ` | ${compareItem.original_ingredient_text}`;
             processedIndices.add(j);
           }
