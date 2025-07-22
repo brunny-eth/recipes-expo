@@ -2,6 +2,7 @@ import { CombinedParsedRecipe, StructuredIngredient } from '../common/types';
 import { parseIngredientDisplayName } from './ingredientHelpers';
 import { parseAmountString } from './recipeUtils';
 import { parse, toFraction } from 'fraction.js';
+import { convertUnits, availableUnits } from './units';
 
 /**
  * Converts decimal amounts to readable fractions for grocery list display
@@ -100,17 +101,14 @@ export function normalizeName(name: string): string {
   let normalized = name.toLowerCase().trim();
   
   // Remove truly irrelevant adjectives that don't affect shopping/aggregation
-  // NOTE: Deliberately NOT including "toasted" as it's a meaningful distinction
-  const irrelevantAdjectives = [
-    'large', 'small', 'medium', 'extra-large', 'jumbo', 'mini',
-    'fresh', 'frozen', 'organic', 'free-range', 'grass-fed',
-    'whole', 'chopped', 'diced', 'minced', 'sliced', 'grated',
-    'peeled', 'unpeeled', 'skinless', 'boneless',
-    'raw', 'cooked', 'steamed', 'roasted', 'grilled'
+  // but keep important ones like "toasted" for "toasted sesame seeds"
+  const adjectivesToRemove = [
+    'fresh', 'dried', 'ground', 'chopped', 'sliced', 'diced', 'minced', 'crushed', 'peeled', 'seeded',
+    'large', 'medium', 'small', 'thin', 'thick', 'whole', 'optional', 'for garnish', 'to taste',
+    'plus more for garnish', 'cooked', 'uncooked', 'raw', 'ripe', 'unripe', 'sweet', 'unsweetened',
+    'salted', 'unsalted', 'low-sodium', 'lower-sodium', 'toasted'
   ];
-  
-  // Remove irrelevant adjectives (word boundaries to avoid partial matches)
-  const adjectivePattern = new RegExp(`\\b(${irrelevantAdjectives.join('|')})\\s+`, 'gi');
+  const adjectivePattern = new RegExp(`\\b(${adjectivesToRemove.join('|')})\\b`, 'gi');
   normalized = normalized.replace(adjectivePattern, '');
   
   // Handle common unit words that might still be in the name
@@ -217,7 +215,7 @@ function parseQuantity(amount: number | string | null): number | null {
  * Groups units by type (volume, weight, count) for proper aggregation.
  */
 function areUnitsCompatible(unit1: string | null, unit2: string | null): boolean {
-  console.log('[groceryHelpers] 🔍 Checking unit compatibility:', { unit1, unit2 });
+  // console.log('[groceryHelpers] 🔍 Checking unit compatibility:', { unit1, unit2 });
   const normalizedUnit1 = normalizeUnit(unit1);
   const normalizedUnit2 = normalizeUnit(unit2);
 
@@ -226,30 +224,27 @@ function areUnitsCompatible(unit1: string | null, unit2: string | null): boolean
 
   // If units are exactly the same, they're compatible
   if (normalizedUnit1 === normalizedUnit2) {
-    console.log('[groceryHelpers] ✅ Units are identical');
+    // console.log('[groceryHelpers] ✅ Units are identical');
     return true;
   }
 
-  // Define unit groups that can be converted between each other
-  const volumeUnits = new Set([
-    'teaspoon', 'tablespoon', 'cup', 'milliliter', 'liter',
-    'fluid_ounce', 'pint', 'quart', 'gallon'
-  ]);
-  
-  const weightUnits = new Set([
-    'gram', 'kilogram', 'ounce', 'pound'
-  ]);
+  // Check if both units are available for conversion (i.e., they are volume units)
+  const isUnit1Convertible = availableUnits.includes(normalizedUnit1 as any);
+  const isUnit2Convertible = availableUnits.includes(normalizedUnit2 as any);
+
+  if (isUnit1Convertible && isUnit2Convertible) {
+    console.log(`[groceryHelpers] ✅ Both units (${normalizedUnit1}, ${normalizedUnit2}) are convertible volume units`);
+    return true;
+  }
+
+  // Define unit groups for non-convertible but similar types
+  const weightUnits = new Set(['gram', 'kilogram', 'ounce', 'pound']);
   
   const countUnits = new Set([
     'clove', 'piece', 'pinch', 'dash'
   ]);
 
   // Check if both units are in the same group
-  if (volumeUnits.has(normalizedUnit1) && volumeUnits.has(normalizedUnit2)) {
-    console.log('[groceryHelpers] ✅ Both are volume units');
-    return true; // Both are volume units
-  }
-  
   if (weightUnits.has(normalizedUnit1) && weightUnits.has(normalizedUnit2)) {
     console.log('[groceryHelpers] ✅ Both are weight units');
     return true; // Both are weight units
@@ -284,45 +279,63 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
     const item = items[i];
     try {
       const normalizedItemName = normalizeName(item.item_name);
-      const normalizedUnit = normalizeUnit(item.quantity_unit);
+      let normalizedUnit = normalizeUnit(item.quantity_unit);
+
+      // HACK: When an ingredient like garlic is specified without a unit (e.g., "1 garlic"),
+      // the unit is parsed as null. We assume 'clove' to ensure it aggregates
+      // with items like "1 clove of garlic".
+      if (normalizedItemName === 'garlic' && normalizedUnit === null) {
+        console.log('[groceryHelpers] ⚠️ Normalizing null unit to "clove" for garlic');
+        normalizedUnit = 'clove';
+      }
+      
       const key = `${normalizedItemName}|${normalizedUnit}`;
 
       const existing = aggregatedMap.get(key);
       
-      if (existing && areUnitsCompatible(existing.quantity_unit, item.quantity_unit)) {
-        console.info(`[groceryHelpers] 🔗 Combining "${item.item_name}"`);
-        // --- Combine Items ---
-        const existingAmount = parseQuantity(existing.quantity_amount);
-        const currentAmount = parseQuantity(item.quantity_amount);
+      if (existing) {
+        // If units are compatible, combine them.
+        if (areUnitsCompatible(existing.quantity_unit, item.quantity_unit)) {
+          console.info(`[groceryHelpers] 🔗 Combining "${item.item_name}"`);
 
-        if (existingAmount !== null && currentAmount !== null) {
-          const total = existingAmount + currentAmount;
-          // The quantity_amount should always be a number for further processing.
-          // Conversion to a fraction string should happen on the frontend.
-          existing.quantity_amount = total;
-          console.log('[groceryHelpers] ➕ Combined amounts:', total);
-        } else if (currentAmount !== null) {
-          // If existing had no amount but the new one does, use the new one.
-          existing.quantity_amount = currentAmount;
-          console.log('[groceryHelpers] ➡️ Using current amount:', currentAmount);
+          const existingAmount = parseQuantity(existing.quantity_amount);
+          let currentAmount = parseQuantity(item.quantity_amount);
+
+          if (existingAmount === null || currentAmount === null) {
+            console.log('[groceryHelpers] ⚠️ Skipping combination due to null amount');
+          } else {
+            // Convert current amount to the existing item's unit
+            if (existing.quantity_unit && item.quantity_unit && existing.quantity_unit !== item.quantity_unit) {
+              const convertedAmount = convertUnits(currentAmount, item.quantity_unit as any, existing.quantity_unit as any);
+              if (convertedAmount !== null) {
+                console.log(`[groceryHelpers] 🔄 Converted ${currentAmount} ${item.quantity_unit} to ${convertedAmount} ${existing.quantity_unit}`);
+                currentAmount = convertedAmount;
+              } else {
+                console.log(`[groceryHelpers] ⚠️ Unit conversion failed for ${item.item_name}`);
+              }
+            }
+            
+            const total = existingAmount + currentAmount;
+            existing.quantity_amount = total;
+            console.log(`[groceryHelpers] ➕ Combined amounts for "${item.item_name}", new total: ${total}`);
+          }
+          
+          // Append original text for reference
+          existing.original_ingredient_text += ` | ${item.original_ingredient_text}`;
+          aggregatedMap.set(key, existing); // Update the map with the combined item
+          continue; // Move to the next item
+        } else {
+          // Units are not compatible, create a new entry with a unique key
+          const newKey = `${key}|${aggregatedMap.size}`;
+          console.log(`[groceryHelpers] ⚠️ Incompatible units for "${item.item_name}". Adding as new item with key: ${newKey}`);
+          aggregatedMap.set(newKey, { ...item, quantity_unit: normalizedUnit });
+          continue;
         }
-        
-        // Append original text for reference
-        existing.original_ingredient_text += ` | ${item.original_ingredient_text}`;
-
-      } else {
-        console.log('[groceryHelpers] ➕ Adding new item');
-        // --- Add New Item ---
-        // If an item with the same name but different unit exists, create a new entry
-        const newKey = `${normalizedItemName}|${normalizedUnit}|${aggregatedMap.size}`;
-        
-        console.log('[groceryHelpers] 🔑 Using key:', existing ? newKey : key);
-        
-        // When adding a new item, store its unit in the canonical form
-        const newItem = { ...item };
-        newItem.quantity_unit = normalizedUnit;
-        aggregatedMap.set(existing ? newKey : key, newItem);
       }
+
+      // If no existing item, add as a new item.
+      aggregatedMap.set(key, { ...item, quantity_unit: normalizedUnit });
+
     } catch (error) {
       console.error(`[groceryHelpers] ❌ Error processing item ${i + 1}:`, item.item_name, error);
       // Continue processing other items
