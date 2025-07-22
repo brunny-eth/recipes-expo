@@ -82,6 +82,12 @@ export function normalizeName(name: string): string {
     normalized = 'eggs';
   }
   
+  // Handle flour variations - normalize plain flour to "all purpose flour"
+  if (normalized === 'flour' || normalized === 'all purpose flour' || normalized === 'all-purpose flour') {
+    console.log('[groceryHelpers] 🌾 FLOUR MATCH! Converting:', normalized, '→ all purpose flour');
+    normalized = 'all purpose flour';
+  }
+  
   // Simple pluralization check - remove trailing 's' but be careful with exceptions
   const pluralExceptions = [
     'beans', 'peas', 'lentils', 'oats', 'grits', 'grains',
@@ -534,8 +540,11 @@ export function getBasicGroceryCategory(ingredientName: string): string {
   
   // PRIORITY 1: Spices & Herbs (most specific - check powders, dried, etc. first)
   // This prevents "onion powder" or "garlic powder" from being categorized as Produce
+  // Note: Be specific about pepper types to avoid catching vegetable peppers (bell, jalapeño, etc.)
   if (hasExactPhrase(name, 'powder') || hasExactPhrase(name, 'dried') || 
-      hasExactWord(name, 'salt') || hasExactWord(name, 'pepper') || hasExactPhrase(name, 'paprika') || 
+      hasExactWord(name, 'salt') || hasExactPhrase(name, 'black pepper') || hasExactPhrase(name, 'white pepper') ||
+      hasExactPhrase(name, 'ground pepper') || hasExactPhrase(name, 'pepper powder') || 
+      hasExactPhrase(name, 'peppercorn') || hasExactPhrase(name, 'pepper corns') || hasExactPhrase(name, 'paprika') || 
       hasExactWord(name, 'cumin') || hasExactWord(name, 'oregano') || hasExactWord(name, 'thyme') || 
       hasExactWord(name, 'rosemary') || hasExactWord(name, 'cinnamon') || hasExactWord(name, 'vanilla') || 
       hasExactWord(name, 'turmeric') || hasExactPhrase(name, 'ginger powder') || hasExactPhrase(name, 'onion powder') || 
@@ -627,6 +636,10 @@ export function getBasicGroceryCategory(ingredientName: string): string {
   if ((hasExactWord(name, 'onion') && !hasExactPhrase(name, 'onion powder') && !hasExactPhrase(name, 'onion flakes')) ||
       (hasExactWord(name, 'garlic') && !hasExactPhrase(name, 'garlic powder') && !hasExactPhrase(name, 'garlic granules')) ||
       hasExactWord(name, 'tomato') || hasExactPhrase(name, 'bell pepper') || hasExactWord(name, 'jalapeño') ||
+      hasExactWord(name, 'poblano') || hasExactWord(name, 'serrano') || hasExactWord(name, 'habanero') ||
+      hasExactWord(name, 'anaheim') || hasExactWord(name, 'fresno') || hasExactWord(name, 'chipotle') ||
+      hasExactPhrase(name, 'chili pepper') || hasExactPhrase(name, 'hot pepper') || hasExactPhrase(name, 'sweet pepper') ||
+      hasExactPhrase(name, 'banana pepper') || hasExactPhrase(name, 'cherry pepper') ||
       hasExactWord(name, 'lettuce') || hasExactWord(name, 'spinach') || hasExactWord(name, 'kale') ||
       hasExactWord(name, 'carrot') || hasExactWord(name, 'celery') || hasExactWord(name, 'potato') ||
       hasExactPhrase(name, 'sweet potato') || hasExactWord(name, 'broccoli') || hasExactWord(name, 'cauliflower') ||

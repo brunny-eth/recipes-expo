@@ -297,7 +297,12 @@ export const coerceToIngredientGroups = (
 /**
  * Parses an ingredient display name into its base name and any substitution text.
  */
-export function parseIngredientDisplayName(name: string): { baseName: string; substitutionText: string | null } {
+export function parseIngredientDisplayName(name: string): { 
+  baseName: string; 
+  substitutionText: string | null;
+  isRemoved?: boolean;
+  substitutedFor?: string | null;
+} {
   console.log('[ingredientHelpers] 🔄 Parsing ingredient name:', name);
   
   // Handle null/undefined input
@@ -341,7 +346,21 @@ export function parseIngredientDisplayName(name: string): { baseName: string; su
     substitutionText
   });
   
-  return { baseName, substitutionText };
+  // Check if this is a removed ingredient
+  const isRemoved = baseName.toLowerCase().includes('removed:');
+  if (isRemoved) {
+    baseName = baseName.replace(/^removed:\s*/i, '').trim();
+  }
+
+  // Check if this is a substituted ingredient
+  const substitutedFor = substitutionText;
+
+  return { 
+    baseName, 
+    substitutionText,
+    isRemoved,
+    substitutedFor
+  };
 }
 
 /**

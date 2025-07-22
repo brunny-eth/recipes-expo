@@ -37,8 +37,19 @@ import { parseServingsValue } from '@/utils/recipeUtils';
 import { useCooking } from '@/context/CookingContext';
 import { formatIngredientsForGroceryList, getBasicGroceryCategory, formatAmountForGroceryDisplay } from '@/utils/groceryHelpers';
 import { getUnitDisplayName } from '@/utils/units';
+import { 
+  loadManualItems, 
+  addManualItem, 
+  deleteManualItem, 
+  clearAllManualItems,
+  ManualGroceryItem 
+} from '@/utils/manualGroceryStorage';
+import AddManualItemModal from '@/components/AddManualItemModal';
 
 // Cache removed - always fetch fresh data for consistency
+
+// AsyncStorage keys
+const GROCERY_SORT_MODE_KEY = 'grocery_sort_mode';
 
 // Types matching the mise database structure
 type MiseRecipe = {
@@ -67,6 +78,7 @@ type GroceryItem = {
   category: string;
   checked: boolean;
   id: string;
+  isManual?: boolean; // Flag to identify manually added items
 };
 
 type GroceryCategory = {
@@ -121,6 +133,91 @@ const convertToGroceryCategories = (items: any[]): GroceryCategory[] => {
   return result;
 };
 
+// Merge manual items into grocery categories
+const mergeManualItemsIntoCategories = (
+  recipeCategories: GroceryCategory[], 
+  manualItems: ManualGroceryItem[]
+): GroceryCategory[] => {
+  console.log('[MiseScreen] 🔄 Merging manual items into categories:', {
+    recipeCategoriesCount: recipeCategories.length,
+    manualItemsCount: manualItems.length
+  });
+
+  // Start with a copy of recipe categories
+  const mergedCategories: { [key: string]: GroceryItem[] } = {};
+  
+  // Add all recipe categories
+  recipeCategories.forEach(category => {
+    mergedCategories[category.name] = [...category.items];
+  });
+  
+  // Add manual items to appropriate categories
+  manualItems.forEach(manualItem => {
+    const categoryName = manualItem.category;
+    
+    // Create category if it doesn't exist
+    if (!mergedCategories[categoryName]) {
+      mergedCategories[categoryName] = [];
+    }
+    
+    // Convert manual item to GroceryItem format
+    const groceryItem: GroceryItem = {
+      id: manualItem.id,
+      name: `${manualItem.itemText} (manually added)`,
+      amount: null,
+      unit: null,
+      category: categoryName,
+      checked: false,
+      isManual: true,
+    };
+    
+    mergedCategories[categoryName].push(groceryItem);
+  });
+  
+  // Always ensure "Miscellaneous" category exists (even if empty)
+  if (!mergedCategories['Miscellaneous']) {
+    mergedCategories['Miscellaneous'] = [];
+  }
+  
+  // Convert back to array format
+  const result = Object.entries(mergedCategories).map(([categoryName, items]) => ({
+    name: categoryName,
+    items: items,
+  }));
+  
+  console.log('[MiseScreen] ✅ Merged categories result:', {
+    categoryCount: result.length,
+    categories: result.map(cat => ({
+      name: cat.name,
+      itemCount: cat.items.length,
+      manualItemCount: cat.items.filter(item => item.isManual).length
+    }))
+  });
+  
+  return result;
+};
+
+// Sort grocery items alphabetically (flatten all categories)
+const sortGroceryItemsAlphabetically = (groceryCategories: GroceryCategory[]): GroceryCategory[] => {
+  console.log('[MiseScreen] 🔤 Sorting grocery items alphabetically...');
+  
+  // Flatten all items from all categories
+  const allItems = groceryCategories.flatMap(category => category.items);
+  
+  // Sort alphabetically by item name
+  const sortedItems = allItems.sort((a, b) => a.name.localeCompare(b.name));
+  
+  // Return as a single "All Items" category
+  const result = [{
+    name: 'All Items',
+    items: sortedItems
+  }];
+  
+  console.log('[MiseScreen] ✅ Alphabetically sorted', sortedItems.length, 'items');
+  
+  return result;
+};
+
 export default function MiseScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -129,9 +226,13 @@ export default function MiseScreen() {
   const { hasResumableSession } = useCooking();
   const [miseRecipes, setMiseRecipes] = useState<MiseRecipe[]>([]);
   const [groceryList, setGroceryList] = useState<GroceryCategory[]>([]);
+  const [manualItems, setManualItems] = useState<ManualGroceryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState<'recipes' | 'grocery'>('recipes');
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [sortMode, setSortMode] = useState<'category' | 'alphabetical'>('category');
 
   // Removed caching strategy - always fetch fresh data for consistency
 
@@ -144,6 +245,50 @@ export default function MiseScreen() {
       console.log(`[MiseScreen] 💀 Component WILL UNMOUNT at ${unmountTimestamp}`);
     };
   }, []);
+
+  // Load manual items from storage on component mount
+  const loadManualItemsFromStorage = useCallback(async () => {
+    try {
+      console.log('[MiseScreen] 📖 Loading manual items from storage...');
+      const items = await loadManualItems();
+      setManualItems(items);
+      console.log('[MiseScreen] ✅ Loaded', items.length, 'manual items');
+    } catch (error) {
+      console.error('[MiseScreen] ❌ Error loading manual items:', error);
+      // Don't show error to user for manual items - graceful degradation
+      setManualItems([]);
+    }
+  }, []);
+
+  // Load sort mode preference from storage
+  const loadSortModeFromStorage = useCallback(async () => {
+    try {
+      const stored = await AsyncStorage.getItem(GROCERY_SORT_MODE_KEY);
+      if (stored && (stored === 'category' || stored === 'alphabetical')) {
+        setSortMode(stored as 'category' | 'alphabetical');
+        console.log('[MiseScreen] 📖 Loaded sort mode:', stored);
+      }
+    } catch (error) {
+      console.error('[MiseScreen] ❌ Error loading sort mode:', error);
+      // Default to category mode on error
+    }
+  }, []);
+
+  // Save sort mode preference to storage
+  const saveSortModeToStorage = useCallback(async (mode: 'category' | 'alphabetical') => {
+    try {
+      await AsyncStorage.setItem(GROCERY_SORT_MODE_KEY, mode);
+      console.log('[MiseScreen] 💾 Saved sort mode:', mode);
+    } catch (error) {
+      console.error('[MiseScreen] ❌ Error saving sort mode:', error);
+    }
+  }, []);
+
+  // Load preferences on component mount
+  useEffect(() => {
+    loadManualItemsFromStorage();
+    loadSortModeFromStorage();
+  }, [loadManualItemsFromStorage, loadSortModeFromStorage]);
 
   // Removed loadCachedMiseData function - always fetch fresh data
 
@@ -211,19 +356,16 @@ export default function MiseScreen() {
         })) || []
       });
 
-      const categorizedGroceryList = convertToGroceryCategories(groceryData?.items || []);
+      const recipeCategorizedList = convertToGroceryCategories(groceryData?.items || []);
+      const mergedGroceryList = mergeManualItemsIntoCategories(recipeCategorizedList, manualItems);
       
-      console.log('[MiseScreen] 🎯 Converted grocery categories:', {
-        categoryCount: categorizedGroceryList.length,
-        categories: categorizedGroceryList.map(cat => ({
+      console.log('[MiseScreen] 🎯 Final grocery list with manual items:', {
+        categoryCount: mergedGroceryList.length,
+        categories: mergedGroceryList.map(cat => ({
           name: cat.name,
           itemCount: cat.items.length,
-          items: cat.items.map(item => ({
-            name: item.name,
-            category: item.category,
-            amount: item.amount,
-            unit: item.unit
-          }))
+          manualItemCount: cat.items.filter(item => item.isManual).length,
+          recipeItemCount: cat.items.filter(item => !item.isManual).length
         }))
       });
 
@@ -256,7 +398,7 @@ export default function MiseScreen() {
       console.log(`[MiseScreen] 📈 Total memory usage: ${totalMemoryKB} KB for ${fetchedRecipes.length} recipes`);
 
       setMiseRecipes(fetchedRecipes);
-      setGroceryList(categorizedGroceryList);
+      setGroceryList(mergedGroceryList);
 
       // Cache removed - always fetch fresh data for consistency
 
@@ -299,8 +441,9 @@ export default function MiseScreen() {
 
       if (groceryResponse.ok) {
         const groceryData = await groceryResponse.json();
-        const categorizedGroceryList = convertToGroceryCategories(groceryData?.items || []);
-        setGroceryList(categorizedGroceryList); // Only update grocery list, no loading states
+        const recipeCategorizedList = convertToGroceryCategories(groceryData?.items || []);
+        const mergedGroceryList = mergeManualItemsIntoCategories(recipeCategorizedList, manualItems);
+        setGroceryList(mergedGroceryList); // Only update grocery list, no loading states
         console.log('[MiseScreen] ✅ Grocery list silently refreshed after recipe deletion');
       } else {
         console.warn('[MiseScreen] Failed to refresh grocery list:', groceryResponse.statusText);
@@ -309,7 +452,7 @@ export default function MiseScreen() {
       console.warn('[MiseScreen] Failed to refresh grocery list after deletion:', error);
       // Fail silently - recipe deletion was successful, just grocery refresh failed
     }
-  }, [session?.user?.id, session?.access_token]);
+  }, [session?.user?.id, session?.access_token, manualItems]);
 
   useFocusEffect(
     useCallback(() => {
@@ -498,7 +641,117 @@ export default function MiseScreen() {
     }
   }, [groceryList, miseRecipes, showError]);
 
+  // Manual item management functions
+  const handleAddManualItem = useCallback(async (category: string, itemText: string) => {
+    try {
+      console.log('[MiseScreen] ➕ Adding manual item:', { category, itemText });
+      const newItem = await addManualItem(category, itemText);
+      
+      // Update local state
+      setManualItems(prev => [...prev, newItem]);
+      
+      // Re-merge grocery list with new manual item
+      const recipeCategorizedList = convertToGroceryCategories(groceryList.flatMap(cat => 
+        cat.items.filter(item => !item.isManual).map(item => ({
+          id: item.id,
+          item_name: item.name,
+          quantity_amount: item.amount,
+          display_unit: item.unit,
+          grocery_category: item.category,
+          is_checked: item.checked
+        }))
+      ));
+      const updatedManualItems = [...manualItems, newItem];
+      const mergedGroceryList = mergeManualItemsIntoCategories(recipeCategorizedList, updatedManualItems);
+      setGroceryList(mergedGroceryList);
+      
+      console.log('[MiseScreen] ✅ Manual item added and grocery list updated');
+    } catch (error) {
+      console.error('[MiseScreen] ❌ Error adding manual item:', error);
+      showError('Error', 'Failed to add item. Please try again.');
+    }
+  }, [manualItems, groceryList, showError]);
 
+  const handleDeleteManualItem = useCallback(async (itemId: string) => {
+    try {
+      console.log('[MiseScreen] 🗑️ Deleting manual item:', itemId);
+      await deleteManualItem(itemId);
+      
+      // Update local state
+      const updatedManualItems = manualItems.filter(item => item.id !== itemId);
+      setManualItems(updatedManualItems);
+      
+      // Re-merge grocery list without deleted item
+      const recipeCategorizedList = convertToGroceryCategories(groceryList.flatMap(cat => 
+        cat.items.filter(item => !item.isManual).map(item => ({
+          id: item.id,
+          item_name: item.name,
+          quantity_amount: item.amount,
+          display_unit: item.unit,
+          grocery_category: item.category,
+          is_checked: item.checked
+        }))
+      ));
+      const mergedGroceryList = mergeManualItemsIntoCategories(recipeCategorizedList, updatedManualItems);
+      setGroceryList(mergedGroceryList);
+      
+      console.log('[MiseScreen] ✅ Manual item deleted and grocery list updated');
+    } catch (error) {
+      console.error('[MiseScreen] ❌ Error deleting manual item:', error);
+      showError('Error', 'Failed to delete item. Please try again.');
+    }
+  }, [manualItems, groceryList, showError]);
+
+  const handleClearAllManualItems = useCallback(async () => {
+    try {
+      console.log('[MiseScreen] 🧹 Clearing all manual items');
+      await clearAllManualItems();
+      
+      // Update local state
+      setManualItems([]);
+      
+      // Re-merge grocery list without manual items
+      const recipeCategorizedList = convertToGroceryCategories(groceryList.flatMap(cat => 
+        cat.items.filter(item => !item.isManual).map(item => ({
+          id: item.id,
+          item_name: item.name,
+          quantity_amount: item.amount,
+          display_unit: item.unit,
+          grocery_category: item.category,
+          is_checked: item.checked
+        }))
+      ));
+      const mergedGroceryList = mergeManualItemsIntoCategories(recipeCategorizedList, []);
+      setGroceryList(mergedGroceryList);
+      
+      console.log('[MiseScreen] ✅ All manual items cleared and grocery list updated');
+    } catch (error) {
+      console.error('[MiseScreen] ❌ Error clearing manual items:', error);
+      showError('Error', 'Failed to clear items. Please try again.');
+    }
+  }, [groceryList, showError]);
+
+  // Modal handlers
+  const handleOpenAddModal = useCallback((categoryName: string) => {
+    setSelectedCategory(categoryName);
+    setAddModalVisible(true);
+  }, []);
+
+  const handleCloseAddModal = useCallback(() => {
+    setAddModalVisible(false);
+    setSelectedCategory('');
+  }, []);
+
+  const handleAddItemFromModal = useCallback(async (itemText: string) => {
+    await handleAddManualItem(selectedCategory, itemText);
+  }, [handleAddManualItem, selectedCategory]);
+
+  // Sort mode toggle
+  const handleToggleSortMode = useCallback(async () => {
+    const newMode = sortMode === 'category' ? 'alphabetical' : 'category';
+    setSortMode(newMode);
+    await saveSortModeToStorage(newMode);
+  }, [sortMode, saveSortModeToStorage]);
 
   // Use focus effect to refresh data when tab becomes active
   // This useFocusEffect is now redundant as the caching strategy handles refetches
@@ -582,18 +835,30 @@ export default function MiseScreen() {
   // Render grocery category
   const renderGroceryCategory = useCallback(({ item }: { item: GroceryCategory }) => (
     <View style={styles.groceryCategory}>
-      <Text style={styles.groceryCategoryTitle}>{item.name}</Text>
+      <View style={styles.groceryCategoryHeader}>
+        <Text style={styles.groceryCategoryTitle}>{item.name}</Text>
+        {/* Hide add button in alphabetical mode since "All Items" isn't a real category */}
+        {sortMode === 'category' && (
+          <TouchableOpacity 
+            onPress={() => handleOpenAddModal(item.name)}
+            style={styles.addButton}
+          >
+            <MaterialCommunityIcons name="plus" size={20} color={COLORS.primary} />
+          </TouchableOpacity>
+        )}
+      </View>
       {item.items.map((groceryItem, index) => (
-        <TouchableOpacity
-          key={groceryItem.id}
-          style={styles.groceryItem}
-          onPress={() => handleGroceryToggle(item.name, index)}
-        >
-          <MaterialCommunityIcons
-            name={groceryItem.checked ? "checkbox-marked" : "checkbox-blank-outline"}
-            size={24}
-            color={groceryItem.checked ? COLORS.success : COLORS.secondary}
-          />
+        <View key={groceryItem.id} style={styles.groceryItem}>
+          <TouchableOpacity
+            style={styles.groceryItemCheckbox}
+            onPress={() => handleGroceryToggle(item.name, index)}
+          >
+            <MaterialCommunityIcons
+              name={groceryItem.checked ? "checkbox-marked" : "checkbox-blank-outline"}
+              size={24}
+              color={groceryItem.checked ? COLORS.success : COLORS.secondary}
+            />
+          </TouchableOpacity>
           <Text style={[
             styles.groceryItemText,
             groceryItem.checked && styles.groceryItemChecked
@@ -606,10 +871,18 @@ export default function MiseScreen() {
             {groceryItem.amount || groceryItem.unit ? ' ' : ''}
             {groceryItem.name}
           </Text>
-        </TouchableOpacity>
+          {groceryItem.isManual && (
+            <TouchableOpacity
+              onPress={() => handleDeleteManualItem(groceryItem.id)}
+              style={styles.deleteManualButton}
+            >
+              <MaterialCommunityIcons name="close" size={16} color={COLORS.textMuted} />
+            </TouchableOpacity>
+          )}
+        </View>
       ))}
     </View>
-  ), [handleGroceryToggle, groceryList]);
+  ), [handleGroceryToggle, handleOpenAddModal, handleDeleteManualItem, sortMode]);
 
   const renderContent = () => {
     if (isLoading) {
@@ -707,10 +980,15 @@ export default function MiseScreen() {
         );
       }
 
+      // Determine which data to use based on sort mode
+      const displayGroceryList = sortMode === 'alphabetical' 
+        ? sortGroceryItemsAlphabetically(groceryList)
+        : groceryList;
+
       return (
         <View style={styles.groceryContainer}>
           <FlatList
-            data={groceryList}
+            data={displayGroceryList}
             renderItem={renderGroceryCategory}
             keyExtractor={(item) => item.name}
             contentContainerStyle={styles.listContent}
@@ -760,6 +1038,20 @@ export default function MiseScreen() {
         </Text>
       )}
 
+      {/* Sort toggle for grocery tab */}
+      {selectedTab === 'grocery' && groceryList.length > 0 && (
+        <View style={styles.groceryControls}>
+          <TouchableOpacity
+            style={styles.sortToggle}
+            onPress={handleToggleSortMode}
+          >
+            <Text style={styles.sortToggleText}>
+              Sort: {sortMode === 'alphabetical' ? 'By Category' : 'A-Z'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {renderContent()}
 
       {/* Cooking Session Button - only show on recipes tab */}
@@ -786,6 +1078,13 @@ export default function MiseScreen() {
         </TouchableOpacity>
       )}
 
+      {/* Add Manual Item Modal */}
+      <AddManualItemModal
+        visible={addModalVisible}
+        onClose={handleCloseAddModal}
+        onAdd={handleAddItemFromModal}
+        categoryName={selectedCategory}
+      />
 
     </View>
   );
@@ -1021,29 +1320,44 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primaryLight,
     ...SHADOWS.small,
   } as ViewStyle,
+  groceryCategoryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  } as ViewStyle,
   groceryCategoryTitle: {
     ...bodyStrongText,
     color: COLORS.textDark,
-    marginBottom: SPACING.md, // Consistent spacing below header
     fontSize: FONT.size.lg,
   } as TextStyle,
+  addButton: {
+    padding: SPACING.xs,
+    borderRadius: RADIUS.sm,
+  } as ViewStyle,
   groceryItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: SPACING.sm,
     marginBottom: SPACING.xs, // Add 6-8px gap between items
   } as ViewStyle,
+  groceryItemCheckbox: {
+    marginRight: SPACING.md,
+  } as ViewStyle,
   groceryItemText: {
     ...bodyText,
     fontSize: FONT.size.bodyMedium,
     color: COLORS.textDark,
-    marginLeft: SPACING.md,
     flex: 1,
   } as TextStyle,
   groceryItemChecked: {
     textDecorationLine: 'line-through',
     color: COLORS.darkGray,
   } as TextStyle,
+  deleteManualButton: {
+    padding: SPACING.xs,
+    marginLeft: SPACING.xs,
+  } as ViewStyle,
   floatingActionButton: {
     position: 'absolute',
     bottom: SPACING.xl,
@@ -1089,6 +1403,32 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: SPACING.md,
     marginTop: SPACING.xs,
+  } as TextStyle,
+  
+  groceryControls: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginBottom: SPACING.sm,
+    paddingHorizontal: 0,
+  } as ViewStyle,
+  
+  sortToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.sm,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.primaryLight,
+  } as ViewStyle,
+  
+  sortToggleText: {
+    ...bodyText,
+    fontSize: FONT.size.caption,
+    color: COLORS.primary,
+    marginLeft: SPACING.xs,
+    fontWeight: '500',
   } as TextStyle,
 
 }); 

@@ -7,25 +7,18 @@ import {
   ScrollView,
   SafeAreaView,
   ActivityIndicator,
-  Platform,
   Dimensions,
   Linking,
   ViewStyle,
   TextStyle,
   ImageStyle,
   InteractionManager,
-  FlatList,
-  Modal,
-  Pressable,
 } from 'react-native';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
-// Import FastImage from the new library
 import FastImage from '@d11/react-native-fast-image';
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import Animated, { FadeIn } from 'react-native-reanimated';
-import { decode } from 'he';
 import {
   COLORS,
   SPACING,
@@ -76,6 +69,16 @@ import RecipeStepsHeader from '@/components/recipe/RecipeStepsHeader';
 type AppliedChange = {
   from: string;
   to: StructuredIngredient | null;
+};
+
+// Helper function to convert time format from "10 minutes" to "10m"
+const formatTimeCondensed = (timeString: string): string => {
+  return timeString
+    .replace(/\b(\d+)\s*minutes?\b/gi, '$1m')
+    .replace(/\b(\d+)\s*hours?\b/gi, '$1h')
+    .replace(/\b(\d+)\s*hrs?\b/gi, '$1h')
+    .replace(/\b(\d+)\s*mins?\b/gi, '$1m')
+    .trim();
 };
 
 const ALLERGENS = [
@@ -274,6 +277,8 @@ export default function RecipeSummaryScreen() {
     isViewingSavedRecipe,
     selectedScaleFactor,
     miseRecipeId,
+    appliedChangesLength: appliedChanges.length,
+    'Should show undo buttons?': !isViewingSavedRecipe,
   });
 
   // Track if modifications have been made for mise entry point
@@ -754,8 +759,8 @@ export default function RecipeSummaryScreen() {
 
       const isRemoval = substitution.name === 'Remove ingredient';
       let originalNameForSub = ingredientToSubstitute.name;
-      const { substitutedFor } = parseIngredientDisplayName(ingredientToSubstitute.name);
-      if (substitutedFor) originalNameForSub = substitutedFor;
+      const { substitutionText } = parseIngredientDisplayName(ingredientToSubstitute.name);
+      if (substitutionText) originalNameForSub = substitutionText;
       
       console.log('[DEBUG] Creating substitution change:', {
         originalIngredient: {
@@ -1782,26 +1787,46 @@ export default function RecipeSummaryScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Recipe image at the very top of the scrollable content */}
+        {/* Recipe image - only render if image exists */}
         {(() => {
           const imageUrl = recipe.image || recipe.thumbnailUrl;
+          
+          // Debug logging for image URL
+          console.log('[DEBUG] Image URL check:', {
+            recipeTitle: recipe.title,
+            hasImage: !!recipe.image,
+            imageValue: recipe.image,
+            hasThumbnail: !!recipe.thumbnailUrl, 
+            thumbnailValue: recipe.thumbnailUrl,
+            finalImageUrl: imageUrl,
+            imageUrlType: typeof imageUrl,
+            imageUrlLength: imageUrl?.length,
+            willRenderImage: !!imageUrl
+          });
+          
+          if (!imageUrl) {
+            console.log('[DEBUG] No image URL - collapsing image area');
+            return null; // Completely collapse when no image
+          }
+
           const sourceUrl = recipe.sourceUrl;
           const isVideoRecipe = sourceUrl && (
             sourceUrl.includes('tiktok.com') ||
             sourceUrl.includes('instagram.com') ||
             sourceUrl.includes('youtube.com')
           );
+          
           const handleOpenSource = async () => {
             if (sourceUrl) {
               try {
                 await Linking.openURL(sourceUrl);
               } catch (err) {
-                // Optionally, show a user-friendly error
                 alert('Could not open the video link.');
               }
             }
           };
-          if (imageUrl && isVideoRecipe) {
+
+          if (isVideoRecipe) {
             return (
               <TouchableOpacity onPress={handleOpenSource} activeOpacity={0.8} style={{ marginBottom: SPACING.md }}>
                 <FastImage
@@ -1815,7 +1840,7 @@ export default function RecipeSummaryScreen() {
                 />
               </TouchableOpacity>
             );
-          } else if (imageUrl) {
+          } else {
             return (
               <FastImage
                 source={{ uri: String(imageUrl) }}
@@ -1823,13 +1848,11 @@ export default function RecipeSummaryScreen() {
                   width: '100%',
                   height: 150,
                   borderRadius: RADIUS.md,
-                  marginBottom: SPACING.xs,
+                  marginBottom: SPACING.md,
                 }}
                 resizeMode="cover"
               />
             );
-          } else {
-            return null;
           }
         })()}
         {/* Short description left-aligned, outside columns */}
@@ -1840,27 +1863,16 @@ export default function RecipeSummaryScreen() {
               : recipe.shortDescription}
           </Text>
         )}
-        {/* Two-column layout for meta info */}
+        {/* Condensed single-line meta info */}
         {(recipe.prepTime || recipe.cookTime || detectedAllergens.length > 0) && (
-          <View style={styles.metaInfoContainer}>
-            {recipe.prepTime && (
-              <View style={styles.metaInfoRow}>
-                <Text style={styles.metaInfoLabel}>Prep Time:</Text>
-                <Text style={styles.metaInfoValue}>{recipe.prepTime}</Text>
-              </View>
-            )}
-            {recipe.cookTime && (
-              <View style={styles.metaInfoRow}>
-                <Text style={styles.metaInfoLabel}>Cook Time:</Text>
-                <Text style={styles.metaInfoValue}>{recipe.cookTime}</Text>
-              </View>
-            )}
-            {detectedAllergens.length > 0 && (
-              <View style={styles.metaInfoRow}>
-                <Text style={styles.metaInfoLabel}>Allergens:</Text>
-                <Text style={styles.metaInfoValue}>{detectedAllergens.join(', ')}</Text>
-              </View>
-            )}
+          <View style={styles.metaInfoCondensed}>
+            <Text style={styles.metaInfoCondensedText}>
+              {[
+                recipe.prepTime && `prep: ${formatTimeCondensed(recipe.prepTime)}`,
+                recipe.cookTime && `cook: ${formatTimeCondensed(recipe.cookTime)}`,
+                detectedAllergens.length > 0 && `allergens: ${detectedAllergens.join(', ')}`
+              ].filter(Boolean).join(' | ')}
+            </Text>
           </View>
         )}
 
@@ -2134,37 +2146,25 @@ const styles = StyleSheet.create({
   },
   shortDescriptionHeaderLeft: {
     fontFamily: FONT.family.inter,
-    fontSize: FONT.size.body,
+    fontSize: FONT.size.smBody+1,
     color: COLORS.textMuted,
     textAlign: 'center',
     marginTop: SPACING.xxs,
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.sm,
     marginHorizontal: SPACING.xs, // Reduced for wider text area
     paddingHorizontal: SPACING.xs, // Reduced for wider text area
     lineHeight: FONT.lineHeight.compact,
   },
-  metaInfoContainer: {
-    marginBottom: SPACING.sm,
-    marginTop: SPACING.xs,
+  metaInfoCondensed: {
+    fontFamily: FONT.family.inter,
+    alignItems: 'center',
+    marginBottom: SPACING.sm
   },
-  metaInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 2,
-  },
-  metaInfoLabel: {
-    minWidth: 90,
-    fontWeight: '600',
-    color: COLORS.textDark,
-    fontSize: FONT.size.body,
-    textAlign: 'left',
-  },
-  metaInfoValue: {
-    flex: 1,
+  metaInfoCondensedText: {
+    ...captionText,
     color: COLORS.textMuted,
-    fontSize: FONT.size.body,
+    fontSize: FONT.size.caption,
     textAlign: 'left',
-    marginLeft: SPACING.xs,
   },
   visitSourceContainer: {
     alignItems: 'center',

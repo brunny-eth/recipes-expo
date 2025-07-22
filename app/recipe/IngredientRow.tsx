@@ -77,6 +77,17 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
     ingredient.name,
   );
 
+  // Debug undo button logic
+  if (ingredient.name.includes('butter') || ingredient.name.includes('sugar')) {
+    console.log(`[DEBUG] ${ingredient.name} undo logic:`, {
+      isRemoved,
+      substitutedFor,
+      isViewingSavedRecipe,
+      shouldShowRemovalUndo: isRemoved && !isViewingSavedRecipe,
+      shouldShowSubstitutionUndo: substitutedFor && !isRemoved && !isViewingSavedRecipe,
+    });
+  }
+
   return (
     <TouchableOpacity
       style={[styles.ingredientItemContainer]}
@@ -96,9 +107,8 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
           </View>
         )
       ) : (
-        <View style={styles.bulletContainer}>
-          <View style={styles.bullet} />
-        </View>
+        // No bullet - cleaner look
+        <View style={styles.noBulletSpacer} />
       )}
 
       {/* Ingredient Text Container */}
@@ -198,7 +208,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: SPACING.smLg,
     paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.smMd,
+    paddingHorizontal: SPACING.xs, // Reduced horizontal padding
   } as ViewStyle,
   checkboxPlaceholder: {
     width: ICON_SIZE.md,
@@ -282,18 +292,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: SPACING.sm,
   } as ViewStyle,
-  bulletContainer: {
-    width: ICON_SIZE.md,
-    height: ICON_SIZE.md,
-    marginRight: SPACING.sm,
-    justifyContent: 'center',
-    alignItems: 'center',
-  } as ViewStyle,
-  bullet: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: COLORS.primary,
+  noBulletSpacer: {
+    width: 0, // No space needed
+    marginRight: 0,
   } as ViewStyle,
   buttonArea: {
     flexDirection: 'row',
