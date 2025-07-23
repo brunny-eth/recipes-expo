@@ -106,7 +106,6 @@ const styles = StyleSheet.create({
     fontFamily: FONT.family.inter,
     fontSize: FONT.size.caption,
     color: COLORS.textMuted,
-    marginTop: SPACING.xs,
     marginBottom: SPACING.sm, // Use small spacing for consistency
     lineHeight: 18,
     textAlign: 'left',
@@ -127,15 +126,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   } as ViewStyle,
   servingButtonSelected: {
-    backgroundColor: COLORS.primaryLight,
-    borderColor: COLORS.primary,
+    backgroundColor: '#d8d8d8',
+    borderColor: COLORS.lightGray,
   } as ViewStyle,
   servingButtonText: {
     ...captionStrongText,
     color: COLORS.textDark,
   } as TextStyle,
   servingButtonTextSelected: {
-    color: COLORS.primary,
+    color: COLORS.textDark,
   } as TextStyle,
 });
 

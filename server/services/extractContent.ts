@@ -153,6 +153,7 @@ export function extractRecipeContent(html: string, requestId: string, sourceUrl?
   let description: string | null = null;
   let image: string | null = null;
   let thumbnailUrl: string | null = null;
+  let extractedSourceUrl: string | null = sourceUrl || null; // Store the sourceUrl parameter
   let ingredientsText: string | null = null;
   let instructionsText: string | null = null;
   let recipeYieldText: string | null = null;
@@ -1070,5 +1071,5 @@ export function extractRecipeContent(html: string, requestId: string, sourceUrl?
   logger.debug({ requestId, ingredientsTextPreview: ingredientsText?.slice(0, 300) || 'null' }, '[extractRecipeContent] Final ingredientsText preview (fallback path)');
   
   // Return structure includes the fallback flag again
-  return { title, description, image, thumbnailUrl, sourceUrl: sourceUrl ?? null, ingredientsText, instructionsText, recipeYieldText, tipsText, isFallback, prepTime, cookTime, totalTime, fallbackType };
+  return { title, description, image, thumbnailUrl, sourceUrl: extractedSourceUrl, ingredientsText, instructionsText, recipeYieldText, tipsText, isFallback, prepTime, cookTime, totalTime, fallbackType };
 }

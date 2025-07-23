@@ -491,6 +491,20 @@ export default function RecipeSummaryScreen() {
           setIsLoading(false);
           return;
         }
+        
+        // Debug: Log the recipe structure to see if sourceUrl exists
+        console.log('[DEBUG] Recipe data structure:', {
+          hasRecipe: !!parsed,
+          keys: Object.keys(parsed),
+          sourceUrl: parsed.sourceUrl,
+          hasSourceUrl: !!parsed.sourceUrl,
+          recipePreview: {
+            title: parsed.title,
+            sourceUrl: parsed.sourceUrl,
+            image: parsed.image,
+          }
+        });
+        
         setRecipe(parsed);
         
         // Reset image load failure state when new recipe is loaded
@@ -1898,13 +1912,13 @@ export default function RecipeSummaryScreen() {
           }
         })()}
         {/* Short description left-aligned, outside columns */}
-        {recipe.shortDescription && (
+        {/* {recipe.shortDescription && (
           <Text style={styles.shortDescriptionHeaderLeft}>
             {recipe.shortDescription.endsWith('.') 
               ? recipe.shortDescription.slice(0, -1) 
               : recipe.shortDescription}
           </Text>
-        )}
+        )} */}
         {/* Condensed single-line meta info */}
         {(recipe.prepTime || recipe.cookTime || detectedAllergens.length > 0) && (
           <View style={styles.metaInfoCondensed}>
@@ -1918,8 +1932,12 @@ export default function RecipeSummaryScreen() {
           </View>
         )}
 
+        {/* Divider between meta info and Adjust servings */}
+        <View style={{ marginTop: SPACING.lg, marginBottom: SPACING.lg }}>
+          <View style={styles.divider} />
+        </View>
 
-                <View style={{ marginTop: SPACING.xxl }}>
+        <View style={{ marginTop: 0 }}>
           <Text style={styles.sectionTitle}>Adjust servings</Text>
           <ServingScaler
             selectedScaleFactor={selectedScaleFactor}
@@ -1929,7 +1947,12 @@ export default function RecipeSummaryScreen() {
           />
         </View>
 
-        <View style={{ marginTop: SPACING.xxl }}>
+        {/* Divider between Adjust servings and Swap ingredients */}
+        <View style={{ marginTop: SPACING.lg, marginBottom: SPACING.lg }}>
+          <View style={styles.divider} />
+        </View>
+
+        <View style={{ marginTop: 0 }}>
           <Text style={styles.sectionTitle}>Swap ingredients</Text>
           {selectedScaleFactor !== 1 && (
             <Text style={styles.ingredientsSubtext}>
@@ -1963,13 +1986,13 @@ export default function RecipeSummaryScreen() {
       </ScrollView>
 
       {/* Move Visit Source to the bottom, above action buttons */}
-      {recipe.sourceUrl && (
+      {(recipe?.sourceUrl || true) && (
         <View style={styles.visitSourceContainer}>
           <Text
             style={styles.visitSourceLink}
-            onPress={() => Linking.openURL(recipe.sourceUrl!)}
+            onPress={() => Linking.openURL(recipe?.sourceUrl || 'https://example.com')}
           >
-            Visit Source ↗︎
+            Visit Source ↗︎ (Debug: {recipe?.sourceUrl ? 'Has URL' : 'No URL'})
           </Text>
         </View>
       )}
@@ -2037,9 +2060,8 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   divider: {
-    height: BORDER_WIDTH.hairline,
+    height: BORDER_WIDTH.default,
     backgroundColor: COLORS.divider,
-    marginVertical: SPACING.lg,
   },
   mainIngredientsHeader: {
     marginBottom: SPACING.sm,

@@ -196,7 +196,7 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
               testID={`substitution-button-${ingredient.name}`}
             >
               <MaterialCommunityIcons
-                name="shuffle-variant"
+                name="pencil"
                 size={FONT.size.lg}
                 color={COLORS.primary}
               />

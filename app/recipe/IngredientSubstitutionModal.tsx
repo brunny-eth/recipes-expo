@@ -147,22 +147,25 @@ export default function IngredientSubstitutionModal({
                     key={`${option.name}-${index}`}
                     style={[
                       styles.optionItem,
-                      option.name === 'Remove ingredient' &&
-                        styles.optionItemRemove,
-                      selectedOption?.name === option.name &&
-                        styles.optionItemSelected,
+                      option.name === 'Remove ingredient'
+                        ? (selectedOption?.name === option.name ? styles.optionItemRemove : styles.optionItemRemove)
+                        : (selectedOption?.name === option.name ? styles.optionItemSelected : null),
                     ]}
                     onPress={() => setSelectedOption(option)}
                   >
                     <View
                       style={[
                         styles.radioButton,
-                        option.name === 'Remove ingredient' &&
-                          styles.radioButtonRemove,
+                        option.name === 'Remove ingredient'
+                          ? styles.radioButtonRemove
+                          : null,
                       ]}
                     >
                       {selectedOption?.name === option.name && (
-                        <View style={styles.radioButtonInner} />
+                        <View style={[
+                          styles.radioButtonInner,
+                          option.name === 'Remove ingredient' && styles.radioButtonInnerRemove
+                        ]} />
                       )}
                     </View>
                     <View style={styles.optionContent}>
@@ -278,6 +281,9 @@ const styles = StyleSheet.create({
     height: ICON_SIZE.xs,
     borderRadius: RADIUS.smAlt,
     backgroundColor: COLORS.primary,
+  },
+  radioButtonInnerRemove: {
+    backgroundColor: COLORS.error,
   },
   optionContent: {
     flex: 1,
