@@ -97,8 +97,12 @@ export function normalizeName(name: string): string {
     'eggs'
   ];
   
-  // Only singularize if it's not an exception and ends with 's'
-  if (normalized.endsWith('s') && !pluralExceptions.includes(normalized)) {
+  // Check if the normalized name contains any plural exception as a substring
+  // This handles compound names like "frozen blueberries"
+  const containsPlural = pluralExceptions.some(exception => normalized.includes(exception));
+  
+  // Only singularize if it's not an exception and ends with 's' and doesn't contain plural words
+  if (normalized.endsWith('s') && !pluralExceptions.includes(normalized) && !containsPlural) {
     // Additional check: don't singularize if it would create a very short word
     const singular = normalized.slice(0, -1);
     if (singular.length >= 3) {
@@ -515,7 +519,39 @@ export function formatIngredientsForGroceryList(
 
   console.log(`[groceryHelpers] 🎯 Finished formatting ${groceryItems.length} grocery items`);
   
-  return groceryItems;
+  // Post-process: Convert large cheese amounts from oz to cups for better grocery shopping
+  const processedItems = groceryItems.map(item => {
+    // Check if this is a cheese item measured in oz
+    if (item.quantity_unit === 'oz' && item.quantity_amount && 
+        (item.item_name.toLowerCase().includes('cheese') || 
+         item.item_name.toLowerCase().includes('mozzarella') || 
+         item.item_name.toLowerCase().includes('cheddar') ||
+         item.item_name.toLowerCase().includes('parmesan'))) {
+      
+      // Convert large oz amounts to cups (4 oz = 1 cup for shredded cheese)
+      if (item.quantity_amount >= 8) { // Convert amounts 8 oz and above
+        const cupsAmount = item.quantity_amount / 4;
+        console.log('[groceryHelpers] 🧀 Converting cheese from oz to cups:', {
+          item: item.item_name,
+          originalAmount: item.quantity_amount,
+          originalUnit: 'oz',
+          newAmount: cupsAmount,
+          newUnit: 'cup'
+        });
+        
+        return {
+          ...item,
+          quantity_amount: cupsAmount,
+          quantity_unit: 'cup',
+          display_unit: getUnitDisplayName('cup', cupsAmount)
+        };
+      }
+    }
+    
+    return item;
+  });
+  
+  return processedItems;
 }
 
 /**

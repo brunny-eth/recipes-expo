@@ -43,7 +43,7 @@ import {
 import {
   coerceToStructuredIngredients,
   coerceToIngredientGroups,
-  parseIngredientDisplayName,
+  parseRecipeDisplayName,
 } from '@/utils/ingredientHelpers';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import InlineErrorBanner from '@/components/InlineErrorBanner';
@@ -272,7 +272,9 @@ export default function RecipeSummaryScreen() {
   } | null>(null);
 
   // Determine if we're viewing a saved recipe (clean display) vs actively editing (show indicators)
-  const isViewingSavedRecipe = !!params.appliedChanges;
+  // For mise recipes: we're actively editing even if appliedChanges exist in URL
+  // The URL appliedChanges are just the baseline from existing mise recipe
+  const isViewingSavedRecipe = entryPoint !== 'mise' && !!params.appliedChanges;
   console.log('[DEBUG] Entry point analysis:', {
     entryPoint,
     hasAppliedChanges: !!params.appliedChanges,
@@ -345,7 +347,7 @@ export default function RecipeSummaryScreen() {
           finalIngredients = scaledIngredients
             .map((baseIngredient) => {
               // Parse the display name to get the original name without "(removed)" or "(substituted for X)" text
-              const { baseName: originalName } = parseIngredientDisplayName(baseIngredient.name);
+              const { baseName: originalName } = parseRecipeDisplayName(baseIngredient.name);
               const change = appliedChanges.find((c) => c.from === originalName);
               
               console.log('[DEBUG] Checking ingredient for substitution (clean display):', {
@@ -776,7 +778,7 @@ export default function RecipeSummaryScreen() {
 
       const isRemoval = substitution.name === 'Remove ingredient';
       let originalNameForSub = ingredientToSubstitute.name;
-      const { substitutionText } = parseIngredientDisplayName(ingredientToSubstitute.name);
+      const { substitutionText } = parseRecipeDisplayName(ingredientToSubstitute.name);
       if (substitutionText) originalNameForSub = substitutionText;
       
       console.log('[DEBUG] Creating substitution change:', {
@@ -873,7 +875,7 @@ export default function RecipeSummaryScreen() {
 
   const undoIngredientRemoval = React.useCallback(
     (fullName: string) => {
-      const { baseName: originalName } = parseIngredientDisplayName(fullName);
+      const { baseName: originalName } = parseRecipeDisplayName(fullName);
       setAppliedChanges((prev) => prev.filter((change) => change.from !== originalName));
       if (lastRemoved?.from === originalName) setLastRemoved(null);
     },

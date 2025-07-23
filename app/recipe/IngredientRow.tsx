@@ -24,7 +24,7 @@ import {
   FONT,
 } from '@/constants/typography';
 import { abbreviateUnit } from '@/utils/format';
-import { parseIngredientDisplayName } from '@/utils/ingredientHelpers';
+import { parseRecipeDisplayName } from '@/utils/ingredientHelpers';
 
 type AppliedChange = {
   from: string;
@@ -51,7 +51,7 @@ function getOriginalIngredientNameFromAppliedChanges(
   appliedChanges: AppliedChange[],
   displayName: string,
 ): string {
-  const { substitutedFor, baseName } = parseIngredientDisplayName(displayName);
+  const { substitutedFor, baseName } = parseRecipeDisplayName(displayName);
   const fallback = substitutedFor || baseName;
   const match = appliedChanges.find((change) => change.to?.name === fallback);
   return match?.from || fallback;
@@ -69,7 +69,7 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
   showCheckboxes = true,
   isViewingSavedRecipe = false,
 }) => {
-  const { baseName, isRemoved, substitutedFor } = parseIngredientDisplayName(
+  const { baseName, isRemoved, substitutedFor } = parseRecipeDisplayName(
     ingredient.name,
   );
   const originalNameForSub = getOriginalIngredientNameFromAppliedChanges(
@@ -81,7 +81,8 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
   if (ingredient.name.includes('butter') || ingredient.name.includes('sugar') || 
       ingredient.name.includes('flank') || ingredient.name.includes('paprika') ||
       ingredient.name.includes('milk') || ingredient.name.includes('onion') ||
-      ingredient.name.includes('cherry tomatoes') || ingredient.name.includes('pickled')) {
+      ingredient.name.includes('cherry tomatoes') || ingredient.name.includes('pickled') ||
+      ingredient.name.includes('thyme') || ingredient.name.includes('rosemary')) {
     console.log(`[DEBUG] ${ingredient.name} undo logic:`, {
       rawIngredientName: ingredient.name,
       isRemoved,
@@ -89,7 +90,7 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
       isViewingSavedRecipe,
       shouldShowRemovalUndo: isRemoved && !isViewingSavedRecipe,
       shouldShowSubstitutionUndo: substitutedFor && !isRemoved && !isViewingSavedRecipe,
-      parsedIngredient: parseIngredientDisplayName(ingredient.name)
+      parsedIngredient: parseRecipeDisplayName(ingredient.name)
     });
   }
 

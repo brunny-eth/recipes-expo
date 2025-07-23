@@ -57,7 +57,7 @@ function SplashScreenMeez({ onFinish }: { onFinish: () => void }) {
     const finishTimeout = setTimeout(() => {
       console.log('[SplashScreenMeez] Animation sequence complete, calling onFinish');
       onFinish();
-    }, 2500); 
+    }, 3000); 
 
     // FALLBACK TIMEOUT: Force app to continue after 5 seconds to prevent getting stuck
     const fallbackTimeout = setTimeout(() => {
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
   },
   tagline: {
     fontFamily: FONT.family.inter,
-    fontSize: 18, // Match subheadingText exactly
+    fontSize: 15, // Match subheadingText exactly
     color: COLORS.textDark,
     textAlign: 'center',
     lineHeight: 24,

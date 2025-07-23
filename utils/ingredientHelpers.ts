@@ -295,15 +295,16 @@ export const coerceToIngredientGroups = (
 };
 
 /**
- * Parses an ingredient display name into its base name and any substitution text.
+ * Parses an ingredient display name for RECIPE DISPLAY purposes.
+ * Detects removal and substitution markers without aggressive cleaning.
  */
-export function parseIngredientDisplayName(name: string): { 
+export function parseRecipeDisplayName(name: string): { 
   baseName: string; 
   substitutionText: string | null;
   isRemoved?: boolean;
   substitutedFor?: string | null;
 } {
-  console.log('[ingredientHelpers] 🔄 Parsing ingredient name:', name);
+  console.log('[ingredientHelpers] 🔄 Parsing RECIPE display name:', name);
   
   // Handle null/undefined input
   if (!name) {
@@ -336,14 +337,85 @@ export function parseIngredientDisplayName(name: string): {
     });
   }
 
+  // Check for "(substituted for X)" pattern first
+  const substitutedForMatch = originalName.match(/^(.*?)\s*\(substituted for (.+?)\)\s*$/i);
+  let baseName = originalName;
+  let substitutionText = null;
+  
+  if (substitutedForMatch) {
+    baseName = substitutedForMatch[1].trim();
+    substitutionText = substitutedForMatch[2].trim();
+    console.log('[ingredientHelpers] 🔄 Found "substituted for" pattern:', {
+      originalName,
+      baseName,
+      substitutionText: substitutionText
+    });
+  } else {
+    // Split on other substitution markers
+    const substitutionMarkers = [' or ', ' (or ', ' / ', ' OR ', ' / ', '/'];
+
+    for (const marker of substitutionMarkers) {
+      if (originalName.includes(marker)) {
+        const parts = originalName.split(marker);
+        baseName = parts[0].trim();
+        substitutionText = parts.slice(1).join(marker).trim();
+        // Remove trailing parenthesis if present
+        if (substitutionText.endsWith(')')) {
+          substitutionText = substitutionText.slice(0, -1).trim();
+        }
+        console.log('[ingredientHelpers] 🔍 Found substitution marker:', {
+          marker,
+          baseName,
+          substitutionText
+        });
+        break;
+      }
+    }
+  }
+
+  console.log('[ingredientHelpers] ✅ RECIPE parsed result:', {
+    baseName,
+    substitutionText,
+    isRemoved
+  });
+  
+  // Check if this is a substituted ingredient
+  const substitutedFor = substitutionText;
+
+  return { 
+    baseName, 
+    substitutionText,
+    isRemoved,
+    substitutedFor
+  };
+}
+
+/**
+ * Parses an ingredient display name for GROCERY LIST purposes.
+ * Aggressively cleans and normalizes ingredient names.
+ */
+export function parseIngredientDisplayName(name: string): { 
+  baseName: string; 
+  substitutionText: string | null;
+  isRemoved?: boolean;
+  substitutedFor?: string | null;
+} {
+  console.log('[ingredientHelpers] 🔄 Parsing GROCERY ingredient name:', name);
+  
+  // Handle null/undefined input
+  if (!name) {
+    console.log('[ingredientHelpers] ⚠️ Empty ingredient name');
+    return { baseName: '', substitutionText: null };
+  }
+
   // Split on substitution markers
   const substitutionMarkers = [' or ', ' (or ', ' / ', ' OR ', ' / ', '/'];
-  let baseName = originalName;
+  let baseName = name;
   let substitutionText = null;
 
   for (const marker of substitutionMarkers) {
-    if (originalName.includes(marker)) {
-      const parts = originalName.split(marker);
+    if (name.includes(marker)) {
+      const parts = name.split(marker);
       baseName = parts[0].trim();
       substitutionText = parts.slice(1).join(marker).trim();
       // Remove trailing parenthesis if present
@@ -359,28 +431,25 @@ export function parseIngredientDisplayName(name: string): {
     }
   }
 
-  // Clean up any remaining parenthetical notes (but not removal markers)
-  if (!isRemoved) {
-    const parenMatch = baseName.match(/^(.*?)\s*\(.*\)\s*$/);
-    if (parenMatch) {
-      baseName = parenMatch[1].trim();
-      console.log('[ingredientHelpers] 🧹 Cleaned parenthetical:', baseName);
-    }
+  // Clean up any parenthetical notes (for grocery normalization)
+  const parenMatch = baseName.match(/^(.*?)\s*\(.*\)\s*$/);
+  if (parenMatch) {
+    baseName = parenMatch[1].trim();
+    console.log('[ingredientHelpers] 🧹 Cleaned parenthetical for grocery:', baseName);
   }
 
-  console.log('[ingredientHelpers] ✅ Parsed result:', {
+  console.log('[ingredientHelpers] ✅ GROCERY parsed result:', {
     baseName,
-    substitutionText,
-    isRemoved
+    substitutionText
   });
-
-  // Check if this is a substituted ingredient
+  
+  // For grocery context, we don't need removal/substitution detection
   const substitutedFor = substitutionText;
 
   return { 
     baseName, 
     substitutionText,
-    isRemoved,
+    isRemoved: false, // Grocery context doesn't care about removals
     substitutedFor
   };
 }

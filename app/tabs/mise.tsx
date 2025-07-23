@@ -859,10 +859,13 @@ export default function MiseScreen() {
               color={groceryItem.checked ? COLORS.success : COLORS.secondary}
             />
           </TouchableOpacity>
-          <Text style={[
-            styles.groceryItemText,
-            groceryItem.checked && styles.groceryItemChecked
-          ]}>
+          <Text 
+            style={[
+              styles.groceryItemText,
+              groceryItem.checked && styles.groceryItemChecked
+            ]}
+            numberOfLines={0}
+          >
             {groceryItem.amount ? `${formatAmountForGroceryDisplay(groceryItem.amount)}` : ''}
             {(() => {
               const unitDisplay = getUnitDisplayName(groceryItem.unit as any, groceryItem.amount || 1);
