@@ -460,7 +460,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xl,
   } as ViewStyle,
   emptyText: {
-            fontFamily: FONT.family.libreBaskerville,
+            fontFamily: FONT.family.ubuntu,
     fontSize: 18,
     color: COLORS.textDark,
     marginTop: SPACING.md,

@@ -89,7 +89,7 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
                 textAlign: 'center',
                 color: COLORS.textDark,
                 lineHeight: 26,
-                fontFamily: 'LibreBaskerville-Italic'
+                fontFamily: 'Ubuntu-Regular'
               }}>
                 Designed for home cooks
               </Text>

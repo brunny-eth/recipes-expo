@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
     fontWeight: FONT.weight.bold,
     color: COLORS.textDark,
     marginBottom: SPACING.md,
-            fontFamily: FONT.family.libreBaskerville,
+            fontFamily: FONT.family.ubuntu,
   } as TextStyle,
   subtitle: {
     ...bodyTextLoose,

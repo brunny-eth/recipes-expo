@@ -2024,7 +2024,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   infoRowLabel: {
-            fontFamily: FONT.family.libreBaskerville,
+            fontFamily: FONT.family.ubuntu,
     fontSize: FONT.size.body,
   },
   infoRowContent: {

@@ -1,9 +1,10 @@
 import { TextStyle } from 'react-native';
 import { RFValue } from 'react-native-responsive-fontsize';
 
-const libreBaskerville = 'LibreBaskerville-Regular';
-const libreBaskervilleBold = 'LibreBaskerville-Bold';
-const libreBaskervilleItalic = 'LibreBaskerville-Italic';
+const ubuntu = 'Ubuntu-Regular';
+const ubuntuBold = 'Ubuntu-Bold';
+const ubuntuMedium = 'Ubuntu-Medium';
+const ubuntuLight = 'Ubuntu-Light';
 const inter = 'Inter-Regular';
 const interSemiBold = 'Inter-SemiBold';
 
@@ -14,9 +15,10 @@ export function responsiveFont(base: number, min: number, max: number) {
 
 export const FONT = {
   family: {
-    libreBaskerville,
-    libreBaskervilleBold,
-    libreBaskervilleItalic,
+    ubuntu,
+    ubuntuBold,
+    ubuntuMedium,
+    ubuntuLight,
     inter,
     interSemiBold,
   },
@@ -51,17 +53,17 @@ export const FONT = {
 };
 
 export const screenTitleText: TextStyle = {
-  fontFamily: FONT.family.libreBaskerville,
+  fontFamily: FONT.family.ubuntu,
   fontSize: FONT.size.screenTitle,
 };
 
 export const titleText: TextStyle = {
-  fontFamily: FONT.family.libreBaskerville,
+  fontFamily: FONT.family.ubuntu,
   fontSize: FONT.size.title,
 };
 
 export const sectionHeaderText: TextStyle = {
-  fontFamily: FONT.family.libreBaskerville,
+  fontFamily: FONT.family.ubuntu,
   fontSize: FONT.size.sectionHeader,
 };
 
