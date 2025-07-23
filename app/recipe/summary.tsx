@@ -1983,21 +1983,19 @@ export default function RecipeSummaryScreen() {
             />
           </View>
         </View>
+
+        {/* Visit Source link inside ScrollView with proper spacing */}
+        {recipe?.sourceUrl && (
+          <View style={[styles.visitSourceContainer, { marginBottom: 60 }]}>
+            <Text
+              style={styles.visitSourceLink}
+              onPress={() => Linking.openURL(recipe.sourceUrl!)}
+            >
+              Visit Source ↗︎
+            </Text>
+          </View>
+        )}
       </ScrollView>
-
-      {/* Move Visit Source to the bottom, above action buttons */}
-      {(recipe?.sourceUrl || true) && (
-        <View style={styles.visitSourceContainer}>
-          <Text
-            style={styles.visitSourceLink}
-            onPress={() => Linking.openURL(recipe?.sourceUrl || 'https://example.com')}
-          >
-            Visit Source ↗︎ (Debug: {recipe?.sourceUrl ? 'Has URL' : 'No URL'})
-          </Text>
-        </View>
-      )}
-
-
 
       <RecipeFooterButtons
         handleGoToSteps={handleGoToSteps}
@@ -2234,6 +2232,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: SPACING.lg,
     marginBottom: SPACING.sm, // Smaller margin to bring closer to buttons
+    zIndex: 1, // Ensure it's above other elements
+    elevation: 1, // For Android
   },
   visitSourceLink: {
     fontFamily: FONT.family.inter,
