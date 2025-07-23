@@ -88,8 +88,8 @@ const MemoizedTabsNavigator = React.memo(() => {
       <Tabs.Screen
         name="mise"
         options={{
-          title: 'Mise',
-          tabBarIcon: createTabBarIcon('chef-hat', 'Mise'),
+          title: 'Prep',
+          tabBarIcon: createTabBarIcon('chef-hat', 'Prep'),
           tabBarLabel: () => null,
           unmountOnBlur: false,
         }}

@@ -49,15 +49,15 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
     if (isRewriting || isSavingModifications) return 'Processing modifications...';
     if (isScalingInstructions) return 'Making sure everything lines up...';
     
-    if (isAlreadyInMise) return 'Already in mise';
+    if (isAlreadyInMise) return 'Already in prep station';
     
     switch (entryPoint) {
       case 'saved':
-        return 'Add to your mise';
+        return 'Add to your prep station';
       case 'mise':
-        return 'Update Mise Recipe';
+        return 'Update Recipe';
       default:
-        return 'Add to your mise';
+        return 'Add to your prep station';
     }
   };
 

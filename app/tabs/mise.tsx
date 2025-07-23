@@ -45,11 +45,14 @@ import {
   ManualGroceryItem 
 } from '@/utils/manualGroceryStorage';
 import AddManualItemModal from '@/components/AddManualItemModal';
+import HouseholdStaplesModal from '@/components/HouseholdStaplesModal';
 
 // Cache removed - always fetch fresh data for consistency
 
 // AsyncStorage keys
 const GROCERY_SORT_MODE_KEY = 'grocery_sort_mode';
+const HOUSEHOLD_STAPLES_KEY = 'household_staples_filter';
+const STAPLES_ENABLED_KEY = 'household_staples_enabled';
 
 // Types matching the mise database structure
 type MiseRecipe = {
@@ -218,6 +221,60 @@ const sortGroceryItemsAlphabetically = (groceryCategories: GroceryCategory[]): G
   return result;
 };
 
+// Filter out household staples from grocery list
+const filterHouseholdStaples = (
+  categories: GroceryCategory[], 
+  enabled: boolean, 
+  selectedStaples: string[]
+): GroceryCategory[] => {
+  if (!enabled || selectedStaples.length === 0) {
+    return categories;
+  }
+  
+  console.log('[MiseScreen] 🏠 Filtering household staples:', {
+    enabled,
+    selectedStaplesCount: selectedStaples.length,
+    selectedStaples: selectedStaples.slice(0, 3), // Log first 3 for debugging
+  });
+  
+  return categories.map(category => ({
+    ...category,
+    items: category.items.filter(item => {
+      const itemName = item.name.toLowerCase().trim();
+      const isStaple = selectedStaples.some(staple => {
+        const stapleName = staple.toLowerCase().trim();
+        
+        // Exact matches or very close matches
+        if (itemName === stapleName || itemName.includes(stapleName)) {
+          // Special handling for pepper types - don't match vegetable peppers
+          if (stapleName.includes('pepper') && !stapleName.includes('bell')) {
+            const vegetablePeppers = ['bell pepper', 'jalapeño', 'jalapeno', 'poblano', 'serrano', 'habanero', 'chili pepper', 'hot pepper', 'sweet pepper'];
+            const isVegetablePepper = vegetablePeppers.some(vegPepper => itemName.includes(vegPepper));
+            return !isVegetablePepper; // Only filter if it's NOT a vegetable pepper
+          }
+          
+          // Special handling for "salt" - don't match specialized salts
+          if (stapleName === 'salt') {
+            const specializedSalts = ['sea salt', 'himalayan', 'kosher salt', 'table salt', 'iodized salt'];
+            // If it's a basic salt, filter it out
+            return itemName === 'salt' || specializedSalts.some(salt => itemName.includes(salt));
+          }
+          
+          return true;
+        }
+        
+        return false;
+      });
+      
+      if (isStaple) {
+        console.log('[MiseScreen] 🚫 Filtering out staple:', item.name);
+      }
+      
+      return !isStaple;
+    })
+  })).filter(category => category.items.length > 0); // Remove empty categories
+};
+
 export default function MiseScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -233,6 +290,9 @@ export default function MiseScreen() {
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [sortMode, setSortMode] = useState<'category' | 'alphabetical'>('category');
+  const [staplesModalVisible, setStaplesModalVisible] = useState(false);
+  const [staplesEnabled, setStaplesEnabled] = useState(false);
+  const [selectedStaples, setSelectedStaples] = useState<string[]>([]);
 
   // Removed caching strategy - always fetch fresh data for consistency
 
@@ -284,11 +344,48 @@ export default function MiseScreen() {
     }
   }, []);
 
+  // Load household staples preferences from storage
+  const loadStaplesPreferences = useCallback(async () => {
+    try {
+      const [enabledStored, staplesStored] = await Promise.all([
+        AsyncStorage.getItem(STAPLES_ENABLED_KEY),
+        AsyncStorage.getItem(HOUSEHOLD_STAPLES_KEY),
+      ]);
+      
+      if (enabledStored !== null) {
+        setStaplesEnabled(enabledStored === 'true');
+        console.log('[MiseScreen] 📖 Loaded staples enabled:', enabledStored === 'true');
+      }
+      
+      if (staplesStored) {
+        const staples = JSON.parse(staplesStored);
+        setSelectedStaples(staples);
+        console.log('[MiseScreen] 📖 Loaded selected staples:', staples.length, 'items');
+      }
+    } catch (error) {
+      console.error('[MiseScreen] ❌ Error loading staples preferences:', error);
+    }
+  }, []);
+
+  // Save household staples preferences to storage
+  const saveStaplesPreferences = useCallback(async (enabled: boolean, staples: string[]) => {
+    try {
+      await Promise.all([
+        AsyncStorage.setItem(STAPLES_ENABLED_KEY, enabled.toString()),
+        AsyncStorage.setItem(HOUSEHOLD_STAPLES_KEY, JSON.stringify(staples)),
+      ]);
+      console.log('[MiseScreen] 💾 Saved staples preferences:', { enabled, staplesCount: staples.length });
+    } catch (error) {
+      console.error('[MiseScreen] ❌ Error saving staples preferences:', error);
+    }
+  }, []);
+
   // Load preferences on component mount
   useEffect(() => {
     loadManualItemsFromStorage();
     loadSortModeFromStorage();
-  }, [loadManualItemsFromStorage, loadSortModeFromStorage]);
+    loadStaplesPreferences();
+  }, [loadManualItemsFromStorage, loadSortModeFromStorage, loadStaplesPreferences]);
 
   // Removed loadCachedMiseData function - always fetch fresh data
 
@@ -301,7 +398,7 @@ export default function MiseScreen() {
       setIsLoading(false);
       setMiseRecipes([]);
       setGroceryList([]);
-      setError('Please log in to access your mise.');
+              setError('Please log in to access your prep station.');
       return;
     }
 
@@ -403,7 +500,7 @@ export default function MiseScreen() {
       // Cache removed - always fetch fresh data for consistency
 
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load mise data';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load prep station data';
       console.error('[MiseScreen] Error fetching mise data:', err);
       setError(errorMessage);
     } finally {
@@ -609,7 +706,18 @@ export default function MiseScreen() {
         plainText += '\n';
       }
 
-      groceryList.forEach(category => {
+      // Use the same filtered list that's displayed (respects staples filter)  
+      let shareGroceryList = groceryList;
+      
+      // Apply staples filtering if enabled (same as display logic)
+      shareGroceryList = filterHouseholdStaples(shareGroceryList, staplesEnabled, selectedStaples);
+      
+      // Apply alphabetical sorting if enabled (same as display logic)
+      if (sortMode === 'alphabetical') {
+        shareGroceryList = sortGroceryItemsAlphabetically(shareGroceryList);
+      }
+
+      shareGroceryList.forEach(category => {
         // Add category header
         plainText += `${category.name.toUpperCase()}\n`;
         
@@ -639,7 +747,7 @@ export default function MiseScreen() {
       console.error('Share failed:', error);
       showError('Share Error', 'Failed to share grocery list');
     }
-  }, [groceryList, miseRecipes, showError]);
+  }, [groceryList, miseRecipes, showError, staplesEnabled, selectedStaples, sortMode]);
 
   // Manual item management functions
   const handleAddManualItem = useCallback(async (category: string, itemText: string) => {
@@ -752,6 +860,37 @@ export default function MiseScreen() {
     setSortMode(newMode);
     await saveSortModeToStorage(newMode);
   }, [sortMode, saveSortModeToStorage]);
+
+  // Household staples toggle
+  const handleToggleStaples = useCallback(async () => {
+    if (!staplesEnabled) {
+      // If enabling staples filter, open modal if no staples selected
+      if (selectedStaples.length === 0) {
+        setStaplesModalVisible(true);
+        return;
+      }
+    }
+    
+    const newEnabled = !staplesEnabled;
+    setStaplesEnabled(newEnabled);
+    await saveStaplesPreferences(newEnabled, selectedStaples);
+  }, [staplesEnabled, selectedStaples, saveStaplesPreferences]);
+
+  // Staples modal handlers
+  const handleOpenStaplesModal = useCallback(() => {
+    setStaplesModalVisible(true);
+  }, []);
+
+  const handleCloseStaplesModal = useCallback(() => {
+    setStaplesModalVisible(false);
+  }, []);
+
+  const handleStaplesChange = useCallback(async (staples: string[]) => {
+    setSelectedStaples(staples);
+    const enabled = staples.length > 0;
+    setStaplesEnabled(enabled);
+    await saveStaplesPreferences(enabled, staples);
+  }, [saveStaplesPreferences]);
 
   // Use focus effect to refresh data when tab becomes active
   // This useFocusEffect is now redundant as the caching strategy handles refetches
@@ -949,9 +1088,9 @@ export default function MiseScreen() {
               size={48}
               color={COLORS.lightGray}
             />
-            <Text style={styles.emptyText}>No recipes in mise</Text>
+            <Text style={styles.emptyText}>No recipes in prep station</Text>
             <Text style={styles.emptySubtext}>
-              Prepare a recipe to add it to your mise en place.
+              Prepare a recipe to add it to your prep station.
             </Text>
           </View>
         );
@@ -983,10 +1122,16 @@ export default function MiseScreen() {
         );
       }
 
-      // Determine which data to use based on sort mode
-      const displayGroceryList = sortMode === 'alphabetical' 
-        ? sortGroceryItemsAlphabetically(groceryList)
-        : groceryList;
+      // Determine which data to use based on sort mode and staples filter
+      let displayGroceryList = groceryList;
+      
+      // First apply staples filtering if enabled
+      displayGroceryList = filterHouseholdStaples(displayGroceryList, staplesEnabled, selectedStaples);
+      
+      // Then apply sorting if alphabetical mode
+      if (sortMode === 'alphabetical') {
+        displayGroceryList = sortGroceryItemsAlphabetically(displayGroceryList);
+      }
 
       return (
         <View style={styles.groceryContainer}>
@@ -1041,7 +1186,7 @@ export default function MiseScreen() {
         </Text>
       )}
 
-      {/* Sort toggle for grocery tab */}
+      {/* Controls for grocery tab */}
       {selectedTab === 'grocery' && groceryList.length > 0 && (
         <View style={styles.groceryControls}>
           <TouchableOpacity
@@ -1052,6 +1197,26 @@ export default function MiseScreen() {
               Sort: {sortMode === 'alphabetical' ? 'By Category' : 'A-Z'}
             </Text>
           </TouchableOpacity>
+          
+          <View style={styles.staplesControlsContainer}>
+            <TouchableOpacity
+              style={styles.staplesToggle}
+              onPress={handleToggleStaples}
+            >
+              <Text style={styles.staplesToggleText}>
+                {staplesEnabled ? 'Show Staples' : 'Hide Staples'}
+              </Text>
+            </TouchableOpacity>
+            
+            {selectedStaples.length > 0 && (
+              <TouchableOpacity
+                style={styles.staplesConfigButton}
+                onPress={handleOpenStaplesModal}
+              >
+                <MaterialCommunityIcons name="format-list-checks" size={16} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       )}
 
@@ -1087,6 +1252,14 @@ export default function MiseScreen() {
         onClose={handleCloseAddModal}
         onAdd={handleAddItemFromModal}
         categoryName={selectedCategory}
+      />
+
+      {/* Household Staples Modal */}
+      <HouseholdStaplesModal
+        visible={staplesModalVisible}
+        onClose={handleCloseStaplesModal}
+        selectedStaples={selectedStaples}
+        onStaplesChange={handleStaplesChange}
       />
 
     </View>
@@ -1410,7 +1583,8 @@ const styles = StyleSheet.create({
   
   groceryControls: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: SPACING.sm,
     paddingHorizontal: 0,
   } as ViewStyle,
@@ -1433,5 +1607,46 @@ const styles = StyleSheet.create({
     marginLeft: SPACING.xs,
     fontWeight: '500',
   } as TextStyle,
+
+  staplesToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.sm,
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.sm,
+    borderWidth: BORDER_WIDTH.default,
+    borderColor: COLORS.primaryLight,
+  } as ViewStyle,
+  
+  staplesToggleActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  } as ViewStyle,
+  
+  staplesToggleText: {
+    ...bodyText,
+    fontSize: FONT.size.caption,
+    color: COLORS.primary,
+    fontWeight: '500',
+  } as TextStyle,
+  
+  staplesToggleTextActive: {
+    color: COLORS.white,
+  } as TextStyle,
+  
+  staplesControlsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  } as ViewStyle,
+  
+  staplesConfigButton: {
+    padding: SPACING.xs,
+    borderRadius: RADIUS.sm,
+    backgroundColor: COLORS.surface,
+    borderWidth: BORDER_WIDTH.hairline,
+    borderColor: COLORS.primaryLight,
+    marginLeft: SPACING.xs,
+  } as ViewStyle,
 
 }); 
