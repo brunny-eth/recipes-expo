@@ -7,15 +7,4 @@ config.transformer.babelTransformerPath = require.resolve('react-native-svg-tran
 config.resolver.assetExts = config.resolver.assetExts.filter(ext => ext !== 'svg');
 config.resolver.sourceExts.push('svg');
 
-// Explicitly block test files to be sure
-// Ensure we have an array before spreading
-const existingBlockList = Array.isArray(config.resolver.blockList) 
-                          ? config.resolver.blockList 
-                          : [];
-
-config.resolver.blockList = [
-  ...existingBlockList, 
-  /.*\.test\.tsx?$/,
-];
-
 module.exports = config; 

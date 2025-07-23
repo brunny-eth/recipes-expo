@@ -15,8 +15,12 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.meez.app",
+      "bundleIdentifier": "com.meez.recipes",
       "usesAppleSignIn": true,
+      "entitlements": {
+        "com.apple.developer.applesignin": ["Default"],
+        "com.apple.developer.associated-domains": ["applinks:meez.app"]
+      },
       "splash": {
         "image": "./assets/images/meez_logo.png",
         "resizeMode": "contain",
@@ -27,7 +31,16 @@
           {
             "CFBundleURLSchemes": ["meez"]
           }
-        ]
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.meez.recipes",
+      "splash": {
+        "image": "./assets/images/meez_logo.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#fefcf7"
       }
     },
     "web": {
@@ -52,14 +65,6 @@
     "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/f14248c8-b5d7-42a2-b029-29fbed6bcd9f"
-    },
-    "android": {
-      "package": "com.meez.app",
-      "splash": {
-        "image": "./assets/images/meez_logo.png",
-        "resizeMode": "contain",
-        "backgroundColor": "#fefcf7"
-      }
     }
   }
 }

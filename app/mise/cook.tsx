@@ -210,10 +210,27 @@ export default function CookScreen() {
         if (miseRecipes.length > 0) {
           console.log('[CookScreen] 🚀 Initializing cooking sessions for', miseRecipes.length, 'recipes with fresh data');
           
-          // Initialize all sessions at once with full recipe data
-          initializeSessions(miseRecipes);
+          // Add robust error handling and logging for initializeSessions call
+          console.log('[CookScreen] 🔍 Debug: typeof initializeSessions =', typeof initializeSessions);
+          console.log('[CookScreen] 🔍 Debug: initializeSessions is function?', typeof initializeSessions === 'function');
+          console.log('[CookScreen] 🔍 Debug: initializeSessions.toString():', initializeSessions?.toString?.()?.substring(0, 100) + '...');
           
-          console.log('[CookScreen] ✅ All cooking sessions initialized with fresh recipe data');
+          try {
+            // Initialize all sessions at once with full recipe data
+            initializeSessions(miseRecipes);
+            
+            console.log('[CookScreen] ✅ All cooking sessions initialized with fresh recipe data');
+          } catch (error) {
+            console.error('[CookScreen] 💥 TypeError caught in initializeSessions call:', error);
+            console.error('[CookScreen] 💥 Error type:', typeof error);
+            console.error('[CookScreen] 💥 Error message:', error instanceof Error ? error.message : String(error));
+            console.error('[CookScreen] 💥 Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+            console.error('[CookScreen] 💥 Error constructor:', error?.constructor?.name);
+            console.error('[CookScreen] 💥 Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+            
+            // Continue without sessions rather than crashing the app
+            console.log('[CookScreen] ⚠️ Continuing without cooking sessions due to initialization error');
+          }
         } else {
           console.log('[CookScreen] ❌ No valid recipes found to start cooking sessions');
         }
@@ -245,7 +262,11 @@ export default function CookScreen() {
           console.log('[CookScreen] 🔄 Starting to refresh mise recipes from API');
           
           // Clear any existing cooking session to start fresh
-          await endAllSessions();
+          try {
+            await endAllSessions();
+          } catch (error) {
+            console.warn('[CookScreen] ⚠️ Error clearing sessions, continuing anyway:', error);
+          }
           
           // Fetch fresh mise data from API
           if (!session?.user) {
@@ -306,7 +327,26 @@ export default function CookScreen() {
           // Initialize all sessions with fresh data
           if (miseRecipes.length > 0) {
             console.log('[CookScreen] 🚀 Re-initializing cooking sessions with fresh data');
-            initializeSessions(miseRecipes);
+            
+            // Add robust error handling and logging for initializeSessions call
+            console.log('[CookScreen] 🔍 Debug: typeof initializeSessions =', typeof initializeSessions);
+            console.log('[CookScreen] 🔍 Debug: initializeSessions is function?', typeof initializeSessions === 'function');
+            console.log('[CookScreen] 🔍 Debug: initializeSessions.toString():', initializeSessions?.toString?.()?.substring(0, 100) + '...');
+            
+            try {
+              initializeSessions(miseRecipes);
+              console.log('[CookScreen] ✅ Re-initialized cooking sessions successfully');
+            } catch (error) {
+              console.error('[CookScreen] 💥 TypeError caught in initializeSessions call (useFocusEffect):', error);
+              console.error('[CookScreen] 💥 Error type:', typeof error);
+              console.error('[CookScreen] 💥 Error message:', error instanceof Error ? error.message : String(error));
+              console.error('[CookScreen] 💥 Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+              console.error('[CookScreen] 💥 Error constructor:', error?.constructor?.name);
+              console.error('[CookScreen] 💥 Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+              
+              // Continue without sessions rather than crashing the app
+              console.log('[CookScreen] ⚠️ Continuing without cooking sessions due to initialization error in useFocusEffect');
+            }
           }
         } catch (error) {
           console.error('[CookScreen] 💥 Error refreshing mise recipes:', error);

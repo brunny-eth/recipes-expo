@@ -35,7 +35,7 @@ export type SubmissionResult = {
  */
 export type ValidationResult = {
   isValid: boolean;
-  inputType: 'url' | 'raw_text' | 'audio' | 'image' | 'video' | 'invalid';
+  inputType: 'url' | 'raw_text' | 'image' | 'video' | 'invalid';
   normalizedInput?: string;
   error?: string;
 }; 

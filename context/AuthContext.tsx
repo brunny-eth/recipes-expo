@@ -271,6 +271,8 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           throw new Error('Apple authentication is not available on this device');
         }
 
+        console.log('[Apple] Starting Apple Sign In process...');
+        
         const credential = await AppleAuthentication.signInAsync({
           requestedScopes: [
             AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
@@ -284,12 +286,21 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         }
 
         console.log('[Apple] Identity token received, signing in with Supabase...');
+        // Log the identityToken to inspect its 'aud' claim later if needed (copy-paste to jwt.io)
+        console.log('[Apple] Identity Token:', identityToken);
+
+        // *** THIS IS THE CRITICAL CHANGE ***
+        // For native Apple Sign In, the clientId for Supabase's verification
+        // should typically be your app's Bundle ID, not the Service ID (which is more for web flows).
+        const supabaseClientId = 'com.meez.recipes';
+
+        console.log('[Apple] Supabase signInWithIdToken clientId:', supabaseClientId);
 
         const { data, error } = await supabase.auth.signInWithIdToken({
           provider: 'apple',
           token: identityToken,
           // @ts-expect-error Supabase types don't include clientId but it's supported at runtime
-          clientId: 'app.meez.auth',
+          clientId: supabaseClientId,
         });
 
         if (error) throw error;

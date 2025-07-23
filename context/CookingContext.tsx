@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { createContext, useContext, useReducer, useEffect } from 'react';
+import { createContext, useContext, useReducer, useEffect, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CombinedParsedRecipe } from '../common/types';
 import { useAuth } from './AuthContext';
@@ -78,48 +78,67 @@ function cookingReducer(state: CookingState, action: CookingAction): CookingStat
 
   switch (action.type) {
     case 'INITIALIZE_SESSIONS': {
-      console.log('[CookingContext] 🚀 Initializing all cooking sessions with eager loading:', {
-        recipesCount: action.payload.recipes.length,
-        activeRecipeId: action.payload.activeRecipeId,
-        recipeIds: action.payload.recipes.map(r => r.id)
-      });
-      
-      const newRecipes: RecipeSession[] = action.payload.recipes.map(recipe => {
-        const recipeId = String(recipe.id);
-        
-        console.log('[CookingContext] 📋 Creating session for recipe:', {
-          recipeId,
-          title: recipe.title,
-          hasInstructions: !!recipe.instructions,
-          instructionsCount: recipe.instructions?.length || 0,
-          hasIngredientGroups: !!recipe.ingredientGroups,
-          ingredientGroupsCount: recipe.ingredientGroups?.length || 0,
+      try {
+        console.log('[CookingContext] 🚀 Initializing all cooking sessions with eager loading:', {
+          recipesCount: action.payload.recipes.length,
+          activeRecipeId: action.payload.activeRecipeId,
+          recipeIds: action.payload.recipes.map(r => r.id)
         });
         
-        return {
-          recipeId,
-          recipe, // Full recipe data immediately available
-          completedSteps: [],
-          activeTimers: [],
-          scrollPosition: 0,
-          isLoading: false, // No loading needed - data is already here
+        const newRecipes: RecipeSession[] = action.payload.recipes.map(recipe => {
+          try {
+            const recipeId = String(recipe.id);
+            
+            console.log('[CookingContext] 📋 Creating session for recipe:', {
+              recipeId,
+              title: recipe.title,
+              hasInstructions: !!recipe.instructions,
+              instructionsCount: recipe.instructions?.length || 0,
+              hasIngredientGroups: !!recipe.ingredientGroups,
+              ingredientGroupsCount: recipe.ingredientGroups?.length || 0,
+            });
+            
+            return {
+              recipeId,
+              recipe, // Full recipe data immediately available
+              completedSteps: [],
+              activeTimers: [],
+              scrollPosition: 0,
+              isLoading: false, // No loading needed - data is already here
+            };
+          } catch (error) {
+            console.error('[CookingContext] 💥 Error creating session for recipe:', recipe.id, error);
+            console.error('[CookingContext] 💥 Recipe data:', JSON.stringify(recipe, null, 2));
+            throw error;
+          }
+        });
+        
+        const newState = {
+          ...state,
+          activeRecipes: newRecipes,
+          activeRecipeId: action.payload.activeRecipeId || newRecipes[0]?.recipeId || null,
+          sessionStartTime: Date.now(),
         };
-      });
-      
-      const newState = {
-        ...state,
-        activeRecipes: newRecipes,
-        activeRecipeId: action.payload.activeRecipeId || newRecipes[0]?.recipeId || null,
-        sessionStartTime: Date.now(),
-      };
-      
-      console.log('[CookingContext] ✅ All sessions initialized:', {
-        activeRecipesCount: newState.activeRecipes.length,
-        activeRecipeId: newState.activeRecipeId,
-        sessionStartTime: newState.sessionStartTime
-      });
-      
-      return newState;
+        
+        console.log('[CookingContext] ✅ All sessions initialized:', {
+          activeRecipesCount: newState.activeRecipes.length,
+          activeRecipeId: newState.activeRecipeId,
+          sessionStartTime: newState.sessionStartTime
+        });
+        
+        return newState;
+      } catch (error) {
+        console.error('[CookingContext] 💥 Error in INITIALIZE_SESSIONS reducer:', error);
+        console.error('[CookingContext] 💥 Error type:', typeof error);
+        console.error('[CookingContext] 💥 Error message:', error instanceof Error ? error.message : String(error));
+        console.error('[CookingContext] 💥 Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+        console.error('[CookingContext] 💥 Error constructor:', error?.constructor?.name);
+        console.error('[CookingContext] 💥 Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+        
+        // Return current state to prevent app crash, but log the error
+        console.error('[CookingContext] ⚠️ Returning current state due to initialization error');
+        return state;
+      }
     }
 
     case 'SET_SCROLL_POSITION': {
@@ -336,58 +355,7 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
     saveState();
   }, [state]);
 
-  const initializeSessions = (miseRecipes: any[]) => {
-    console.time(`[CookingContext] ⏱️ initializeSessions`);
-    console.log('[CookingContext] 🚀 Initializing cooking sessions with mise recipes:', {
-      recipesCount: miseRecipes.length,
-      recipeIds: miseRecipes.map(mr => mr.id),
-    });
 
-    // Convert mise recipes to full recipe objects using prepared_recipe_data
-    const recipes: CombinedParsedRecipe[] = miseRecipes.map(miseRecipe => {
-      const recipeData = miseRecipe.local_modifications?.modified_recipe_data || 
-                       miseRecipe.prepared_recipe_data || 
-                       miseRecipe.original_recipe_data;
-      
-      if (!recipeData) {
-        console.error('[CookingContext] ❌ No recipe data found for mise recipe:', miseRecipe.id);
-        return null;
-      }
-
-      // Create the recipe object with mise ID as primary ID
-      const recipe = {
-        ...recipeData,
-        id: String(miseRecipe.id), // Use the mise ID as the primary ID
-        originalRecipeId: recipeData.id, // Keep original recipe ID for reference
-        miseRecipeId: miseRecipe.id, // Keep mise recipe ID for reference
-      };
-
-      console.log('[CookingContext] 📋 Processed mise recipe:', {
-        miseRecipeId: miseRecipe.id,
-        recipeId: recipe.id,
-        title: recipe.title,
-        hasInstructions: !!recipe.instructions,
-        instructionsCount: recipe.instructions?.length || 0,
-        hasIngredientGroups: !!recipe.ingredientGroups,
-        ingredientGroupsCount: recipe.ingredientGroups?.length || 0,
-                 totalIngredients: recipe.ingredientGroups?.reduce((total: number, group: any) => 
-           total + (group.ingredients?.length || 0), 0) || 0,
-      });
-
-      return recipe;
-    }).filter(Boolean) as CombinedParsedRecipe[];
-
-         // Initialize all sessions with full recipe data
-     dispatch({ 
-       type: 'INITIALIZE_SESSIONS', 
-       payload: { 
-         recipes,
-         activeRecipeId: recipes[0]?.id ? String(recipes[0].id) : undefined // Set first recipe as active
-       } 
-     });
-    
-    console.timeEnd(`[CookingContext] ⏱️ initializeSessions`);
-  };
 
   const endSession = (recipeId: string) => {
     dispatch({ type: 'END_SESSION', payload: { recipeId } });
@@ -396,15 +364,17 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
   const endAllSessions = async () => {
     console.log('[CookingContext] 🛑 Ending all cooking sessions');
     console.log('[CookingContext] 📊 Current sessions to end:', {
-      activeRecipesCount: state.activeRecipes.length,
-      recipeIds: state.activeRecipes.map(r => r.recipeId)
+      activeRecipesCount: state.activeRecipes?.length || 0,
+      recipeIds: state.activeRecipes?.map(r => r.recipeId) || []
     });
     
     // Clear all active sessions
-    state.activeRecipes.forEach(recipe => {
-      console.log('[CookingContext] 🛑 Ending session for recipe:', recipe.recipeId);
-      dispatch({ type: 'END_SESSION', payload: { recipeId: recipe.recipeId } });
-    });
+    if (state.activeRecipes && Array.isArray(state.activeRecipes)) {
+      state.activeRecipes.forEach(recipe => {
+        console.log('[CookingContext] 🛑 Ending session for recipe:', recipe.recipeId);
+        dispatch({ type: 'END_SESSION', payload: { recipeId: recipe.recipeId } });
+      });
+    }
     
     // Clear storage
     try {
@@ -461,27 +431,144 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
     return state.activeRecipes.length > 0;
   };
 
+  // Use useMemo to prevent tree-shaking of functions in production builds
+  const contextValue = useMemo(() => {
+    // Define initializeSessions directly inside useMemo to make it intrinsically part of the context value
+    const initializeSessions = (miseRecipes: any[]) => {
+      console.time(`[CookingContext] ⏱️ initializeSessions`);
+      console.log('[CookingContext] 🚀 Initializing cooking sessions with mise recipes:', {
+        recipesCount: miseRecipes.length,
+        recipeIds: miseRecipes.map(mr => mr.id),
+      });
 
+      try {
+        // Validate input
+        if (!Array.isArray(miseRecipes)) {
+          throw new Error(`Invalid miseRecipes parameter: expected array, got ${typeof miseRecipes}`);
+        }
+
+        // Convert mise recipes to full recipe objects using prepared_recipe_data
+        const recipes: CombinedParsedRecipe[] = miseRecipes.map(miseRecipe => {
+          try {
+            const recipeData = miseRecipe.local_modifications?.modified_recipe_data || 
+                             miseRecipe.prepared_recipe_data || 
+                             miseRecipe.original_recipe_data;
+            
+            if (!recipeData) {
+              console.error('[CookingContext] ❌ No recipe data found for mise recipe:', miseRecipe.id);
+              return null;
+            }
+
+            // Create the recipe object with mise ID as primary ID
+            const recipe = {
+              ...recipeData,
+              id: String(miseRecipe.id), // Use the mise ID as the primary ID
+              originalRecipeId: recipeData.id, // Keep original recipe ID for reference
+              miseRecipeId: miseRecipe.id, // Keep mise recipe ID for reference
+            };
+
+            console.log('[CookingContext] 📋 Processed mise recipe:', {
+              miseRecipeId: miseRecipe.id,
+              recipeId: recipe.id,
+              title: recipe.title,
+              hasInstructions: !!recipe.instructions,
+              instructionsCount: recipe.instructions?.length || 0,
+              hasIngredientGroups: !!recipe.ingredientGroups,
+              ingredientGroupsCount: recipe.ingredientGroups?.length || 0,
+              totalIngredients: recipe.ingredientGroups?.reduce((total: number, group: any) => 
+                total + (group.ingredients?.length || 0), 0) || 0,
+            });
+
+            return recipe;
+          } catch (error) {
+            console.error('[CookingContext] 💥 Error processing mise recipe:', miseRecipe.id, error);
+            return null;
+          }
+        }).filter(Boolean) as CombinedParsedRecipe[];
+
+        console.log('[CookingContext] 📊 Processed recipes count:', recipes.length);
+
+        // Initialize all sessions with full recipe data
+        try {
+          dispatch({ 
+            type: 'INITIALIZE_SESSIONS', 
+            payload: { 
+              recipes,
+              activeRecipeId: recipes[0]?.id ? String(recipes[0].id) : undefined // Set first recipe as active
+            } 
+          });
+          console.log('[CookingContext] ✅ Dispatch completed successfully');
+        } catch (dispatchError) {
+          console.error('[CookingContext] 💥 Error during dispatch:', dispatchError);
+          console.error('[CookingContext] 💥 Dispatch error type:', typeof dispatchError);
+          console.error('[CookingContext] 💥 Dispatch error message:', dispatchError instanceof Error ? dispatchError.message : String(dispatchError));
+          console.error('[CookingContext] 💥 Dispatch error stack:', dispatchError instanceof Error ? dispatchError.stack : 'No stack trace');
+          console.error('[CookingContext] 💥 Dispatch error constructor:', dispatchError?.constructor?.name);
+          console.error('[CookingContext] 💥 Full dispatch error object:', JSON.stringify(dispatchError, Object.getOwnPropertyNames(dispatchError), 2));
+          throw dispatchError; // Re-throw to be caught by the calling function
+        }
+        
+        console.timeEnd(`[CookingContext] ⏱️ initializeSessions`);
+      } catch (error) {
+        console.error('[CookingContext] 💥 Error in initializeSessions:', error);
+        console.error('[CookingContext] 💥 Error type:', typeof error);
+        console.error('[CookingContext] 💥 Error message:', error instanceof Error ? error.message : String(error));
+        console.error('[CookingContext] 💥 Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+        console.error('[CookingContext] 💥 Error constructor:', error?.constructor?.name);
+        console.error('[CookingContext] 💥 Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+        console.timeEnd(`[CookingContext] ⏱️ initializeSessions`);
+        throw error; // Re-throw to be caught by the calling function
+      }
+    };
+
+    // Force reference to initializeSessions to prevent tree-shaking
+    if (process.env.NODE_ENV === 'production') {
+      console.log('[CookingContext] 🔍 Production build - initializeSessions type:', typeof initializeSessions);
+    }
+    
+    // Explicitly construct the context value to ensure all functions are included
+    const value = {
+      state,
+      initializeSessions, // Direct reference to function defined in useMemo
+      endSession,
+      endAllSessions,
+      switchRecipe,
+      completeStep,
+      uncompleteStep,
+      startTimer,
+      pauseTimer,
+      resumeTimer,
+      endTimer,
+      setScrollPosition,
+      getCurrentScrollPosition,
+      hasResumableSession,
+    };
+    
+    // Additional safety check in production
+    if (process.env.NODE_ENV === 'production') {
+      console.log('[CookingContext] 🔍 Production build - context value keys:', Object.keys(value));
+      console.log('[CookingContext] 🔍 Production build - initializeSessions in value:', typeof value.initializeSessions);
+    }
+    
+    return value;
+  }, [
+    state,
+    endSession,
+    endAllSessions,
+    switchRecipe,
+    completeStep,
+    uncompleteStep,
+    startTimer,
+    pauseTimer,
+    resumeTimer,
+    endTimer,
+    setScrollPosition,
+    getCurrentScrollPosition,
+    hasResumableSession,
+  ]);
 
   return (
-    <CookingContext.Provider
-      value={{
-        state,
-        initializeSessions,
-        endSession,
-        endAllSessions,
-        switchRecipe,
-        completeStep,
-        uncompleteStep,
-        startTimer,
-        pauseTimer,
-        resumeTimer,
-        endTimer,
-        setScrollPosition,
-        getCurrentScrollPosition,
-        hasResumableSession,
-      }}
-    >
+    <CookingContext.Provider value={contextValue}>
       {children}
     </CookingContext.Provider>
   );
@@ -493,5 +580,26 @@ export function useCooking() {
   if (!context) {
     throw new Error('useCooking must be used within a CookingProvider');
   }
+  
+  // Add fallback for initializeSessions if it's undefined in production builds
+  if (!context.initializeSessions && process.env.NODE_ENV === 'production') {
+    console.error('[CookingContext] 💥 initializeSessions is undefined in production build!');
+    console.error('[CookingContext] 💥 Available context keys:', Object.keys(context));
+    
+    // Create a fallback function that logs the error
+    const fallbackInitializeSessions = (miseRecipes: any[]) => {
+      console.error('[CookingContext] 💥 Fallback initializeSessions called - this should not happen!');
+      console.error('[CookingContext] 💥 miseRecipes:', miseRecipes);
+      throw new Error('initializeSessions is not available in this build');
+    };
+    
+    return {
+      ...context,
+      initializeSessions: fallbackInitializeSessions,
+    };
+  }
+  
   return context;
-} 
+}
+
+ 

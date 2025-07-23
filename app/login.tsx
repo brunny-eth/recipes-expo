@@ -15,6 +15,7 @@ import { COLORS, SPACING, RADIUS, ICON_SIZE } from '@/constants/theme';
 import { FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { FONT, bodyText, bodyTextLoose, bodyStrongText } from '@/constants/typography';
+import MeezLogo from '@/components/MeezLogo';
 
 type AuthProvider = 'google' | 'apple';
 
@@ -57,9 +58,9 @@ const LoginScreen = () => {
         />
       </TouchableOpacity>
       <View style={styles.content}>
-        <Text style={styles.title}>Meez</Text>
+        <MeezLogo />
         <Text style={styles.subtitle}>
-          Create an account to use, save, and find new recipes.
+          Link an account to use, save, and find new recipes.
         </Text>
 
         <TouchableOpacity

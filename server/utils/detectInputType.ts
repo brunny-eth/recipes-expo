@@ -1,4 +1,4 @@
-export type InputType = 'url' | 'raw_text' | 'audio' | 'image' | 'video' | 'invalid';
+export type InputType = 'url' | 'raw_text' | 'image' | 'video' | 'invalid';
 
 /**
  * Detects if the input string is likely a URL, raw text, or invalid input.

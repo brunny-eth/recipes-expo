@@ -4,52 +4,15 @@
     "appVersionSource": "remote"
   },
   "build": {
-    "development": {
-      "developmentClient": true,
-      "distribution": "internal",
-      "channel": "development",
-      "env": {
-        "BUNDLE_ID": "com.meez.app"
-      },
-      "ios": {
-        "simulator": false
-      }
-    },
-    "preview": {
-      "distribution": "internal",
-      "channel": "preview",
-      "env": {
-        "BUNDLE_ID": "com.meez.app"
-      },
-      "ios": {
-        "simulator": false
-      }
-    },
     "production": {
       "developmentClient": false,
       "distribution": "store",
       "channel": "production",
       "autoIncrement": true,
-      "ios": {
-        "simulator": false
-      }
-    },
-    "devbuild": {
-      "developmentClient": false,
-      "distribution": "internal",
-      "channel": "devbuild",
-      "autoIncrement": true,
       "env": {
-        "BUNDLE_ID": "com.meez.app"
+        "BUNDLE_ID": "com.meez.recipes",
+        "EXPO_DEBUG": "1"
       },
-      "ios": {
-        "simulator": false
-      }
-    },
-    "testflight": {
-      "distribution": "store",
-      "channel": "production",
-      "autoIncrement": true,
       "ios": {
         "simulator": false
       }
