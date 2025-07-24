@@ -72,13 +72,15 @@ const CookingContext = createContext<CookingContextType | null>(null);
 
 // Reducer
 function cookingReducer(state: CookingState, action: CookingAction): CookingState {
-  console.error('[CookingContext] *** REDUCER ENTRY POINT ***'); 
-  console.error('[CookingContext] 🔄 Reducer action:', action.type, action.payload);
+  console.error('[CookingContext] *** REDUCER ENTRY POINT ***');
+  console.error('[CookingContext] 🔄 Reducer action type (raw):', action?.type); // Check action.type robustly
+  console.error('[CookingContext] 🔄 Reducer action payload (raw):', action?.payload ? JSON.stringify(action.payload).substring(0, 200) + '...' : 'N/A'); // Safely log part of payload
   console.error('[CookingContext] 📊 Current state before action:', {
-    activeRecipesCount: state.activeRecipes.length,
+    activeRecipesCount: state.activeRecipes?.length, // Add ?. for safety
     activeRecipeId: state.activeRecipeId,
     sessionStartTime: state.sessionStartTime,
-    recipeIds: state.activeRecipes.map(r => ({ id: r.recipeId, title: r.recipe?.title, isLoading: r.isLoading }))
+    // Only map if activeRecipes exists to prevent error if it's undefined/null early
+    recipeIds: state.activeRecipes ? state.activeRecipes.map(r => ({ id: r.recipeId, title: r.recipe?.title, isLoading: r.isLoading })) : []
   });
 
   switch (action.type) {
