@@ -33,7 +33,7 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
             >
               <Text style={{ 
                 fontSize: 24,
-                marginBottom: 40,
+                marginBottom: 60,
                 textAlign: 'center',
                 color: COLORS.textDark,
                 lineHeight: 28,
@@ -100,7 +100,7 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
               style={{
                 width: '100%',
                 alignItems: 'center',
-                marginBottom: 40
+                marginBottom: 72
               }}
             >
               <TouchableOpacity 
@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
     fontSize: 17,
     textAlign: 'left' as const,
     color: COLORS.textDark,
-    lineHeight: 38,
-    marginBottom: 16,
+    lineHeight: 22,
+    marginBottom: 48,
   } as TextStyle,
 });
