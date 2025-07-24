@@ -429,23 +429,63 @@ export default function CookScreen() {
   const handleRecipeSwitch = (recipeId: string) => {
     console.time(`[CookScreen] ⏱️ handleRecipeSwitch-${recipeId}`);
     console.log('[CookScreen] 🔄 Starting recipe switch to:', recipeId);
-    
+
+    // --- BEGIN NEW LOGGING ---
+    console.error('[CookScreen] 🔍 Inside handleRecipeSwitch. Checking types:');
+    console.error('[CookScreen] 🔍 typeof setScrollPosition:', typeof setScrollPosition);
+    console.error('[CookScreen] 🔍 typeof switchRecipe:', typeof switchRecipe);
+    console.error('[CookScreen] 🔍 typeof getCurrentScrollPosition:', typeof getCurrentScrollPosition);
+    // --- END NEW LOGGING ---
+
     // Save current scroll position before switching
     if (state.activeRecipeId && scrollViewRef.current) {
-      // Get current scroll position - this would need to be implemented
-      // For now, we'll use a placeholder
       const currentScrollY = 0; // TODO: Get actual scroll position
-      setScrollPosition(state.activeRecipeId, currentScrollY);
+      
+      // Add try-catch around setScrollPosition
+      try {
+        if (typeof setScrollPosition === 'function') {
+          setScrollPosition(state.activeRecipeId, currentScrollY);
+          console.error('[CookScreen] ✅ setScrollPosition called successfully');
+        } else {
+          console.error('[CookScreen] 💥 setScrollPosition is NOT a function!');
+        }
+      } catch (error: any) {
+        console.error('[CookScreen] 💥 Error calling setScrollPosition:', error);
+        console.error('[CookScreen] 💥 setScrollPosition error stack:', error.stack);
+      }
     }
-    
-    switchRecipe(recipeId);
-    // No need to load recipe data - all recipes are already loaded with eager loading
+
+    // Add try-catch around switchRecipe
+    try {
+      if (typeof switchRecipe === 'function') {
+        switchRecipe(recipeId);
+        console.error('[CookScreen] ✅ switchRecipe called successfully');
+      } else {
+        console.error('[CookScreen] 💥 switchRecipe is NOT a function!');
+      }
+    } catch (error: any) {
+      console.error('[CookScreen] 💥 Error calling switchRecipe:', error);
+      console.error('[CookScreen] 💥 switchRecipe error stack:', error.stack);
+    }
     
     console.log('[CookScreen] ✅ Recipe switch completed for:', recipeId);
     console.timeEnd(`[CookScreen] ⏱️ handleRecipeSwitch-${recipeId}`);
-    
+
     // Restore scroll position for new recipe
-    const savedScrollY = getCurrentScrollPosition(recipeId);
+    let savedScrollY = 0;
+    // Add try-catch around getCurrentScrollPosition
+    try {
+      if (typeof getCurrentScrollPosition === 'function') {
+        savedScrollY = getCurrentScrollPosition(recipeId);
+        console.error('[CookScreen] ✅ getCurrentScrollPosition called successfully. Value:', savedScrollY);
+      } else {
+        console.error('[CookScreen] 💥 getCurrentScrollPosition is NOT a function!');
+      }
+    } catch (error: any) {
+      console.error('[CookScreen] 💥 Error calling getCurrentScrollPosition:', error);
+      console.error('[CookScreen] 💥 getCurrentScrollPosition error stack:', error.stack);
+    }
+
     if (savedScrollY > 0 && scrollViewRef.current) {
       InteractionManager.runAfterInteractions(() => {
         scrollViewRef.current?.scrollTo({ y: savedScrollY, animated: true });
