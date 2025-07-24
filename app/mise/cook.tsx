@@ -46,6 +46,11 @@ export default function CookScreen() {
   const { session } = useAuth();
   const { showError } = useErrorModal();
   const { state, initializeSessions, endSession, endAllSessions, switchRecipe, setScrollPosition, getCurrentScrollPosition, hasResumableSession, completeStep, uncompleteStep } = useCooking();
+
+  // Add targeted debugging for navigation-related functions
+  console.error('[CookScreen] 🔍 Component initialized with router:', typeof router);
+  console.error('[CookScreen] 🔍 Router methods available:', Object.keys(router));
+  console.error('[CookScreen] 🔍 showError function type:', typeof showError);
   
   // 💥 LOGGING POINT 3: Check initializeSessions type immediately after destructuring from useCooking
   useEffect(() => {
@@ -105,17 +110,24 @@ export default function CookScreen() {
     }
   };
 
-  // Cleanup timeout and timer on unmount
+  // Component lifecycle monitoring with cleanup
   useEffect(() => {
+    console.error('[CookScreen] 🔍 Component mounted or dependencies changed.');
+    
     return () => {
+      console.error('[CookScreen] 🔍 Component unmounting (cleanup function).');
+      console.error('[CookScreen] 🔍 Cleaning up scroll timeout and timer interval');
+      
       if (scrollPositionTimeoutRef.current) {
+        console.error('[CookScreen] 🔍 Clearing scroll position timeout');
         clearTimeout(scrollPositionTimeoutRef.current);
       }
       if (timerIntervalRef.current) {
+        console.error('[CookScreen] 🔍 Clearing timer interval');
         clearInterval(timerIntervalRef.current);
       }
     };
-  }, []);
+  }, [state.activeRecipes, state.activeRecipeId, state.sessionStartTime, isLoading, router]);
 
   // Load recipes from mise on mount - fetch fresh data from API
   useEffect(() => {
@@ -267,6 +279,7 @@ export default function CookScreen() {
   // Refresh data when screen comes into focus for consistency with mise.tsx
   useFocusEffect(
     useCallback(() => {
+      console.error('[CookScreen] 🔍 useFocusEffect: Screen focused.');
       const timestamp = new Date().toISOString();
       console.log(`[CookScreen] 🎯 useFocusEffect triggered at ${timestamp}`);
       
@@ -371,13 +384,23 @@ export default function CookScreen() {
         }
       };
       
-      refreshMiseRecipes();
-    }, [session?.user?.id, session?.access_token]) // Removed function dependencies that change on every render
-  );
+              refreshMiseRecipes();
+        
+        return () => {
+          console.error('[CookScreen] 🔍 useFocusEffect: Screen blurred/unfocused (cleanup function).');
+          // Look here for any complex cleanup operations that might involve external libraries
+          // or specific objects that could be undefined if uninitialized.
+        };
+      }, [session?.user?.id, session?.access_token]) // Removed function dependencies that change on every render
+    );
 
   // Handle app state changes for timer management
   useEffect(() => {
+    console.error('[CookScreen] 🔍 Setting up AppState listener');
+    
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      console.error(`[CookScreen] 🔍 AppState changed from ${appState.current} to ${nextAppState}`);
+      
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
         // App has come to foreground - sync timers
         console.log('App came to foreground, syncing timers');
@@ -387,7 +410,18 @@ export default function CookScreen() {
     };
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
-    return () => subscription?.remove();
+    
+    return () => {
+      console.error('[CookScreen] 🔍 Cleaning up AppState listener');
+      console.error('[CookScreen] 🔍 AppState subscription type:', typeof subscription);
+      console.error('[CookScreen] 🔍 AppState subscription remove type:', typeof subscription?.remove);
+      
+      if (subscription && typeof subscription.remove === 'function') {
+        subscription.remove();
+      } else {
+        console.error('[CookScreen] ⚠️ AppState subscription remove is not a function!');
+      }
+    };
   }, []);
 
 
@@ -436,12 +470,25 @@ export default function CookScreen() {
       }
       // Swipe from left edge to go back - similar to summary.tsx
       else if (translationX > 100 && velocityX > 300 && currentIndex === 0) {
-        // Check if we can go back properly, otherwise navigate to mise as fallback
-        if (router.canGoBack()) {
-          router.back();
-        } else {
-          // Navigate back to mise tab
-          router.navigate('/tabs/mise' as any);
+        console.error('[CookScreen] 🔍 Attempting to navigate back via swipe');
+        console.error('[CookScreen] 🔍 router.canGoBack type:', typeof router.canGoBack);
+        console.error('[CookScreen] 🔍 router.back type:', typeof router.back);
+        console.error('[CookScreen] 🔍 router.navigate type:', typeof router.navigate);
+        
+        try {
+          // Check if we can go back properly, otherwise navigate to mise as fallback
+          if (router.canGoBack && typeof router.canGoBack === 'function' && router.canGoBack()) {
+            console.error('[CookScreen] 🔍 Calling router.back()');
+            router.back();
+          } else {
+            console.error('[CookScreen] 🔍 Calling router.navigate to /tabs/mise');
+            // Navigate back to mise tab
+            router.navigate('/tabs/mise' as any);
+          }
+          console.error('[CookScreen] ✅ Navigation call completed');
+        } catch (navError: any) {
+          console.error('[CookScreen] 💥 Error during swipe navigation:', navError);
+          console.error('[CookScreen] 💥 Navigation error stack:', navError.stack);
         }
       }
     }
@@ -507,6 +554,9 @@ export default function CookScreen() {
   };
 
   const handleTimerStartPause = () => {
+    console.error('[CookScreen] 🔍 handleTimerStartPause called, isTimerActive:', isTimerActive);
+    console.error('[CookScreen] 🔍 showError function type:', typeof showError);
+    
     if (isTimerActive) {
       // Pause timer
       if (timerIntervalRef.current) {
@@ -528,7 +578,17 @@ export default function CookScreen() {
                 timerIntervalRef.current = null;
               }
               // Show notification when timer finishes
-              showError('Timer', "Time's up!");
+              console.error('[CookScreen] 🔍 About to call showError for timer completion');
+              try {
+                if (typeof showError === 'function') {
+                  showError('Timer', "Time's up!");
+                } else {
+                  console.error('[CookScreen] ⚠️ showError is not a function!');
+                }
+              } catch (showErrorError: any) {
+                console.error('[CookScreen] 💥 Error calling showError:', showErrorError);
+                console.error('[CookScreen] 💥 showError error stack:', showErrorError.stack);
+              }
               return 0;
             }
             return prev - 1;
