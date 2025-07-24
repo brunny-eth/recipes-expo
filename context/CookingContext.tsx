@@ -72,37 +72,73 @@ const CookingContext = createContext<CookingContextType | null>(null);
 
 // Reducer
 function cookingReducer(state: CookingState, action: CookingAction): CookingState {
-  console.error('[CookingContext] *** REDUCER ENTRY POINT ***');
-  console.error('[CookingContext] 🔄 Reducer action type (raw):', action?.type); // Check action.type robustly
-  console.error('[CookingContext] 🔄 Reducer action payload (raw):', action?.payload ? JSON.stringify(action.payload).substring(0, 200) + '...' : 'N/A'); // Safely log part of payload
-  console.error('[CookingContext] 📊 Current state before action:', {
-    activeRecipesCount: state.activeRecipes?.length, // Add ?. for safety
-    activeRecipeId: state.activeRecipeId,
-    sessionStartTime: state.sessionStartTime,
-    // Only map if activeRecipes exists to prevent error if it's undefined/null early
-    recipeIds: state.activeRecipes ? state.activeRecipes.map(r => ({ id: r.recipeId, title: r.recipe?.title, isLoading: r.isLoading })) : []
-  });
+  console.error(`[CookingReducer] 🔄 Reducer called with action type: ${action.type}`);
+  console.error(`[CookingReducer] 🔍 Current state:`, state);
+  console.error(`[CookingReducer] 🔍 Incoming action payload:`, action.payload);
 
   switch (action.type) {
-    case 'INITIALIZE_SESSIONS': {
-      console.error('[CookingContext] 🚀 Entering INITIALIZE_SESSIONS reducer case. Doing nothing for now.'); // ADD THIS
-      // Return a simple, valid state to ensure no nested logic fails.
-      return {
-        ...state,
-        activeRecipes: action.payload.recipes.map(recipe => ({ // Minimal processing to see if map breaks
-          recipeId: String(recipe.id),
-          recipe,
-          completedSteps: [],
-          activeTimers: [],
-          scrollPosition: 0,
-          isLoading: false,
-        })),
-        activeRecipeId: action.payload.activeRecipeId || null,
-        sessionStartTime: Date.now(),
-      };
-      // Original logic here was: try { ... newRecipes ... } catch { ... }
-      // We are removing the inner try/catch and complex logic for now.
-    }
+    case 'INITIALIZE_SESSIONS':
+      console.error('[CookingReducer] 🚀 Handling INITIALIZE_SESSIONS action...');
+      try {
+        if (!action.payload || !Array.isArray(action.payload.recipes)) {
+          console.error('[CookingReducer] ❌ INITIALIZE_SESSIONS: Invalid payload or recipes not an array.');
+          console.error('[CookingReducer] ❌ Payload type:', typeof action.payload);
+          console.error('[CookingReducer] ❌ Recipes type:', typeof action.payload?.recipes);
+          return { ...state }; // Return current state instead of throwing
+        }
+        
+        console.error('[CookingReducer] ✅ INITIALIZE_SESSIONS: Payload validation passed.');
+        console.error('[CookingReducer] ✅ INITIALIZE_SESSIONS: Recipes array length:', action.payload.recipes.length);
+        
+        // Safely map recipes with error handling for each item
+        const newActiveRecipes: RecipeSession[] = [];
+        for (let i = 0; i < action.payload.recipes.length; i++) {
+          try {
+            const recipe = action.payload.recipes[i];
+            console.error(`[CookingReducer] 🔍 Processing recipe ${i}:`, { id: recipe?.id, title: recipe?.title });
+            
+            if (!recipe || !recipe.id) {
+              console.error(`[CookingReducer] ⚠️ Skipping recipe ${i}: missing id`);
+              continue;
+            }
+            
+            const recipeSession: RecipeSession = {
+              recipeId: String(recipe.id),
+              recipe,
+              completedSteps: [],
+              activeTimers: [],
+              scrollPosition: 0,
+              isLoading: false,
+            };
+            
+            newActiveRecipes.push(recipeSession);
+            console.error(`[CookingReducer] ✅ Successfully processed recipe ${i}: ${recipeSession.recipeId}`);
+          } catch (recipeError: any) {
+            console.error(`[CookingReducer] 💥 Error processing recipe ${i}:`, recipeError);
+            console.error(`[CookingReducer] 💥 Recipe ${i} data:`, action.payload.recipes[i]);
+            // Continue processing other recipes instead of failing completely
+          }
+        }
+        
+        const newActiveRecipeId = action.payload.activeRecipeId || newActiveRecipes[0]?.recipeId || null;
+
+        console.error(`[CookingReducer] ✅ INITIALIZE_SESSIONS: Successfully processed ${newActiveRecipes.length} recipes.`);
+        console.error(`[CookingReducer] ✅ INITIALIZE_SESSIONS: New activeRecipeId: ${newActiveRecipeId}`);
+
+        return {
+          ...state,
+          activeRecipes: newActiveRecipes,
+          activeRecipeId: newActiveRecipeId,
+          sessionStartTime: Date.now(),
+        };
+      } catch (e: any) {
+        console.error('[CookingReducer] 💥 CRITICAL ERROR in INITIALIZE_SESSIONS case:', e);
+        console.error('[CookingReducer] 💥 Error stack in INITIALIZE_SESSIONS case:', e.stack);
+        console.error('[CookingReducer] 💥 Error type:', typeof e);
+        console.error('[CookingReducer] 💥 Error message:', e.message);
+        // Return current state instead of throwing to prevent app crash
+        return { ...state };
+      }
 
     case 'SET_SCROLL_POSITION': {
       // Only log significant scroll changes to reduce noise
@@ -217,7 +253,7 @@ function cookingReducer(state: CookingState, action: CookingAction): CookingStat
     }
 
     default:
-      console.error('[CookingContext] ❓ Unknown action type:', action.type);
+      console.warn(`[CookingReducer] ❓ Unhandled action type: ${action.type}`);
       return state;
   }
 }
