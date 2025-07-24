@@ -581,17 +581,22 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
           });
 
           // ADD THIS LOG IMMEDIATELY BEFORE DISPATCH - THIS IS CRITICAL NOW
-          console.error(`[CookingContext] 🔍 Just before dispatch call (inside useCallback). typeof dispatchParam: ${typeof dispatchParam}`);
-          console.error(`[CookingContext] 🔍 dispatchParam value (inside useCallback):`, dispatchParam); // See what it actually is
+                      console.error(`[CookingContext] 🔍 Just before dispatch call (inside useCallback). typeof dispatchParam: ${typeof dispatchParam}`);
+            console.error(`[CookingContext] 🔍 dispatchParam value (inside useCallback):`, dispatchParam); // See what it actually is
 
-          try {
-            // USE dispatchParam instead of the lexical 'dispatch'
-            dispatchParam(actionToDispatch);
-            console.error('[CookingContext] ✅ Dispatch call completed (before reducer entry log)');
-          } catch (error: any) {
-            console.error('[CookingContext] 💥 Error during dispatch call (inside useCallback):', error.message);
-            console.error('[CookingContext] 💥 Error stack during dispatch call (inside useCallback):', error.stack);
-          }
+            // --- ADD THESE NEW LOGS AND TRY/CATCH ---
+            try {
+              dispatchParam(actionToDispatch);
+              console.error('[CookingContext] ✅ Dispatch call completed successfully (synchronous check).');
+            } catch (dispatchInnerError: any) {
+              console.error('[CookingContext] 💥 ERROR: Dispatch call FAILED synchronously (inside useCallback)!', dispatchInnerError);
+              console.error('[CookingContext] 💥 Error message from inner dispatch catch:', dispatchInnerError.message);
+              console.error('[CookingContext] 💥 Error stack from inner dispatch catch:', dispatchInnerError.stack);
+              throw dispatchInnerError; // Re-throw to propagate if needed
+            }
+            // --- END NEW LOGS AND TRY/CATCH ---
+
+            console.error('[CookingContext] ✅ Dispatch attempt finished. Waiting for reducer to process...'); // This log indicates it went past the synchronous dispatch call
         } catch (dispatchError: any) { // Ensure error is typed to 'any' for direct property access
           console.error('[CookingContext] ❌ Error during initializeSessions dispatch:', dispatchError);
           console.error('[CookingContext] ❌ Error message (from dispatch):', dispatchError.message);
