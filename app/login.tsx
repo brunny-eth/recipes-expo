@@ -9,6 +9,7 @@ import {
   ViewStyle,
   TextStyle,
   Image,
+  Alert,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
@@ -45,12 +46,31 @@ const LoginScreen = () => {
   const handleSignIn = async (provider: AuthProvider) => {
     if (isSigningIn) return;
     setIsSigningIn(provider);
+    
+    // Add a timeout to prevent getting stuck on loading
+    const timeoutId = setTimeout(() => {
+      if (isSigningIn === provider) {
+        console.warn(`[LoginScreen] Sign-in timeout for ${provider}`);
+        setIsSigningIn(null);
+        Alert.alert(
+          'Sign-in Timeout',
+          'The sign-in process is taking longer than expected. Please try again.',
+          [{ text: 'OK' }]
+        );
+      }
+    }, 30000); // 30 second timeout
+    
     try {
       await signIn(provider);
+      // If we reach here, sign-in was successful
+      console.log(`[LoginScreen] Successfully signed in with ${provider}`);
+      // The AuthContext will handle navigation automatically
     } catch (error) {
-      // Error is already handled by the AuthContext's error modal
-      console.log('Redirecting to login after error or cancellation.');
+      // This catch block will only trigger if signIn throws an error
+      // Most errors are handled by AuthContext's error modal
+      console.error(`[LoginScreen] Sign-in error with ${provider}:`, error);
     } finally {
+      clearTimeout(timeoutId);
       setIsSigningIn(null);
     }
   };
@@ -90,7 +110,10 @@ const LoginScreen = () => {
             disabled={!!isSigningIn}
           >
             {isSigningIn === 'google' ? (
-              <ActivityIndicator color={COLORS.white} />
+              <View style={styles.buttonContent}>
+                <ActivityIndicator color={COLORS.white} size="small" />
+                <Text style={styles.buttonText}>Signing in...</Text>
+              </View>
             ) : (
               <View style={styles.buttonContent}>
                 <FontAwesome
@@ -112,19 +135,22 @@ const LoginScreen = () => {
               accessibilityLabel="Continue with Apple"
               accessibilityHint="Logs you in using your Apple ID"
             >
-              {isSigningIn === 'apple' ? (
-                <ActivityIndicator color={COLORS.white} />
-              ) : (
-                <View style={styles.buttonContent}>
-                  <FontAwesome
-                    name="apple"
-                    size={ICON_SIZE.lg}
-                    color={COLORS.white}
-                    style={styles.icon}
-                  />
-                  <Text style={styles.buttonText}>Continue with Apple</Text>
-                </View>
-              )}
+                          {isSigningIn === 'apple' ? (
+              <View style={styles.buttonContent}>
+                <ActivityIndicator color={COLORS.white} size="small" />
+                <Text style={styles.buttonText}>Signing in...</Text>
+              </View>
+            ) : (
+              <View style={styles.buttonContent}>
+                <FontAwesome
+                  name="apple"
+                  size={ICON_SIZE.lg}
+                  color={COLORS.white}
+                  style={styles.icon}
+                />
+                <Text style={styles.buttonText}>Continue with Apple</Text>
+              </View>
+            )}
             </TouchableOpacity>
           )}
         </View>
