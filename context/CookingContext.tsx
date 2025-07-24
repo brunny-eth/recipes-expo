@@ -62,6 +62,7 @@ const initialState: CookingState = {
   activeRecipeId: null,
   sessionStartTime: undefined,
 };
+console.error('[CookingContext] 🌟 Initial state defined:', JSON.stringify(initialState)); // ADD THIS LINE
 
 // Context
 const CookingContext = createContext<CookingContextType | null>(null);
@@ -69,8 +70,6 @@ const CookingContext = createContext<CookingContextType | null>(null);
 // Reducer
 function cookingReducer(state: CookingState, action: CookingAction): CookingState {
   console.error('[CookingContext] *** REDUCER ENTRY POINT ***'); // ADD THIS LINE FIRST
-  console.error('[CookingContext] State at reducer entry:', JSON.stringify(state)); // ADD THIS
-  console.error('[CookingContext] Action at reducer entry:', JSON.stringify(action)); // ADD THIS
   console.error('[CookingContext] 🔄 Reducer action:', action.type, action.payload);
   console.error('[CookingContext] 📊 Current state before action:', {
     activeRecipesCount: state.activeRecipes.length,
@@ -267,6 +266,7 @@ function cookingReducer(state: CookingState, action: CookingAction): CookingStat
 // Provider Component
 export function CookingProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(cookingReducer, initialState);
+  console.error('[CookingContext] 🎯 cookingReducer function reference:', cookingReducer.toString()); // ADD THIS LINE
   
   // 💥 ADDED LOGGING POINT: Check typeof dispatch right after useReducer
   if (process.env.NODE_ENV === 'production') {
@@ -511,12 +511,11 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
 
         // Initialize all sessions with full recipe data
         try {
+          const actionPayload = { recipes, activeRecipeId: recipes[0]?.id ? String(recipes[0].id) : undefined };
+          console.error('[CookingContext] 🔍 dispatching action:', JSON.stringify({ type: 'INITIALIZE_SESSIONS', payload: actionPayload })); // ADD THIS LINE
           dispatch({ 
             type: 'INITIALIZE_SESSIONS', 
-            payload: { 
-              recipes,
-              activeRecipeId: recipes[0]?.id ? String(recipes[0].id) : undefined // Set first recipe as active
-            } 
+            payload: actionPayload
           });
           console.error('[CookingContext] ✅ Dispatch completed successfully');
         } catch (dispatchError: any) { // Ensure error is typed to 'any' for direct property access
