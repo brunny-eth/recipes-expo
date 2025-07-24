@@ -8,6 +8,9 @@ import {
   Pressable,
   SafeAreaView,
   Image,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, {
@@ -21,10 +24,9 @@ import { COLORS } from '@/constants/theme';
 import TimerTool from './TimerTool';
 import UnitsTool from './UnitsTool';
 import HelpTool from './HelpTool';
-import AIChatTool from './AIChatTool';
 import { sectionHeaderText } from '@/constants/typography';
 
-export type ActiveTool = 'timer' | 'units' | 'help' | 'aiChat' | null;
+export type ActiveTool = 'timer' | 'units' | 'help' | null;
 
 interface ToolsModalProps {
   isVisible: boolean;
@@ -36,8 +38,6 @@ interface ToolsModalProps {
   handleTimerStartPause: () => void;
   handleTimerReset: () => void;
   formatTime: (timeInSeconds: number) => string;
-  recipeInstructions?: string[];
-  recipeSubstitutions?: string | null;
 }
 
 export default function ToolsModal({
@@ -50,10 +50,9 @@ export default function ToolsModal({
   handleTimerStartPause,
   handleTimerReset,
   formatTime,
-  recipeInstructions,
-  recipeSubstitutions,
 }: ToolsModalProps) {
   const [activeTool, setActiveTool] = useState<ActiveTool>(null);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   useEffect(() => {
     if (isVisible) {
@@ -62,6 +61,21 @@ export default function ToolsModal({
       setActiveTool(null);
     }
   }, [isVisible, initialTool]);
+
+  // Handle keyboard visibility
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
+      setKeyboardVisible(true);
+    });
+    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardVisible(false);
+    });
+
+    return () => {
+      keyboardDidShowListener?.remove();
+      keyboardDidHideListener?.remove();
+    };
+  }, []);
 
   const renderToolContent = () => {
     switch (activeTool) {
@@ -80,14 +94,7 @@ export default function ToolsModal({
       case 'units':
         return <UnitsTool />;
       case 'help':
-        return <HelpTool recipeInstructions={recipeInstructions} />;
-      case 'aiChat':
-        console.log('[ToolsModal] Rendering AIChatTool with props:', {
-          hasRecipeInstructions: !!recipeInstructions,
-          instructionsCount: recipeInstructions?.length || 0,
-          hasSubstitutions: !!recipeSubstitutions,
-        });
-        return <AIChatTool recipeInstructions={recipeInstructions} recipeSubstitutions={recipeSubstitutions} />;
+        return <HelpTool />;
       default:
         return (
           <View style={styles.placeholderContainer}>
@@ -110,12 +117,21 @@ export default function ToolsModal({
       visible={isVisible}
       onRequestClose={onClose}
     >
-      <BlurView intensity={20} tint="light" style={styles.absolute}>
-        <Pressable style={styles.centeredView} onPress={onClose}>
-          <Pressable
-            style={styles.modalView}
-            onPress={(e) => e.stopPropagation()}
-          >
+            <BlurView intensity={20} tint="light" style={styles.absolute}>
+        <Pressable 
+          style={[
+            styles.centeredView,
+            keyboardVisible && styles.centeredViewWithKeyboard
+          ]} 
+          onPress={onClose}
+        >
+                      <Pressable
+              style={[
+                styles.modalView,
+                keyboardVisible && styles.modalViewWithKeyboard,
+              ]}
+              onPress={(e) => e.stopPropagation()}
+            >
             <TouchableOpacity style={styles.closeButton} onPress={onClose}>
               <MaterialCommunityIcons
                 name="close"
@@ -124,12 +140,11 @@ export default function ToolsModal({
               />
             </TouchableOpacity>
 
-            <View
-              style={[
-                styles.toolContentContainer,
-                activeTool === 'help' && styles.toolContentContainerHelpActive,
-                activeTool === 'aiChat' && styles.toolContentContainerAIChatActive,
-              ]}
+                          <View
+                style={[
+                  styles.toolContentContainer,
+                  activeTool === 'help' && styles.toolContentContainerHelpActive,
+                ]}
               onLayout={(event) => {
                 console.log('[ToolsModal] Tool content container layout:', {
                   width: event.nativeEvent.layout.width,
@@ -156,11 +171,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 40 : 20, // Add some top padding to prevent going off-screen
   },
   modalView: {
     width: '100%',
     maxWidth: 450,
-    maxHeight: '90%',
+    maxHeight: '85%',
     backgroundColor: COLORS.white,
     borderRadius: 20,
     paddingTop: 50,
@@ -195,13 +211,17 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     alignItems: 'stretch',
   },
-  toolContentContainerAIChatActive: {
-    minHeight: 600,
-    maxHeight: '80%',
-    width: '100%',
-    justifyContent: 'flex-start',
-    alignItems: 'stretch',
+  keyboardAvoidingContainer: {
+    flex: 1,
   },
+  centeredViewWithKeyboard: {
+    justifyContent: 'flex-start',
+    paddingTop: 60, // Move modal down when keyboard is visible
+  },
+  modalViewWithKeyboard: {
+    maxHeight: '70%', // Reduce height when keyboard is visible
+  },
+
   placeholderContainer: {
     alignItems: 'center',
     justifyContent: 'center',

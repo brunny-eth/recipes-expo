@@ -103,6 +103,10 @@ function RootLayoutNav() {
         console.log('[RootLayoutNav][prepareApp] Starting asset load...');
         await Asset.loadAsync([
           require('@/assets/images/meez_logo.webp'),
+          require('@/assets/gifs/FirstScreen.gif'),
+          require('@/assets/gifs/SecondScreen.gif'),
+          require('@/assets/gifs/ThirdScreen.gif'),
+          require('@/assets/gifs/FourthScreen.gif'),
         ]);
         if (!isMounted) {
           console.log('[RootLayoutNav][prepareApp] Component unmounted during asset load, skipping state update.');

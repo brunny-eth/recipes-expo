@@ -663,9 +663,7 @@ export default function CookScreen() {
     openToolsModal('timer');
   };
 
-  const handleAIChatPress = () => {
-    openToolsModal('aiChat');
-  };
+
 
   const handleMiniTimerPress = () => {
     openToolsModal('timer');
@@ -838,7 +836,6 @@ export default function CookScreen() {
         {/* Footer Buttons */}
         <StepsFooterButtons
           onTimersPress={handleTimersPress}
-          onAIChatPress={handleAIChatPress}
           onRecipeTipsPress={handleRecipeTipsPress}
           hasRecipeTips={!!currentRecipe?.recipe?.tips}
         />
@@ -854,8 +851,6 @@ export default function CookScreen() {
           handleTimerAddSeconds={handleTimerAddSeconds}
           handleTimerStartPause={handleTimerStartPause}
           handleTimerReset={handleTimerReset}
-          recipeInstructions={currentRecipe?.recipe?.instructions || []}
-          recipeSubstitutions={currentRecipe?.recipe?.substitutions_text || null}
         />
 
         {/* Mini Timer Display */}

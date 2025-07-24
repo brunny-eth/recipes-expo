@@ -728,10 +728,11 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   emptyContainer: {
     flexGrow: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'center',
     paddingHorizontal: SPACING.xl,
     paddingVertical: SPACING.xl,
+    paddingTop: '30%', // Move content higher up on the screen
   } as ViewStyle,
   emptyText: {
             fontFamily: FONT.family.ubuntu,

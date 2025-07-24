@@ -564,9 +564,7 @@ export default function StepsScreen() {
     openToolsModal('timer');
   };
 
-  const handleAIChatPress = () => {
-    openToolsModal('aiChat');
-  };
+
 
   const handleRecipeTipsPress = () => {
     if (modifiedRecipe?.tips) {
@@ -767,7 +765,6 @@ export default function StepsScreen() {
       {/* Footer Buttons */}
       <StepsFooterButtons
         onTimersPress={handleTimersPress}
-        onAIChatPress={handleAIChatPress}
         onRecipeTipsPress={handleRecipeTipsPress}
         hasRecipeTips={!!modifiedRecipe?.tips}
       />
@@ -783,8 +780,6 @@ export default function StepsScreen() {
         handleTimerAddSeconds={handleTimerAddSeconds}
         handleTimerStartPause={handleTimerStartPause}
         handleTimerReset={handleTimerReset}
-        recipeInstructions={instructions}
-        recipeSubstitutions={modifiedRecipe?.substitutions_text || null}
       />
 
       {!isToolsPanelVisible && isTimerActive && timerTimeRemaining > 0 && (

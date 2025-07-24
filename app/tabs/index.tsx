@@ -84,7 +84,7 @@ export default function HomeScreen() {
   const [displayedPlaceholder, setDisplayedPlaceholder] = useState('');
   const [isTypingPlaceholder, setIsTypingPlaceholder] = useState(false);
 
-  const firstPrompt = "Try 'www...' or 'mac and cheese'";
+  const firstPrompt = "Try 'mac and cheese' or 'www...'";
 
   // Typewriter effect for placeholder
   const typewriterEffect = useCallback((text: string, onComplete?: () => void) => {
@@ -244,7 +244,7 @@ export default function HomeScreen() {
     if (!isValidRecipeInput(recipeUrl)) {
       showError(
         'Input Not Recognized',
-        'Please enter a real dish name or recipe link (e.g., "chicken soup", "tomato pasta", or a recipe/video URL).',
+        'Please enter a real dish name (like "chicken soup" or "tomato pasta") or a recipe link',
         undefined,
         undefined,
         'Go to Explore',
@@ -401,13 +401,14 @@ export default function HomeScreen() {
           <View style={styles.contentContainer}>
             <View style={styles.headerContainer}>
               <View style={{ width: '90%', maxWidth: 340, alignSelf: 'center' }}>
-                <Text style={styles.mainFeatureText}>Home base for home cooks</Text>
+                <Text style={styles.mainFeatureText}>Meez helps you prep and cook without clutter
+                </Text>
               </View>
             </View>
             <View style={styles.secondaryTextContainer}>
               <View style={{ width: '90%', maxWidth: 340, alignSelf: 'center' }}>
                 <Text style={styles.subheadingText}>
-                  Paste a link or recipe idea to get started.
+                  Paste a link or recipe idea to get started
                 </Text>
               </View>
             </View>

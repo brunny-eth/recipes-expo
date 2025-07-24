@@ -76,6 +76,29 @@ export interface Database {
           description?: string
         }
       }
+      user_feedback: {
+        Row: {
+          id: string
+          message: string
+          email: string | null
+          app_version: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          message: string
+          email?: string | null
+          app_version?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          message?: string
+          email?: string | null
+          app_version?: string | null
+          created_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

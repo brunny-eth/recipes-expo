@@ -48,8 +48,11 @@ export function convertUnits(amount: number, fromUnit: Unit, toUnit: Unit): numb
 
 // Helper to get common display names (can be expanded)
 export function getUnitDisplayName(unit: Unit | string | null, amount: number = 1): string | null {
+    console.log('[units] 📏 getUnitDisplayName called with:', { unit, amount });
+    
     // Handle null or undefined units
     if (!unit || unit === 'null') {
+        console.log('[units] 📏 getUnitDisplayName returning null - unit is null or "null"');
         return null;
     }
     
@@ -75,8 +78,12 @@ export function getUnitDisplayName(unit: Unit | string | null, amount: number = 
 
     // Special cases for amounts that should use plural
     if (amount === 0 || amount > 1 || (amount < 1 && amount > 0)) {
-        return displayForms[unit]?.plural || String(unit);
+        const result = displayForms[unit]?.plural || String(unit);
+        console.log('[units] 📏 getUnitDisplayName returning plural form:', result);
+        return result;
     }
 
-    return displayForms[unit]?.singular || String(unit);
+    const result = displayForms[unit]?.singular || String(unit);
+    console.log('[units] 📏 getUnitDisplayName returning singular form:', result);
+    return result;
 } 

@@ -1,8 +1,22 @@
 import { View, Text, TouchableOpacity, SafeAreaView, TextStyle, StyleSheet } from 'react-native';
 import { COLORS } from '@/constants/theme';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { useState } from 'react';
+import OnboardingScreen from './OnboardingScreen';
+
+type WelcomeScreenState = 'welcome' | 'onboarding';
 
 export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) {
+  const [currentScreen, setCurrentScreen] = useState<WelcomeScreenState>('welcome');
+
+  if (currentScreen === 'onboarding') {
+    return (
+      <OnboardingScreen
+        onComplete={onDismiss}
+        onBack={() => setCurrentScreen('welcome')}
+      />
+    );
+  }
   return (
     <Animated.View 
       style={{
@@ -45,39 +59,33 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
             </Animated.View>
 
             {/* Bullets - each in its own animated container */}
+
             <Animated.View
-              entering={FadeIn.duration(1000).delay(1500)}
+              entering={FadeIn.duration(1000).delay(2000)}
               style={{ width: '100%' }}
             >
-              <Text style={styles.bullet}>• No more ad-filled recipe blogs</Text>
+              <Text style={styles.bullet}>• Import any recipe and customize it</Text>
             </Animated.View>
 
             <Animated.View
-              entering={FadeIn.duration(1000).delay(3000)}
+              entering={FadeIn.duration(1000).delay(3500)}
               style={{ width: '100%' }}
             >
-              <Text style={styles.bullet}>• Clean, consistent, editable recipes</Text>
+              <Text style={styles.bullet}>• Instantly swap or remove any ingredient</Text>
             </Animated.View>
 
             <Animated.View
-              entering={FadeIn.duration(1000).delay(4500)}
+              entering={FadeIn.duration(1000).delay(5000)}
               style={{ width: '100%' }}
             >
-              <Text style={styles.bullet}>• Swap or remove ingredients with ease</Text>
-            </Animated.View>
-
-            <Animated.View
-              entering={FadeIn.duration(1000).delay(6000)}
-              style={{ width: '100%' }}
-            >
-              <Text style={styles.bullet}>• Cook with clear steps and useful tools</Text>
+              <Text style={styles.bullet}>• Cook multiple dishes at the same time</Text>
             </Animated.View>
           </View>
 
           {/* Button container with tagline */}
           <View style={{ width: '100%', alignItems: 'center' }}>
             <Animated.View
-              entering={FadeIn.duration(1000).delay(7200)}
+              entering={FadeIn.duration(1000).delay(6500)}
               style={{
                 width: '100%',
                 alignItems: 'center',
@@ -91,16 +99,16 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
                 lineHeight: 26,
                 fontFamily: 'Ubuntu-Regular'
               }}>
-                Designed for home cooks
+                Designed by home cooks, for home cooks
               </Text>
             </Animated.View>
 
             <Animated.View
-              entering={FadeIn.duration(1200).delay(7800)}
+              entering={FadeIn.duration(1200).delay(8000)}
               style={{
                 width: '100%',
                 alignItems: 'center',
-                marginBottom: 72
+                marginBottom: 140
               }}
             >
               <TouchableOpacity 
@@ -120,7 +128,7 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
                   shadowRadius: 8,
                   elevation: 5,
                 }}
-                onPress={onDismiss}
+                onPress={() => setCurrentScreen('onboarding')}
               >
                 <Text style={{ 
                   color: COLORS.white, 

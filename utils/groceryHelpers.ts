@@ -9,12 +9,17 @@ import { convertUnits, availableUnits, Unit, getUnitDisplayName } from './units'
  * Converts decimal amounts to readable fractions for grocery list display
  */
 export function formatAmountForGroceryDisplay(amount: number | null): string | null {
+  console.log('[groceryHelpers] 📊 formatAmountForGroceryDisplay called with:', amount);
+  
   if (amount === null || amount === 0) {
+    console.log('[groceryHelpers] 📊 formatAmountForGroceryDisplay returning null - amount is null or 0');
     return null;
   }
 
   // Use the existing formatMeasurement function which already handles fractions properly
-  return formatMeasurement(amount);
+  const result = formatMeasurement(amount);
+  console.log('[groceryHelpers] 📊 formatAmountForGroceryDisplay returning:', result);
+  return result;
 }
 
 export interface GroceryListItem {
@@ -44,14 +49,24 @@ export function normalizeName(name: string): string {
   let normalized = name.toLowerCase().trim();
 
   // A more robust way to remove adjectives without brittle regex
+  // Be more careful about removing adjectives that are part of compound terms
   const adjectivesToRemove = [
-    'fresh', 'dried', 'ground', 'chopped', 'sliced', 'diced', 'minced', 'crushed', 'peeled', 'seeded',
+    'fresh', 'dried', 'chopped', 'sliced', 'diced', 'minced', 'crushed', 'peeled', 'seeded',
     'large', 'medium', 'small', 'thin', 'thick', 'whole', 'optional', 'for garnish', 'to taste',
     'plus more for garnish', 'cooked', 'uncooked', 'raw', 'ripe', 'unripe', 'sweet', 'unsweetened',
     'salted', 'unsalted', 'low-sodium', 'lower-sodium', 'toasted'
   ];
   
-  // Create a regex pattern that matches any of the adjectives as whole words
+  // Special handling for "ground" - only remove if it's not part of "ground pepper" or similar
+  if (normalized.includes('ground pepper') || normalized.includes('ground black pepper')) {
+    // Keep "ground" in these cases - it's part of the ingredient name
+    console.log('[groceryHelpers] 🌶️ Keeping "ground" in pepper terms:', normalized);
+  } else {
+    // Remove "ground" only if it's not part of a compound term
+    normalized = normalized.replace(/\bground\b/gi, '');
+  }
+  
+  // Create a regex pattern that matches any of the other adjectives as whole words
   const pattern = new RegExp(`\\b(${adjectivesToRemove.join('|')})\\b`, 'gi');
   normalized = normalized.replace(pattern, '');
 
@@ -502,6 +517,23 @@ export function formatIngredientsForGroceryList(
           user_saved_recipe_id: userSavedRecipeId || null,
           source_recipe_title: recipe.title || 'Unknown Recipe'
         };
+        
+        console.log(`[groceryHelpers] 🔍 Detailed grocery item creation:`, {
+          originalName: ingredient.name,
+          parsedBaseName: parsedName.baseName,
+          originalAmount: ingredient.amount,
+          parsedAmount: amount,
+          originalUnit: ingredient.unit,
+          standardizedUnit: standardizedUnit,
+          displayUnit: groceryItem.display_unit,
+          originalText: originalText,
+          finalGroceryItem: {
+            item_name: groceryItem.item_name,
+            quantity_amount: groceryItem.quantity_amount,
+            quantity_unit: groceryItem.quantity_unit,
+            display_unit: groceryItem.display_unit
+          }
+        });
         
         console.log(`[groceryHelpers] ✅ Created grocery item:`, {
           item_name: groceryItem.item_name,

@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   TextStyle,
   Linking,
   Alert,
+  TextInput,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
@@ -25,76 +26,133 @@ import {
 } from '@/constants/typography';
 import ScreenHeader from '@/components/ScreenHeader';
 
-function AuthStatus() {
-  const { session } = useAuth();
-
-  return (
-    <View style={styles.authStatusContainer}>
-      <Text style={styles.authStatusText}>
-        {`Logged in as ${session?.user?.email}`}
-      </Text>
-    </View>
-  );
-}
-
-export default function SettingsScreen() {
+export default function AccountScreen() {
   const { signOut, isAuthenticated, session } = useAuth();
   const insets = useSafeAreaInsets();
+  const [feedbackMessage, setFeedbackMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Component Mount/Unmount logging
   useEffect(() => {
-    console.log('[SettingsScreen] Component DID MOUNT');
+    console.log('[AccountScreen] Component DID MOUNT');
     return () => {
-      console.log('[SettingsScreen] Component WILL UNMOUNT');
+      console.log('[AccountScreen] Component WILL UNMOUNT');
     };
   }, []);
 
   // Focus effect logging
   useFocusEffect(
     useCallback(() => {
-      console.log('[SettingsScreen] 🎯 useFocusEffect triggered');
-      console.log('[SettingsScreen] 👁️ Screen focused');
+      console.log('[AccountScreen] 🎯 useFocusEffect triggered');
+      console.log('[AccountScreen] 👁️ Screen focused');
 
       return () => {
-        console.log('[SettingsScreen] 🌀 useFocusEffect cleanup');
-        console.log('[SettingsScreen] 🌀 Screen is blurring (not necessarily unmounting)');
+        console.log('[AccountScreen] 🌀 useFocusEffect cleanup');
+        console.log('[AccountScreen] 🌀 Screen is blurring (not necessarily unmounting)');
       };
     }, [])
   );
 
+  const handleSubmitFeedback = async () => {
+    if (!feedbackMessage.trim()) {
+      Alert.alert('Error', 'Please enter a message before submitting feedback.');
+      return;
+    }
+
+    if (!session?.user?.email) {
+      Alert.alert('Error', 'You must be logged in to submit feedback.');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: session.user.email,
+          message: feedbackMessage.trim(),
+          app_version: '1.0.0', // Hardcoded version
+        }),
+      });
+
+      if (response.ok) {
+        Alert.alert('Success', 'Thank you for your feedback!');
+        setFeedbackMessage('');
+      } else {
+        throw new Error('Failed to submit feedback');
+      }
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+      Alert.alert('Error', 'Failed to submit feedback. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScreenHeader title="Settings" />
+      <ScreenHeader title="Account" />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        <View style={styles.section}>
-          <TouchableOpacity style={styles.linkRow} onPress={() => Linking.openURL('https://meez.app/tos.html')}>
-            <Text style={styles.linkText}>Privacy Policy</Text>
-          </TouchableOpacity>
+        {/* User Info Section */}
+        {isAuthenticated && (
+          <>
+            <View style={styles.authStatusContainer}>
+              <Text style={styles.authStatusText}>
+                {`Logged in as ${session?.user?.email}`}
+              </Text>
+            </View>
+            <TouchableOpacity style={styles.signOutButton} onPress={signOut}>
+              <Text style={styles.signOutButtonText}>Sign Out</Text>
+            </TouchableOpacity>
+          </>
+        )}
 
-          <TouchableOpacity style={styles.linkRow} onPress={() => Linking.openURL('https://meez.app/privacy.html')}>
-            <Text style={styles.linkText}>Terms of Service</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.linkRow}>
-            <Text style={styles.linkText}>Contact Us</Text>
+        {/* Feedback Form Section */}
+        <View style={styles.feedbackSection}>
+          <Text style={styles.sectionTitle}>Send Feedback</Text>
+          <TextInput
+            style={styles.feedbackInput}
+            placeholder="Send us a note if you have an idea for a feature, found a bug, or just want to say hi."
+            placeholderTextColor={COLORS.textSubtle}
+            value={feedbackMessage}
+            onChangeText={setFeedbackMessage}
+            multiline
+            numberOfLines={4}
+            textAlignVertical="top"
+            maxLength={400}
+          />
+          <TouchableOpacity
+            style={[
+              styles.sendFeedbackButton,
+              (!feedbackMessage.trim() || isSubmitting) && styles.sendFeedbackButtonDisabled
+            ]}
+            onPress={handleSubmitFeedback}
+            disabled={!feedbackMessage.trim() || isSubmitting}
+          >
+            <Text style={styles.sendFeedbackButtonText}>
+              {isSubmitting ? 'Sending...' : 'Send Feedback'}
+            </Text>
           </TouchableOpacity>
         </View>
 
         {__DEV__ && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Developer Tools</Text>
+          <View style={styles.devSection}>
             <TouchableOpacity
-              style={styles.linkRow}
+              style={styles.devLinkRow}
               onPress={() => router.push('/debug' as any)}
             >
-              <Text style={styles.linkText}>Open Debug Menu</Text>
+              <Text style={styles.devLinkText}>Open Debug Menu</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.linkRow}
+              style={styles.devLinkRow}
               onPress={async () => {
                 try {
                   await AsyncStorage.removeItem('hasLaunched');
@@ -116,36 +174,43 @@ export default function SettingsScreen() {
                 }
               }}
             >
-              <Text style={styles.linkText}>Reset Welcome Screen</Text>
+              <Text style={styles.devLinkText}>Reset Welcome Screen</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        <Text style={styles.versionText}>Version 1.0.0</Text>
       </ScrollView>
 
-      {/* Bottom section with auth status and sign out button */}
-      <View style={[styles.bottomSection, { paddingBottom: insets.bottom + SPACING.md }]}>
-        {isAuthenticated ? (
-          <>
-            <View style={styles.authStatusContainer}>
-              <Text style={styles.authStatusText}>
-                {`Logged in as ${session?.user?.email}`}
-              </Text>
-            </View>
-            <TouchableOpacity style={styles.signOutButton} onPress={signOut}>
-              <Text style={styles.signOutButtonText}>Sign Out</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
+      {/* Legal Links and Version - Fixed to bottom */}
+      <View style={[styles.bottomLegalSection, { paddingBottom: insets.bottom + SPACING.md }]}>
+        <View style={styles.legalSection}>
+          <TouchableOpacity 
+            style={styles.legalLink} 
+            onPress={() => Linking.openURL('https://meez.app/tos.html')}
+          >
+            <Text style={styles.legalLinkText}>Privacy Policy</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.legalLink} 
+            onPress={() => Linking.openURL('https://meez.app/privacy.html')}
+          >
+            <Text style={styles.legalLinkText}>Terms of Service</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.versionText}>Version 1.0.0</Text>
+      </View>
+
+      {/* Login button for unauthenticated users */}
+      {!isAuthenticated && (
+        <View style={[styles.bottomSection, { paddingBottom: insets.bottom + SPACING.md }]}>
           <TouchableOpacity
             onPress={() => router.push('/login')}
             style={styles.loginButton}
           >
             <Text style={styles.loginButtonText}>Log In or Sign Up</Text>
           </TouchableOpacity>
-        )}
-      </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -156,75 +221,137 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     paddingHorizontal: SPACING.pageHorizontal,
   } as ViewStyle,
-  authContainer: {
-    minHeight: 70, // TODO: Tokenize component heights?
-    marginBottom: SPACING.pageHorizontal,
-  } as ViewStyle,
   authStatusContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12, // TODO: No SPACING token for 12
+    padding: SPACING.base,
     borderRadius: RADIUS.sm,
     backgroundColor: COLORS.primaryLight,
+    marginBottom: SPACING.sm,
   } as ViewStyle,
   authStatusText: {
     ...bodyStrongText,
     color: COLORS.primary,
     marginLeft: SPACING.sm,
   } as TextStyle,
-  section: {
-    marginBottom: SPACING.pageHorizontal,
+  userSection: {
+    marginBottom: SPACING.xl,
+    padding: SPACING.md,
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.md,
+    borderWidth: BORDER_WIDTH.default,
+    borderColor: COLORS.lightGray,
   } as ViewStyle,
-  sectionTitle: {
-    ...sectionHeaderText,
+  userEmail: {
+    ...bodyStrongText,
+    color: COLORS.textDark,
     marginBottom: SPACING.sm,
   } as TextStyle,
-  linkRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: SPACING.md,
-    borderBottomWidth: BORDER_WIDTH.default,
-    borderBottomColor: COLORS.lightGray,
-  } as ViewStyle,
-  linkText: {
-    ...bodyText,
-    fontSize: FONT.size.body,
-  } as TextStyle,
-  versionText: {
-    ...bodyText,
-    color: COLORS.darkGray,
-    textAlign: 'center',
-    marginTop: SPACING.pageHorizontal,
-  } as TextStyle,
   signOutButton: {
-    marginTop: SPACING.pageHorizontal,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.xxl,
     backgroundColor: COLORS.primary,
-    padding: 15, // TODO: No SPACING token for 15. md is 16.
-    borderRadius: 10, // TODO: No RADIUS token for 10. sm is 8, md is 12.
+    padding: SPACING.smLg,
+    borderRadius: RADIUS.smMd,
     alignItems: 'center',
   } as ViewStyle,
   signOutButtonText: {
     ...bodyStrongText,
     color: COLORS.white,
-    fontSize: FONT.size.body,
+    fontSize: FONT.size.smBody,
+  } as TextStyle,
+  feedbackSection: {
+    marginTop: SPACING.xxxl,
+    marginBottom: SPACING.xl,
+  } as ViewStyle,
+  sectionTitle: {
+    ...sectionHeaderText,
+    marginBottom: SPACING.md,
+    color: COLORS.textDark,
+    textAlign: 'center',
+  } as TextStyle,
+  feedbackInput: {
+    backgroundColor: COLORS.white,
+    borderWidth: BORDER_WIDTH.default,
+    borderColor: COLORS.lightGray,
+    borderRadius: RADIUS.sm,
+    padding: SPACING.md,
+    minHeight: 100,
+    marginBottom: SPACING.sm,
+    ...bodyText,
+    color: COLORS.textDark,
+  } as TextStyle,
+  sendFeedbackButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.sm,
+    alignItems: 'center',
+  } as ViewStyle,
+  sendFeedbackButtonDisabled: {
+    backgroundColor: COLORS.disabled,
+  } as ViewStyle,
+  sendFeedbackButtonText: {
+    ...bodyStrongText,
+    color: COLORS.white,
+    fontSize: FONT.size.smBody,
+  } as TextStyle,
+  devSection: {
+    marginBottom: SPACING.xl,
+  } as ViewStyle,
+  devLinkRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: SPACING.md,
+  } as ViewStyle,
+  devLinkText: {
+    ...bodyText,
+    fontSize: FONT.size.smBody,
+    color: COLORS.primary,
+  } as TextStyle,
+  legalSection: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: SPACING.lg,
+    marginBottom: SPACING.md,
+  } as ViewStyle,
+  legalLink: {
+  } as ViewStyle,
+  legalLinkText: {
+    ...bodyText,
+    fontSize: FONT.size.caption,
+    color: COLORS.textSubtle,
+    textDecorationLine: 'underline',
+  } as TextStyle,
+  versionText: {
+    ...bodyText,
+    color: COLORS.textSubtle,
+    textAlign: 'center',
+    fontSize: FONT.size.caption,
   } as TextStyle,
   loginButton: {
     backgroundColor: COLORS.primary,
-    paddingVertical: 12, // TODO: No SPACING token for 12.
-    paddingHorizontal: 25, // TODO: No SPACING token for 25. lg is 24.
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.xl,
     borderRadius: RADIUS.sm,
     alignItems: 'center',
   } as ViewStyle,
   loginButtonText: {
     ...bodyStrongText,
     color: COLORS.white,
-    fontSize: FONT.size.body,
+    fontSize: FONT.size.smBody,
   } as TextStyle,
   scrollContent: {
     paddingBottom: SPACING.xl,
   } as ViewStyle,
   bottomSection: {
+    paddingHorizontal: SPACING.pageHorizontal,
+    paddingTop: SPACING.lg,
+    borderTopWidth: BORDER_WIDTH.default,
+    borderTopColor: COLORS.lightGray,
+  } as ViewStyle,
+  bottomLegalSection: {
     paddingHorizontal: SPACING.pageHorizontal,
     paddingTop: SPACING.lg,
     borderTopWidth: BORDER_WIDTH.default,

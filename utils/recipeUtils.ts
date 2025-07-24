@@ -38,12 +38,16 @@ const unicodeFractionCharsRegexFragment = Object.keys(UNICODE_FRACTIONS)
 
 // --- Main Parsing Function ---
 export const parseAmountString = (amountStr: string | null | undefined): number | null => {
+  console.log('[recipeUtils] 🔢 parseAmountString called with:', amountStr);
+  
   if (amountStr === null || amountStr === undefined || typeof amountStr !== 'string') {
+    console.log('[recipeUtils] 🔢 parseAmountString returning null - invalid input type');
     return null;
   }
 
   let currentAmountStr = amountStr.trim();
   if (!currentAmountStr) {
+    console.log('[recipeUtils] 🔢 parseAmountString returning null - empty string after trim');
     return null;
   }
 
@@ -112,12 +116,14 @@ export const parseAmountString = (amountStr: string | null | undefined): number 
   if (/^(\d|\.\d)/.test(currentAmountStr)) { // Check if it starts like a number
     const num = parseFloat(currentAmountStr);
     if (!isNaN(num)) {
+      console.log('[recipeUtils] 🔢 parseAmountString returning parsed number:', num);
       return num; // parseFloat will extract "2" from "2 apples"
     }
   }
 
   // If none of the above specific formats match, return null.
   // This covers cases like "to taste", "a pinch", or other non-numeric/unhandled amounts.
+  console.log('[recipeUtils] 🔢 parseAmountString returning null - no valid number found');
   return null;
 };
 

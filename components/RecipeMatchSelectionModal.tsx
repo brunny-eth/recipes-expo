@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Modal,
   View,
@@ -10,6 +10,7 @@ import {
   ViewStyle,
   TextStyle,
   ImageStyle,
+  Image,
 } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -28,6 +29,9 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
   matches,
   onAction,
 }) => {
+  // State to track which images have failed to load
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+
   console.log('[RecipeMatchSelectionModal] Modal rendered with', matches.length, 'matches.');
   console.log('[RecipeMatchSelectionModal] Matches data:', matches);
   console.log('[RecipeMatchSelectionModal] First match sample:', matches[0]);
@@ -48,22 +52,39 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
     onAction('returnHome');
   };
 
+  const handleImageError = (imageUrl: string) => {
+    console.log('[RecipeMatchSelectionModal] Image failed to load:', imageUrl);
+    setFailedImages(prev => new Set(prev).add(imageUrl));
+  };
+
   const renderRecipeItem = ({ item }: { item: { recipe: CombinedParsedRecipe; similarity: number; } }) => {
     console.log('[RecipeMatchSelectionModal] Rendering item:', item);
     const recipe = item.recipe;
     const imageUrl = recipe.image || null;
-    console.log('[RecipeMatchSelectionModal] Recipe title:', recipe.title, 'Image URL:', imageUrl);
+    const hasImageFailed = imageUrl ? failedImages.has(imageUrl) : true;
+    const shouldShowFallback = !imageUrl || hasImageFailed;
+    
+    console.log('[RecipeMatchSelectionModal] Recipe title:', recipe.title, 'Image URL:', imageUrl, 'Show fallback:', shouldShowFallback);
     
     return (
       <TouchableOpacity
         style={styles.recipeCard}
         onPress={() => handleRecipeSelect(recipe.id || 0)}
       >
-        {imageUrl && (
+        {shouldShowFallback ? (
+          <View style={styles.fallbackImageContainer}>
+            <Image
+              source={require('@/assets/images/meez_logo.png')}
+              style={styles.fallbackImage}
+              resizeMode="contain"
+            />
+          </View>
+        ) : (
           <FastImage
             source={{ uri: imageUrl }}
             style={styles.recipeImage}
             resizeMode="cover"
+            onError={() => handleImageError(imageUrl)}
           />
         )}
         <View style={styles.recipeTextContainer}>
@@ -156,8 +177,6 @@ const styles = StyleSheet.create({
   recipeList: {
     flex: 1,
     paddingVertical: SPACING.md,
-    backgroundColor: '#f0f0f0', // Temporary: to see if FlatList is rendering
-    minHeight: 200, // Temporary: ensure minimum height
   } as ViewStyle,
   recipeCard: {
     flexDirection: 'row',
@@ -180,6 +199,19 @@ const styles = StyleSheet.create({
     borderRadius: 8, // Slightly more rounded for larger image
     marginRight: SPACING.md,
   },
+  fallbackImageContainer: {
+    width: SPACING.xxxl || 72,
+    height: SPACING.xxxl || 72,
+    borderRadius: 8,
+    backgroundColor: COLORS.lightGray,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: SPACING.md,
+  } as ViewStyle,
+  fallbackImage: {
+    width: '60%',
+    height: '60%',
+  } as ImageStyle,
   recipeTextContainer: {
     flex: 1,
     justifyContent: 'center', // Vertically center the title

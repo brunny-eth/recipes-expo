@@ -102,21 +102,36 @@ const convertToGroceryCategories = (items: any[]): GroceryCategory[] => {
       item_name: item.item_name,
       original_category: item.grocery_category,
       final_category: categoryName,
-      original_ingredient_text: item.original_ingredient_text
+      original_ingredient_text: item.original_ingredient_text,
+      quantity_amount: item.quantity_amount,
+      quantity_unit: item.quantity_unit,
+      display_unit: item.display_unit,
+      raw_item_data: item // Log the entire raw item for debugging
     });
     
     if (!categories[categoryName]) {
       categories[categoryName] = [];
     }
     
-    categories[categoryName].push({
+    const groceryItem = {
       id: item.id || `item_${index}`,
       name: item.item_name || item.name,
       amount: item.quantity_amount,
       unit: item.display_unit || item.quantity_unit, // Use display_unit if available
       category: categoryName,
       checked: item.is_checked || false,
+    };
+    
+    console.log(`[MiseScreen] 🛒 Created grocery item:`, {
+      id: groceryItem.id,
+      name: groceryItem.name,
+      amount: groceryItem.amount,
+      unit: groceryItem.unit,
+      category: groceryItem.category,
+      checked: groceryItem.checked
     });
+    
+    categories[categoryName].push(groceryItem);
   });
   
   // Convert to array format expected by UI
@@ -129,7 +144,12 @@ const convertToGroceryCategories = (items: any[]): GroceryCategory[] => {
     categoryCount: result.length,
     categories: result.map(cat => ({
       name: cat.name,
-      itemCount: cat.items.length
+      itemCount: cat.items.length,
+      items: cat.items.map(item => ({
+        name: item.name,
+        amount: item.amount,
+        unit: item.unit
+      }))
     }))
   });
   
@@ -177,16 +197,16 @@ const mergeManualItemsIntoCategories = (
     mergedCategories[categoryName].push(groceryItem);
   });
   
-  // Always ensure "Miscellaneous" category exists (even if empty)
-  if (!mergedCategories['Miscellaneous']) {
-    mergedCategories['Miscellaneous'] = [];
-  }
+  // Only create "Miscellaneous" category if there are actually items to put in it
+  // (Don't create empty categories)
   
-  // Convert back to array format
-  const result = Object.entries(mergedCategories).map(([categoryName, items]) => ({
-    name: categoryName,
-    items: items,
-  }));
+  // Convert back to array format, but only include categories that have items
+  const result = Object.entries(mergedCategories)
+    .filter(([categoryName, items]) => items.length > 0) // Only include categories with items
+    .map(([categoryName, items]) => ({
+      name: categoryName,
+      items: items,
+    }));
   
   console.log('[MiseScreen] ✅ Merged categories result:', {
     categoryCount: result.length,
@@ -246,12 +266,20 @@ const filterHouseholdStaples = (
         
         // Exact matches or very close matches
         if (itemName === stapleName || itemName.includes(stapleName)) {
-          // Special handling for pepper types - don't match vegetable peppers
-          if (stapleName.includes('pepper') && !stapleName.includes('bell')) {
-            const vegetablePeppers = ['bell pepper', 'jalapeño', 'jalapeno', 'poblano', 'serrano', 'habanero', 'chili pepper', 'hot pepper', 'sweet pepper'];
-            const isVegetablePepper = vegetablePeppers.some(vegPepper => itemName.includes(vegPepper));
-            return !isVegetablePepper; // Only filter if it's NOT a vegetable pepper
+                  // Special handling for pepper types - don't match vegetable peppers
+        if (stapleName.includes('pepper') && !stapleName.includes('bell')) {
+          const vegetablePeppers = ['bell pepper', 'jalapeño', 'jalapeno', 'poblano', 'serrano', 'habanero', 'chili pepper', 'hot pepper', 'sweet pepper'];
+          const isVegetablePepper = vegetablePeppers.some(vegPepper => itemName.includes(vegPepper));
+          
+          // Also check for "freshly ground pepper" and similar variations
+          if (stapleName === 'black pepper' || stapleName === 'ground pepper') {
+            const pepperVariations = ['freshly ground pepper', 'ground black pepper', 'black pepper', 'ground pepper', 'pepper'];
+            const isPepperVariation = pepperVariations.some(pepper => itemName.includes(pepper));
+            return isPepperVariation; // Filter out all pepper variations
           }
+          
+          return !isVegetablePepper; // Only filter if it's NOT a vegetable pepper
+        }
           
           // Special handling for "salt" - don't match specialized salts
           if (stapleName === 'salt') {
@@ -449,7 +477,10 @@ export default function MiseScreen() {
         items: groceryData?.items?.map((item: any) => ({
           item_name: item.item_name,
           grocery_category: item.grocery_category,
-          original_ingredient_text: item.original_ingredient_text
+          original_ingredient_text: item.original_ingredient_text,
+          quantity_amount: item.quantity_amount,
+          quantity_unit: item.quantity_unit,
+          display_unit: item.display_unit
         })) || []
       });
 
@@ -890,6 +921,12 @@ export default function MiseScreen() {
     const enabled = staples.length > 0;
     setStaplesEnabled(enabled);
     await saveStaplesPreferences(enabled, staples);
+    
+    console.log('[MiseScreen] 🏠 Staples changed:', {
+      staples,
+      enabled,
+      isDefaultSelection: staples.length === 2 && staples.includes('salt') && staples.includes('black pepper')
+    });
   }, [saveStaplesPreferences]);
 
   // Use focus effect to refresh data when tab becomes active
@@ -986,43 +1023,56 @@ export default function MiseScreen() {
           </TouchableOpacity>
         )}
       </View>
-      {item.items.map((groceryItem, index) => (
-        <View key={groceryItem.id} style={styles.groceryItem}>
-          <TouchableOpacity
-            style={styles.groceryItemCheckbox}
-            onPress={() => handleGroceryToggle(item.name, index)}
-          >
-            <MaterialCommunityIcons
-              name={groceryItem.checked ? "checkbox-marked" : "checkbox-blank-outline"}
-              size={24}
-              color={groceryItem.checked ? COLORS.success : COLORS.secondary}
-            />
-          </TouchableOpacity>
-          <Text 
-            style={[
-              styles.groceryItemText,
-              groceryItem.checked && styles.groceryItemChecked
-            ]}
-            numberOfLines={0}
-          >
-            {groceryItem.amount ? `${formatAmountForGroceryDisplay(groceryItem.amount)}` : ''}
-            {(() => {
-              const unitDisplay = getUnitDisplayName(groceryItem.unit as any, groceryItem.amount || 1);
-              return unitDisplay ? ` ${unitDisplay}` : '';
-            })()}
-            {groceryItem.amount || groceryItem.unit ? ' ' : ''}
-            {groceryItem.name}
-          </Text>
-          {groceryItem.isManual && (
+      {item.items.map((groceryItem, index) => {
+        // Add detailed logging for each grocery item being rendered
+        console.log(`[MiseScreen] 🎨 Rendering grocery item:`, {
+          id: groceryItem.id,
+          name: groceryItem.name,
+          amount: groceryItem.amount,
+          unit: groceryItem.unit,
+          amountFormatted: groceryItem.amount ? formatAmountForGroceryDisplay(groceryItem.amount) : 'null',
+          unitDisplay: getUnitDisplayName(groceryItem.unit as any, groceryItem.amount || 1),
+          finalDisplayText: `${groceryItem.amount ? formatAmountForGroceryDisplay(groceryItem.amount) : ''}${getUnitDisplayName(groceryItem.unit as any, groceryItem.amount || 1) ? ` ${getUnitDisplayName(groceryItem.unit as any, groceryItem.amount || 1)}` : ''}${groceryItem.amount || groceryItem.unit ? ' ' : ''}${groceryItem.name}`
+        });
+        
+        return (
+          <View key={groceryItem.id} style={styles.groceryItem}>
             <TouchableOpacity
-              onPress={() => handleDeleteManualItem(groceryItem.id)}
-              style={styles.deleteManualButton}
+              style={styles.groceryItemCheckbox}
+              onPress={() => handleGroceryToggle(item.name, index)}
             >
-              <MaterialCommunityIcons name="close" size={16} color={COLORS.textMuted} />
+              <MaterialCommunityIcons
+                name={groceryItem.checked ? "checkbox-marked" : "checkbox-blank-outline"}
+                size={24}
+                color={groceryItem.checked ? COLORS.success : COLORS.secondary}
+              />
             </TouchableOpacity>
-          )}
-        </View>
-      ))}
+            <Text 
+              style={[
+                styles.groceryItemText,
+                groceryItem.checked && styles.groceryItemChecked
+              ]}
+              numberOfLines={0}
+            >
+              {groceryItem.amount ? `${formatAmountForGroceryDisplay(groceryItem.amount)}` : ''}
+              {(() => {
+                const unitDisplay = getUnitDisplayName(groceryItem.unit as any, groceryItem.amount || 1);
+                return unitDisplay ? ` ${unitDisplay}` : '';
+              })()}
+              {groceryItem.amount || groceryItem.unit ? ' ' : ''}
+              {groceryItem.name}
+            </Text>
+            {groceryItem.isManual && (
+              <TouchableOpacity
+                onPress={() => handleDeleteManualItem(groceryItem.id)}
+                style={styles.deleteManualButton}
+              >
+                <MaterialCommunityIcons name="close" size={16} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            )}
+          </View>
+        );
+      })}
     </View>
   ), [handleGroceryToggle, handleOpenAddModal, handleDeleteManualItem, sortMode]);
 
@@ -1106,22 +1156,6 @@ export default function MiseScreen() {
         />
       );
     } else {
-      if (groceryList.length === 0) {
-        return (
-          <View style={styles.emptyContainer}>
-            <MaterialCommunityIcons
-              name="cart-outline"
-              size={48}
-              color={COLORS.lightGray}
-            />
-            <Text style={styles.emptyText}>No grocery items</Text>
-            <Text style={styles.emptySubtext}>
-              Add recipes to your mise to see grocery items.
-            </Text>
-          </View>
-        );
-      }
-
       // Determine which data to use based on sort mode and staples filter
       let displayGroceryList = groceryList;
       
@@ -1131,6 +1165,26 @@ export default function MiseScreen() {
       // Then apply sorting if alphabetical mode
       if (sortMode === 'alphabetical') {
         displayGroceryList = sortGroceryItemsAlphabetically(displayGroceryList);
+      }
+
+      // Check if the displayed list is empty (after filtering)
+      if (displayGroceryList.length === 0) {
+        return (
+          <View style={styles.emptyContainer}>
+            <MaterialCommunityIcons
+              name="cart-outline"
+              size={48}
+              color={COLORS.lightGray}
+            />
+            <Text style={styles.emptyText}>No grocery items</Text>
+            <Text style={styles.emptySubtext}>
+              {groceryList.length === 0 
+                ? "Add recipes to your mise to see grocery items."
+                : "All items are hidden by your staples filter."
+              }
+            </Text>
+          </View>
+        );
       }
 
       return (
@@ -1316,10 +1370,11 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   emptyContainer: {
     flexGrow: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'center',
     paddingHorizontal: SPACING.xl,
     paddingVertical: SPACING.xl,
+    paddingTop: '30%', // Move content higher up on the screen
   } as ViewStyle,
   emptyText: {
             fontFamily: FONT.family.ubuntu,

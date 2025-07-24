@@ -6,11 +6,10 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  KeyboardAvoidingView,
-  Platform,
   Keyboard,
   ActivityIndicator,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { COLORS } from '@/constants/theme';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -133,10 +132,8 @@ export default function AIChatTool({
   );
 
   return (
-    <KeyboardAvoidingView
+    <View
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
       onLayout={(event) => {
         console.log('[AIChatTool] Container layout:', {
           width: event.nativeEvent.layout.width,
@@ -188,7 +185,7 @@ export default function AIChatTool({
         </TouchableOpacity>
 
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -204,6 +201,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 15,
     minHeight: 0,
+    maxHeight: '70%', // Limit height to leave room for input
   },
   messageListContent: {
     paddingBottom: 20,

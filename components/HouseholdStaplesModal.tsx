@@ -53,7 +53,14 @@ export default function HouseholdStaplesModal({
   // Sync with props when modal opens
   useEffect(() => {
     if (visible) {
-      setLocalSelected(selectedStaples);
+      // If no staples are selected, default to salt and pepper
+      if (selectedStaples.length === 0) {
+        const defaultStaples = ['salt', 'black pepper', 'ground pepper'];
+        setLocalSelected(defaultStaples);
+        console.log('[HouseholdStaplesModal] 🏠 Setting default staples:', defaultStaples);
+      } else {
+        setLocalSelected(selectedStaples);
+      }
     }
   }, [visible, selectedStaples]);
 

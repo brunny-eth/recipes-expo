@@ -13,14 +13,12 @@ import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
 type StepsFooterButtonsProps = {
   onTimersPress: () => void;
   onRecipeTipsPress: () => void;
-  onAIChatPress: () => void;
   hasRecipeTips?: boolean;
 };
 
 const StepsFooterButtons: React.FC<StepsFooterButtonsProps> = ({
   onTimersPress,
   onRecipeTipsPress,
-  onAIChatPress,
   hasRecipeTips = false,
 }) => {
   return (
@@ -31,13 +29,6 @@ const StepsFooterButtons: React.FC<StepsFooterButtonsProps> = ({
           onPress={onTimersPress}
         >
           <Text style={styles.timerButtonText}>Timer</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={styles.aiChatButton}
-          onPress={onAIChatPress}
-        >
-          <Text style={styles.aiChatButtonText}>Ask for help</Text>
         </TouchableOpacity>
       </View>
       
@@ -103,23 +94,6 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
   } as ViewStyle,
   timerButtonText: {
-    ...bodyStrongText,
-    color: COLORS.primary,
-    fontSize: 14,
-  } as TextStyle,
-  aiChatButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.sm,
-    borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.background,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-  } as ViewStyle,
-  aiChatButtonText: {
     ...bodyStrongText,
     color: COLORS.primary,
     fontSize: 14,
