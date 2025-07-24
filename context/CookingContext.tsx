@@ -62,14 +62,17 @@ const initialState: CookingState = {
   activeRecipeId: null,
   sessionStartTime: undefined,
 };
-console.error('[CookingContext] 🌟 Initial state defined:', JSON.stringify(initialState)); // ADD THIS LINE
+// REMOVE PREVIOUS JSON.stringify(initialState) log here.
+console.error('[CookingContext] 🌟 Initial state - activeRecipes length:', initialState.activeRecipes?.length || 'N/A'); // ADD THIS
+console.error('[CookingContext] 🌟 Initial state - activeRecipeId:', initialState.activeRecipeId); // ADD THIS
+console.error('[CookingContext] 🌟 Initial state - sessionStartTime:', initialState.sessionStartTime); // ADD THIS
 
 // Context
 const CookingContext = createContext<CookingContextType | null>(null);
 
 // Reducer
 function cookingReducer(state: CookingState, action: CookingAction): CookingState {
-  console.error('[CookingContext] *** REDUCER ENTRY POINT ***'); // ADD THIS LINE FIRST
+  console.error('[CookingContext] *** REDUCER ENTRY POINT ***'); 
   console.error('[CookingContext] 🔄 Reducer action:', action.type, action.payload);
   console.error('[CookingContext] 📊 Current state before action:', {
     activeRecipesCount: state.activeRecipes.length,
@@ -265,8 +268,21 @@ function cookingReducer(state: CookingState, action: CookingAction): CookingStat
 
 // Provider Component
 export function CookingProvider({ children }: { children: React.ReactNode }) {
-  const [state, dispatch] = useReducer(cookingReducer, initialState);
-  console.error('[CookingContext] 🎯 cookingReducer function reference:', cookingReducer.toString()); // ADD THIS LINE
+  let state: CookingState;
+  let dispatch: React.Dispatch<CookingAction>;
+
+  try {
+    [state, dispatch] = useReducer(cookingReducer, initialState);
+    console.error('[CookingContext] ✅ useReducer initialized successfully.'); // ADD THIS
+  } catch (e: any) {
+    console.error('[CookingContext] 💥 CRITICAL ERROR: useReducer failed to initialize!', e); // ADD THIS
+    console.error('[CookingContext] 💥 useReducer error stack:', e.stack); // ADD THIS
+    // Provide a fallback to prevent app crash, though functionality will be broken
+    state = initialState;
+    dispatch = () => { console.error('[CookingContext] 💥 Fallback dispatch called due to useReducer init error.'); };
+  }
+
+  console.error('[CookingContext] 🎯 cookingReducer function reference:', cookingReducer.toString()); // Keep this existing log
   
   // 💥 ADDED LOGGING POINT: Check typeof dispatch right after useReducer
   if (process.env.NODE_ENV === 'production') {
@@ -511,13 +527,18 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
 
         // Initialize all sessions with full recipe data
         try {
-          const actionPayload = { recipes, activeRecipeId: recipes[0]?.id ? String(recipes[0].id) : undefined };
-          console.error('[CookingContext] 🔍 dispatching action:', JSON.stringify({ type: 'INITIALIZE_SESSIONS', payload: actionPayload })); // ADD THIS LINE
+          const actionPayload = { recipes, activeRecipeId: recipes[0]?.id ? String(recipes[0].id) : undefined }; // Ensure actionPayload is defined here
+
+          // REMOVE PREVIOUS JSON.stringify(actionPayload) log here.
+          console.error('[CookingContext] 🔍 dispatching action type:', 'INITIALIZE_SESSIONS'); // ADD THIS
+          console.error('[CookingContext] 🔍 dispatching action payload.recipes length:', actionPayload.recipes?.length || 'N/A'); // ADD THIS
+          console.error('[CookingContext] 🔍 dispatching action payload.activeRecipeId:', actionPayload.activeRecipeId); // ADD THIS
+
           dispatch({ 
             type: 'INITIALIZE_SESSIONS', 
-            payload: actionPayload
+            payload: actionPayload 
           });
-          console.error('[CookingContext] ✅ Dispatch completed successfully');
+          console.error('[CookingContext] ✅ Dispatch completed successfully'); // Keep this existing log
         } catch (dispatchError: any) { // Ensure error is typed to 'any' for direct property access
           console.error('[CookingContext] ❌ Error during initializeSessions dispatch:', dispatchError);
           console.error('[CookingContext] ❌ Error message (from dispatch):', dispatchError.message);
