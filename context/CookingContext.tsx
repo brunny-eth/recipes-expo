@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { createContext, useContext, useReducer, useEffect, useMemo } from 'react';
+import { createContext, useContext, useReducer, useEffect, useMemo, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CombinedParsedRecipe } from '../common/types';
 import { useAuth } from './AuthContext';
@@ -433,19 +433,22 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Define initializeSessions directly inside useMemo to make it intrinsically part of the context value
-    const initializeSessions = (miseRecipes: any[]) => {
-      console.error('[CookingContext] 🚀 initializeSessions called (inside useMemo). Recipes Count:', miseRecipes.length);
-      
-      // 💥 ADDED LOGGING POINT: Check typeof dispatch right before calling it inside initializeSessions
-      if (process.env.NODE_ENV === 'production') {
-        console.error('[CookingContext] 🔍 initializeSessions: typeof dispatch before calling:', typeof dispatch);
-      }
-      
-      console.time(`[CookingContext] ⏱️ initializeSessions`);
-      console.error('[CookingContext] 🚀 Initializing cooking sessions with mise recipes:', {
-        recipesCount: miseRecipes.length,
-        recipeIds: miseRecipes.map(mr => mr.id),
-      });
+    // Pass dispatch as an explicit argument here
+    const initializeSessions = useCallback(
+      // ADD dispatchParam as the first argument
+      async (dispatchParam: React.Dispatch<CookingAction>, miseRecipes: any[]) => {
+        console.error('[CookingContext] 🚀 initializeSessions called (inside useCallback). Recipes Count:', miseRecipes.length);
+        
+        // 💥 ADDED LOGGING POINT: Check typeof dispatchParam right before calling it inside initializeSessions
+        if (process.env.NODE_ENV === 'production') {
+          console.error('[CookingContext] 🔍 initializeSessions: typeof dispatchParam before calling:', typeof dispatchParam);
+        }
+        
+        console.time(`[CookingContext] ⏱️ initializeSessions`);
+        console.error('[CookingContext] 🚀 Initializing cooking sessions with mise recipes:', {
+          recipesCount: miseRecipes.length,
+          recipeIds: miseRecipes.map(mr => mr.id),
+        });
 
       try {
         // Validate input
@@ -541,15 +544,17 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
             payloadKeys: Object.keys(actionToDispatch.payload),
           });
 
-          // ADD THIS LOG IMMEDIATELY BEFORE DISPATCH
-          console.error(`[CookingContext] 🔍 Just before dispatch call. typeof dispatch: ${typeof dispatch}`);
+          // ADD THIS LOG IMMEDIATELY BEFORE DISPATCH - THIS IS CRITICAL NOW
+          console.error(`[CookingContext] 🔍 Just before dispatch call (inside useCallback). typeof dispatchParam: ${typeof dispatchParam}`);
+          console.error(`[CookingContext] 🔍 dispatchParam value (inside useCallback):`, dispatchParam); // See what it actually is
 
           try {
-            dispatch(actionToDispatch);
+            // USE dispatchParam instead of the lexical 'dispatch'
+            dispatchParam(actionToDispatch);
             console.error('[CookingContext] ✅ Dispatch call completed (before reducer entry log)');
           } catch (error: any) {
-            console.error('[CookingContext] 💥 Error during dispatch call:', error.message);
-            console.error('[CookingContext] 💥 Error stack during dispatch call:', error.stack);
+            console.error('[CookingContext] 💥 Error during dispatch call (inside useCallback):', error.message);
+            console.error('[CookingContext] 💥 Error stack during dispatch call (inside useCallback):', error.stack);
           }
         } catch (dispatchError: any) { // Ensure error is typed to 'any' for direct property access
           console.error('[CookingContext] ❌ Error during initializeSessions dispatch:', dispatchError);
@@ -570,7 +575,9 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
         console.timeEnd(`[CookingContext] ⏱️ initializeSessions`);
         throw error; // Re-throw to be caught by the calling function
       }
-    };
+    },
+    [] // Dependencies for useCallback remain empty as dispatchParam is now an argument
+  );
 
     // 💥 CRITICAL: Ensure this function is not tree-shaken - use void operator
     void initializeSessions; // This line is crucial for preventing tree-shaking
@@ -602,7 +609,8 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
     // Explicitly construct the context value to ensure all functions are included
     const value = {
       state,
-      initializeSessions, // Direct reference to function defined in useMemo
+      // WRAP initializeSessions to pass 'dispatch' from this scope
+      initializeSessions: (recipes: any[]) => initializeSessions(dispatch, recipes),
       endSession,
       endAllSessions,
       switchRecipe,
