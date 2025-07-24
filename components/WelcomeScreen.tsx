@@ -104,7 +104,7 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
             </Animated.View>
 
             <Animated.View
-              entering={FadeIn.duration(1200).delay(8000)}
+              entering={FadeIn.duration(1000).delay(6500)}
               style={{
                 width: '100%',
                 alignItems: 'center',

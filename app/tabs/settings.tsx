@@ -115,9 +115,10 @@ export default function AccountScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        style={styles.scrollView}
       >
         {/* User Info Section */}
-        {isAuthenticated && (
+        {isAuthenticated ? (
           <>
             <View style={styles.authStatusContainer}>
               <Text style={styles.authStatusText}>
@@ -128,6 +129,13 @@ export default function AccountScreen() {
               <Text style={styles.signOutButtonText}>Sign Out</Text>
             </TouchableOpacity>
           </>
+        ) : (
+          <TouchableOpacity
+            onPress={() => router.push('/login')}
+            style={styles.loginButton}
+          >
+            <Text style={styles.loginButtonText}>Log In or Sign Up</Text>
+          </TouchableOpacity>
         )}
 
         {/* Feedback Form Section */}
@@ -214,18 +222,6 @@ export default function AccountScreen() {
         </View>
         <Text style={styles.versionText}>Version 1.0.0</Text>
       </View>
-
-      {/* Login button for unauthenticated users */}
-      {!isAuthenticated && (
-        <View style={[styles.bottomSection, { paddingBottom: insets.bottom + SPACING.md }]}>
-          <TouchableOpacity
-            onPress={() => router.push('/login')}
-            style={styles.loginButton}
-          >
-            <Text style={styles.loginButtonText}>Log In or Sign Up</Text>
-          </TouchableOpacity>
-        </View>
-      )}
     </View>
   );
 }
@@ -235,6 +231,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
     paddingHorizontal: SPACING.pageHorizontal,
+  } as ViewStyle,
+  scrollView: {
+    marginTop: SPACING.xl,
   } as ViewStyle,
   authStatusContainer: {
     flexDirection: 'row',
