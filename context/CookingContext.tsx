@@ -68,8 +68,11 @@ const CookingContext = createContext<CookingContextType | null>(null);
 
 // Reducer
 function cookingReducer(state: CookingState, action: CookingAction): CookingState {
-  console.log('[CookingContext] 🔄 Reducer action:', action.type, action.payload);
-  console.log('[CookingContext] 📊 Current state before action:', {
+  console.error('[CookingContext] *** REDUCER ENTRY POINT ***'); // ADD THIS LINE FIRST
+  console.error('[CookingContext] State at reducer entry:', JSON.stringify(state)); // ADD THIS
+  console.error('[CookingContext] Action at reducer entry:', JSON.stringify(action)); // ADD THIS
+  console.error('[CookingContext] 🔄 Reducer action:', action.type, action.payload);
+  console.error('[CookingContext] 📊 Current state before action:', {
     activeRecipesCount: state.activeRecipes.length,
     activeRecipeId: state.activeRecipeId,
     sessionStartTime: state.sessionStartTime,
@@ -79,7 +82,7 @@ function cookingReducer(state: CookingState, action: CookingAction): CookingStat
   switch (action.type) {
     case 'INITIALIZE_SESSIONS': {
       try {
-        console.log('[CookingContext] 🚀 Initializing all cooking sessions with eager loading:', {
+        console.error('[CookingContext] 🚀 Initializing all cooking sessions with eager loading:', {
           recipesCount: action.payload.recipes.length,
           activeRecipeId: action.payload.activeRecipeId,
           recipeIds: action.payload.recipes.map(r => r.id)
@@ -89,7 +92,7 @@ function cookingReducer(state: CookingState, action: CookingAction): CookingStat
           try {
             const recipeId = String(recipe.id);
             
-            console.log('[CookingContext] 📋 Creating session for recipe:', {
+            console.error('[CookingContext] 📋 Creating session for recipe:', {
               recipeId,
               title: recipe.title,
               hasInstructions: !!recipe.instructions,
@@ -120,7 +123,7 @@ function cookingReducer(state: CookingState, action: CookingAction): CookingStat
           sessionStartTime: Date.now(),
         };
         
-        console.log('[CookingContext] ✅ All sessions initialized:', {
+        console.error('[CookingContext] ✅ All sessions initialized:', {
           activeRecipesCount: newState.activeRecipes.length,
           activeRecipeId: newState.activeRecipeId,
           sessionStartTime: newState.sessionStartTime
@@ -147,7 +150,7 @@ function cookingReducer(state: CookingState, action: CookingAction): CookingStat
       const positionDifference = Math.abs((currentRecipe?.scrollPosition || 0) - action.payload.position);
       
       if (positionDifference > 20) { // Only log if position changed by more than 20px
-        console.log('[CookingContext] 📍 Setting scroll position:', {
+        console.error('[CookingContext] 📍 Setting scroll position:', {
           recipeId: action.payload.recipeId,
           position: action.payload.position,
           previousPosition: currentRecipe?.scrollPosition || 0,
@@ -165,10 +168,10 @@ function cookingReducer(state: CookingState, action: CookingAction): CookingStat
     }
 
     case 'SWITCH_RECIPE': {
-      console.log('[CookingContext] 🔀 Switching to recipe:', action.payload.recipeId);
+      console.error('[CookingContext] 🔀 Switching to recipe:', action.payload.recipeId);
       
       if (!state.activeRecipes.some(r => r.recipeId === action.payload.recipeId)) {
-        console.warn('[CookingContext] ⚠️ Cannot switch to recipe - not found in active recipes:', action.payload.recipeId);
+        console.error('[CookingContext] ⚠️ Cannot switch to recipe - not found in active recipes:', action.payload.recipeId);
         return state;
       }
       
@@ -177,12 +180,12 @@ function cookingReducer(state: CookingState, action: CookingAction): CookingStat
         activeRecipeId: action.payload.recipeId,
       };
       
-      console.log('[CookingContext] ✅ Switched to recipe:', action.payload.recipeId);
+      console.error('[CookingContext] ✅ Switched to recipe:', action.payload.recipeId);
       return newState;
     }
 
     case 'END_SESSION': {
-      console.log('[CookingContext] 🛑 Ending session for recipe:', action.payload.recipeId);
+      console.error('[CookingContext] 🛑 Ending session for recipe:', action.payload.recipeId);
       
       const updatedRecipes = state.activeRecipes.filter(
         recipe => recipe.recipeId !== action.payload.recipeId
@@ -194,7 +197,7 @@ function cookingReducer(state: CookingState, action: CookingAction): CookingStat
         activeRecipeId: updatedRecipes.length > 0 ? updatedRecipes[0].recipeId : null,
       };
       
-      console.log('[CookingContext] ✅ Session ended:', {
+      console.error('[CookingContext] ✅ Session ended:', {
         endedRecipeId: action.payload.recipeId,
         remainingRecipesCount: newState.activeRecipes.length,
         newActiveRecipeId: newState.activeRecipeId
@@ -204,7 +207,7 @@ function cookingReducer(state: CookingState, action: CookingAction): CookingStat
     }
 
     case 'RESTORE_STATE': {
-      console.log('[CookingContext] 🔄 Restoring state from storage:', {
+      console.error('[CookingContext] 🔄 Restoring state from storage:', {
         activeRecipesCount: action.payload.activeRecipes.length,
         activeRecipeId: action.payload.activeRecipeId,
         sessionStartTime: action.payload.sessionStartTime
@@ -214,7 +217,7 @@ function cookingReducer(state: CookingState, action: CookingAction): CookingStat
     }
 
     case 'COMPLETE_STEP': {
-      console.log('[CookingContext] ✅ Completing step:', {
+      console.error('[CookingContext] ✅ Completing step:', {
         recipeId: action.payload.recipeId,
         stepId: action.payload.stepId,
       });
@@ -235,7 +238,7 @@ function cookingReducer(state: CookingState, action: CookingAction): CookingStat
     }
 
     case 'UNCOMPLETE_STEP': {
-      console.log('[CookingContext] ❌ Uncompleting step:', {
+      console.error('[CookingContext] ❌ Uncompleting step:', {
         recipeId: action.payload.recipeId,
         stepId: action.payload.stepId,
       });
@@ -254,7 +257,7 @@ function cookingReducer(state: CookingState, action: CookingAction): CookingStat
     }
 
     default:
-      console.log('[CookingContext] ❓ Unknown action type:', action.type);
+      console.error('[CookingContext] ❓ Unknown action type:', action.type);
       return state;
   }
 }
@@ -264,6 +267,12 @@ function cookingReducer(state: CookingState, action: CookingAction): CookingStat
 // Provider Component
 export function CookingProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(cookingReducer, initialState);
+  
+  // 💥 ADDED LOGGING POINT: Check typeof dispatch right after useReducer
+  if (process.env.NODE_ENV === 'production') {
+    console.error('[CookingContext] 🔍 typeof dispatch immediately after useReducer:', typeof dispatch);
+  }
+  
   const { session } = useAuth();
 
   // Load state from storage on mount with recovery logic
@@ -433,10 +442,22 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
 
   // Use useMemo to prevent tree-shaking of functions in production builds
   const contextValue = useMemo(() => {
+    // 💥 LOGGING POINT 1: Check dispatch type right before defining initializeSessions
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[CookingContext] 🔍 Production build - preparing contextValue. typeof dispatch (inside useMemo scope):', typeof dispatch);
+    }
+
     // Define initializeSessions directly inside useMemo to make it intrinsically part of the context value
     const initializeSessions = (miseRecipes: any[]) => {
+      console.error('[CookingContext] 🚀 initializeSessions called (inside useMemo). Recipes Count:', miseRecipes.length);
+      
+      // 💥 ADDED LOGGING POINT: Check typeof dispatch right before calling it inside initializeSessions
+      if (process.env.NODE_ENV === 'production') {
+        console.error('[CookingContext] 🔍 initializeSessions: typeof dispatch before calling:', typeof dispatch);
+      }
+      
       console.time(`[CookingContext] ⏱️ initializeSessions`);
-      console.log('[CookingContext] 🚀 Initializing cooking sessions with mise recipes:', {
+      console.error('[CookingContext] 🚀 Initializing cooking sessions with mise recipes:', {
         recipesCount: miseRecipes.length,
         recipeIds: miseRecipes.map(mr => mr.id),
       });
@@ -467,7 +488,7 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
               miseRecipeId: miseRecipe.id, // Keep mise recipe ID for reference
             };
 
-            console.log('[CookingContext] 📋 Processed mise recipe:', {
+            console.error('[CookingContext] 📋 Processed mise recipe:', {
               miseRecipeId: miseRecipe.id,
               recipeId: recipe.id,
               title: recipe.title,
@@ -486,7 +507,7 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
           }
         }).filter(Boolean) as CombinedParsedRecipe[];
 
-        console.log('[CookingContext] 📊 Processed recipes count:', recipes.length);
+        console.error('[CookingContext] 📊 Processed recipes count:', recipes.length);
 
         // Initialize all sessions with full recipe data
         try {
@@ -497,15 +518,13 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
               activeRecipeId: recipes[0]?.id ? String(recipes[0].id) : undefined // Set first recipe as active
             } 
           });
-          console.log('[CookingContext] ✅ Dispatch completed successfully');
-        } catch (dispatchError) {
-          console.error('[CookingContext] 💥 Error during dispatch:', dispatchError);
-          console.error('[CookingContext] 💥 Dispatch error type:', typeof dispatchError);
-          console.error('[CookingContext] 💥 Dispatch error message:', dispatchError instanceof Error ? dispatchError.message : String(dispatchError));
-          console.error('[CookingContext] 💥 Dispatch error stack:', dispatchError instanceof Error ? dispatchError.stack : 'No stack trace');
-          console.error('[CookingContext] 💥 Dispatch error constructor:', dispatchError?.constructor?.name);
-          console.error('[CookingContext] 💥 Full dispatch error object:', JSON.stringify(dispatchError, Object.getOwnPropertyNames(dispatchError), 2));
-          throw dispatchError; // Re-throw to be caught by the calling function
+          console.error('[CookingContext] ✅ Dispatch completed successfully');
+        } catch (dispatchError: any) { // Ensure error is typed to 'any' for direct property access
+          console.error('[CookingContext] ❌ Error during initializeSessions dispatch:', dispatchError);
+          console.error('[CookingContext] ❌ Error message (from dispatch):', dispatchError.message);
+          console.error('[CookingContext] ❌ Error stack (from dispatch):', dispatchError.stack);
+          // Re-throw if it's a critical error you don't want to swallow
+          throw dispatchError;
         }
         
         console.timeEnd(`[CookingContext] ⏱️ initializeSessions`);
@@ -521,9 +540,31 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    // Force reference to initializeSessions to prevent tree-shaking
+    // 💥 CRITICAL: Ensure this function is not tree-shaken - use void operator
+    void initializeSessions; // This line is crucial for preventing tree-shaking
+    
+    // 💥 ADDED VOID DISPATCH: Explicitly hint to the bundler that dispatch is used
+    void dispatch; // New line
+
+    // 💥 LOGGING POINT 2: Check initializeSessions type as it's being returned in contextValue
     if (process.env.NODE_ENV === 'production') {
-      console.log('[CookingContext] 🔍 Production build - initializeSessions type:', typeof initializeSessions);
+      console.error('[CookingContext] 🔍 Production build - contextValue being formed. typeof initializeSessions (inside useMemo):', typeof initializeSessions);
+      console.error('[CookingContext] 🔍 Production build - contextValue keys:', Object.keys({
+        state,
+        initializeSessions,
+        endSession,
+        endAllSessions,
+        switchRecipe,
+        completeStep,
+        uncompleteStep,
+        startTimer,
+        pauseTimer,
+        resumeTimer,
+        endTimer,
+        setScrollPosition,
+        getCurrentScrollPosition,
+        hasResumableSession,
+      }));
     }
     
     // Explicitly construct the context value to ensure all functions are included
@@ -546,13 +587,14 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
     
     // Additional safety check in production
     if (process.env.NODE_ENV === 'production') {
-      console.log('[CookingContext] 🔍 Production build - context value keys:', Object.keys(value));
-      console.log('[CookingContext] 🔍 Production build - initializeSessions in value:', typeof value.initializeSessions);
+      console.error('[CookingContext] 🔍 Production build - context value keys:', Object.keys(value));
+      console.error('[CookingContext] 🔍 Production build - initializeSessions in value:', typeof value.initializeSessions);
     }
     
     return value;
   }, [
     state,
+    dispatch, // Crucial dependency for initializeSessions defined within
     endSession,
     endAllSessions,
     switchRecipe,

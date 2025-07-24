@@ -47,6 +47,20 @@ export default function CookScreen() {
   const { showError } = useErrorModal();
   const { state, initializeSessions, endSession, endAllSessions, switchRecipe, setScrollPosition, getCurrentScrollPosition, hasResumableSession, completeStep, uncompleteStep } = useCooking();
   
+  // 💥 LOGGING POINT 3: Check initializeSessions type immediately after destructuring from useCooking
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[CookScreen] 🔍 useCooking hook accessed. typeof initializeSessions:', typeof initializeSessions);
+      if (typeof initializeSessions !== 'function') {
+        console.error('[CookScreen] 💥 CRITICAL: initializeSessions is NOT a function after useCooking!');
+        console.error('[CookScreen] 💥 Available keys from useCooking:', Object.keys(useCooking()));
+        console.error('[CookScreen] 💥 Full useCooking result:', useCooking());
+      } else {
+        console.error('[CookScreen] ✅ initializeSessions is properly defined as function');
+      }
+    }
+  }, [initializeSessions]); // Dependency on initializeSessions itself
+  
   const [isLoading, setIsLoading] = useState(true);
   const [recipes, setRecipes] = useState<CombinedParsedRecipe[]>([]);
   const appState = useRef(AppState.currentState);
@@ -210,16 +224,18 @@ export default function CookScreen() {
         if (miseRecipes.length > 0) {
           console.log('[CookScreen] 🚀 Initializing cooking sessions for', miseRecipes.length, 'recipes with fresh data');
           
-          // Add robust error handling and logging for initializeSessions call
-          console.log('[CookScreen] 🔍 Debug: typeof initializeSessions =', typeof initializeSessions);
-          console.log('[CookScreen] 🔍 Debug: initializeSessions is function?', typeof initializeSessions === 'function');
-          console.log('[CookScreen] 🔍 Debug: initializeSessions.toString():', initializeSessions?.toString?.()?.substring(0, 100) + '...');
+          // 💥 LOGGING POINT 4: Log right before calling initializeSessions
+          if (process.env.NODE_ENV === 'production') {
+            console.error('[CookScreen] 🔍 Before calling initializeSessions. typeof initializeSessions:', typeof initializeSessions);
+            console.error('[CookScreen] 🔍 initializeSessions is function?', typeof initializeSessions === 'function');
+            console.error('[CookScreen] 🔍 initializeSessions.toString():', initializeSessions?.toString?.()?.substring(0, 100) + '...');
+          }
           
           try {
             // Initialize all sessions at once with full recipe data
             initializeSessions(miseRecipes);
             
-            console.log('[CookScreen] ✅ All cooking sessions initialized with fresh recipe data');
+            console.error('[CookScreen] ✅ All cooking sessions initialized with fresh recipe data');
           } catch (error) {
             console.error('[CookScreen] 💥 TypeError caught in initializeSessions call:', error);
             console.error('[CookScreen] 💥 Error type:', typeof error);
@@ -229,10 +245,10 @@ export default function CookScreen() {
             console.error('[CookScreen] 💥 Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
             
             // Continue without sessions rather than crashing the app
-            console.log('[CookScreen] ⚠️ Continuing without cooking sessions due to initialization error');
+            console.error('[CookScreen] ⚠️ Continuing without cooking sessions due to initialization error');
           }
         } else {
-          console.log('[CookScreen] ❌ No valid recipes found to start cooking sessions');
+          console.error('[CookScreen] ❌ No valid recipes found to start cooking sessions');
         }
       } catch (error) {
         console.error('[CookScreen] 💥 Error loading mise recipes:', error);
@@ -328,14 +344,16 @@ export default function CookScreen() {
           if (miseRecipes.length > 0) {
             console.log('[CookScreen] 🚀 Re-initializing cooking sessions with fresh data');
             
-            // Add robust error handling and logging for initializeSessions call
-            console.log('[CookScreen] 🔍 Debug: typeof initializeSessions =', typeof initializeSessions);
-            console.log('[CookScreen] 🔍 Debug: initializeSessions is function?', typeof initializeSessions === 'function');
-            console.log('[CookScreen] 🔍 Debug: initializeSessions.toString():', initializeSessions?.toString?.()?.substring(0, 100) + '...');
+                      // 💥 LOGGING POINT 5: Log right before calling initializeSessions in useFocusEffect
+          if (process.env.NODE_ENV === 'production') {
+            console.error('[CookScreen] 🔍 Before calling initializeSessions (useFocusEffect). typeof initializeSessions:', typeof initializeSessions);
+            console.error('[CookScreen] 🔍 initializeSessions is function?', typeof initializeSessions === 'function');
+            console.error('[CookScreen] 🔍 initializeSessions.toString():', initializeSessions?.toString?.()?.substring(0, 100) + '...');
+          }
             
             try {
               initializeSessions(miseRecipes);
-              console.log('[CookScreen] ✅ Re-initialized cooking sessions successfully');
+              console.error('[CookScreen] ✅ Re-initialized cooking sessions successfully');
             } catch (error) {
               console.error('[CookScreen] 💥 TypeError caught in initializeSessions call (useFocusEffect):', error);
               console.error('[CookScreen] 💥 Error type:', typeof error);
@@ -345,7 +363,7 @@ export default function CookScreen() {
               console.error('[CookScreen] 💥 Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
               
               // Continue without sessions rather than crashing the app
-              console.log('[CookScreen] ⚠️ Continuing without cooking sessions due to initialization error in useFocusEffect');
+              console.error('[CookScreen] ⚠️ Continuing without cooking sessions due to initialization error in useFocusEffect');
             }
           }
         } catch (error) {
