@@ -64,10 +64,19 @@ export default function AccountScreen() {
       return;
     }
 
+    const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+    if (!backendUrl) {
+      console.error('Missing EXPO_PUBLIC_API_URL environment variable');
+      Alert.alert('Error', 'Server configuration error. Please try again later.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      const response = await fetch('/api/feedback', {
+      console.log('[AccountScreen] Submitting feedback to:', `${backendUrl}/api/feedback`);
+      
+      const response = await fetch(`${backendUrl}/api/feedback`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -79,14 +88,20 @@ export default function AccountScreen() {
         }),
       });
 
+      console.log('[AccountScreen] Feedback response status:', response.status);
+
       if (response.ok) {
+        const responseData = await response.json();
+        console.log('[AccountScreen] Feedback submitted successfully:', responseData);
         Alert.alert('Success', 'Thank you for your feedback!');
         setFeedbackMessage('');
       } else {
-        throw new Error('Failed to submit feedback');
+        const errorData = await response.json().catch(() => ({}));
+        console.error('[AccountScreen] Feedback submission failed:', errorData);
+        throw new Error(errorData.error || 'Failed to submit feedback');
       }
     } catch (error) {
-      console.error('Error submitting feedback:', error);
+      console.error('[AccountScreen] Error submitting feedback:', error);
       Alert.alert('Error', 'Failed to submit feedback. Please try again.');
     } finally {
       setIsSubmitting(false);
