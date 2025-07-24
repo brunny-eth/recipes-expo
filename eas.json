@@ -14,7 +14,8 @@
         "EXPO_DEBUG": "1"
       },
       "ios": {
-        "simulator": false
+        "simulator": false,
+        "sourceMaps": true
       }
     }
   },

@@ -485,18 +485,33 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
 
         // Initialize all sessions with full recipe data
         try {
-          const actionPayload = { recipes, activeRecipeId: recipes[0]?.id ? String(recipes[0].id) : undefined }; // Ensure actionPayload is defined here
+          const actionPayload = { recipes, activeRecipeId: recipes[0]?.id ? String(recipes[0].id) : undefined };
+          const actionToDispatch: CookingAction = {
+            type: 'INITIALIZE_SESSIONS',
+            payload: actionPayload
+          };
 
-          // REMOVE PREVIOUS JSON.stringify(actionPayload) log here.
-          console.error('[CookingContext] 🔍 dispatching action type:', 'INITIALIZE_SESSIONS'); // ADD THIS
-          console.error('[CookingContext] 🔍 dispatching action payload.recipes length:', actionPayload.recipes?.length || 'N/A'); // ADD THIS
-          console.error('[CookingContext] 🔍 dispatching action payload.activeRecipeId:', actionPayload.activeRecipeId); // ADD THIS
+          console.error('[CookingContext] 🔍 dispatching action type:', actionToDispatch.type);
+          console.error('[CookingContext] 🔍 dispatching action payload.recipes length:', actionToDispatch.payload?.recipes?.length || 'N/A');
+          console.error('[CookingContext] 🔍 dispatching action payload.activeRecipeId:', actionToDispatch.payload?.activeRecipeId);
 
-          dispatch({ 
-            type: 'INITIALIZE_SESSIONS', 
-            payload: actionPayload 
+          // Add a log for the raw action object, but with caution to avoid silent failures
+          // Try logging pieces of the object if stringify fails.
+          console.error('[CookingContext] 🔍 Action object before dispatch (type and payload type):', {
+              type: actionToDispatch.type,
+              payloadType: typeof actionToDispatch.payload,
+              payloadKeys: Object.keys(actionToDispatch.payload || {}) // Log keys of payload
           });
-          console.error('[CookingContext] ✅ Dispatch call completed (before reducer entry log)'); // ADD THIS NEW LOG
+
+          // Attempt stringify again, but wrap in try/catch to ensure it doesn't block
+          try {
+              console.error('[CookingContext] 🔍 Action object before dispatch (JSON.stringify - attempt):', JSON.stringify(actionToDispatch).substring(0, 500) + '...');
+          } catch (e: any) {
+              console.error('[CookingContext] ⚠️ Failed to stringify action object:', e.message);
+          }
+
+          dispatch(actionToDispatch);
+          console.error('[CookingContext] ✅ Dispatch call completed (before reducer entry log)'); // This log still won't appear, but keep it for consistency
         } catch (dispatchError: any) { // Ensure error is typed to 'any' for direct property access
           console.error('[CookingContext] ❌ Error during initializeSessions dispatch:', dispatchError);
           console.error('[CookingContext] ❌ Error message (from dispatch):', dispatchError.message);
