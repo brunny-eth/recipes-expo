@@ -83,67 +83,23 @@ function cookingReducer(state: CookingState, action: CookingAction): CookingStat
 
   switch (action.type) {
     case 'INITIALIZE_SESSIONS': {
-      try {
-        console.error('[CookingContext] 🚀 Initializing all cooking sessions with eager loading:', {
-          recipesCount: action.payload.recipes.length,
-          activeRecipeId: action.payload.activeRecipeId,
-          recipeIds: action.payload.recipes.map(r => r.id)
-        });
-        
-        const newRecipes: RecipeSession[] = action.payload.recipes.map(recipe => {
-          try {
-            const recipeId = String(recipe.id);
-            
-            console.error('[CookingContext] 📋 Creating session for recipe:', {
-              recipeId,
-              title: recipe.title,
-              hasInstructions: !!recipe.instructions,
-              instructionsCount: recipe.instructions?.length || 0,
-              hasIngredientGroups: !!recipe.ingredientGroups,
-              ingredientGroupsCount: recipe.ingredientGroups?.length || 0,
-            });
-            
-            return {
-              recipeId,
-              recipe, // Full recipe data immediately available
-              completedSteps: [],
-              activeTimers: [],
-              scrollPosition: 0,
-              isLoading: false, // No loading needed - data is already here
-            };
-          } catch (error) {
-            console.error('[CookingContext] 💥 Error creating session for recipe:', recipe.id, error);
-            console.error('[CookingContext] 💥 Recipe data:', JSON.stringify(recipe, null, 2));
-            throw error;
-          }
-        });
-        
-        const newState = {
-          ...state,
-          activeRecipes: newRecipes,
-          activeRecipeId: action.payload.activeRecipeId || newRecipes[0]?.recipeId || null,
-          sessionStartTime: Date.now(),
-        };
-        
-        console.error('[CookingContext] ✅ All sessions initialized:', {
-          activeRecipesCount: newState.activeRecipes.length,
-          activeRecipeId: newState.activeRecipeId,
-          sessionStartTime: newState.sessionStartTime
-        });
-        
-        return newState;
-      } catch (error) {
-        console.error('[CookingContext] 💥 Error in INITIALIZE_SESSIONS reducer:', error);
-        console.error('[CookingContext] 💥 Error type:', typeof error);
-        console.error('[CookingContext] 💥 Error message:', error instanceof Error ? error.message : String(error));
-        console.error('[CookingContext] 💥 Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-        console.error('[CookingContext] 💥 Error constructor:', error?.constructor?.name);
-        console.error('[CookingContext] 💥 Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-        
-        // Return current state to prevent app crash, but log the error
-        console.error('[CookingContext] ⚠️ Returning current state due to initialization error');
-        return state;
-      }
+      console.error('[CookingContext] 🚀 Entering INITIALIZE_SESSIONS reducer case. Doing nothing for now.'); // ADD THIS
+      // Return a simple, valid state to ensure no nested logic fails.
+      return {
+        ...state,
+        activeRecipes: action.payload.recipes.map(recipe => ({ // Minimal processing to see if map breaks
+          recipeId: String(recipe.id),
+          recipe,
+          completedSteps: [],
+          activeTimers: [],
+          scrollPosition: 0,
+          isLoading: false,
+        })),
+        activeRecipeId: action.payload.activeRecipeId || null,
+        sessionStartTime: Date.now(),
+      };
+      // Original logic here was: try { ... newRecipes ... } catch { ... }
+      // We are removing the inner try/catch and complex logic for now.
     }
 
     case 'SET_SCROLL_POSITION': {
@@ -538,7 +494,7 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
             type: 'INITIALIZE_SESSIONS', 
             payload: actionPayload 
           });
-          console.error('[CookingContext] ✅ Dispatch completed successfully'); // Keep this existing log
+          console.error('[CookingContext] ✅ Dispatch call completed (before reducer entry log)'); // ADD THIS NEW LOG
         } catch (dispatchError: any) { // Ensure error is typed to 'any' for direct property access
           console.error('[CookingContext] ❌ Error during initializeSessions dispatch:', dispatchError);
           console.error('[CookingContext] ❌ Error message (from dispatch):', dispatchError.message);
