@@ -485,10 +485,12 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
 
         // Initialize all sessions with full recipe data
         try {
-          const actionPayload = { recipes, activeRecipeId: recipes[0]?.id ? String(recipes[0].id) : undefined };
+          // TEMPORARY DEBUG: Simplify payload to isolate issue
+          // Original: const actionPayload = { recipes, activeRecipeId: recipes[0]?.id ? String(recipes[0].id) : undefined };
+          // We are now dispatching a minimal payload to see if the issue is with the data structure.
           const actionToDispatch: CookingAction = {
             type: 'INITIALIZE_SESSIONS',
-            payload: actionPayload
+            payload: { recipes: [], activeRecipeId: undefined } // <--- CHANGE THIS LINE
           };
 
           console.error('[CookingContext] 🔍 dispatching action type:', actionToDispatch.type);
@@ -500,7 +502,8 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
           console.error('[CookingContext] 🔍 Action object before dispatch (type and payload type):', {
               type: actionToDispatch.type,
               payloadType: typeof actionToDispatch.payload,
-              payloadKeys: Object.keys(actionToDispatch.payload || {}) // Log keys of payload
+              payloadKeys: Object.keys(actionToDispatch.payload || {}), // Log keys of payload
+              isMinimalPayload: actionToDispatch.payload?.recipes?.length === 0 // Log if we're using minimal payload
           });
 
           // Attempt stringify again, but wrap in try/catch to ensure it doesn't block
