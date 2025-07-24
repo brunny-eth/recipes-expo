@@ -575,9 +575,9 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
         console.timeEnd(`[CookingContext] ⏱️ initializeSessions`);
         throw error; // Re-throw to be caught by the calling function
       }
-    },
-    [] // Dependencies for useCallback remain empty as dispatchParam is now an argument
-  );
+          },
+      [dispatch] // ADD DISPATCH HERE. This is the key change!
+    );
 
     // 💥 CRITICAL: Ensure this function is not tree-shaken - use void operator
     void initializeSessions; // This line is crucial for preventing tree-shaking
