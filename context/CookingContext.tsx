@@ -246,6 +246,17 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
   if (process.env.NODE_ENV === 'production') {
     console.error('[CookingContext] 🔍 typeof dispatch immediately after useReducer:', typeof dispatch);
   }
+
+  // ADD THESE NEW LOGS:
+  useEffect(() => {
+    console.error(`[CookingContext] ✅ useReducer initialized successfully. Effect fired.`);
+    console.error(`[CookingContext] 🎯 cookingReducer function reference from effect: ${cookingReducer.toString()}`);
+    console.error(`[CookingContext] 🔍 typeof dispatch immediately after useReducer from effect: ${typeof dispatch}`);
+    console.error(`[CookingContext] 🔍 dispatch object from effect (should be a function):`, dispatch);
+    console.error(`[CookingContext] 🔍 state object from effect (initial state):`, state);
+    console.error(`[CookingContext] 🔍 state.activeRecipes length from effect: ${state.activeRecipes?.length}`); // Check for deep property access
+
+  }, [dispatch, state]); // Add dispatch and state to dependencies
   
   const { session } = useAuth();
 
@@ -485,36 +496,61 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
 
         // Initialize all sessions with full recipe data
         try {
-          // TEMPORARY DEBUG: Simplify payload to isolate issue
-          // Original: const actionPayload = { recipes, activeRecipeId: recipes[0]?.id ? String(recipes[0].id) : undefined };
-          // We are now dispatching a minimal payload to see if the issue is with the data structure.
+          // REVERTED: Back to original payload for comprehensive debugging
+          const actionPayload = { recipes, activeRecipeId: recipes[0]?.id ? String(recipes[0].id) : undefined };
           const actionToDispatch: CookingAction = {
             type: 'INITIALIZE_SESSIONS',
-            payload: { recipes: [], activeRecipeId: undefined } // <--- CHANGE THIS LINE
+            payload: actionPayload
           };
 
           console.error('[CookingContext] 🔍 dispatching action type:', actionToDispatch.type);
           console.error('[CookingContext] 🔍 dispatching action payload.recipes length:', actionToDispatch.payload?.recipes?.length || 'N/A');
           console.error('[CookingContext] 🔍 dispatching action payload.activeRecipeId:', actionToDispatch.payload?.activeRecipeId);
 
-          // Add a log for the raw action object, but with caution to avoid silent failures
-          // Try logging pieces of the object if stringify fails.
-          console.error('[CookingContext] 🔍 Action object before dispatch (type and payload type):', {
-              type: actionToDispatch.type,
-              payloadType: typeof actionToDispatch.payload,
-              payloadKeys: Object.keys(actionToDispatch.payload || {}), // Log keys of payload
-              isMinimalPayload: actionToDispatch.payload?.recipes?.length === 0 // Log if we're using minimal payload
-          });
-
-          // Attempt stringify again, but wrap in try/catch to ensure it doesn't block
+          // Try to stringify actionPayload with a replacer to handle circular refs/complex objects if any
           try {
-              console.error('[CookingContext] 🔍 Action object before dispatch (JSON.stringify - attempt):', JSON.stringify(actionToDispatch).substring(0, 500) + '...');
-          } catch (e: any) {
-              console.error('[CookingContext] ⚠️ Failed to stringify action object:', e.message);
+            console.error('[CookingContext] 🔍 Action object before dispatch (JSON.stringify - attempt):',
+              JSON.stringify({
+                type: 'INITIALIZE_SESSIONS',
+                payload: {
+                  recipes: actionToDispatch.payload.recipes.map(r => ({ id: r.id, title: r.title })), // Simplify recipes for logging
+                  activeRecipeId: actionToDispatch.payload.activeRecipeId
+                }
+              }, (key, value) => {
+                // A simple replacer to handle potential complex objects or circular references
+                if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                  const simpleObject: { [k: string]: any } = {};
+                  for (const prop in value) {
+                    if (typeof value[prop] !== 'function' && typeof value[prop] !== 'object') {
+                      simpleObject[prop] = value[prop];
+                    }
+                  }
+                  return simpleObject;
+                }
+                return value;
+              })
+            );
+          } catch (e) {
+            console.error('[CookingContext] 💥 Error stringifying actionPayload before dispatch:', e);
           }
 
-          dispatch(actionToDispatch);
-          console.error('[CookingContext] ✅ Dispatch call completed (before reducer entry log)'); // This log still won't appear, but keep it for consistency
+          console.error('[CookingContext] 🔍 Action object before dispatch (type and payload type):', {
+            type: actionToDispatch.type,
+            payloadType: typeof actionToDispatch.payload,
+            isMinimalPayload: Object.keys(actionToDispatch.payload).length === 0,
+            payloadKeys: Object.keys(actionToDispatch.payload),
+          });
+
+          // ADD THIS LOG IMMEDIATELY BEFORE DISPATCH
+          console.error(`[CookingContext] 🔍 Just before dispatch call. typeof dispatch: ${typeof dispatch}`);
+
+          try {
+            dispatch(actionToDispatch);
+            console.error('[CookingContext] ✅ Dispatch call completed (before reducer entry log)');
+          } catch (error: any) {
+            console.error('[CookingContext] 💥 Error during dispatch call:', error.message);
+            console.error('[CookingContext] 💥 Error stack during dispatch call:', error.stack);
+          }
         } catch (dispatchError: any) { // Ensure error is typed to 'any' for direct property access
           console.error('[CookingContext] ❌ Error during initializeSessions dispatch:', dispatchError);
           console.error('[CookingContext] ❌ Error message (from dispatch):', dispatchError.message);
