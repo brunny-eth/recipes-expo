@@ -43,6 +43,8 @@ import {
 import { abbreviateUnit } from '@/utils/format';
 
 export default function CookScreen() {
+  console.error('[CookScreen] 🧨 FRESH BUILD MARKER vC3 - added session invalidation on recipe changes');
+  
   const router = useRouter();
   const params = useLocalSearchParams();
   const { session } = useAuth();

@@ -73,6 +73,7 @@ type CookingContextType = {
   setScrollPosition: (recipeId: string, position: number) => void;
   getCurrentScrollPosition: (recipeId: string) => number;
   hasResumableSession: () => boolean;
+  invalidateSession: () => void;
 };
 
 const initialState: CookingState = {
@@ -179,7 +180,11 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
       try {
         // Only save if there are active recipes
         if (activeRecipes.length > 0) {
-          const stateToSave = JSON.stringify({ activeRecipes, activeRecipeId, sessionStartTime });
+          const stateToSave = JSON.stringify({ 
+            activeRecipes, 
+            activeRecipeId, 
+            sessionStartTime
+          });
           console.error('[CookingContext] 📤 Saving state to AsyncStorage, size:', stateToSave.length, 'characters');
           await AsyncStorage.setItem('meez.cookingSession', stateToSave);
           console.error('[CookingContext] ✅ State saved successfully');
@@ -536,8 +541,41 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
   }, [activeRecipes]);
 
   const hasResumableSession = useCallback((): boolean => {
-    return activeRecipes.length > 0;
-  }, [activeRecipes]);
+    // Check if we have active recipes
+    if (activeRecipes.length === 0) {
+      return false;
+    }
+
+    // Check if session is not too old (24 hour expiration)
+    if (!sessionStartTime) {
+      console.warn('[CookingContext] No sessionStartTime found - session not resumable');
+      return false;
+    }
+
+    const now = Date.now();
+    const sessionAge = now - sessionStartTime;
+    const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+    
+    if (sessionAge > maxAge) {
+      console.log('[CookingContext] Session expired (age:', Math.round(sessionAge / (60 * 60 * 1000)), 'hours) - not resumable');
+      return false;
+    }
+
+    console.log('[CookingContext] Session is resumable (age:', Math.round(sessionAge / (60 * 60 * 1000)), 'hours)');
+    return true;
+  }, [activeRecipes, sessionStartTime]);
+
+  const invalidateSession = useCallback(() => {
+    console.log('[CookingContext] 🗑️ Invalidating cooking session - forcing fresh data fetch');
+    setActiveRecipes([]);
+    setActiveRecipeId(null);
+    setSessionStartTime(undefined);
+    
+    // Also clear AsyncStorage
+    AsyncStorage.removeItem('meez.cookingSession').catch(error => {
+      console.warn('[CookingContext] Warning: Failed to clear AsyncStorage during invalidation:', error);
+    });
+  }, []);
 
   // Construct the state object for the context value
   const state = useMemo(() => ({
@@ -563,6 +601,7 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
       setScrollPosition,
       getCurrentScrollPosition,
       hasResumableSession,
+      invalidateSession,
     }),
     [
       state,
@@ -579,6 +618,7 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
       setScrollPosition,
       getCurrentScrollPosition,
       hasResumableSession,
+      invalidateSession,
     ]
   );
 

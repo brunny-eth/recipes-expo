@@ -260,8 +260,20 @@ const filterHouseholdStaples = (
   return categories.map(category => ({
     ...category,
     items: category.items.filter(item => {
+      // DEFENSIVE: Check if item and item.name exist and are strings
+      if (!item || typeof item.name !== 'string') {
+        console.warn('[MiseScreen] Invalid item in filterHouseholdStaples:', item);
+        return true; // Keep the item if we can't validate it
+      }
+      
       const itemName = item.name.toLowerCase().trim();
       const isStaple = selectedStaples.some(staple => {
+        // DEFENSIVE: Check if staple exists and is a string
+        if (!staple || typeof staple !== 'string') {
+          console.warn('[MiseScreen] Invalid staple in filterHouseholdStaples:', staple);
+          return false; // Skip this staple comparison
+        }
+        
         const stapleName = staple.toLowerCase().trim();
         
         // Exact matches or very close matches
@@ -304,11 +316,13 @@ const filterHouseholdStaples = (
 };
 
 export default function MiseScreen() {
+  console.error('[MiseScreen] 🧨 FRESH BUILD MARKER vB2 - added cooking session invalidation');
+  
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { session } = useAuth();
   const { showError } = useErrorModal();
-  const { hasResumableSession } = useCooking();
+  const { hasResumableSession, state: cookingState, invalidateSession } = useCooking();
   const [miseRecipes, setMiseRecipes] = useState<MiseRecipe[]>([]);
   const [groceryList, setGroceryList] = useState<GroceryCategory[]>([]);
   const [manualItems, setManualItems] = useState<ManualGroceryItem[]>([]);
@@ -527,6 +541,24 @@ export default function MiseScreen() {
 
       setMiseRecipes(fetchedRecipes);
       setGroceryList(mergedGroceryList);
+
+      // Check if cooking session needs invalidation due to recipe changes
+      if (cookingState.activeRecipes.length > 0) {
+        const currentRecipeIds = cookingState.activeRecipes.map(r => r.recipeId).sort();
+        const freshRecipeIds = fetchedRecipes.map((r: any) => String(r.id)).sort();
+        
+        const recipesChanged = currentRecipeIds.length !== freshRecipeIds.length ||
+          !currentRecipeIds.every((id, index) => id === freshRecipeIds[index]);
+        
+        if (recipesChanged) {
+          console.log('[MiseScreen] 🔄 Recipes changed - invalidating cooking session');
+          console.log('[MiseScreen] 📊 Current cooking recipes:', currentRecipeIds);
+          console.log('[MiseScreen] 📊 Fresh mise recipes:', freshRecipeIds);
+          invalidateSession();
+        } else {
+          console.log('[MiseScreen] ✅ Recipes unchanged - keeping cooking session');
+        }
+      }
 
       // Cache removed - always fetch fresh data for consistency
 
