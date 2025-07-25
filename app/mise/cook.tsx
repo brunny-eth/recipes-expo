@@ -446,9 +446,34 @@ export default function CookScreen() {
       // --- END CRITICAL NEW LOGGING ---
 
       // Save current scroll position before switching
-      // The crash is likely happening here if state or scrollViewRef.current are undefined
       if (state.activeRecipeId && scrollViewRef.current) {
-        const currentScrollY = 0; // TODO: Get actual scroll position
+        // --- NEW GRANULAR LOGGING HERE ---
+        console.error('[CookScreen] 💥💥 CRASH DEBUG: Inside if block. scrollViewRef.current is present.');
+        console.error('[CookScreen] 💥💥 CRASH DEBUG: typeof scrollViewRef.current.scrollTo:', typeof scrollViewRef.current.scrollTo);
+        console.error('[CookScreen] 💥💥 CRASH DEBUG: typeof scrollViewRef.current.props.onScroll:', typeof scrollViewRef.current.props.onScroll);
+        console.error('[CookScreen] 💥💥 CRASH DEBUG: scrollViewRef.current keys:', Object.keys(scrollViewRef.current || {}));
+        // --- END NEW GRANULAR LOGGING ---
+
+        // Get current scroll position using the getCurrentScrollPosition function from useCooking
+        let currentScrollY = 0;
+        try {
+          console.error('[CookScreen] 💥💥 CRASH DEBUG: About to call getCurrentScrollPosition');
+          console.error('[CookScreen] 💥💥 CRASH DEBUG: typeof getCurrentScrollPosition:', typeof getCurrentScrollPosition);
+          
+          if (typeof getCurrentScrollPosition === 'function') {
+            currentScrollY = getCurrentScrollPosition(state.activeRecipeId);
+            console.error('[CookScreen] 💥💥 CRASH DEBUG: getCurrentScrollPosition called successfully, result:', currentScrollY);
+          } else {
+            console.error('[CookScreen] 💥💥 CRASH DEBUG: getCurrentScrollPosition is not a function, using 0');
+            currentScrollY = 0;
+          }
+        } catch (getScrollError: any) {
+          console.error('[CookScreen] 💥💥 CRASH DEBUG: Error calling getCurrentScrollPosition:', getScrollError);
+          console.error('[CookScreen] 💥💥 CRASH DEBUG: getScrollError stack:', getScrollError.stack);
+          currentScrollY = 0; // Fallback to 0
+        }
+        
+        console.error('[CookScreen] 💥💥 CRASH DEBUG: currentScrollY evaluated to:', currentScrollY);
         
         try {
           if (typeof setScrollPosition === 'function') {
