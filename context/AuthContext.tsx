@@ -204,39 +204,38 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           console.log('[Auth] isLoading value is the SAME, skipping setIsLoading.');
         }
 
-        setTimeout(async () => {
-          if (newSession && event === 'SIGNED_IN') {
-            if (__DEV__) {
-              console.log(
-                `[Auth] Rehydrated session for user: ${newSession.user.id}`,
-              );
-            }
-            await new Promise((res) => setTimeout(res, 300));
-
-            if (!isLoadingFreeUsage) {
-              if (isFirstLogin(newSession)) {
-                if (localHasUsedFreeRecipe !== null) {
-                  const { error: updateError } = await supabase.auth.updateUser(
-                    {
-                      data: {
-                        has_used_free_recipe: localHasUsedFreeRecipe,
-                        first_login_at: new Date().toISOString(),
-                      },
+        // Handle first login and sign out immediately after state updates
+        if (newSession && event === 'SIGNED_IN') {
+          if (__DEV__) {
+            console.log(
+              `[Auth] Rehydrated session for user: ${newSession.user.id}`,
+            );
+          }
+          
+          // Check if this is first login and update metadata if needed
+          if (!isLoadingFreeUsage) {
+            if (isFirstLogin(newSession)) {
+              if (localHasUsedFreeRecipe !== null) {
+                const { error: updateError } = await supabase.auth.updateUser(
+                  {
+                    data: {
+                      has_used_free_recipe: localHasUsedFreeRecipe,
+                      first_login_at: new Date().toISOString(),
                     },
+                  },
+                );
+                if (updateError) {
+                  console.error(
+                    '[Auth] Error updating user metadata on first login:',
+                    updateError,
                   );
-                  if (updateError) {
-                    console.error(
-                      '[Auth] Error updating user metadata on first login (deferred):',
-                      updateError,
-                    );
-                  }
                 }
               }
             }
-          } else if (!newSession && event === 'SIGNED_OUT') {
-            resetFreeRecipeUsageRef.current();
           }
-        }, 0);
+        } else if (!newSession && event === 'SIGNED_OUT') {
+          resetFreeRecipeUsageRef.current();
+        }
       },
     );
 

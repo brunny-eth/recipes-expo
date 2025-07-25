@@ -35,6 +35,7 @@ export default function AccountScreen() {
   // Component Mount/Unmount logging
   useEffect(() => {
     console.log('[AccountScreen] Component DID MOUNT');
+    console.log('[AccountScreen] Initial auth state:', { isAuthenticated, hasSession: !!session });
     return () => {
       console.log('[AccountScreen] Component WILL UNMOUNT');
     };
@@ -45,13 +46,19 @@ export default function AccountScreen() {
     useCallback(() => {
       console.log('[AccountScreen] 🎯 useFocusEffect triggered');
       console.log('[AccountScreen] 👁️ Screen focused');
+      console.log('[AccountScreen] Auth state:', { isAuthenticated, hasSession: !!session });
 
       return () => {
         console.log('[AccountScreen] 🌀 useFocusEffect cleanup');
         console.log('[AccountScreen] 🌀 Screen is blurring (not necessarily unmounting)');
       };
-    }, [])
+    }, [isAuthenticated, session])
   );
+
+  // Log auth state changes
+  useEffect(() => {
+    console.log('[AccountScreen] Auth state changed:', { isAuthenticated, hasSession: !!session });
+  }, [isAuthenticated, session]);
 
   const handleSubmitFeedback = async () => {
     if (!feedbackMessage.trim()) {
@@ -116,30 +123,48 @@ export default function AccountScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
         style={styles.scrollView}
+        onLayout={(event) => {
+          const { height } = event.nativeEvent.layout;
+          console.log('[AccountScreen] ScrollView layout height:', height);
+        }}
       >
-        {/* User Info Section */}
-        {isAuthenticated ? (
-          <>
-            <View style={styles.authStatusContainer}>
-              <Text style={styles.authStatusText}>
-                {`Logged in as ${session?.user?.email}`}
-              </Text>
-            </View>
-            <TouchableOpacity style={styles.signOutButton} onPress={signOut}>
-              <Text style={styles.signOutButtonText}>Sign Out</Text>
+        {/* User Info Section - Fixed height container */}
+        <View 
+          style={styles.userInfoContainer}
+          onLayout={(event) => {
+            const { height, y } = event.nativeEvent.layout;
+            console.log('[AccountScreen] UserInfoContainer layout:', { height, y, isAuthenticated });
+          }}
+        >
+          {isAuthenticated ? (
+            <>
+              <View style={styles.authStatusContainer}>
+                <Text style={styles.authStatusText}>
+                  {`Logged in as ${session?.user?.email}`}
+                </Text>
+              </View>
+              <TouchableOpacity style={styles.signOutButton} onPress={signOut}>
+                <Text style={styles.signOutButtonText}>Sign Out</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <TouchableOpacity
+              onPress={() => router.push('/login')}
+              style={styles.loginButton}
+            >
+              <Text style={styles.loginButtonText}>Log In or Sign Up</Text>
             </TouchableOpacity>
-          </>
-        ) : (
-          <TouchableOpacity
-            onPress={() => router.push('/login')}
-            style={styles.loginButton}
-          >
-            <Text style={styles.loginButtonText}>Log In or Sign Up</Text>
-          </TouchableOpacity>
-        )}
+          )}
+        </View>
 
-        {/* Feedback Form Section */}
-        <View style={styles.feedbackSection}>
+        {/* Feedback Form Section - Always at consistent position */}
+        <View 
+          style={styles.feedbackSection}
+          onLayout={(event) => {
+            const { height, y } = event.nativeEvent.layout;
+            console.log('[AccountScreen] FeedbackSection layout:', { height, y, isAuthenticated });
+          }}
+        >
           <Text style={styles.sectionTitle}>Send Feedback</Text>
           <TextInput
             style={styles.feedbackInput}
@@ -234,6 +259,11 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   scrollView: {
     marginTop: SPACING.xl,
+  } as ViewStyle,
+  userInfoContainer: {
+    height: 140, // Fixed height to ensure consistent positioning (use exact height instead of minHeight)
+    marginBottom: SPACING.lg,
+    justifyContent: 'center', // Center content vertically within fixed height
   } as ViewStyle,
   authStatusContainer: {
     flexDirection: 'row',

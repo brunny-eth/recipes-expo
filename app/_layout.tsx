@@ -146,6 +146,7 @@ function RootLayoutNav() {
   // === CUSTOM SPLASH ANIMATION COMPLETE HANDLER ===
   const handleSplashFinish = useCallback(() => {
     console.log('[RootLayoutNav][handleSplashFinish] Custom splash animation reported complete.');
+    console.log('[RootLayoutNav][handleSplashFinish] splashFinishedRef.current:', splashFinishedRef.current);
     
     // Prevent multiple calls
     if (splashFinishedRef.current) {
@@ -251,22 +252,73 @@ function RootLayoutNav() {
     if (splashAnimationComplete && isReadyToRender) {
       console.log('[RootLayoutNav][Effect: hideNativeSplash] Hiding native splash - next content ready to render:', 
         isFirstLaunch ? 'WelcomeScreen' : 'AppNavigators');
+      console.log('[RootLayoutNav][Effect: hideNativeSplash] Values at hide time:', {
+        splashAnimationComplete,
+        isReadyToRender,
+        isFirstLaunch,
+        hasSession: !!session,
+        isAuthLoading,
+      });
       SplashScreen.hideAsync();
     }
-  }, [isReadyToRender, splashAnimationComplete, isFirstLaunch]);
+  }, [isReadyToRender, splashAnimationComplete, isFirstLaunch, session, isAuthLoading]);
 
   // === MEMOIZED RENDER LOGIC ===
   // Use useMemo to prevent unnecessary re-renders of SplashScreenMeez
   const renderContent = useMemo(() => {
+    // Add granular logging for every render
+    console.log('[RootLayoutNav][useMemo] Current state values:', {
+      isReadyToRender,
+      splashAnimationComplete,
+      isFirstLaunch,
+      isAuthLoading,
+      isLoadingFreeUsage,
+      isFrameworkReady,
+      isOnLoginScreen,
+      hasSession: !!session,
+    });
+    
     console.log(`[RootLayoutNav][useMemo] Evaluating render: isReadyToRender=${isReadyToRender}, splashAnimationComplete=${splashAnimationComplete}, isFirstLaunch=${isFirstLaunch}`);
     
-    // 1. Show custom splash screen while app is not fully ready for main content OR splash animation hasn't completed
+    // PRIORITY 1: If user is authenticated and auth is settled, show main content immediately
+    // This ensures authenticated users don't get stuck on splash screen
+    if (session && !isAuthLoading && isFrameworkReady && isFirstLaunch !== null) {
+      console.log('[RootLayoutNav][useMemo] Authenticated user detected - showing main content immediately');
+      
+      if (isFirstLaunch === true) {
+        console.log('[RootLayoutNav][useMemo] Returning WelcomeScreen for authenticated first-time user');
+        return (
+          <Animated.View 
+            style={{ flex: 1, backgroundColor: COLORS.background }}
+            entering={FadeIn.duration(400)}
+          >
+            <WelcomeScreen onDismiss={handleWelcomeDismiss} />
+          </Animated.View>
+        );
+      } else {
+        console.log('[RootLayoutNav][useMemo] Returning AppNavigators for authenticated returning user');
+        return (
+          <Animated.View 
+            style={{ 
+              flex: 1,
+              backgroundColor: COLORS.background,
+            }}
+            entering={FadeIn.duration(400)}
+          >
+            <StatusBar style="dark" />
+            <AppNavigators />
+          </Animated.View>
+        );
+      }
+    }
+    
+    // PRIORITY 2: Show custom splash screen while app is not fully ready for main content OR splash animation hasn't completed
     if (!isReadyToRender || !splashAnimationComplete) {
-      console.log('[RootLayoutNav][useMemo] Returning SplashScreenMeez');
+      console.log('[RootLayoutNav][useMemo] Returning SplashScreenMeez - app not ready or splash not complete');
       return <SplashScreenMeez onFinish={handleSplashFinish} />;
     }
     
-    // 2. If app is ready AND splash animation is complete AND it's the first launch, show Welcome Screen
+    // PRIORITY 3: If app is ready AND splash animation is complete AND it's the first launch, show Welcome Screen
     if (isFirstLaunch === true) {
       console.log('[RootLayoutNav][useMemo] Returning WelcomeScreen with fade-in animation');
       return (
@@ -279,7 +331,7 @@ function RootLayoutNav() {
       );
     }
 
-    // 3. Otherwise, app is ready AND splash animation is complete AND it's not the first launch (or welcome dismissed), show main app
+    // PRIORITY 4: Otherwise, app is ready AND splash animation is complete AND it's not the first launch, show main app
     console.log('[RootLayoutNav][useMemo] Returning AppNavigators with fade-in animation');
     return (
       <Animated.View 
@@ -293,7 +345,7 @@ function RootLayoutNav() {
         <AppNavigators />
       </Animated.View>
     );
-  }, [isReadyToRender, splashAnimationComplete, isFirstLaunch, handleSplashFinish, handleWelcomeDismiss]);
+  }, [isReadyToRender, splashAnimationComplete, isFirstLaunch, handleSplashFinish, handleWelcomeDismiss, session, isAuthLoading, isFrameworkReady]);
 
   return renderContent;
 }
