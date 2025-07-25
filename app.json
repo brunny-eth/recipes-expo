@@ -8,6 +8,7 @@
     "scheme": "meez",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "jsEngine": "hermes", 
     "splash": {
       "image": "./assets/images/meezblue_underline.png",
       "resizeMode": "contain",
@@ -33,7 +34,8 @@
           }
         ],
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "jsEngine": "hermes" 
     },
     "android": {
       "package": "com.meez.recipes",
@@ -41,7 +43,8 @@
         "image": "./assets/images/meezblue_underline.png",
         "resizeMode": "contain",
         "backgroundColor": "#fefcf7"
-      }
+      },
+      "jsEngine": "hermes"
     },
     "web": {
       "bundler": "metro",

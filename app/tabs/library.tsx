@@ -49,7 +49,7 @@ export default function LibraryScreen() {
   const { showError } = useErrorModal();
   
   // Tab state
-  const [selectedTab, setSelectedTab] = useState<'explore' | 'saved'>('saved');
+  const [selectedTab, setSelectedTab] = useState<'explore' | 'saved'>('explore');
   
   // Explore recipes state
   const [exploreRecipes, setExploreRecipes] = useState<ParsedRecipe[]>([]);
@@ -631,6 +631,18 @@ export default function LibraryScreen() {
       <View style={styles.tabContainer}>
         <TouchableOpacity
           style={styles.tabButton}
+          onPress={() => setSelectedTab('explore')}
+        >
+          <Text style={[
+            styles.tabButtonText,
+            selectedTab === 'explore' && styles.tabButtonTextActive
+          ]}>
+            Explore
+          </Text>
+          {selectedTab === 'explore' && <View style={styles.tabUnderline} />}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.tabButton}
           onPress={() => setSelectedTab('saved')}
         >
           <Text style={[
@@ -640,18 +652,6 @@ export default function LibraryScreen() {
             Saved
           </Text>
           {selectedTab === 'saved' && <View style={styles.tabUnderline} />}
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.tabButton}
-          onPress={() => setSelectedTab('explore')}
-        >
-          <Text style={[
-            styles.tabButtonText,
-            selectedTab === 'explore' && styles.tabButtonTextActive
-          ]}>
-            Explore 
-          </Text>
-          {selectedTab === 'explore' && <View style={styles.tabUnderline} />}
         </TouchableOpacity>
       </View>
 

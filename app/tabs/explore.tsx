@@ -332,7 +332,7 @@ const ExploreScreen = () => {
             />
           ) : (
             <FastImage
-              source={require('@/assets/images/meez_logo.webp')}
+              source={require('@/assets/images/meezblue_underline.webp')}
               style={styles.cardImage}
               onLoad={() => handleImageLoad(item.title || 'Unknown Recipe')}
             />

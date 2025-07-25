@@ -102,7 +102,7 @@ function RootLayoutNav() {
       try {
         console.log('[RootLayoutNav][prepareApp] Starting asset load...');
         await Asset.loadAsync([
-          require('@/assets/images/meez_logo.webp'),
+          require('@/assets/images/meezblue_underline.webp'),
           require('@/assets/gifs/FirstScreen.gif'),
           require('@/assets/gifs/SecondScreen.gif'),
           require('@/assets/gifs/ThirdScreen.gif'),

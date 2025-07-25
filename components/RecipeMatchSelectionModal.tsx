@@ -74,7 +74,7 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
         {shouldShowFallback ? (
           <View style={styles.fallbackImageContainer}>
             <Image
-              source={require('@/assets/images/meez_logo.png')}
+              source={require('@/assets/images/meezblue_underline.png')}
               style={styles.fallbackImage}
               resizeMode="contain"
             />
