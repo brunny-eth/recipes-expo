@@ -436,6 +436,11 @@ export default function CookScreen() {
       console.time(`[CookScreen] ⏱️ handleRecipeSwitch-${recipeId}`);
       console.log('[CookScreen] 🔄 Starting recipe switch to:', recipeId);
 
+      // --- TOP DEBUG: Check function types at the very beginning ---
+      console.error('[CookScreen] TOP DEBUG: typeof setScrollPosition:', typeof setScrollPosition);
+      console.error('[CookScreen] TOP DEBUG: typeof switchRecipe:', typeof switchRecipe);
+      console.error('[CookScreen] TOP DEBUG: typeof getCurrentScrollPosition:', typeof getCurrentScrollPosition);
+
       // --- GENERAL ENTRY POINT CHECKS ---
       console.error('[CookScreen] 💥💥 CRASH DEBUG (outer try): handleRecipeSwitch entry point.');
       console.error('[CookScreen] 💥💥 CRASH DEBUG (outer try): typeof state:', typeof state);
@@ -473,17 +478,41 @@ export default function CookScreen() {
       if (hasValidActiveRecipeId && hasValidScrollViewRef) {
         console.error('[CookScreen] ✅ Both state.activeRecipeId AND scrollViewRef.current are confirmed valid. Proceeding to scroll position logic.');
 
-        // --- Pre-check logs for scrollViewRef.current ---
-        console.error('[CookScreen] CRASH DEBUG: handleRecipeSwitch - scrollViewRef.current is present and an object:', !!scrollViewRef.current && typeof scrollViewRef.current === 'object');
-        // Try to log some common, expected properties of the ScrollView ref, without deeply recursing
+        // --- NEW: Even more granular checks for scrollViewRef.current properties ---
+        // Wrap each property access in its own try-catch
         try {
-          if (scrollViewRef.current) {
-            console.error('[CookScreen] CRASH DEBUG: scrollViewRef.current.scrollTo typeof:', typeof scrollViewRef.current.scrollTo);
-            console.error('[CookScreen] CRASH DEBUG: scrollViewRef.current.getScrollResponder typeof:', typeof scrollViewRef.current.getScrollResponder);
-            // Add more known properties if you use them, e.g., 'flashScrollIndicators'
+          console.error('[CookScreen] CRASH DEBUG: Checking scrollViewRef.current properties - START');
+          // Log scrollViewRef.current itself if it's safe to stringify
+          try {
+            console.error('[CookScreen] CRASH DEBUG: scrollViewRef.current object (JSON.stringify safe portion):', JSON.stringify(Object.keys(scrollViewRef.current || {})));
+          } catch (e: any) {
+            console.error('[CookScreen] CRASH DEBUG: Error stringifying scrollViewRef.current keys:', e.message);
           }
+
+          // Check if it's a valid React Native ScrollView instance (or at least has ._nativeTag)
+          try {
+            console.error('[CookScreen] CRASH DEBUG: scrollViewRef.current._nativeTag presence:', !!(scrollViewRef.current as any)._nativeTag);
+          } catch (e: any) {
+            console.error('[CookScreen] CRASH DEBUG: Error accessing _nativeTag:', e.message);
+          }
+
+          try {
+            console.error('[CookScreen] CRASH DEBUG: scrollViewRef.current.scrollTo typeof:', typeof (scrollViewRef.current as any).scrollTo);
+          } catch (e: any) {
+            console.error('[CookScreen] CRASH DEBUG: Error accessing scrollTo typeof:', e.message);
+          }
+
+          try {
+            console.error('[CookScreen] CRASH DEBUG: scrollViewRef.current.getScrollResponder typeof:', typeof (scrollViewRef.current as any).getScrollResponder);
+          } catch (e: any) {
+            console.error('[CookScreen] CRASH DEBUG: Error accessing getScrollResponder typeof:', e.message);
+          }
+          console.error('[CookScreen] CRASH DEBUG: Checking scrollViewRef.current properties - END');
+
         } catch (e: any) {
-          console.error('[CookScreen] CRASH DEBUG: Error inspecting other scrollViewRef.current properties:', e.message);
+          console.error('[CookScreen] CRASH DEBUG: Caught general error during scrollViewRef.current property checks:', e.message, e.stack);
+          // Re-throw this to ensure outer catch gets it with the exact location
+          throw e;
         }
 
         // --- Granular checks for contentOffset and y ---
