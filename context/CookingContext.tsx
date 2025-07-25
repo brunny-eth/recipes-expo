@@ -4,6 +4,38 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CombinedParsedRecipe } from '../common/types';
 import { useAuth } from './AuthContext';
 
+// Helper for deep comparison (simple for arrays of primitives/objects without circular refs)
+// This is a basic deep equality check. For more complex objects, a dedicated library like 'fast-deep-equal' might be needed.
+const deepEqual = (a: any, b: any): boolean => {
+  if (a === b) return true;
+
+  if (a && b && typeof a == 'object' && typeof b == 'object') {
+    if (Array.isArray(a) && Array.isArray(b)) {
+      if (a.length !== b.length) return false;
+      for (let i = 0; i < a.length; i++) {
+        if (!deepEqual(a[i], b[i])) return false;
+      }
+      return true;
+    }
+
+    if (a.constructor !== b.constructor) return false;
+
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+
+    if (keysA.length !== keysB.length) return false;
+
+    for (const key of keysA) {
+      if (!keysB.includes(key) || !deepEqual(a[key], b[key])) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  return a !== a && b !== b; // Handle NaN
+};
+
 // Types
 export type RecipeSession = {
   recipeId: string;
@@ -27,7 +59,8 @@ type CookingState = {
 
 type CookingContextType = {
   state: CookingState;
-  initializeSessions: (miseRecipes: any[]) => void;
+  // Updated initializeSessions signature
+  initializeSessions: (miseRecipes: any[], initialActiveRecipeId?: string) => void;
   endSession: (recipeId: string) => void;
   endAllSessions: () => void;
   switchRecipe: (recipeId: string) => void;
@@ -112,9 +145,16 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
         if (sessionAge < maxAge && parsedState.activeRecipes?.length > 0) {
           // Valid session found - can be resumed
           console.error('[CookingContext] ✅ Found resumable cooking session, restoring state');
-          setActiveRecipes(parsedState.activeRecipes);
-          setActiveRecipeId(parsedState.activeRecipeId);
-          setSessionStartTime(parsedState.sessionStartTime);
+          // Use deepEqual to prevent unnecessary re-renders if state is identical
+          if (!deepEqual(activeRecipes, parsedState.activeRecipes)) {
+            setActiveRecipes(parsedState.activeRecipes);
+          }
+          if (activeRecipeId !== parsedState.activeRecipeId) {
+            setActiveRecipeId(parsedState.activeRecipeId);
+          }
+          if (sessionStartTime !== parsedState.sessionStartTime) {
+            setSessionStartTime(parsedState.sessionStartTime);
+          }
         } else {
           // Session too old or empty, clear it
           console.error('[CookingContext] 🗑️ Session too old or empty, clearing stored state');
@@ -158,14 +198,17 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
 
   // --- initializeSessions function refactored to use useState setters directly ---
   const initializeSessions = useCallback(
-    (miseRecipes: any[]) => {
-      console.error('[CookingContext] 🚀 initializeSessions called (useState version). Recipes Count:', miseRecipes.length);
+    (miseRecipes: any[], initialActiveRecipeId?: string) => { // Added optional initialActiveRecipeId
+      console.error('[CookingContext] 🚀 initializeSessions called (useState version). Recipes Count:', miseRecipes.length, 'Initial Active ID:', initialActiveRecipeId);
 
       if (!miseRecipes || !Array.isArray(miseRecipes) || miseRecipes.length === 0) {
         console.error('[CookingContext] ⚠️ initializeSessions called with empty or invalid recipes array.');
-        setActiveRecipes([]);
-        setActiveRecipeId(null);
-        setSessionStartTime(undefined);
+        // Only update if state is not already empty
+        if (activeRecipes.length > 0 || activeRecipeId !== null || sessionStartTime !== undefined) {
+          setActiveRecipes([]);
+          setActiveRecipeId(null);
+          setSessionStartTime(undefined);
+        }
         return;
       }
 
@@ -222,26 +265,53 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
             console.error('[CookingContext] ❌ Invalid recipe object found during mapping:', recipe);
             return null as any;
           }
+          // Preserve existing scroll position if recipe already exists in activeRecipes
+          const existingSession = activeRecipes.find(s => s.recipeId === String(recipe.id));
           return {
             recipeId: String(recipe.id),
             recipe: recipe,
-            completedSteps: [],
-            activeTimers: [],
-            scrollPosition: 0,
+            completedSteps: existingSession ? existingSession.completedSteps : [],
+            activeTimers: existingSession ? existingSession.activeTimers : [],
+            scrollPosition: existingSession ? existingSession.scrollPosition : 0,
             isLoading: false,
           };
         }).filter(Boolean) as RecipeSession[];
 
-        const newActiveRecipeId = newActiveRecipes.length > 0 ? String(newActiveRecipes[0].recipeId) : null;
+        // Determine the new active recipe ID
+        let targetActiveRecipeId = initialActiveRecipeId || (newActiveRecipes.length > 0 ? String(newActiveRecipes[0].recipeId) : null);
+        // Ensure the targetActiveRecipeId actually exists in the newActiveRecipes list
+        if (targetActiveRecipeId && !newActiveRecipes.some(r => r.recipeId === targetActiveRecipeId)) {
+          console.warn(`[CookingContext] ⚠️ Initial active recipe ID "${targetActiveRecipeId}" not found in new recipes. Defaulting to first recipe.`);
+          targetActiveRecipeId = newActiveRecipes.length > 0 ? String(newActiveRecipes[0].recipeId) : null;
+        }
 
-        // Update state directly using useState setters
-        setActiveRecipes(newActiveRecipes);
-        setActiveRecipeId(newActiveRecipeId);
-        setSessionStartTime(Date.now());
+        // Update state directly using useState setters, with deep comparison
+        if (!deepEqual(activeRecipes, newActiveRecipes)) {
+          setActiveRecipes(newActiveRecipes);
+          console.error('[CookingContext] ✅ activeRecipes updated.');
+        } else {
+          console.error('[CookingContext] ℹ️ activeRecipes are identical, skipping update.');
+        }
+        
+        if (activeRecipeId !== targetActiveRecipeId) {
+          setActiveRecipeId(targetActiveRecipeId);
+          console.error('[CookingContext] ✅ activeRecipeId updated.');
+        } else {
+          console.error('[CookingContext] ℹ️ activeRecipeId is identical, skipping update.');
+        }
 
-        console.error('[CookingContext] ✅ State updated successfully via useState setters.');
-        console.error(`[CookingContext] ✅ New activeRecipes count: ${newActiveRecipes.length}`);
-        console.error(`[CookingContext] ✅ New activeRecipeId: ${newActiveRecipeId}`);
+        // Always set session start time on initialization
+        const newSessionStartTime = Date.now();
+        if (sessionStartTime !== newSessionStartTime) {
+          setSessionStartTime(newSessionStartTime);
+          console.error('[CookingContext] ✅ sessionStartTime updated.');
+        } else {
+          console.error('[CookingContext] ℹ️ sessionStartTime is identical, skipping update.');
+        }
+
+        console.error('[CookingContext] ✅ State update checks completed via useState setters.');
+        console.error(`[CookingContext] ✅ Final activeRecipes count: ${newActiveRecipes.length}`);
+        console.error(`[CookingContext] ✅ Final activeRecipeId: ${targetActiveRecipeId}`);
 
       } catch (e: any) {
         console.error('[CookingContext] 💥 CRITICAL ERROR in initializeSessions (useState refactor):', e);
@@ -252,7 +322,7 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
         setSessionStartTime(undefined);
       }
     },
-    [] // No dependencies here, as it directly uses the state setters
+    [activeRecipes, activeRecipeId, sessionStartTime] // Dependencies for useCallback to ensure deepEqual works with current state
   );
 
   // All other functions refactored to use useState setters
@@ -266,6 +336,7 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
         setActiveRecipeId(null);
         setSessionStartTime(undefined);
       } else if (activeRecipeId === recipeId) {
+        // If the current active recipe is being ended, switch to the first remaining one
         setActiveRecipeId(updatedRecipes[0].recipeId);
       }
       
@@ -276,7 +347,7 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
       
       return updatedRecipes;
     });
-  }, [activeRecipeId]);
+  }, [activeRecipeId]); // Dependency on activeRecipeId to ensure correct switch logic
 
   const endAllSessions = useCallback(() => {
     console.error('[CookingContext] 🛑 Ending all cooking sessions');
@@ -304,7 +375,7 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
     }).catch(error => {
       console.error('[CookingContext] 💥 Error clearing AsyncStorage:', error);
     });
-  }, [activeRecipes, activeRecipeId]);
+  }, [activeRecipes, activeRecipeId]); // Dependencies to ensure accurate logging before state clear
 
   const switchRecipe = useCallback((recipeId: string) => {
     console.error('[CookingContext] 🔄 Switching to recipe:', recipeId);
@@ -314,9 +385,14 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     
-    setActiveRecipeId(recipeId);
-    console.error('[CookingContext] ✅ Switched to recipe:', recipeId);
-  }, [activeRecipes]);
+    // Only update if the activeRecipeId is actually changing
+    if (activeRecipeId !== recipeId) {
+      setActiveRecipeId(recipeId);
+      console.error('[CookingContext] ✅ Switched to recipe:', recipeId);
+    } else {
+      console.error('[CookingContext] ℹ️ Already on target recipe, skipping switch.');
+    }
+  }, [activeRecipes, activeRecipeId]); // Dependencies to ensure correct check and prevent unnecessary updates
 
   const completeStep = useCallback((recipeId: string, stepId: string) => {
     console.error('[CookingContext] ✅ Completing step:', { recipeId, stepId });
@@ -402,7 +478,7 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
               ...recipe,
               activeTimers: recipe.activeTimers.map(timer =>
                 timer.stepId === stepId
-                  ? { ...timer, pausedAt: null, startTime: Date.now() }
+                  ? { ...timer, pausedAt: null, startTime: Date.now() + (timer.pausedAt ? (Date.now() - timer.pausedAt) : 0) } // Adjust start time to account for pause
                   : timer
               )
             }
@@ -436,7 +512,7 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
           : recipe
       )
     );
-  }, [activeRecipes]);
+  }, []); // No dependencies needed as it uses prevRecipes directly
 
   const getCurrentScrollPosition = useCallback((recipeId: string): number => {
     const recipeSession = activeRecipes.find(session => session.recipeId === recipeId);
@@ -510,5 +586,3 @@ export function useCooking() {
   
   return context;
 }
-
- 

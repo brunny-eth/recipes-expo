@@ -50,28 +50,16 @@ export default function CookScreen() {
   const { state, initializeSessions, endSession, endAllSessions, switchRecipe, setScrollPosition, getCurrentScrollPosition, hasResumableSession, completeStep, uncompleteStep } = useCooking();
 
   // DEBUG: Check types of functions that handleRecipeSwitch relies on
-  console.error('[CookScreen] DEBUG: typeof setScrollPosition:', typeof setScrollPosition);
-  console.error('[CookScreen] DEBUG: typeof switchRecipe:', typeof switchRecipe);
-  console.error('[CookScreen] DEBUG: typeof getCurrentScrollPosition:', typeof getCurrentScrollPosition);
-
-  // Add targeted debugging for navigation-related functions
-  console.error('[CookScreen] 🔍 Component initialized with router:', typeof router);
-  console.error('[CookScreen] 🔍 Router methods available:', Object.keys(router));
-  console.error('[CookScreen] 🔍 showError function type:', typeof showError);
-  
-  // 💥 LOGGING POINT 3: Check initializeSessions type immediately after destructuring from useCooking
   useEffect(() => {
-    if (process.env.NODE_ENV === 'production') {
-      console.error('[CookScreen] 🔍 useCooking hook accessed. typeof initializeSessions:', typeof initializeSessions);
-      if (typeof initializeSessions !== 'function') {
-        console.error('[CookScreen] 💥 CRITICAL: initializeSessions is NOT a function after useCooking!');
-        console.error('[CookScreen] 💥 Available keys from useCooking:', Object.keys(useCooking()));
-        console.error('[CookScreen] 💥 Full useCooking result:', useCooking());
-      } else {
-        console.error('[CookScreen] ✅ initializeSessions is properly defined as function');
-      }
-    }
-  }, [initializeSessions]); // Dependency on initializeSessions itself
+    console.error('[CookScreen] DEBUG: typeof setScrollPosition:', typeof setScrollPosition);
+    console.error('[CookScreen] DEBUG: typeof switchRecipe:', typeof switchRecipe);
+    console.error('[CookScreen] DEBUG: typeof getCurrentScrollPosition:', typeof getCurrentScrollPosition);
+    console.error('[CookScreen] DEBUG: typeof showError:', typeof showError);
+    console.error('[CookScreen] DEBUG: typeof initializeSessions:', typeof initializeSessions);
+  }, [setScrollPosition, switchRecipe, getCurrentScrollPosition, showError, initializeSessions]);
+
+  console.error('[CookScreen] 🔍 Component initialized with router:', typeof router);
+  console.error('[CookScreen] 🔍 showError function type:', typeof showError);
   
   const [isLoading, setIsLoading] = useState(true);
   const [recipes, setRecipes] = useState<CombinedParsedRecipe[]>([]);
@@ -141,118 +129,155 @@ export default function CookScreen() {
     };
   }, [state.activeRecipes, state.activeRecipeId, state.sessionStartTime, isLoading, router]);
 
-  // REMOVED: Separate useEffect for loadMiseRecipes - consolidated into useFocusEffect below
-
-  // Simple, reliable approach: Always fetch fresh data when screen comes into focus
+  // Main data fetching and session initialization logic
   useFocusEffect(
     useCallback(() => {
       console.error('[CookScreen] 🔍 useFocusEffect: Screen focused.');
       const timestamp = new Date().toISOString();
       console.log(`[CookScreen] 🎯 useFocusEffect triggered at ${timestamp}`);
       
-      const refreshMiseRecipes = async () => {
-        try {
-          setIsLoading(true);
-          console.log('[CookScreen] 🔄 Starting to refresh mise recipes from API');
-          
-          // Clear existing sessions to start fresh
-          console.log('[CookScreen] 🧹 Clearing existing cooking sessions');
+      const loadAndInitializeRecipes = async () => {
+        setIsLoading(true);
+        const initialRecipeIdFromParams = params.recipeId ? String(params.recipeId) : undefined;
+        console.log(`[CookScreen] 🔍 Initial recipe ID from params: ${initialRecipeIdFromParams}`);
+
+        // Determine if we need to fetch new data and re-initialize sessions
+        // We re-initialize if:
+        // 1. There are no active recipes in context OR
+        // 2. The session is not resumable (e.g., too old, empty) OR
+        // 3. The requested recipeId from params is different from the current activeRecipeId
+        const shouldFetchAndInitialize = 
+          !state.activeRecipes || state.activeRecipes.length === 0 || 
+          !hasResumableSession() ||
+          (initialRecipeIdFromParams && state.activeRecipeId !== initialRecipeIdFromParams);
+
+        console.log('[CookScreen] 🔍 shouldFetchAndInitialize:', shouldFetchAndInitialize);
+        console.log('[CookScreen] 🔍 Current context state for decision:', {
+          activeRecipesCount: state.activeRecipes?.length,
+          hasResumableSession: hasResumableSession(),
+          activeRecipeId: state.activeRecipeId,
+          initialRecipeIdFromParams: initialRecipeIdFromParams,
+        });
+
+        if (shouldFetchAndInitialize) {
+          console.log('[CookScreen] 🔄 Proceeding with fetching and initializing new sessions.');
           try {
-            await endAllSessions();
-          } catch (error) {
-            console.warn('[CookScreen] ⚠️ Error clearing sessions, continuing anyway:', error);
-          }
-          
-          // Fetch fresh mise data from API
-          if (!session?.user) {
-            console.log('[CookScreen] ❌ No user session found');
-            setRecipes([]);
-            setIsLoading(false);
-            return;
-          }
-          
-          const backendUrl = process.env.EXPO_PUBLIC_API_URL;
-          if (!backendUrl) {
-            throw new Error('API configuration error');
-          }
-          
-          const headers = {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          };
-          
-          const response = await fetch(`${backendUrl}/api/mise/recipes?userId=${session.user.id}`, { headers });
-          
-          if (!response.ok) {
-            throw new Error(`Failed to fetch mise recipes: ${response.statusText}`);
-          }
-          
-          const recipesData = await response.json();
-          const miseRecipes = recipesData?.recipes || [];
-          
-          console.log('[CookScreen] 📊 Refreshed mise recipes from API:', miseRecipes.length, 'recipes');
-          
-          if (miseRecipes.length === 0) {
-            console.log('[CookScreen] ❌ No mise recipes found after refresh');
-            setRecipes([]);
-            setIsLoading(false);
-            return;
-          }
-          
-          // Extract recipe data from mise recipes
-          const recipeList = miseRecipes.map((miseRecipe: any) => {
-            const recipeData = miseRecipe.prepared_recipe_data || miseRecipe.original_recipe_data;
-            
-            if (!recipeData) {
-              console.error('[CookScreen] ❌ No recipe data found for mise recipe:', miseRecipe.id);
-              return null;
-            }
-            
-            const cookingSessionId = String(miseRecipe.id);
-            
-            return {
-              ...recipeData,
-              id: cookingSessionId,
-              originalRecipeId: recipeData.id,
-              miseRecipeId: miseRecipe.id,
-              title: miseRecipe.title_override || recipeData.title,
-            };
-          }).filter(Boolean);
-          
-          setRecipes(recipeList);
-          
-          // Initialize sessions with fresh data
-          if (miseRecipes.length > 0) {
-            console.log('[CookScreen] 🚀 Initializing cooking sessions with fresh data');
-            
+            // Clear existing sessions to start fresh IF we are truly re-initializing
+            console.log('[CookScreen] 🧹 Clearing existing cooking sessions before fresh fetch');
             try {
-              initializeSessions(miseRecipes);
-              console.error('[CookScreen] ✅ Initialized cooking sessions successfully');
+              await endAllSessions();
             } catch (error) {
-              console.error('[CookScreen] 💥 TypeError caught in initializeSessions call:', error);
-              console.error('[CookScreen] 💥 Error type:', typeof error);
-              console.error('[CookScreen] 💥 Error message:', error instanceof Error ? error.message : String(error));
-              console.error('[CookScreen] 💥 Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-              
-              // Continue without sessions rather than crashing the app
-              console.error('[CookScreen] ⚠️ Continuing without cooking sessions due to initialization error');
+              console.warn('[CookScreen] ⚠️ Error clearing sessions, continuing anyway:', error);
             }
+            
+            // Fetch fresh mise data from API
+            if (!session?.user) {
+              console.log('[CookScreen] ❌ No user session found, cannot fetch mise recipes');
+              setRecipes([]);
+              setIsLoading(false);
+              return;
+            }
+            
+            const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+            if (!backendUrl) {
+              throw new Error('API configuration error: EXPO_PUBLIC_API_URL is not defined.');
+            }
+            
+            const headers = {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            };
+            
+            const response = await fetch(`${backendUrl}/api/mise/recipes?userId=${session.user.id}`, { headers });
+            
+            if (!response.ok) {
+              throw new Error(`Failed to fetch mise recipes: ${response.statusText}`);
+            }
+            
+            const recipesData = await response.json();
+            const miseRecipes = recipesData?.recipes || [];
+            
+            console.log('[CookScreen] 📊 Fetched mise recipes from API:', miseRecipes.length, 'recipes');
+            
+            if (miseRecipes.length === 0) {
+              console.log('[CookScreen] ❌ No mise recipes found after fetch');
+              setRecipes([]); // Clear local recipes if none fetched
+              setIsLoading(false);
+              return;
+            }
+            
+            // Extract recipe data from mise recipes for local state
+            const recipeList = miseRecipes.map((miseRecipe: any) => {
+              const recipeData = miseRecipe.prepared_recipe_data || miseRecipe.original_recipe_data;
+              
+              if (!recipeData) {
+                console.error('[CookScreen] ❌ No recipe data found for mise recipe:', miseRecipe.id);
+                return null;
+              }
+              
+              const cookingSessionId = String(miseRecipe.id);
+              
+              return {
+                ...recipeData,
+                id: cookingSessionId,
+                originalRecipeId: recipeData.id,
+                miseRecipeId: miseRecipe.id,
+                title: miseRecipe.title_override || recipeData.title,
+              };
+            }).filter(Boolean);
+            
+            setRecipes(recipeList); // Update local recipes state
+            
+            // Initialize sessions in context with fresh data
+            if (miseRecipes.length > 0) {
+              console.log('[CookScreen] 🚀 Initializing cooking sessions in context with fresh data');
+              
+              try {
+                initializeSessions(miseRecipes, initialRecipeIdFromParams); // Pass initialActiveRecipeId
+                console.error('[CookScreen] ✅ Initialized cooking sessions in context successfully');
+              } catch (error) {
+                console.error('[CookScreen] 💥 TypeError caught in initializeSessions call:', error);
+                console.error('[CookScreen] 💥 Error type:', typeof error);
+                console.error('[CookScreen] 💥 Error message:', error instanceof Error ? error.message : String(error));
+                console.error('[CookScreen] 💥 Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+                
+                // Continue without sessions rather than crashing the app
+                console.error('[CookScreen] ⚠️ Continuing without cooking sessions due to initialization error');
+              }
+            }
+          } catch (error) {
+            console.error('[CookScreen] 💥 Error fetching/initializing mise recipes:', error);
+            if (typeof showError === 'function') {
+              showError('Loading Error', 'Failed to load recipes. Please check your connection.');
+            }
+            setRecipes([]); // Clear local recipes on error
+          } finally {
+            setIsLoading(false);
+            console.log('[CookScreen] 🏁 Finished fetching/initializing, isLoading set to false');
           }
-        } catch (error) {
-          console.error('[CookScreen] 💥 Error refreshing mise recipes:', error);
-        } finally {
+        } else {
+          console.log('[CookScreen] ⏭️ Skipping re-initialization - sessions are already valid or being resumed.');
+          // If not re-initializing, ensure local 'recipes' state is synced with context's 'activeRecipes'
+          if (state.activeRecipes && state.activeRecipes.length > 0) {
+            const syncedRecipes = state.activeRecipes.map(sessionRecipe => sessionRecipe.recipe).filter(Boolean) as CombinedParsedRecipe[];
+            setRecipes(syncedRecipes);
+            console.log('[CookScreen] ✅ Local recipes state synced with context activeRecipes.');
+          } else {
+            setRecipes([]); // Ensure local recipes are empty if context is empty
+            console.log('[CookScreen] ⚠️ Context activeRecipes is empty, local recipes set to empty.');
+          }
           setIsLoading(false);
-          console.log('[CookScreen] 🏁 Finished refreshing mise recipes, isLoading set to false');
+          console.log('[CookScreen] 🏁 Skipping re-initialization, isLoading set to false');
         }
       };
       
-      refreshMiseRecipes();
+      loadAndInitializeRecipes();
         
       return () => {
         console.error('[CookScreen] 🔍 useFocusEffect: Screen blurred/unfocused (cleanup function).');
       };
-    }, [session?.user?.id, session?.access_token]) // Simple dependency array - only re-run when session changes
-  );
+    }, [session?.user?.id, session?.access_token, state.activeRecipes, state.activeRecipeId, hasResumableSession, initializeSessions, endAllSessions, params.recipeId])
+  ); // Added state dependencies to trigger re-evaluation when context changes
 
   // Handle app state changes for timer management
   useEffect(() => {
@@ -264,7 +289,7 @@ export default function CookScreen() {
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
         // App has come to foreground - sync timers
         console.log('App came to foreground, syncing timers');
-        // Timer sync logic will be handled by individual timer components
+        // Timer sync logic will be handled by individual timer components (if applicable)
       }
       appState.current = nextAppState;
     };
@@ -283,8 +308,6 @@ export default function CookScreen() {
       }
     };
   }, []);
-
-
 
   // NEW: Defensive handleRecipeSwitch that doesn't rely on potentially stale context functions
   const handleRecipeSwitch = useCallback((recipeId: string) => {
@@ -307,7 +330,12 @@ export default function CookScreen() {
           typeof getCurrentScrollPosition !== 'function' || 
           typeof showError !== 'function') {
         console.error('[CookScreen] 🛑 CRITICAL: Context functions are undefined! Bailing out.');
-        showError('Context Error', 'Recipe switching context is invalid. Please restart the app.');
+        // Ensure showError is callable before attempting to use it
+        if (typeof showError === 'function') {
+          showError('Context Error', 'Recipe switching context is invalid. Please restart the app.');
+        } else {
+          console.error('[CookScreen] 🛑 CRITICAL: showError is also undefined, cannot display error!');
+        }
         return;
       }
 
@@ -372,41 +400,68 @@ export default function CookScreen() {
         console.error('[CookScreen] 🛑 CRITICAL: showError is also undefined!');
       }
     }
-  }, [state.activeRecipeId, currentScrollY, setScrollPosition, switchRecipe, getCurrentScrollPosition, showError]); // Reverted to include context functions
+  }, [state.activeRecipeId, currentScrollY, setScrollPosition, switchRecipe, getCurrentScrollPosition, showError]);
 
 
   const handleSwipeGesture = (event: any) => {
     if (event.nativeEvent.state === State.END) {
       const { translationX, velocityX } = event.nativeEvent;
+      
+      // Ensure state.activeRecipes is an array before accessing its properties
+      if (!state.activeRecipes || !Array.isArray(state.activeRecipes) || state.activeRecipes.length === 0) {
+        console.warn('[CookScreen] ⚠️ Swipe gesture ignored: No active recipes in context state.');
+        return;
+      }
+
       const currentIndex = state.activeRecipes.findIndex(r => r.recipeId === state.activeRecipeId);
       
       // Swipe left (next recipe) - need sufficient distance and velocity
-      if (translationX < -100 && velocityX < -300 && currentIndex < state.activeRecipes.length - 1) {
+      if (translationX < -100 && velocityX < -300 && currentIndex !== -1 && currentIndex < state.activeRecipes.length - 1) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         
         // NEW LOGGING AND TRY-CATCH FOR CALL SITE
         console.error('[CookScreen] 💥💥 CALL SITE DEBUG: Attempting to call handleRecipeSwitch (next). typeof handleRecipeSwitch:', typeof handleRecipeSwitch);
         try {
-          // This is the call to handleRecipeSwitch that seems to be crashing.
-          handleRecipeSwitch(state.activeRecipes[currentIndex + 1].recipeId);
+          // Defensive check before accessing next recipe
+          const nextRecipe = state.activeRecipes[currentIndex + 1];
+          if (nextRecipe && nextRecipe.recipeId) {
+            handleRecipeSwitch(nextRecipe.recipeId);
+          } else {
+            console.error('[CookScreen] 🛑 CALL SITE CRASH: Next recipe or its ID is undefined during swipe.');
+            if (typeof showError === 'function') {
+              showError('Swipe Error', 'Failed to find next recipe. Please try again.');
+            }
+          }
         } catch (callSiteErr: any) {
           console.error('[CookScreen] 🛑 CALL SITE CRASH: Error calling handleRecipeSwitch (next):', callSiteErr.message, callSiteErr.stack);
-          showError('Swipe Error', 'Failed to switch recipe during swipe. Please try again.');
+          if (typeof showError === 'function') {
+            showError('Swipe Error', 'Failed to switch recipe during swipe. Please try again.');
+          }
         }
 
       }
       // Swipe right (previous recipe)
-      else if (translationX > 100 && velocityX > 300 && currentIndex > 0) {
+      else if (translationX > 100 && velocityX > 300 && currentIndex !== -1 && currentIndex > 0) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
         // NEW LOGGING AND TRY-CATCH FOR CALL SITE
         console.error('[CookScreen] 💥💥 CALL SITE DEBUG: Attempting to call handleRecipeSwitch (prev). typeof handleRecipeSwitch:', typeof handleRecipeSwitch);
         try {
-          // This is the call to handleRecipeSwitch that seems to be crashing.
-          handleRecipeSwitch(state.activeRecipes[currentIndex - 1].recipeId);
+          // Defensive check before accessing previous recipe
+          const prevRecipe = state.activeRecipes[currentIndex - 1];
+          if (prevRecipe && prevRecipe.recipeId) {
+            handleRecipeSwitch(prevRecipe.recipeId);
+          } else {
+            console.error('[CookScreen] 🛑 CALL SITE CRASH: Previous recipe or its ID is undefined during swipe.');
+            if (typeof showError === 'function') {
+              showError('Swipe Error', 'Failed to find previous recipe. Please try again.');
+            }
+          }
         } catch (callSiteErr: any) {
           console.error('[CookScreen] 🛑 CALL SITE CRASH: Error calling handleRecipeSwitch (prev):', callSiteErr.message, callSiteErr.stack);
-          showError('Swipe Error', 'Failed to switch recipe during swipe. Please try again.');
+          if (typeof showError === 'function') {
+            showError('Swipe Error', 'Failed to switch recipe during swipe. Please try again.');
+          }
         }
       }
       // Swipe from left edge to go back - similar to summary.tsx
@@ -430,6 +485,9 @@ export default function CookScreen() {
         } catch (navError: any) {
           console.error('[CookScreen] 💥 Error during swipe navigation:', navError);
           console.error('[CookScreen] 💥 Navigation error stack:', navError.stack);
+          if (typeof showError === 'function') {
+            showError('Navigation Error', 'Failed to navigate back. Please try again.');
+          }
         }
       }
     }
@@ -437,16 +495,19 @@ export default function CookScreen() {
 
   const toggleStepCompleted = (recipeId: string, stepIndex: number) => {
     // Find the current recipe and toggle the step
-    const currentRecipe = state.activeRecipes.find(r => r.recipeId === recipeId);
-    if (!currentRecipe) return;
+    const currentRecipeSession = state.activeRecipes.find(r => r.recipeId === recipeId);
+    if (!currentRecipeSession || !currentRecipeSession.recipe) {
+      console.warn('[CookScreen] ⚠️ Cannot toggle step: current recipe session or recipe data not found.');
+      return;
+    }
 
-    const stepId = stepIndex.toString();
-    const isCompleted = currentRecipe.completedSteps.includes(stepId);
+    const stepId = String(stepIndex); // Ensure stepId is a string
+    const isCompleted = currentRecipeSession.completedSteps.includes(stepId);
     
     // Convert completedSteps array to StepCompletionState object for utilities
     const completedStepsState: StepCompletionState = {};
-    currentRecipe.completedSteps.forEach(stepId => {
-      completedStepsState[parseInt(stepId)] = true;
+    currentRecipeSession.completedSteps.forEach(sId => {
+      completedStepsState[parseInt(sId)] = true;
     });
     
     if (isCompleted) {
@@ -459,10 +520,10 @@ export default function CookScreen() {
       completeStep(recipeId, stepId);
       
       // Auto-scroll to next step if recipe has instructions
-      if (currentRecipe.recipe?.instructions) {
+      if (currentRecipeSession.recipe.instructions) {
         autoScrollToNextStep(
           stepIndex,
-          currentRecipe.recipe.instructions,
+          currentRecipeSession.recipe.instructions,
           completedStepsState,
           scrollViewRef
         );
@@ -564,8 +625,6 @@ export default function CookScreen() {
     openToolsModal('timer');
   };
 
-
-
   const handleMiniTimerPress = () => {
     openToolsModal('timer');
   };
@@ -582,9 +641,11 @@ export default function CookScreen() {
   };
   // --- End Recipe Tips Functions ---
 
-  const currentRecipe = state.activeRecipes.find(
+  // Get the current recipe from the context state
+  const currentRecipeSession = state.activeRecipes.find(
     recipe => recipe.recipeId === state.activeRecipeId
   );
+  const currentRecipeData = currentRecipeSession?.recipe; // Get the actual CombinedParsedRecipe object
 
   if (isLoading) {
     return (
@@ -596,7 +657,9 @@ export default function CookScreen() {
     );
   }
 
-  if (state.activeRecipes.length === 0) {
+  // Use the local 'recipes' state for rendering the switcher, as it directly drives the UI
+  // and is synced with context in useFocusEffect.
+  if (recipes.length === 0) {
     return (
       <SafeAreaView style={styles.centeredStatusContainer}>
         <View style={styles.emptyContainer}>
@@ -610,17 +673,23 @@ export default function CookScreen() {
     );
   }
 
-
-
   return (
     <PanGestureHandler onHandlerStateChange={handleSwipeGesture}>
       <SafeAreaView style={styles.container}>
         {/* Recipe Switcher */}
         <View style={styles.recipeSwitcherContainer}>
           <RecipeSwitcher
-            recipes={state.activeRecipes}
+            // Convert CombinedParsedRecipe[] to RecipeSession[] format
+            recipes={recipes.map(recipe => ({
+              recipeId: String(recipe.id),
+              recipe: recipe,
+              completedSteps: [],
+              activeTimers: [],
+              scrollPosition: 0,
+              isLoading: false
+            }))} 
             activeRecipeId={state.activeRecipeId || ''}
-            onRecipeSwitch={handleRecipeSwitch} // This remains the same
+            onRecipeSwitch={handleRecipeSwitch}
           />
         </View>
 
@@ -632,30 +701,32 @@ export default function CookScreen() {
           onScroll={handleScroll}
           scrollEventThrottle={16}
         >
-        {currentRecipe ? (
+        {currentRecipeData ? ( // Use currentRecipeData for rendering the steps
           <View style={styles.recipeContainer}>
-            {currentRecipe.isLoading ? (
+            {currentRecipeSession?.isLoading ? ( // Check isLoading from session if needed
               <View style={styles.loadingContainer}>
                 <Text style={styles.loadingText}>Loading recipe...</Text>
               </View>
-            ) : currentRecipe.recipe ? (
+            ) : (
               <>
                 {/* Recipe Steps with steps.tsx styling */}
-                {currentRecipe.recipe.instructions && currentRecipe.recipe.instructions.length > 0 ? (
-                  currentRecipe.recipe.instructions.map((step, index) => {
+                {currentRecipeData.instructions && currentRecipeData.instructions.length > 0 ? (
+                  currentRecipeData.instructions.map((step, index) => {
                     // Convert completedSteps array to StepCompletionState object
                     const completedStepsState: StepCompletionState = {};
-                    currentRecipe.completedSteps.forEach(stepId => {
-                      completedStepsState[parseInt(stepId)] = true;
-                    });
+                    if (currentRecipeSession?.completedSteps) {
+                      currentRecipeSession.completedSteps.forEach(stepId => {
+                        completedStepsState[parseInt(stepId)] = true;
+                      });
+                    }
                     
                     const stepIsCompleted = isStepCompleted(index, completedStepsState);
-                    const stepIsActive = isStepActive(index, currentRecipe.recipe?.instructions || [], completedStepsState);
+                    const stepIsActive = isStepActive(index, currentRecipeData.instructions || [], completedStepsState);
                     
                     // Flatten ingredients from ingredient groups for highlighting
                     const flatIngredients: StructuredIngredient[] = [];
-                    if (currentRecipe.recipe?.ingredientGroups) {
-                      currentRecipe.recipe.ingredientGroups.forEach(group => {
+                    if (currentRecipeData.ingredientGroups) {
+                      currentRecipeData.ingredientGroups.forEach(group => {
                         if (group.ingredients && Array.isArray(group.ingredients)) {
                           flatIngredients.push(...group.ingredients);
                         }
@@ -669,7 +740,7 @@ export default function CookScreen() {
                         stepIndex={index}
                         isCompleted={stepIsCompleted}
                         isActive={stepIsActive}
-                        onStepPress={(stepIndex) => toggleStepCompleted(currentRecipe.recipeId, stepIndex)}
+                        onStepPress={(stepIndex) => toggleStepCompleted(currentRecipeSession.recipeId, stepIndex)}
                         ingredients={flatIngredients}
                         onIngredientPress={handleIngredientPress}
                       />
@@ -684,10 +755,6 @@ export default function CookScreen() {
                 {/* Add some bottom padding */}
                 <View style={{ height: 100 }} />
               </>
-            ) : (
-              <View style={styles.noRecipeContainer}>
-                <Text style={styles.noRecipeText}>Recipe data not available</Text>
-              </View>
             )}
           </View>
         ) : (
@@ -735,7 +802,7 @@ export default function CookScreen() {
         <StepsFooterButtons
           onTimersPress={handleTimersPress}
           onRecipeTipsPress={handleRecipeTipsPress}
-          hasRecipeTips={!!currentRecipe?.recipe?.tips}
+          hasRecipeTips={!!currentRecipeData?.tips}
         />
 
         {/* Tools Modal */}
@@ -795,7 +862,7 @@ export default function CookScreen() {
               
               <FlatList
                 style={styles.recipeTipsList}
-                data={currentRecipe?.recipe?.tips?.split(/\.\s+|\n+/).filter(tip => tip.trim()) || []}
+                data={currentRecipeData?.tips?.split(/\.\s+|\n+/).filter(tip => tip.trim()) || []}
                 keyExtractor={(item, index) => index.toString()}
                 renderItem={({ item, index }) => (
                   <View style={styles.tipItem}>
