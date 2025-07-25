@@ -1054,13 +1054,13 @@ export default function MiseScreen() {
               ]}
               numberOfLines={0}
             >
-              {groceryItem.amount ? `${formatAmountForGroceryDisplay(groceryItem.amount)}` : ''}
               {(() => {
+                const amountText = groceryItem.amount ? formatAmountForGroceryDisplay(groceryItem.amount) : '';
                 const unitDisplay = getUnitDisplayName(groceryItem.unit as any, groceryItem.amount || 1);
-                return unitDisplay ? ` ${unitDisplay}` : '';
+                const unitText = unitDisplay ? ` ${unitDisplay}` : '';
+                const spaceBeforeName = (amountText || unitText) ? ' ' : '';
+                return `${amountText}${unitText}${spaceBeforeName}${groceryItem.name}`;
               })()}
-              {groceryItem.amount || groceryItem.unit ? ' ' : ''}
-              {groceryItem.name}
             </Text>
             {groceryItem.isManual && (
               <TouchableOpacity

@@ -143,82 +143,24 @@ export default function CookScreen() {
 
   // REMOVED: Separate useEffect for loadMiseRecipes - consolidated into useFocusEffect below
 
-  // Keep local recipes state in sync with CookingContext
-  useEffect(() => {
-    if (state.activeRecipes.length > 0 && recipes.length === 0) {
-      console.log('[CookScreen] 🔄 Syncing local recipes with CookingContext (useEffect)');
-      
-      const localRecipes = state.activeRecipes.map((activeRecipe: any) => ({
-        ...activeRecipe,
-        id: activeRecipe.recipeId,
-        title: activeRecipe.title || 'Untitled Recipe',
-      }));
-      
-      setRecipes(localRecipes);
-      setIsLoading(false);
-      console.log('[CookScreen] ✅ Local state synced via useEffect');
-    }
-  }, [state.activeRecipes, recipes.length]);
-
-  // Consolidated data loading and session initialization in useFocusEffect
+  // Simple, reliable approach: Always fetch fresh data when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       console.error('[CookScreen] 🔍 useFocusEffect: Screen focused.');
       const timestamp = new Date().toISOString();
       console.log(`[CookScreen] 🎯 useFocusEffect triggered at ${timestamp}`);
       
-      // Determine if we should clear and re-initialize sessions
-      const shouldClearAndInitialize = 
-        state.activeRecipes.length === 0 || // No recipes loaded (initial load)
-        !session?.user?.id || // User session changed
-        !session?.access_token; // Access token missing
-      
-      console.log('[CookScreen] 🔍 shouldClearAndInitialize:', shouldClearAndInitialize, {
-        activeRecipesLength: state.activeRecipes.length,
-        hasUserId: !!session?.user?.id,
-        hasAccessToken: !!session?.access_token
-      });
-      
-      if (!shouldClearAndInitialize) {
-        console.log('[CookScreen] ⏭️ Skipping re-initialization - sessions are already valid');
-        
-        // CRITICAL FIX: Even when skipping re-initialization, we need to sync local state
-        // with the existing CookingContext state to prevent "stuck loading"
-        if (state.activeRecipes.length > 0 && recipes.length === 0) {
-          console.log('[CookScreen] 🔄 Syncing local recipes state with CookingContext');
-          
-          // Convert CookingContext recipes to local format
-          const localRecipes = state.activeRecipes.map((activeRecipe: any) => ({
-            ...activeRecipe,
-            id: activeRecipe.recipeId, // Ensure ID is set correctly
-            title: activeRecipe.title || 'Untitled Recipe',
-          }));
-          
-          setRecipes(localRecipes);
-          setIsLoading(false);
-          console.log('[CookScreen] ✅ Local state synced with CookingContext');
-        } else if (state.activeRecipes.length === 0 && recipes.length === 0) {
-          // Both are empty, ensure loading is false
-          setIsLoading(false);
-          console.log('[CookScreen] ✅ Both contexts empty, loading set to false');
-        }
-        
-        return;
-      }
-      
       const refreshMiseRecipes = async () => {
         try {
           setIsLoading(true);
           console.log('[CookScreen] 🔄 Starting to refresh mise recipes from API');
           
-          // Only clear sessions if there are actually sessions to clear
-          if (state.activeRecipes.length > 0) {
-            console.log('[CookScreen] 🧹 Clearing existing cooking sessions');
-            try {
-              await endAllSessions();
-            } catch (error) {
-              console.warn('[CookScreen] ⚠️ Error clearing sessions, continuing anyway:', error);
-            }
+          // Clear existing sessions to start fresh
+          console.log('[CookScreen] 🧹 Clearing existing cooking sessions');
+          try {
+            await endAllSessions();
+          } catch (error) {
+            console.warn('[CookScreen] ⚠️ Error clearing sessions, continuing anyway:', error);
           }
           
           // Fetch fresh mise data from API
@@ -279,12 +221,11 @@ export default function CookScreen() {
           
           setRecipes(recipeList);
           
-          // Initialize sessions only if we have recipes and should initialize
-          if (miseRecipes.length > 0 && shouldClearAndInitialize) {
+          // Initialize sessions with fresh data
+          if (miseRecipes.length > 0) {
             console.log('[CookScreen] 🚀 Initializing cooking sessions with fresh data');
             
             try {
-              // Pass only miseRecipes - CookingContext will handle recipe activation internally
               initializeSessions(miseRecipes);
               console.error('[CookScreen] ✅ Initialized cooking sessions successfully');
             } catch (error) {
@@ -299,15 +240,9 @@ export default function CookScreen() {
           }
         } catch (error) {
           console.error('[CookScreen] 💥 Error refreshing mise recipes:', error);
-          // Ensure loading is set to false even on error
-          setIsLoading(false);
-          console.log('[CookScreen] 🏁 Error occurred, isLoading set to false');
         } finally {
-          // Double-check loading is false
-          if (isLoading) {
-            setIsLoading(false);
-            console.log('[CookScreen] 🏁 Finally block ensuring isLoading is false');
-          }
+          setIsLoading(false);
+          console.log('[CookScreen] 🏁 Finished refreshing mise recipes, isLoading set to false');
         }
       };
       
@@ -316,7 +251,7 @@ export default function CookScreen() {
       return () => {
         console.error('[CookScreen] 🔍 useFocusEffect: Screen blurred/unfocused (cleanup function).');
       };
-    }, [session?.user?.id, session?.access_token, state.activeRecipes.length, state.activeRecipeId]) // Smart dependency array
+    }, [session?.user?.id, session?.access_token]) // Simple dependency array - only re-run when session changes
   );
 
   // Handle app state changes for timer management
