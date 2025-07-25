@@ -61,14 +61,16 @@ const LoginScreen = () => {
     }, 30000); // 30 second timeout
     
     try {
-      await signIn(provider);
-      // If we reach here, sign-in was successful
-      console.log(`[LoginScreen] Successfully signed in with ${provider}`);
-      // The AuthContext will handle navigation automatically
+      const success = await signIn(provider); // Get the boolean result
+      if (success) {
+        console.log(`[LoginScreen] Sign-in flow initiated successfully with ${provider}. Waiting for AuthContext to confirm session.`);
+        // AuthContext handles navigation on successful session
+      } else {
+        console.log(`[LoginScreen] Sign-in flow cancelled or failed for ${provider}.`);
+        // No specific action needed here as AuthContext's error modal already showed
+      }
     } catch (error) {
-      // This catch block will only trigger if signIn throws an error
-      // Most errors are handled by AuthContext's error modal
-      console.error(`[LoginScreen] Sign-in error with ${provider}:`, error);
+      console.error(`[LoginScreen] Unexpected error during sign-in initiation with ${provider}:`, error);
     } finally {
       clearTimeout(timeoutId);
       setIsSigningIn(null);

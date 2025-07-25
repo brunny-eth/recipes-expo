@@ -34,7 +34,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   userMetadata: UserMetadata | null;
   isLoading: boolean;
-  signIn: (provider: AuthProvider) => Promise<void>;
+  signIn: (provider: AuthProvider) => Promise<boolean>;
   signOut: () => Promise<void>;
 }
 
@@ -100,6 +100,8 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         return;
       }
 
+      console.log(`[AuthContext][handleUrl] Processing URL: ${url}`);
+
       // Extract tokens from URL fragment and set session explicitly using setSession()
       const urlParts = url.split('#');
       let fragment = null;
@@ -108,6 +110,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       }
 
       if (!fragment) {
+        console.log('[AuthContext][handleUrl] No URL fragment found.');
         return;
       }
 
@@ -116,6 +119,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       const refreshToken = params.get('refresh_token');
 
       if (accessToken && refreshToken) {
+        console.log('[AuthContext][handleUrl] Found access and refresh tokens.');
         try {
           const {
             data: { session: newSession },
@@ -141,6 +145,8 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
             `Unexpected error setting session: ${e.message}`,
           );
         }
+      } else {
+        console.log('[AuthContext][handleUrl] No access/refresh tokens found in URL fragment.');
       }
     },
     [], // Empty dependency array - function is now truly stable
@@ -156,7 +162,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, sessionData) => {
-        console.log(`[Auth] onAuthStateChange event: ${event}`);
+        console.log(`[Auth] onAuthStateChange event: ${event}, sessionData: ${sessionData ? 'exists' : 'null'}`);
         console.log('[Auth] Incoming sessionData:', sessionData);
 
         const newSession = sessionData;
@@ -192,13 +198,13 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         }
 
         if (shouldUpdateSession) {
-          console.log('[Auth] State update: setSession() called with session change');
+          console.log('[Auth] setSession() called. New session state:', newSession);
           setSession(newSession);
         }
 
         // --- Compare and Update Loading State ---
         if (newIsLoading !== isLoading) {
-          console.log(`[Auth] State update: setIsLoading(${newIsLoading})`);
+          console.log(`[Auth] setIsLoading(${newIsLoading}) called.`);
           setIsLoading(newIsLoading);
         } else {
           console.log('[Auth] isLoading value is the SAME, skipping setIsLoading.');
@@ -252,7 +258,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     // Removed session dependency since we now do inline comparison
   ]);
 
-  const signIn = useCallback(async (provider: AuthProvider) => {
+  const signIn = useCallback(async (provider: AuthProvider): Promise<boolean> => {
     // Add granular logging for useCallback recreation
     console.log('[AuthContext] signIn useCallback recreated. Current dependencies:', {
       handleUrlDep: handleUrl,
@@ -262,145 +268,156 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     console.log('[Auth] State update: setIsLoading(true)');
     setIsLoading(true);
 
-    if (provider === 'apple') {
-      // Apple Native Sign-In
-      try {
-        const isAvailable = await AppleAuthentication.isAvailableAsync();
-        if (!isAvailable) {
-          throw new Error('Apple authentication is not available on this device');
+    try { // Wrap the entire logic in a try-finally
+      if (provider === 'apple') {
+        // Apple Native Sign-In
+        try {
+          const isAvailable = await AppleAuthentication.isAvailableAsync();
+          if (!isAvailable) {
+            throw new Error('Apple authentication is not available on this device');
+          }
+
+          console.log('[Apple] Starting Apple Sign In process...');
+          
+          const credential = await AppleAuthentication.signInAsync({
+            requestedScopes: [
+              AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+              AppleAuthentication.AppleAuthenticationScope.EMAIL,
+            ],
+          });
+
+          const { identityToken, email, fullName } = credential;
+          if (!identityToken) {
+            throw new Error('No identity token returned from Apple');
+          }
+
+          console.log('[Apple] Identity token received, signing in with Supabase...');
+          // Log the identityToken to inspect its 'aud' claim later if needed (copy-paste to jwt.io)
+          console.log('[Apple] Identity Token:', identityToken);
+
+          // *** THIS IS THE CRITICAL CHANGE ***
+          // For native Apple Sign In, the clientId for Supabase's verification
+          // should typically be your app's Bundle ID, not the Service ID (which is more for web flows).
+          const supabaseClientId = 'com.meez.recipes';
+
+          console.log('[Apple] Supabase signInWithIdToken clientId:', supabaseClientId);
+
+          const { data, error } = await supabase.auth.signInWithIdToken({
+            provider: 'apple',
+            token: identityToken,
+            // @ts-expect-error Supabase types don't include clientId but it's supported at runtime
+            clientId: supabaseClientId,
+          });
+
+          if (error) throw error;
+
+          if (data?.user && (email || fullName)) {
+            const fullNameStr = fullName
+              ? [fullName.givenName, fullName.familyName]
+                  .filter(Boolean)
+                  .join(' ')
+              : undefined;
+
+            const metadataUpdate: Record<string, any> = {};
+            if (email) metadataUpdate.email = email;
+            if (fullNameStr) metadataUpdate.full_name = fullNameStr;
+
+            if (Object.keys(metadataUpdate).length > 0) {
+              console.log(
+                '[Apple] Updating user metadata with Apple-provided values:',
+                metadataUpdate,
+              );
+              const { error: metadataError } = await supabase.auth.updateUser({
+                data: metadataUpdate,
+              });
+              if (metadataError) {
+                console.error(
+                  '[Apple] Failed to update user metadata:',
+                  metadataError,
+                );
+              }
+            }
+          }
+          return true; // Indicate success for Apple
+        } catch (err: any) {
+          console.error('[Apple] Native Sign-In Error:', err.message);
+          showErrorRef.current(
+            'Sign In Error',
+            err.message || 'An unknown error occurred during Apple sign-in.',
+          );
+          return false; // Indicate failure
+        }
+      } else { // Google OAuth flow
+        const redirectTo = process.env.EXPO_PUBLIC_AUTH_URL;
+
+        if (!redirectTo) {
+          const errorMsg =
+            'Missing EXPO_PUBLIC_AUTH_URL environment variable. Cannot proceed with authentication.';
+          console.error(`[Auth] ${errorMsg}`);
+          showErrorRef.current('Configuration Error', errorMsg);
+          return false; // Indicate failure
         }
 
-        console.log('[Apple] Starting Apple Sign In process...');
-        
-        const credential = await AppleAuthentication.signInAsync({
-          requestedScopes: [
-            AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-            AppleAuthentication.AppleAuthenticationScope.EMAIL,
-          ],
-        });
+        console.log(
+          `[Auth] Attempting Google sign-in. Redirect URL: ${redirectTo}`,
+        );
 
-        const { identityToken, email, fullName } = credential;
-        if (!identityToken) {
-          throw new Error('No identity token returned from Apple');
-        }
-
-        console.log('[Apple] Identity token received, signing in with Supabase...');
-        // Log the identityToken to inspect its 'aud' claim later if needed (copy-paste to jwt.io)
-        console.log('[Apple] Identity Token:', identityToken);
-
-        // *** THIS IS THE CRITICAL CHANGE ***
-        // For native Apple Sign In, the clientId for Supabase's verification
-        // should typically be your app's Bundle ID, not the Service ID (which is more for web flows).
-        const supabaseClientId = 'com.meez.recipes';
-
-        console.log('[Apple] Supabase signInWithIdToken clientId:', supabaseClientId);
-
-        const { data, error } = await supabase.auth.signInWithIdToken({
-          provider: 'apple',
-          token: identityToken,
-          // @ts-expect-error Supabase types don't include clientId but it's supported at runtime
-          clientId: supabaseClientId,
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider,
+          options: {
+            redirectTo,
+            skipBrowserRedirect: true,
+          },
         });
 
         if (error) throw error;
 
-        if (data?.user && (email || fullName)) {
-          const fullNameStr = fullName
-            ? [fullName.givenName, fullName.familyName]
-                .filter(Boolean)
-                .join(' ')
-            : undefined;
-
-          const metadataUpdate: Record<string, any> = {};
-          if (email) metadataUpdate.email = email;
-          if (fullNameStr) metadataUpdate.full_name = fullNameStr;
-
-          if (Object.keys(metadataUpdate).length > 0) {
-            console.log(
-              '[Apple] Updating user metadata with Apple-provided values:',
-              metadataUpdate,
-            );
-            const { error: metadataError } = await supabase.auth.updateUser({
-              data: metadataUpdate,
-            });
-            if (metadataError) {
-              console.error(
-                '[Apple] Failed to update user metadata:',
-                metadataError,
-              );
-            }
-          }
-        }
-      } catch (err: any) {
-        console.error('[Apple] Native Sign-In Error:', err.message);
-        showErrorRef.current(
-          'Sign In Error',
-          err.message || 'An unknown error occurred during Apple sign-in.',
-        );
-      }
-      return;
-    }
-
-    // Google OAuth flow
-    const redirectTo = process.env.EXPO_PUBLIC_AUTH_URL;
-
-    if (!redirectTo) {
-      const errorMsg =
-        'Missing EXPO_PUBLIC_AUTH_URL environment variable. Cannot proceed with authentication.';
-      console.error(`[Auth] ${errorMsg}`);
-      showErrorRef.current('Configuration Error', errorMsg);
-      return;
-    }
-
-    console.log(
-      `[Auth] Attempting Google sign-in. Redirect URL: ${redirectTo}`,
-    );
-
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo,
-          skipBrowserRedirect: true,
-        },
-      });
-
-      if (error) throw error;
-
-      if (data.url) {
-        const result = await WebBrowser.openAuthSessionAsync(
-          data.url,
-          redirectTo,
-        );
-        if (result.type === 'success' && result.url) {
-          await handleUrl(result.url);
-        } else {
-          if (result.type === 'cancel') {
+        if (data.url) {
+          const result = await WebBrowser.openAuthSessionAsync(
+            data.url,
+            redirectTo,
+          );
+          if (result.type === 'success' && result.url) {
+            console.log('[Auth] WebBrowser.openAuthSessionAsync: Success.');
+            await handleUrl(result.url);
+            return true; // Indicate that browser flow completed successfully
+          } else if (result.type === 'cancel') {
+            console.log('[Auth] WebBrowser.openAuthSessionAsync: Cancelled by user.');
             showErrorRef.current(
               'Sign In Cancelled',
               'You cancelled the sign-in process.',
             );
+            return false; // Indicate cancellation
           } else {
+            console.log(`[Auth] WebBrowser.openAuthSessionAsync: Unknown result type: ${result.type}`);
             showErrorRef.current(
               'Sign In Error',
               `Sign-in was not completed. Reason: ${result.type}`,
             );
+            return false; // Indicate other failure
           }
+        } else {
+          showErrorRef.current(
+            'Sign In Error',
+            'No redirect URL received. Please try again.',
+          );
+          return false; // Indicate failure to get URL
         }
-      } else {
-        showErrorRef.current(
-          'Sign In Error',
-          'No redirect URL received. Please try again.',
-        );
       }
     } catch (err: any) {
-      console.error('[Auth] Google Sign-In Error:', err.message);
+      console.error('[Auth] Sign-In Error caught:', err.message);
       showErrorRef.current(
         'Sign In Error',
         err.message || 'An unknown error occurred during sign-in.',
       );
+      return false; // Indicate failure due to an exception
+    } finally {
+      // Always ensure isLoading is set to false when the signIn process finishes,
+      // regardless of success, error, or cancellation.
+      console.log('[Auth] State update: setIsLoading(false) in finally block of signIn');
+      setIsLoading(false);
     }
-  }, [handleUrl]); // Only depend on handleUrl, which is now stable
+  }, [handleUrl, showErrorRef]); // Added showErrorRef to dependencies
 
   const signOut = useCallback(async () => {
     // Add granular logging for useCallback recreation

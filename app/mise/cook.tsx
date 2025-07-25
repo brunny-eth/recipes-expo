@@ -47,6 +47,11 @@ export default function CookScreen() {
   const { showError } = useErrorModal();
   const { state, initializeSessions, endSession, endAllSessions, switchRecipe, setScrollPosition, getCurrentScrollPosition, hasResumableSession, completeStep, uncompleteStep } = useCooking();
 
+  // DEBUG: Check types of functions that handleRecipeSwitch relies on
+  console.error('[CookScreen] DEBUG: typeof setScrollPosition:', typeof setScrollPosition);
+  console.error('[CookScreen] DEBUG: typeof switchRecipe:', typeof switchRecipe);
+  console.error('[CookScreen] DEBUG: typeof getCurrentScrollPosition:', typeof getCurrentScrollPosition);
+
   // Add targeted debugging for navigation-related functions
   console.error('[CookScreen] 🔍 Component initialized with router:', typeof router);
   console.error('[CookScreen] 🔍 Router methods available:', Object.keys(router));
