@@ -435,12 +435,21 @@ export default function CookScreen() {
     console.time(`[CookScreen] ⏱️ handleRecipeSwitch-${recipeId}`);
     console.log('[CookScreen] 🔄 Starting recipe switch to:', recipeId);
 
-    // --- BEGIN NEW LOGGING ---
+    // --- BEGIN CRITICAL NEW LOGGING ---
+    console.error('[CookScreen] 💥💥 CRASH DEBUG: handleRecipeSwitch entry point.');
+    console.error('[CookScreen] 💥💥 CRASH DEBUG: typeof state:', typeof state);
+    console.error('[CookScreen] 💥💥 CRASH DEBUG: state value (partial):', state ? { activeRecipeId: state.activeRecipeId, activeRecipesCount: state.activeRecipes?.length } : 'null/undefined');
+    console.error('[CookScreen] 💥💥 CRASH DEBUG: typeof scrollViewRef.current:', typeof scrollViewRef.current);
+    console.error('[CookScreen] 💥💥 CRASH DEBUG: scrollViewRef.current value (presence check):', !!scrollViewRef.current);
+    console.error('[CookScreen] 💥💥 CRASH DEBUG: typeof state.activeRecipeId:', typeof state?.activeRecipeId);
+    // --- END CRITICAL NEW LOGGING ---
+
+    // --- Original Debugging (keep these for now, they seem to run before crash) ---
     console.error('[CookScreen] 🔍 Inside handleRecipeSwitch. Checking types:');
     console.error('[CookScreen] 🔍 typeof setScrollPosition:', typeof setScrollPosition);
     console.error('[CookScreen] 🔍 typeof switchRecipe:', typeof switchRecipe);
     console.error('[CookScreen] 🔍 typeof getCurrentScrollPosition:', typeof getCurrentScrollPosition);
-    // --- END NEW LOGGING ---
+    // --- END Original Debugging ---
 
     // Save current scroll position before switching
     if (state.activeRecipeId && scrollViewRef.current) {
