@@ -73,8 +73,6 @@ type CookingContextType = {
   setScrollPosition: (recipeId: string, position: number) => void;
   getCurrentScrollPosition: (recipeId: string) => number;
   hasResumableSession: () => boolean;
-  // TEMPORARY: For debugging minification issues
-  setActiveRecipeId: (recipeId: string | null) => void;
 };
 
 const initialState: CookingState = {
@@ -382,19 +380,35 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
   const switchRecipe = useCallback((recipeId: string) => {
     console.error('[CookingContext] 🔄 Switching to recipe:', recipeId);
     
-    if (!activeRecipes.some(r => r.recipeId === recipeId)) {
+    // DEFENSIVE: Check if activeRecipes is valid before calling .some()
+    if (!activeRecipes || !Array.isArray(activeRecipes)) {
+      console.error('[CookingContext] 🛑 CRITICAL: activeRecipes is not a valid array:', typeof activeRecipes, activeRecipes);
+      return;
+    }
+    
+    // DEFENSIVE: Check if setActiveRecipeId is still a function
+    if (typeof setActiveRecipeId !== 'function') {
+      console.error('[CookingContext] 🛑 CRITICAL: setActiveRecipeId is not a function:', typeof setActiveRecipeId);
+      return;
+    }
+    
+    // Safe to call .some() now
+    const recipeExists = activeRecipes.some(r => r && r.recipeId === recipeId);
+    if (!recipeExists) {
       console.error('[CookingContext] ⚠️ Cannot switch to recipe - not found in active recipes:', recipeId);
+      console.error('[CookingContext] 🔍 Available recipes:', activeRecipes.map(r => r?.recipeId));
       return;
     }
     
     // Only update if the activeRecipeId is actually changing
     if (activeRecipeId !== recipeId) {
+      console.error('[CookingContext] 🧪 About to call setActiveRecipeId with:', recipeId);
       setActiveRecipeId(recipeId);
       console.error('[CookingContext] ✅ Switched to recipe:', recipeId);
     } else {
       console.error('[CookingContext] ℹ️ Already on target recipe, skipping switch.');
     }
-  }, [activeRecipes, activeRecipeId]); // Dependencies to ensure correct check and prevent unnecessary updates
+  }, [activeRecipes, activeRecipeId, setActiveRecipeId]); // Added setActiveRecipeId to dependencies
 
   const completeStep = useCallback((recipeId: string, stepId: string) => {
     console.error('[CookingContext] ✅ Completing step:', { recipeId, stepId });
@@ -549,8 +563,6 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
       setScrollPosition,
       getCurrentScrollPosition,
       hasResumableSession,
-      // TEMPORARY: For debugging minification issues
-      setActiveRecipeId,
     }),
     [
       state,
@@ -567,8 +579,6 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
       setScrollPosition,
       getCurrentScrollPosition,
       hasResumableSession,
-      // TEMPORARY: For debugging minification issues
-      setActiveRecipeId,
     ]
   );
 

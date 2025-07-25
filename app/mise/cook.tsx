@@ -50,30 +50,15 @@ export default function CookScreen() {
   const cookingContext = useCooking();
   const errorModalContext = useErrorModal();
 
+  // Removed temporary AsyncStorage clearing - no longer needed
+
   // Destructure from the context objects where needed, but use the objects directly in handleRecipeSwitch
   // This is a key change to potentially avoid stale closures in production builds.
   const { state, initializeSessions, endSession, endAllSessions, hasResumableSession, completeStep, uncompleteStep } = cookingContext;
   const { showError } = errorModalContext;
 
 
-  // DEBUG: Check types of functions that handleRecipeSwitch relies on
-  useEffect(() => {
-    // DEFENSIVE: Extract context functions to local constants for debugging
-    const setScrollPositionFn = cookingContext.setScrollPosition;
-    const switchRecipeFn = cookingContext.switchRecipe;
-    const getCurrentScrollPositionFn = cookingContext.getCurrentScrollPosition;
-    const initializeSessionsFn = cookingContext.initializeSessions;
-    const showErrorFn = errorModalContext.showError;
-    
-    console.error('[CookScreen] DEBUG: typeof setScrollPositionFn:', typeof setScrollPositionFn);
-    console.error('[CookScreen] DEBUG: typeof switchRecipeFn:', typeof switchRecipeFn);
-    console.error('[CookScreen] DEBUG: typeof getCurrentScrollPositionFn:', typeof getCurrentScrollPositionFn);
-    console.error('[CookScreen] DEBUG: typeof showErrorFn:', typeof showErrorFn);
-    console.error('[CookScreen] DEBUG: typeof initializeSessionsFn:', typeof initializeSessionsFn);
-  }, [cookingContext, errorModalContext]); // Depend on the context objects directly
-
-  console.error('[CookScreen] 🔍 Component initialized with router:', typeof router);
-  console.error('[CookScreen] 🔍 showError function type (from errorModalContext):', typeof errorModalContext.showError);
+  // Removed debug logging - production ready
   
   const [isLoading, setIsLoading] = useState(true);
   const [recipes, setRecipes] = useState<CombinedParsedRecipe[]>([]);
@@ -344,162 +329,55 @@ export default function CookScreen() {
     };
   }, []);
 
-  // DUMMY FUNCTION TEST: To isolate context poisoning
-  const debugSwitchRecipe = (id: string) => {
-    console.error(`[CookScreen] ✅ Dummy switchRecipe called with: ${id}`);
-    
-    // Inline the actual logic that switchRecipe should do
-    if (!cookingContext.state.activeRecipes || !Array.isArray(cookingContext.state.activeRecipes)) {
-      console.error('[CookScreen] 🛑 DUMMY: activeRecipes is not a valid array!');
-      return;
-    }
-    
-    if (!cookingContext.state.activeRecipes.some(r => r && r.recipeId === id)) {
-      console.error('[CookScreen] 🛑 DUMMY: Recipe not found in active recipes:', id);
-      return;
-    }
-    
-    if (cookingContext.state.activeRecipeId !== id) {
-      console.error('[CookScreen] 🧪 DUMMY: Would call setActiveRecipeId with:', id);
-      // Actually call setActiveRecipeId to test if that works
-      try {
-        const setActiveRecipeIdFn = cookingContext.setActiveRecipeId;
-        if (typeof setActiveRecipeIdFn === 'function') {
-          setActiveRecipeIdFn(id);
-          console.error('[CookScreen] ✅ DUMMY: setActiveRecipeId completed successfully');
-        } else {
-          console.error('[CookScreen] 🛑 DUMMY: setActiveRecipeId is not a function!');
-        }
-      } catch (setError: any) {
-        console.error('[CookScreen] 💥 DUMMY: setActiveRecipeId crashed:', setError.message);
-      }
-    } else {
-      console.error('[CookScreen] ℹ️ DUMMY: Already on target recipe, skipping switch.');
-    }
-  };
+  // REMOVED: Dummy function no longer needed - using real context function with defensive checks
 
-  // NEW: Defensive handleRecipeSwitch that doesn't rely on potentially stale context functions
+    // Production-ready handleRecipeSwitch with defensive checks
   const handleRecipeSwitch = useCallback((recipeId: string) => {
     try {
-      console.time(`[CookScreen] ⏱️ handleRecipeSwitch-${recipeId}`);
-      console.log('[CookScreen] 🔄 Starting recipe switch to:', recipeId);
-
-      console.error('[CookScreen] 💥💥 CRASH DEBUG (outer try): handleRecipeSwitch entry point.');
-
-      // DEFENSIVE: Extract context functions to local constants to prevent minification issues
+      // Extract context functions to local constants to prevent minification issues
       const setScrollPositionFn = cookingContext.setScrollPosition;
-      const switchRecipeFn = debugSwitchRecipe; // 👈 OVERRIDE THE CONTEXT ONE WITH DUMMY
-      const contextSwitchRecipeFn = cookingContext.switchRecipe; // Keep original for comparison
+      const switchRecipeFn = cookingContext.switchRecipe;
       const getCurrentScrollPositionFn = cookingContext.getCurrentScrollPosition;
       const showErrorFn = errorModalContext.showError;
 
-      console.error('[CookScreen] DEBUG: Checking context function validity...');
-      console.error('[CookScreen] DEBUG: typeof setScrollPositionFn:', typeof setScrollPositionFn);
-      console.error('[CookScreen] DEBUG: typeof switchRecipeFn (DUMMY):', typeof switchRecipeFn);
-      console.error('[CookScreen] DEBUG: typeof contextSwitchRecipeFn (ORIGINAL):', typeof contextSwitchRecipeFn);
-      console.error('[CookScreen] DEBUG: typeof getCurrentScrollPositionFn:', typeof getCurrentScrollPositionFn);
-      console.error('[CookScreen] DEBUG: typeof showErrorFn:', typeof showErrorFn);
-
-      // If any context function is undefined, bail out early
+      // Defensive checks - if any context function is undefined, bail out
       if (typeof setScrollPositionFn !== 'function' || 
           typeof switchRecipeFn !== 'function' || 
           typeof getCurrentScrollPositionFn !== 'function' || 
           typeof showErrorFn !== 'function') {
-        console.error('[CookScreen] 🛑 CRITICAL: Context functions are undefined! Bailing out.');
-        console.error('[CookScreen] 🛑 Original context switchRecipe type:', typeof contextSwitchRecipeFn);
-        // Ensure showError is callable before attempting to use it
-        if (typeof showErrorFn === 'function') {
-          showErrorFn('Context Error', 'Recipe switching context is invalid. Please restart the app.');
-        } else {
-          console.error('[CookScreen] 🛑 CRITICAL: showError is also undefined, cannot display error!');
-        }
+        console.error('[CookScreen] Context functions are undefined, aborting recipe switch');
         return;
       }
 
-      // NEW: Use the state variable for the scroll position instead of direct ref access
-      const scrollYToSave = currentScrollY; // Use the most recently updated scroll position from state
-
-      console.error('[CookScreen] DEBUG: ScrollY to save:', scrollYToSave);
-
-      if (cookingContext.state.activeRecipeId) {
-        const savedScrollPosition = getCurrentScrollPositionFn(cookingContext.state.activeRecipeId);
-        console.error('[CookScreen] DEBUG: Previously saved scroll position for activeRecipe:', savedScrollPosition);
-        
-        // Save the current scroll position for the *old* active recipe ID
-        console.log(`[CookScreen] 💾 Saving scroll position ${scrollYToSave} for recipe ${cookingContext.state.activeRecipeId}`);
-        setScrollPositionFn(cookingContext.state.activeRecipeId, scrollYToSave);
-      } else {
-        console.log('[CookScreen] ⚠️ No activeRecipeId to save scroll position for.');
-      }
-
-            console.log(`[CookScreen] 🚀 Starting DUMMY vs CONTEXT function test for recipe: ${recipeId}`);
+      // Save current scroll position for the old recipe
+      const scrollYToSave = currentScrollY;
+      const prevId = cookingContext.state.activeRecipeId;
       
-      // TEST 1: Try the DUMMY function (should work)
-      console.error('[CookScreen] 🧪 TEST 1: Calling DUMMY switchRecipe function');
-      try {
-        switchRecipeFn(recipeId); // This is the dummy function
-        console.error('[CookScreen] ✅ TEST 1: DUMMY function completed successfully!');
-      } catch (dummyError: any) {
-        console.error('[CookScreen] 💥 TEST 1: DUMMY function crashed:', dummyError.message);
-        console.error('[CookScreen] 💥 TEST 1: DUMMY stack:', dummyError.stack);
-      }
-      
-      // TEST 2: Try the ORIGINAL context function (might crash)
-      console.error('[CookScreen] 🧪 TEST 2: Calling ORIGINAL context switchRecipe function');
-      console.error('[CookScreen] 🧪 contextSwitchRecipeFn.toString:', contextSwitchRecipeFn?.toString?.());
-      try {
-        contextSwitchRecipeFn(recipeId); // This is the original context function
-        console.error('[CookScreen] ✅ TEST 2: ORIGINAL context function also worked!');
-      } catch (contextError: any) {
-        console.error('[CookScreen] 💥 TEST 2: ORIGINAL context function crashed:', contextError.message);
-        console.error('[CookScreen] 💥 TEST 2: ORIGINAL stack:', contextError.stack);
-        console.error('[CookScreen] 🎯 CONFIRMED: Context function is corrupted, dummy function works!');
+      if (prevId) {
+        setScrollPositionFn(prevId, scrollYToSave);
       }
 
-      // Now, try to scroll to the new recipe's saved position after the switch
-      const newRecipeSavedScrollY = getCurrentScrollPositionFn(recipeId);
-      console.log(`[CookScreen] ➡️ Attempting to scroll new recipe ${recipeId} to: ${newRecipeSavedScrollY}`);
+      // Switch to the new recipe
+      switchRecipeFn(recipeId);
 
+      // Scroll to the new recipe's saved position
+      const newScrollY = getCurrentScrollPositionFn(recipeId);
       if (scrollViewRef.current) {
-        // Wrap this in a safe block as well
-        try {
-          // Delaying the scroll slightly often helps with rendering race conditions
-          setTimeout(() => {
-            if (scrollViewRef.current) {
-              scrollViewRef.current.scrollTo({ y: newRecipeSavedScrollY, animated: false });
-              console.log(`[CookScreen] ✅ Scrolled to position ${newRecipeSavedScrollY} for new recipe ${recipeId}`);
-            } else {
-              console.warn('[CookScreen] ⚠️ scrollViewRef.current is null when trying to scroll.');
-            }
-          }, 50); // Small delay to allow re-render
-        } catch (scrollErr: any) {
-          console.error('[CookScreen] 🛑 ERROR during scrollTo:', scrollErr.message, scrollErr.stack);
-        }
-      } else {
-        console.warn('[CookScreen] ⚠️ scrollViewRef.current is null when trying to scroll after switch.');
+        setTimeout(() => {
+          if (scrollViewRef.current) {
+            scrollViewRef.current.scrollTo({ y: newScrollY, animated: false });
+          }
+        }, 50);
       }
 
-      console.timeEnd(`[CookScreen] ⏱️ handleRecipeSwitch-${recipeId}`);
     } catch (e: any) {
-      console.error('[CookScreen] 🛑 FATAL CRASH CAUGHT IN handleRecipeSwitch OUTER TRY-CATCH!');
-      console.error('[CookScreen] 🛑 Error Name:', e.name);
-      console.error('[CookScreen] 🛑 Error Message:', e.message);
-      console.error('[CookScreen] 🛑 Error Stack:', e.stack);
-      console.error('[CookScreen] 🛑 State at crash time: typeof state:', typeof cookingContext.state);
-      console.error('[CookScreen] 🛑 State at crash time: state value (partial):', cookingContext.state ? { activeRecipeId: cookingContext.state.activeRecipeId, activeRecipesCount: cookingContext.state.activeRecipes?.length } : 'null/undefined');
-      console.error('[CookScreen] 🛑 State at crash time: typeof scrollViewRef.current:', typeof scrollViewRef.current);
-      console.error('[CookScreen] 🛑 State at crash time: scrollViewRef.current value (presence check):', !!scrollViewRef.current);
-      console.error('[CookScreen] 🛑 State at crash time: typeof state.activeRecipeId:', typeof cookingContext.state?.activeRecipeId);
-      
-      // DEFENSIVE: Extract showError to local constant
+      console.error('[CookScreen] Error in handleRecipeSwitch:', e.message);
       const showErrorFn = errorModalContext.showError;
       if (typeof showErrorFn === 'function') {
-        showErrorFn('Application Error', 'A critical error occurred while switching recipes. Please restart the app.');
-      } else {
-        console.error('[CookScreen] 🛑 CRITICAL: showError is also undefined!');
+        showErrorFn('Recipe Switch Error', 'Failed to switch recipe. Please try again.');
       }
     }
-  }, [cookingContext, errorModalContext, currentScrollY]); // Depend on the context objects directly, not destructured functions
+  }, [cookingContext, errorModalContext, currentScrollY]);
 
 
   const handleSwipeGesture = (event: any) => {
@@ -518,24 +396,10 @@ export default function CookScreen() {
       if (translationX < -100 && velocityX < -300 && currentIndex !== -1 && currentIndex < cookingContext.state.activeRecipes.length - 1) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         
-        // NEW LOGGING AND TRY-CATCH FOR CALL SITE
-        console.error('[CookScreen] 💥💥 CALL SITE DEBUG: Attempting to call handleRecipeSwitch (next). typeof handleRecipeSwitch:', typeof handleRecipeSwitch);
-        try {
-          // Defensive check before accessing next recipe
-          const nextRecipe = cookingContext.state.activeRecipes[currentIndex + 1];
-          if (nextRecipe && nextRecipe.recipeId) {
-            handleRecipeSwitch(nextRecipe.recipeId);
-          } else {
-            console.error('[CookScreen] 🛑 CALL SITE CRASH: Next recipe or its ID is undefined during swipe.');
-            if (typeof errorModalContext.showError === 'function') {
-              errorModalContext.showError('Swipe Error', 'Failed to find next recipe. Please try again.');
-            }
-          }
-        } catch (callSiteErr: any) {
-          console.error('[CookScreen] 🛑 CALL SITE CRASH: Error calling handleRecipeSwitch (next):', callSiteErr.message, callSiteErr.stack);
-          if (typeof errorModalContext.showError === 'function') {
-            errorModalContext.showError('Swipe Error', 'Failed to switch recipe during swipe. Please try again.');
-          }
+        // Defensive check before accessing next recipe
+        const nextRecipe = cookingContext.state.activeRecipes[currentIndex + 1];
+        if (nextRecipe && nextRecipe.recipeId) {
+          handleRecipeSwitch(nextRecipe.recipeId);
         }
 
       }
@@ -543,47 +407,24 @@ export default function CookScreen() {
       else if (translationX > 100 && velocityX > 300 && currentIndex !== -1 && currentIndex > 0) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-        // NEW LOGGING AND TRY-CATCH FOR CALL SITE
-        console.error('[CookScreen] 💥💥 CALL SITE DEBUG: Attempting to call handleRecipeSwitch (prev). typeof handleRecipeSwitch:', typeof handleRecipeSwitch);
-        try {
-          // Defensive check before accessing previous recipe
-          const prevRecipe = cookingContext.state.activeRecipes[currentIndex - 1];
-          if (prevRecipe && prevRecipe.recipeId) {
-            handleRecipeSwitch(prevRecipe.recipeId);
-          } else {
-            console.error('[CookScreen] 🛑 CALL SITE CRASH: Previous recipe or its ID is undefined during swipe.');
-            if (typeof errorModalContext.showError === 'function') {
-              errorModalContext.showError('Swipe Error', 'Failed to find previous recipe. Please try again.');
-            }
-          }
-        } catch (callSiteErr: any) {
-          console.error('[CookScreen] 🛑 CALL SITE CRASH: Error calling handleRecipeSwitch (prev):', callSiteErr.message, callSiteErr.stack);
-          if (typeof errorModalContext.showError === 'function') {
-            errorModalContext.showError('Swipe Error', 'Failed to switch recipe during swipe. Please try again.');
-          }
+        // Defensive check before accessing previous recipe
+        const prevRecipe = cookingContext.state.activeRecipes[currentIndex - 1];
+        if (prevRecipe && prevRecipe.recipeId) {
+          handleRecipeSwitch(prevRecipe.recipeId);
         }
       }
       // Swipe from left edge to go back - similar to summary.tsx
       else if (translationX > 100 && velocityX > 300 && currentIndex === 0) {
-        console.error('[CookScreen] 🔍 Attempting to navigate back via swipe');
-        console.error('[CookScreen] 🔍 router.canGoBack type:', typeof router.canGoBack);
-        console.error('[CookScreen] 🔍 router.back type:', typeof router.back);
-        console.error('[CookScreen] 🔍 router.navigate type:', typeof router.navigate);
-        
         try {
           // Check if we can go back properly, otherwise navigate to mise as fallback
           if (router.canGoBack && typeof router.canGoBack === 'function' && router.canGoBack()) {
-            console.error('[CookScreen] 🔍 Calling router.back()');
             router.back();
           } else {
-            console.error('[CookScreen] 🔍 Calling router.navigate to /tabs/mise');
             // Navigate back to mise tab
             router.navigate('/tabs/mise' as any);
           }
-          console.error('[CookScreen] ✅ Navigation call completed');
         } catch (navError: any) {
-          console.error('[CookScreen] 💥 Error during swipe navigation:', navError);
-          console.error('[CookScreen] 💥 Navigation error stack:', navError.stack);
+          console.error('[CookScreen] Error during swipe navigation:', navError);
           if (typeof errorModalContext.showError === 'function') {
             errorModalContext.showError('Navigation Error', 'Failed to navigate back. Please try again.');
           }
