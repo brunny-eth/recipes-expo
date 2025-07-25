@@ -431,81 +431,88 @@ export default function CookScreen() {
 
 
 
-  const handleRecipeSwitch = (recipeId: string) => {
-    console.time(`[CookScreen] ⏱️ handleRecipeSwitch-${recipeId}`);
-    console.log('[CookScreen] 🔄 Starting recipe switch to:', recipeId);
+  const handleRecipeSwitch = useCallback((recipeId: string) => {
+    try {
+      console.time(`[CookScreen] ⏱️ handleRecipeSwitch-${recipeId}`);
+      console.log('[CookScreen] 🔄 Starting recipe switch to:', recipeId);
 
-    // --- BEGIN CRITICAL NEW LOGGING ---
-    console.error('[CookScreen] 💥💥 CRASH DEBUG: handleRecipeSwitch entry point.');
-    console.error('[CookScreen] 💥💥 CRASH DEBUG: typeof state:', typeof state);
-    console.error('[CookScreen] 💥💥 CRASH DEBUG: state value (partial):', state ? { activeRecipeId: state.activeRecipeId, activeRecipesCount: state.activeRecipes?.length } : 'null/undefined');
-    console.error('[CookScreen] 💥💥 CRASH DEBUG: typeof scrollViewRef.current:', typeof scrollViewRef.current);
-    console.error('[CookScreen] 💥💥 CRASH DEBUG: scrollViewRef.current value (presence check):', !!scrollViewRef.current);
-    console.error('[CookScreen] 💥💥 CRASH DEBUG: typeof state.activeRecipeId:', typeof state?.activeRecipeId);
-    // --- END CRITICAL NEW LOGGING ---
+      // --- BEGIN CRITICAL NEW LOGGING (these should now be caught if crash is BEFORE them) ---
+      console.error('[CookScreen] 💥💥 CRASH DEBUG (inside try): handleRecipeSwitch entry point.');
+      console.error('[CookScreen] 💥💥 CRASH DEBUG (inside try): typeof state:', typeof state);
+      console.error('[CookScreen] 💥💥 CRASH DEBUG (inside try): state value (partial):', state ? { activeRecipeId: state.activeRecipeId, activeRecipesCount: state.activeRecipes?.length } : 'null/undefined');
+      console.error('[CookScreen] 💥💥 CRASH DEBUG (inside try): typeof scrollViewRef.current:', typeof scrollViewRef.current);
+      console.error('[CookScreen] 💥💥 CRASH DEBUG (inside try): scrollViewRef.current value (presence check):', !!scrollViewRef.current);
+      console.error('[CookScreen] 💥💥 CRASH DEBUG (inside try): typeof state.activeRecipeId:', typeof state?.activeRecipeId);
+      // --- END CRITICAL NEW LOGGING ---
 
-    // --- Original Debugging (keep these for now, they seem to run before crash) ---
-    console.error('[CookScreen] 🔍 Inside handleRecipeSwitch. Checking types:');
-    console.error('[CookScreen] 🔍 typeof setScrollPosition:', typeof setScrollPosition);
-    console.error('[CookScreen] 🔍 typeof switchRecipe:', typeof switchRecipe);
-    console.error('[CookScreen] 🔍 typeof getCurrentScrollPosition:', typeof getCurrentScrollPosition);
-    // --- END Original Debugging ---
+      // Save current scroll position before switching
+      // The crash is likely happening here if state or scrollViewRef.current are undefined
+      if (state.activeRecipeId && scrollViewRef.current) {
+        const currentScrollY = 0; // TODO: Get actual scroll position
+        
+        try {
+          if (typeof setScrollPosition === 'function') {
+            setScrollPosition(state.activeRecipeId, currentScrollY);
+            console.error('[CookScreen] ✅ setScrollPosition called successfully');
+          } else {
+            console.error('[CookScreen] 💥 setScrollPosition is NOT a function!');
+          }
+        } catch (error: any) {
+          console.error('[CookScreen] 💥 Error calling setScrollPosition:', error);
+          console.error('[CookScreen] 💥 setScrollPosition error stack:', error.stack);
+        }
+      }
 
-    // Save current scroll position before switching
-    if (state.activeRecipeId && scrollViewRef.current) {
-      const currentScrollY = 0; // TODO: Get actual scroll position
-      
-      // Add try-catch around setScrollPosition
+      // Add try-catch around switchRecipe
       try {
-        if (typeof setScrollPosition === 'function') {
-          setScrollPosition(state.activeRecipeId, currentScrollY);
-          console.error('[CookScreen] ✅ setScrollPosition called successfully');
+        if (typeof switchRecipe === 'function') {
+          switchRecipe(recipeId);
+          console.error('[CookScreen] ✅ switchRecipe called successfully');
         } else {
-          console.error('[CookScreen] 💥 setScrollPosition is NOT a function!');
+          console.error('[CookScreen] 💥 switchRecipe is NOT a function!');
         }
       } catch (error: any) {
-        console.error('[CookScreen] 💥 Error calling setScrollPosition:', error);
-        console.error('[CookScreen] 💥 setScrollPosition error stack:', error.stack);
+        console.error('[CookScreen] 💥 Error calling switchRecipe:', error);
+        console.error('[CookScreen] 💥 switchRecipe error stack:', error.stack);
       }
-    }
+      
+      console.log('[CookScreen] ✅ Recipe switch completed for:', recipeId);
+      console.timeEnd(`[CookScreen] ⏱️ handleRecipeSwitch-${recipeId}`);
 
-    // Add try-catch around switchRecipe
-    try {
-      if (typeof switchRecipe === 'function') {
-        switchRecipe(recipeId);
-        console.error('[CookScreen] ✅ switchRecipe called successfully');
-      } else {
-        console.error('[CookScreen] 💥 switchRecipe is NOT a function!');
+      // Restore scroll position for new recipe
+      let savedScrollY = 0;
+      try {
+        if (typeof getCurrentScrollPosition === 'function') {
+          savedScrollY = getCurrentScrollPosition(recipeId);
+          console.error('[CookScreen] ✅ getCurrentScrollPosition called successfully. Value:', savedScrollY);
+        } else {
+          console.error('[CookScreen] 💥 getCurrentScrollPosition is NOT a function!');
+        }
+      } catch (error: any) {
+        console.error('[CookScreen] 💥 Error calling getCurrentScrollPosition:', error);
+        console.error('[CookScreen] 💥 getCurrentScrollPosition error stack:', error.stack);
       }
-    } catch (error: any) {
-      console.error('[CookScreen] 💥 Error calling switchRecipe:', error);
-      console.error('[CookScreen] 💥 switchRecipe error stack:', error.stack);
-    }
-    
-    console.log('[CookScreen] ✅ Recipe switch completed for:', recipeId);
-    console.timeEnd(`[CookScreen] ⏱️ handleRecipeSwitch-${recipeId}`);
 
-    // Restore scroll position for new recipe
-    let savedScrollY = 0;
-    // Add try-catch around getCurrentScrollPosition
-    try {
-      if (typeof getCurrentScrollPosition === 'function') {
-        savedScrollY = getCurrentScrollPosition(recipeId);
-        console.error('[CookScreen] ✅ getCurrentScrollPosition called successfully. Value:', savedScrollY);
-      } else {
-        console.error('[CookScreen] 💥 getCurrentScrollPosition is NOT a function!');
+      if (savedScrollY > 0 && scrollViewRef.current) {
+        InteractionManager.runAfterInteractions(() => {
+          scrollViewRef.current?.scrollTo({ y: savedScrollY, animated: true });
+        });
       }
-    } catch (error: any) {
-      console.error('[CookScreen] 💥 Error calling getCurrentScrollPosition:', error);
-      console.error('[CookScreen] 💥 getCurrentScrollPosition error stack:', error.stack);
+    } catch (outerError: any) {
+      // This is the crucial part: if any part of handleRecipeSwitch fails very early, it will be caught here.
+      console.error('[CookScreen] 🛑 FATAL CRASH CAUGHT IN handleRecipeSwitch OUTER TRY-CATCH!');
+      console.error('[CookScreen] 🛑 Error Name:', outerError.name);
+      console.error('[CookScreen] 🛑 Error Message:', outerError.message);
+      console.error('[CookScreen] 🛑 Error Stack:', outerError.stack);
+      console.error('[CookScreen] 🛑 State at crash time: typeof state:', typeof state);
+      console.error('[CookScreen] 🛑 State at crash time: state value (partial):', state ? { activeRecipeId: state.activeRecipeId, activeRecipesCount: state.activeRecipes?.length } : 'null/undefined');
+      console.error('[CookScreen] 🛑 State at crash time: typeof scrollViewRef.current:', typeof scrollViewRef.current);
+      console.error('[CookScreen] 🛑 State at crash time: scrollViewRef.current value (presence check):', !!scrollViewRef.current);
+      console.error('[CookScreen] 🛑 State at crash time: typeof state.activeRecipeId:', typeof state?.activeRecipeId);
+      showError('Application Error', 'A critical error occurred while switching recipes. Please restart the app.'); // Inform the user
     }
+  }, [state, scrollViewRef, setScrollPosition, switchRecipe, getCurrentScrollPosition, showError]); // Dependencies for useCallback
 
-    if (savedScrollY > 0 && scrollViewRef.current) {
-      InteractionManager.runAfterInteractions(() => {
-        scrollViewRef.current?.scrollTo({ y: savedScrollY, animated: true });
-      });
-    }
-  };
 
   const handleSwipeGesture = (event: any) => {
     if (event.nativeEvent.state === State.END) {
@@ -728,15 +735,12 @@ export default function CookScreen() {
   return (
     <PanGestureHandler onHandlerStateChange={handleSwipeGesture}>
       <SafeAreaView style={styles.container}>
-        
-
-
         {/* Recipe Switcher */}
         <View style={styles.recipeSwitcherContainer}>
           <RecipeSwitcher
             recipes={state.activeRecipes}
             activeRecipeId={state.activeRecipeId || ''}
-            onRecipeSwitch={handleRecipeSwitch}
+            onRecipeSwitch={handleRecipeSwitch} // This remains the same
           />
         </View>
 
