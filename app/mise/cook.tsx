@@ -12,6 +12,8 @@ import {
   Modal,
   Pressable,
   FlatList,
+  NativeSyntheticEvent, // Import this for type safety for onScroll event
+  NativeScrollEvent, // Import this for type safety for onScroll event
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -103,7 +105,7 @@ export default function CookScreen() {
   const scrollPositionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // NEW: handleScroll function for onScroll prop - tracks current scroll position in state
-  const handleScroll = useCallback((event: any) => {
+  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const scrollY = event.nativeEvent.contentOffset.y;
     setCurrentScrollY(scrollY); // Update the state with current scroll position
     
@@ -401,7 +403,7 @@ export default function CookScreen() {
           // Look here for any complex cleanup operations that might involve external libraries
           // or specific objects that could be undefined if uninitialized.
         };
-      }, [session?.user?.id, session?.access_token]) // Removed function dependencies that change on every render
+      }, [session?.user?.id, session?.access_token, endAllSessions, initializeSessions]) // Added missing dependencies to useCallback
     );
 
   // Handle app state changes for timer management
@@ -436,13 +438,30 @@ export default function CookScreen() {
 
 
 
-  // NEW: Simplified handleRecipeSwitch using state-managed scroll position
+  // NEW: Defensive handleRecipeSwitch that doesn't rely on potentially stale context functions
   const handleRecipeSwitch = useCallback((recipeId: string) => {
     try {
       console.time(`[CookScreen] ⏱️ handleRecipeSwitch-${recipeId}`);
       console.log('[CookScreen] 🔄 Starting recipe switch to:', recipeId);
 
       console.error('[CookScreen] 💥💥 CRASH DEBUG (outer try): handleRecipeSwitch entry point.');
+
+      // DEFENSIVE: Check if context functions are still valid before using them
+      console.error('[CookScreen] DEBUG: Checking context function validity...');
+      console.error('[CookScreen] DEBUG: typeof setScrollPosition:', typeof setScrollPosition);
+      console.error('[CookScreen] DEBUG: typeof switchRecipe:', typeof switchRecipe);
+      console.error('[CookScreen] DEBUG: typeof getCurrentScrollPosition:', typeof getCurrentScrollPosition);
+      console.error('[CookScreen] DEBUG: typeof showError:', typeof showError);
+
+      // If any context function is undefined, bail out early
+      if (typeof setScrollPosition !== 'function' || 
+          typeof switchRecipe !== 'function' || 
+          typeof getCurrentScrollPosition !== 'function' || 
+          typeof showError !== 'function') {
+        console.error('[CookScreen] 🛑 CRITICAL: Context functions are undefined! Bailing out.');
+        showError('Context Error', 'Recipe switching context is invalid. Please restart the app.');
+        return;
+      }
 
       // NEW: Use the state variable for the scroll position instead of direct ref access
       const scrollYToSave = currentScrollY; // Use the most recently updated scroll position from state
@@ -497,9 +516,15 @@ export default function CookScreen() {
       console.error('[CookScreen] 🛑 State at crash time: typeof scrollViewRef.current:', typeof scrollViewRef.current);
       console.error('[CookScreen] 🛑 State at crash time: scrollViewRef.current value (presence check):', !!scrollViewRef.current);
       console.error('[CookScreen] 🛑 State at crash time: typeof state.activeRecipeId:', typeof state?.activeRecipeId);
-      showError('Application Error', 'A critical error occurred while switching recipes. Please restart the app.');
+      
+      // DEFENSIVE: Check if showError is still valid before using it
+      if (typeof showError === 'function') {
+        showError('Application Error', 'A critical error occurred while switching recipes. Please restart the app.');
+      } else {
+        console.error('[CookScreen] 🛑 CRITICAL: showError is also undefined!');
+      }
     }
-  }, [state.activeRecipeId, setScrollPosition, switchRecipe, currentScrollY, getCurrentScrollPosition, showError]); // Add currentScrollY to deps
+  }, [state.activeRecipeId, currentScrollY]); // REMOVED context function dependencies
 
 
   const handleSwipeGesture = (event: any) => {
@@ -510,12 +535,31 @@ export default function CookScreen() {
       // Swipe left (next recipe) - need sufficient distance and velocity
       if (translationX < -100 && velocityX < -300 && currentIndex < state.activeRecipes.length - 1) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        handleRecipeSwitch(state.activeRecipes[currentIndex + 1].recipeId);
+        
+        // NEW LOGGING AND TRY-CATCH FOR CALL SITE
+        console.error('[CookScreen] 💥💥 CALL SITE DEBUG: Attempting to call handleRecipeSwitch (next). typeof handleRecipeSwitch:', typeof handleRecipeSwitch);
+        try {
+          // This is the call to handleRecipeSwitch that seems to be crashing.
+          handleRecipeSwitch(state.activeRecipes[currentIndex + 1].recipeId);
+        } catch (callSiteErr: any) {
+          console.error('[CookScreen] 🛑 CALL SITE CRASH: Error calling handleRecipeSwitch (next):', callSiteErr.message, callSiteErr.stack);
+          showError('Swipe Error', 'Failed to switch recipe during swipe. Please try again.');
+        }
+
       }
       // Swipe right (previous recipe)
       else if (translationX > 100 && velocityX > 300 && currentIndex > 0) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        handleRecipeSwitch(state.activeRecipes[currentIndex - 1].recipeId);
+
+        // NEW LOGGING AND TRY-CATCH FOR CALL SITE
+        console.error('[CookScreen] 💥💥 CALL SITE DEBUG: Attempting to call handleRecipeSwitch (prev). typeof handleRecipeSwitch:', typeof handleRecipeSwitch);
+        try {
+          // This is the call to handleRecipeSwitch that seems to be crashing.
+          handleRecipeSwitch(state.activeRecipes[currentIndex - 1].recipeId);
+        } catch (callSiteErr: any) {
+          console.error('[CookScreen] 🛑 CALL SITE CRASH: Error calling handleRecipeSwitch (prev):', callSiteErr.message, callSiteErr.stack);
+          showError('Swipe Error', 'Failed to switch recipe during swipe. Please try again.');
+        }
       }
       // Swipe from left edge to go back - similar to summary.tsx
       else if (translationX > 100 && velocityX > 300 && currentIndex === 0) {
@@ -1113,4 +1157,4 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     fontSize: 16,
   },
-}); 
+});
