@@ -468,6 +468,23 @@ export default function CookScreen() {
         console.error('[CookScreen] 💥💥 CRASH DEBUG: Result of scrollViewRef.current check:', hasValidScrollViewRef);
         if (!hasValidScrollViewRef) {
           console.error('[CookScreen] 💥💥 CRASH DEBUG: scrollViewRef.current is null/undefined.');
+        } else {
+          // Additional validation: check if the ref is still connected to a valid component
+          console.error('[CookScreen] 💥💥 CRASH DEBUG: scrollViewRef.current type:', typeof scrollViewRef.current);
+          console.error('[CookScreen] 💥💥 CRASH DEBUG: scrollViewRef.current constructor:', scrollViewRef.current?.constructor?.name);
+          
+          // Check if the component is still mounted and valid
+          try {
+            const nativeTag = (scrollViewRef.current as any)?._nativeTag;
+            console.error('[CookScreen] 💥💥 CRASH DEBUG: scrollViewRef.current._nativeTag:', nativeTag);
+            if (!nativeTag) {
+              console.error('[CookScreen] 💥💥 CRASH DEBUG: WARNING - scrollViewRef.current has no _nativeTag, may be stale!');
+              hasValidScrollViewRef = false;
+            }
+          } catch (nativeTagError: any) {
+            console.error('[CookScreen] 💥💥 CRASH DEBUG: Error checking _nativeTag:', nativeTagError.message);
+            hasValidScrollViewRef = false;
+          }
         }
       } catch (e: any) {
         console.error('[CookScreen] 🛑🛑🛑 CRASH DEBUG ERROR: Exception during scrollViewRef.current check:', e.message, e.stack);
@@ -477,6 +494,18 @@ export default function CookScreen() {
       // Proceed only if both are truly valid
       if (hasValidActiveRecipeId && hasValidScrollViewRef) {
         console.error('[CookScreen] ✅ Both state.activeRecipeId AND scrollViewRef.current are confirmed valid. Proceeding to scroll position logic.');
+        
+        // Additional check: ensure currentRecipe exists and is valid
+        const currentRecipe = state.activeRecipes.find(
+          recipe => recipe.recipeId === state.activeRecipeId
+        );
+        console.error('[CookScreen] 💥💥 CRASH DEBUG: currentRecipe exists:', !!currentRecipe);
+        console.error('[CookScreen] 💥💥 CRASH DEBUG: currentRecipe loading state:', currentRecipe?.isLoading);
+        console.error('[CookScreen] 💥💥 CRASH DEBUG: currentRecipe has recipe data:', !!currentRecipe?.recipe);
+        
+        if (!currentRecipe) {
+          console.error('[CookScreen] 💥💥 CRASH DEBUG: WARNING - currentRecipe is null, ScrollView may be in invalid state!');
+        }
 
         // --- NEW: Even more granular checks for scrollViewRef.current properties ---
         // Wrap each property access in its own try-catch
