@@ -73,6 +73,8 @@ type CookingContextType = {
   setScrollPosition: (recipeId: string, position: number) => void;
   getCurrentScrollPosition: (recipeId: string) => number;
   hasResumableSession: () => boolean;
+  // TEMPORARY: For debugging minification issues
+  setActiveRecipeId: (recipeId: string | null) => void;
 };
 
 const initialState: CookingState = {
@@ -547,6 +549,8 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
       setScrollPosition,
       getCurrentScrollPosition,
       hasResumableSession,
+      // TEMPORARY: For debugging minification issues
+      setActiveRecipeId,
     }),
     [
       state,
@@ -563,6 +567,8 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
       setScrollPosition,
       getCurrentScrollPosition,
       hasResumableSession,
+      // TEMPORARY: For debugging minification issues
+      setActiveRecipeId,
     ]
   );
 
