@@ -96,13 +96,18 @@ export default function CookScreen() {
   const [isRecipeTipsModalVisible, setIsRecipeTipsModalVisible] = useState(false);
   // --- End Recipe Tips Modal State ---
 
+  // NEW: State to store the current scroll Y position
+  const [currentScrollY, setCurrentScrollY] = useState(0);
+
   // Add scroll position throttling
   const scrollPositionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const handleScroll = (event: any) => {
+  // NEW: handleScroll function for onScroll prop - tracks current scroll position in state
+  const handleScroll = useCallback((event: any) => {
+    const scrollY = event.nativeEvent.contentOffset.y;
+    setCurrentScrollY(scrollY); // Update the state with current scroll position
+    
     if (state.activeRecipeId) {
-      const scrollY = event.nativeEvent.contentOffset.y;
-      
       // Clear existing timeout
       if (scrollPositionTimeoutRef.current) {
         clearTimeout(scrollPositionTimeoutRef.current);
@@ -113,7 +118,7 @@ export default function CookScreen() {
         setScrollPosition(state.activeRecipeId!, scrollY);
       }, 100); // Update every 100ms instead of every 16ms
     }
-  };
+  }, [state.activeRecipeId, setScrollPosition]);
 
   // Component lifecycle monitoring with cleanup
   useEffect(() => {
@@ -431,226 +436,62 @@ export default function CookScreen() {
 
 
 
+  // NEW: Simplified handleRecipeSwitch using state-managed scroll position
   const handleRecipeSwitch = useCallback((recipeId: string) => {
     try {
       console.time(`[CookScreen] ⏱️ handleRecipeSwitch-${recipeId}`);
       console.log('[CookScreen] 🔄 Starting recipe switch to:', recipeId);
 
-      // --- TOP DEBUG: Check function types at the very beginning ---
-      console.error('[CookScreen] TOP DEBUG: typeof setScrollPosition:', typeof setScrollPosition);
-      console.error('[CookScreen] TOP DEBUG: typeof switchRecipe:', typeof switchRecipe);
-      console.error('[CookScreen] TOP DEBUG: typeof getCurrentScrollPosition:', typeof getCurrentScrollPosition);
-
-      // --- GENERAL ENTRY POINT CHECKS ---
       console.error('[CookScreen] 💥💥 CRASH DEBUG (outer try): handleRecipeSwitch entry point.');
-      console.error('[CookScreen] 💥💥 CRASH DEBUG (outer try): typeof state:', typeof state);
-      console.error('[CookScreen] 💥💥 CRASH DEBUG (outer try): state value (partial):', state ? { activeRecipeId: state.activeRecipeId, activeRecipesCount: state.activeRecipes?.length } : 'null/undefined');
-      console.error('[CookScreen] 💥💥 CRASH DEBUG (outer try): typeof scrollViewRef.current:', typeof scrollViewRef.current);
-      console.error('[CookScreen] 💥💥 CRASH DEBUG (outer try): scrollViewRef.current value (presence check):', !!scrollViewRef.current);
-      console.error('[CookScreen] 💥💥 CRASH DEBUG (outer try): typeof state.activeRecipeId:', typeof state?.activeRecipeId);
 
-      // --- GRANULAR IF CONDITION EVALUATION ---
-      let hasValidActiveRecipeId = false;
-      try {
-        hasValidActiveRecipeId = !!(state?.activeRecipeId && typeof state.activeRecipeId === 'string');
-        console.error('[CookScreen] 💥💥 CRASH DEBUG: Result of state.activeRecipeId check:', hasValidActiveRecipeId);
-        if (!hasValidActiveRecipeId) {
-          console.error('[CookScreen] 💥💥 CRASH DEBUG: state.activeRecipeId is missing or not a string.');
-        }
-      } catch (e: any) {
-        console.error('[CookScreen] 🛑🛑🛑 CRASH DEBUG ERROR: Exception during state.activeRecipeId check:', e.message, e.stack);
-        throw e; // Re-throw to catch with outer catch
+      // NEW: Use the state variable for the scroll position instead of direct ref access
+      const scrollYToSave = currentScrollY; // Use the most recently updated scroll position from state
+
+      console.error('[CookScreen] DEBUG: ScrollY to save:', scrollYToSave);
+
+      if (state.activeRecipeId) {
+        const savedScrollPosition = getCurrentScrollPosition(state.activeRecipeId);
+        console.error('[CookScreen] DEBUG: Previously saved scroll position for activeRecipe:', savedScrollPosition);
+        
+        // Save the current scroll position for the *old* active recipe ID
+        console.log(`[CookScreen] 💾 Saving scroll position ${scrollYToSave} for recipe ${state.activeRecipeId}`);
+        setScrollPosition(state.activeRecipeId, scrollYToSave);
+      } else {
+        console.log('[CookScreen] ⚠️ No activeRecipeId to save scroll position for.');
       }
 
-      let hasValidScrollViewRef = false;
-      try {
-        hasValidScrollViewRef = !!scrollViewRef.current;
-        console.error('[CookScreen] 💥💥 CRASH DEBUG: Result of scrollViewRef.current check:', hasValidScrollViewRef);
-        if (!hasValidScrollViewRef) {
-          console.error('[CookScreen] 💥💥 CRASH DEBUG: scrollViewRef.current is null/undefined.');
-        } else {
-          // Additional validation: check if the ref is still connected to a valid component
-          console.error('[CookScreen] 💥💥 CRASH DEBUG: scrollViewRef.current type:', typeof scrollViewRef.current);
-          console.error('[CookScreen] 💥💥 CRASH DEBUG: scrollViewRef.current constructor:', scrollViewRef.current?.constructor?.name);
-          
-          // Check if the component is still mounted and valid
-          try {
-            const nativeTag = (scrollViewRef.current as any)?._nativeTag;
-            console.error('[CookScreen] 💥💥 CRASH DEBUG: scrollViewRef.current._nativeTag:', nativeTag);
-            if (!nativeTag) {
-              console.error('[CookScreen] 💥💥 CRASH DEBUG: WARNING - scrollViewRef.current has no _nativeTag, may be stale!');
-              hasValidScrollViewRef = false;
+      console.log(`[CookScreen] 🚀 Switching to recipe: ${recipeId}`);
+      switchRecipe(recipeId);
+
+      // Now, try to scroll to the new recipe's saved position after the switch
+      const newRecipeSavedScrollY = getCurrentScrollPosition(recipeId);
+      console.log(`[CookScreen] ➡️ Attempting to scroll new recipe ${recipeId} to: ${newRecipeSavedScrollY}`);
+
+      if (scrollViewRef.current) {
+        // Wrap this in a safe block as well
+        try {
+          // Delaying the scroll slightly often helps with rendering race conditions
+          setTimeout(() => {
+            if (scrollViewRef.current) {
+              scrollViewRef.current.scrollTo({ y: newRecipeSavedScrollY, animated: false });
+              console.log(`[CookScreen] ✅ Scrolled to position ${newRecipeSavedScrollY} for new recipe ${recipeId}`);
+            } else {
+              console.warn('[CookScreen] ⚠️ scrollViewRef.current is null when trying to scroll.');
             }
-          } catch (nativeTagError: any) {
-            console.error('[CookScreen] 💥💥 CRASH DEBUG: Error checking _nativeTag:', nativeTagError.message);
-            hasValidScrollViewRef = false;
-          }
-        }
-      } catch (e: any) {
-        console.error('[CookScreen] 🛑🛑🛑 CRASH DEBUG ERROR: Exception during scrollViewRef.current check:', e.message, e.stack);
-        throw e; // Re-throw to catch with outer catch
-      }
-
-      // Proceed only if both are truly valid
-      if (hasValidActiveRecipeId && hasValidScrollViewRef) {
-        console.error('[CookScreen] ✅ Both state.activeRecipeId AND scrollViewRef.current are confirmed valid. Proceeding to scroll position logic.');
-        
-        // Additional check: ensure currentRecipe exists and is valid
-        const currentRecipe = state.activeRecipes.find(
-          recipe => recipe.recipeId === state.activeRecipeId
-        );
-        console.error('[CookScreen] 💥💥 CRASH DEBUG: currentRecipe exists:', !!currentRecipe);
-        console.error('[CookScreen] 💥💥 CRASH DEBUG: currentRecipe loading state:', currentRecipe?.isLoading);
-        console.error('[CookScreen] 💥💥 CRASH DEBUG: currentRecipe has recipe data:', !!currentRecipe?.recipe);
-        
-        if (!currentRecipe) {
-          console.error('[CookScreen] 💥💥 CRASH DEBUG: WARNING - currentRecipe is null, ScrollView may be in invalid state!');
-        }
-
-        // --- NEW: Even more granular checks for scrollViewRef.current properties ---
-        // Wrap each property access in its own try-catch
-        try {
-          console.error('[CookScreen] CRASH DEBUG: Checking scrollViewRef.current properties - START');
-          // Log scrollViewRef.current itself if it's safe to stringify
-          try {
-            console.error('[CookScreen] CRASH DEBUG: scrollViewRef.current object (JSON.stringify safe portion):', JSON.stringify(Object.keys(scrollViewRef.current || {})));
-          } catch (e: any) {
-            console.error('[CookScreen] CRASH DEBUG: Error stringifying scrollViewRef.current keys:', e.message);
-          }
-
-          // Check if it's a valid React Native ScrollView instance (or at least has ._nativeTag)
-          try {
-            console.error('[CookScreen] CRASH DEBUG: scrollViewRef.current._nativeTag presence:', !!(scrollViewRef.current as any)._nativeTag);
-          } catch (e: any) {
-            console.error('[CookScreen] CRASH DEBUG: Error accessing _nativeTag:', e.message);
-          }
-
-          try {
-            console.error('[CookScreen] CRASH DEBUG: scrollViewRef.current.scrollTo typeof:', typeof (scrollViewRef.current as any).scrollTo);
-          } catch (e: any) {
-            console.error('[CookScreen] CRASH DEBUG: Error accessing scrollTo typeof:', e.message);
-          }
-
-          try {
-            console.error('[CookScreen] CRASH DEBUG: scrollViewRef.current.getScrollResponder typeof:', typeof (scrollViewRef.current as any).getScrollResponder);
-          } catch (e: any) {
-            console.error('[CookScreen] CRASH DEBUG: Error accessing getScrollResponder typeof:', e.message);
-          }
-          console.error('[CookScreen] CRASH DEBUG: Checking scrollViewRef.current properties - END');
-
-        } catch (e: any) {
-          console.error('[CookScreen] CRASH DEBUG: Caught general error during scrollViewRef.current property checks:', e.message, e.stack);
-          // Re-throw this to ensure outer catch gets it with the exact location
-          throw e;
-        }
-
-        // --- Granular checks for contentOffset and y ---
-        let currentScrollY: number = 0; // Initialize to ensure it's a number
-
-        try {
-          console.error('[CookScreen] CRASH DEBUG: Attempting to access scrollViewRef.current.contentOffset...');
-          // Note: contentOffset is not a direct property on ScrollView ref in React Native
-          // This is a test to see if this access causes the crash
-          console.error('[CookScreen] CRASH DEBUG: scrollViewRef.current exists:', !!scrollViewRef.current);
-          
-          // Use getCurrentScrollPosition as the safe alternative
-          if (typeof getCurrentScrollPosition === 'function' && state.activeRecipeId) {
-            currentScrollY = getCurrentScrollPosition(state.activeRecipeId);
-            console.error('[CookScreen] CRASH DEBUG: getCurrentScrollPosition result:', currentScrollY);
-          } else {
-            console.error('[CookScreen] CRASH DEBUG: getCurrentScrollPosition is not a function or activeRecipeId is null, using 0');
-            currentScrollY = 0;
-          }
-
-        } catch (errDuringScrollYCalculation: any) {
-          console.error('[CookScreen] CRASH DEBUG: Caught error during scrollY calculation TRY BLOCK:', errDuringScrollYCalculation.message);
-          console.error('[CookScreen] CRASH DEBUG: Error Stack from scrollY calculation TRY BLOCK:', errDuringScrollYCalculation.stack);
-          throw errDuringScrollYCalculation; // Re-throw to be caught by the outer handleRecipeSwitch try/catch
-        }
-
-        console.error('[CookScreen] CRASH DEBUG: currentScrollY AFTER CALCULATION (type):', typeof currentScrollY);
-        console.error('[CookScreen] CRASH DEBUG: currentScrollY AFTER CALCULATION (value):', currentScrollY);
-        
-        // --- Checks immediately before calling setScrollPosition ---
-        console.error('[CookScreen] CRASH DEBUG: Before setScrollPosition call - state.activeRecipeId type:', typeof state.activeRecipeId);
-        console.error('[CookScreen] CRASH DEBUG: Before setScrollPosition call - state.activeRecipeId value:', state.activeRecipeId);
-        console.error('[CookScreen] CRASH DEBUG: Before setScrollPosition call - currentScrollY type:', typeof currentScrollY);
-        console.error('[CookScreen] CRASH DEBUG: Before setScrollPosition call - currentScrollY value:', currentScrollY);
-        console.error('[CookScreen] CRASH DEBUG: Before setScrollPosition call - typeof setScrollPosition:', typeof setScrollPosition);
-        console.error('[CookScreen] CRASH DEBUG: Before setScrollPosition call - setScrollPosition is function?', typeof setScrollPosition === 'function');
-
-        try {
-          if (typeof setScrollPosition === 'function' && state.activeRecipeId) {
-            setScrollPosition(state.activeRecipeId, currentScrollY); // Use currentScrollY
-            console.error('[CookScreen] CRASH DEBUG: setScrollPosition called successfully.');
-          } else {
-            console.error('[CookScreen] 💥 setScrollPosition is NOT a function or activeRecipeId is null!');
-          }
-        } catch (errSetScrollPosition: any) {
-          console.error('[CookScreen] CRASH DEBUG: Caught error calling setScrollPosition TRY BLOCK:', errSetScrollPosition.message);
-          console.error('[CookScreen] CRASH DEBUG: Error Stack from setScrollPosition TRY BLOCK:', errSetScrollPosition.stack);
-          throw errSetScrollPosition; // Re-throw for the outer catch to handle
+          }, 50); // Small delay to allow re-render
+        } catch (scrollErr: any) {
+          console.error('[CookScreen] 🛑 ERROR during scrollTo:', scrollErr.message, scrollErr.stack);
         }
       } else {
-        console.error('[CookScreen] ⚠️ Skipping scroll position logic because one or both conditions failed: hasValidActiveRecipeId:', hasValidActiveRecipeId, 'hasValidScrollViewRef:', hasValidScrollViewRef);
+        console.warn('[CookScreen] ⚠️ scrollViewRef.current is null when trying to scroll after switch.');
       }
 
-      // --- Checks immediately before calling switchRecipe ---
-      console.error('[CookScreen] CRASH DEBUG: Before switchRecipe call - recipeId type:', typeof recipeId);
-      console.error('[CookScreen] CRASH DEBUG: Before switchRecipe call - recipeId value:', recipeId);
-      console.error('[CookScreen] CRASH DEBUG: Before switchRecipe call - typeof switchRecipe:', typeof switchRecipe);
-      console.error('[CookScreen] CRASH DEBUG: Before switchRecipe call - switchRecipe is function?', typeof switchRecipe === 'function');
-
-      try {
-        if (typeof switchRecipe === 'function') {
-          switchRecipe(recipeId);
-          console.error('[CookScreen] CRASH DEBUG: switchRecipe called successfully.');
-        } else {
-          console.error('[CookScreen] 💥 switchRecipe is NOT a function!');
-        }
-      } catch (errSwitchRecipe: any) {
-        console.error('[CookScreen] CRASH DEBUG: Caught error calling switchRecipe TRY BLOCK:', errSwitchRecipe.message);
-        console.error('[CookScreen] CRASH DEBUG: Error Stack from switchRecipe TRY BLOCK:', errSwitchRecipe.stack);
-        throw errSwitchRecipe; // Re-throw for the outer catch to handle
-      }
-      
-      console.log('[CookScreen] ✅ Recipe switch completed for:', recipeId);
       console.timeEnd(`[CookScreen] ⏱️ handleRecipeSwitch-${recipeId}`);
-
-      // Restore scroll position for new recipe
-      let savedScrollY = 0;
-      try {
-        console.error('[CookScreen] 💥💥 CRASH DEBUG: About to call getCurrentScrollPosition');
-        if (typeof getCurrentScrollPosition === 'function') {
-          savedScrollY = getCurrentScrollPosition(recipeId);
-          console.error('[CookScreen] ✅ getCurrentScrollPosition called successfully. Value:', savedScrollY);
-        } else {
-          console.error('[CookScreen] 💥 getCurrentScrollPosition is NOT a function!');
-        }
-      } catch (error: any) {
-        console.error('[CookScreen] 💥 Error calling getCurrentScrollPosition:', error);
-        console.error('[CookScreen] 💥 getCurrentScrollPosition error stack:', error.stack);
-        throw error; // Re-throw to ensure outer catch gets it
-      }
-
-      if (savedScrollY > 0 && scrollViewRef.current) {
-        InteractionManager.runAfterInteractions(() => {
-          try {
-            console.error('[CookScreen] 💥💥 CRASH DEBUG: About to call scrollViewRef.current.scrollTo');
-            scrollViewRef.current?.scrollTo({ y: savedScrollY, animated: true });
-            console.error('[CookScreen] ✅ scrollViewRef.current.scrollTo called successfully.');
-          } catch (error: any) {
-            console.error('[CookScreen] 💥 Error calling scrollViewRef.current.scrollTo:', error);
-            console.error('[CookScreen] 💥 scrollViewRef.current.scrollTo error stack:', error.stack);
-            // Don't rethrow here, scroll isn't critical app path
-          }
-        });
-      }
-    } catch (outerError: any) {
+    } catch (e: any) {
       console.error('[CookScreen] 🛑 FATAL CRASH CAUGHT IN handleRecipeSwitch OUTER TRY-CATCH!');
-      console.error('[CookScreen] 🛑 Error Name:', outerError.name);
-      console.error('[CookScreen] 🛑 Error Message:', outerError.message);
-      console.error('[CookScreen] 🛑 Error Stack:', outerError.stack);
+      console.error('[CookScreen] 🛑 Error Name:', e.name);
+      console.error('[CookScreen] 🛑 Error Message:', e.message);
+      console.error('[CookScreen] 🛑 Error Stack:', e.stack);
       console.error('[CookScreen] 🛑 State at crash time: typeof state:', typeof state);
       console.error('[CookScreen] 🛑 State at crash time: state value (partial):', state ? { activeRecipeId: state.activeRecipeId, activeRecipesCount: state.activeRecipes?.length } : 'null/undefined');
       console.error('[CookScreen] 🛑 State at crash time: typeof scrollViewRef.current:', typeof scrollViewRef.current);
@@ -658,7 +499,7 @@ export default function CookScreen() {
       console.error('[CookScreen] 🛑 State at crash time: typeof state.activeRecipeId:', typeof state?.activeRecipeId);
       showError('Application Error', 'A critical error occurred while switching recipes. Please restart the app.');
     }
-  }, [state, scrollViewRef, setScrollPosition, switchRecipe, getCurrentScrollPosition, showError]);
+  }, [state.activeRecipeId, setScrollPosition, switchRecipe, currentScrollY, getCurrentScrollPosition, showError]); // Add currentScrollY to deps
 
 
   const handleSwipeGesture = (event: any) => {
