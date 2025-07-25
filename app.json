@@ -4,12 +4,12 @@
     "slug": "meez",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/meezrecipes_icon.png",
+    "icon": "./assets/images/meezblue_underline.png",
     "scheme": "meez",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/meez_logo.png",
+      "image": "./assets/images/meezblue_underline.png",
       "resizeMode": "contain",
       "backgroundColor": "#fefcf7"
     },
@@ -22,7 +22,7 @@
         "com.apple.developer.associated-domains": ["applinks:meez.app"]
       },
       "splash": {
-        "image": "./assets/images/meez_logo.png",
+        "image": "./assets/images/meezblue_underline.png",
         "resizeMode": "contain",
         "backgroundColor": "#fefcf7"
       },
@@ -38,7 +38,7 @@
     "android": {
       "package": "com.meez.recipes",
       "splash": {
-        "image": "./assets/images/meez_logo.png",
+        "image": "./assets/images/meezblue_underline.png",
         "resizeMode": "contain",
         "backgroundColor": "#fefcf7"
       }
@@ -46,7 +46,7 @@
     "web": {
       "bundler": "metro",
       "output": "single",
-      "favicon": "./assets/images/meezrecipes_icon.png"
+      "favicon": "./assets/images/meezblue_underline.png"
     },
     "plugins": [
       "expo-router",
