@@ -98,9 +98,15 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
 
   console.error('[CookingContext] ✅ useState hooks initialized successfully.');
 
-  // State monitoring effect (reduced logging)
+  // State monitoring effect with timestamps to track when state changes
   useEffect(() => {
-    console.error(`[CookingContext] ✅ useState initialized. activeRecipes: ${activeRecipes?.length}, activeRecipeId: ${activeRecipeId}`);
+    const timestamp = new Date().toISOString();
+    console.error(`[CookingContext] 📊 STATE CHANGE at ${timestamp}: activeRecipes: ${activeRecipes?.length}, activeRecipeId: ${activeRecipeId}, sessionStartTime: ${sessionStartTime}`);
+    
+    // Log what might have triggered this state change
+    if (activeRecipes?.length > 0) {
+      console.error('[CookingContext] 📊 Active recipes detected:', activeRecipes.map(r => ({ id: r.recipeId, hasRecipe: !!r.recipe })));
+    }
   }, [activeRecipes, activeRecipeId, sessionStartTime]);
   
   const { session } = useAuth();
@@ -108,7 +114,8 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
   // Load state from storage on mount with recovery logic
   useEffect(() => {
     const loadState = async () => {
-      console.error('[CookingContext] 🔄 Loading cooking state from AsyncStorage on mount');
+      const loadTimestamp = new Date().toISOString();
+      console.error(`[CookingContext] 🔄 ASYNCSTORAGE LOAD START at ${loadTimestamp}`);
       
       try {
         const savedState = await AsyncStorage.getItem('meez.cookingSession');
@@ -145,7 +152,15 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
         
         if (sessionAge < maxAge && parsedState.activeRecipes?.length > 0) {
           // Valid session found - can be resumed
-          console.error('[CookingContext] ✅ Found resumable cooking session, restoring state');
+          const restoreTimestamp = new Date().toISOString();
+          console.error(`[CookingContext] ✅ RESTORING SESSION from AsyncStorage at ${restoreTimestamp}`);
+          console.error('[CookingContext] ✅ Restoring data:', {
+            activeRecipesCount: parsedState.activeRecipes?.length,
+            activeRecipeId: parsedState.activeRecipeId,
+            sessionStartTime: parsedState.sessionStartTime,
+            sessionAgeHours: Math.round(sessionAge / (60 * 60 * 1000) * 10) / 10
+          });
+          
           // Use deepEqual to prevent unnecessary re-renders if state is identical
           if (!deepEqual(activeRecipes, parsedState.activeRecipes)) {
             setActiveRecipes(parsedState.activeRecipes);
@@ -566,16 +581,27 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
   }, [activeRecipes, sessionStartTime]);
 
   const invalidateSession = useCallback(() => {
-    console.log('[CookingContext] 🗑️ Invalidating cooking session - forcing fresh data fetch');
+    const timestamp = new Date().toISOString();
+    console.log(`[CookingContext] 🗑️ INVALIDATING SESSION at ${timestamp}`);
+    console.log('[CookingContext] 🗑️ Before invalidation:', { 
+      activeRecipesCount: activeRecipes.length, 
+      activeRecipeId, 
+      sessionStartTime 
+    });
+    
     setActiveRecipes([]);
     setActiveRecipeId(null);
     setSessionStartTime(undefined);
     
+    console.log('[CookingContext] 🗑️ After invalidation state set - should be empty');
+    
     // Also clear AsyncStorage
-    AsyncStorage.removeItem('meez.cookingSession').catch(error => {
+    AsyncStorage.removeItem('meez.cookingSession').then(() => {
+      console.log('[CookingContext] 🗑️ AsyncStorage cleared successfully');
+    }).catch(error => {
       console.warn('[CookingContext] Warning: Failed to clear AsyncStorage during invalidation:', error);
     });
-  }, []);
+  }, [activeRecipes, activeRecipeId, sessionStartTime]);
 
   // Construct the state object for the context value
   const state = useMemo(() => ({

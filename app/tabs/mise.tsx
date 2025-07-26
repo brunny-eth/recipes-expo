@@ -113,11 +113,39 @@ const convertToGroceryCategories = (items: any[]): GroceryCategory[] => {
       categories[categoryName] = [];
     }
     
+    // Fallback unit parsing when backend fails to extract compound units
+    let finalUnit = item.display_unit || item.quantity_unit;
+    
+    // If unit is null but we have original text with compound units, try to extract them
+    if (!finalUnit && item.original_ingredient_text && item.quantity_amount) {
+      const originalText = item.original_ingredient_text.toLowerCase().trim();
+      
+      // Common compound unit patterns that backend often misses
+      const compoundUnits = [
+        { pattern: /(\d+(\.\d+)?)\s*ounce\s+can/i, unit: 'oz can' },
+        { pattern: /(\d+(\.\d+)?)\s*oz\s+can/i, unit: 'oz can' },
+        { pattern: /(\d+(\.\d+)?)\s*pound\s+bag/i, unit: 'lb bag' },
+        { pattern: /(\d+(\.\d+)?)\s*lb\s+bag/i, unit: 'lb bag' },
+        { pattern: /(\d+(\.\d+)?)\s*ounce\s+package/i, unit: 'oz package' },
+        { pattern: /(\d+(\.\d+)?)\s*oz\s+package/i, unit: 'oz package' },
+        { pattern: /(\d+(\.\d+)?)\s*ounce\s+jar/i, unit: 'oz jar' },
+        { pattern: /(\d+(\.\d+)?)\s*oz\s+jar/i, unit: 'oz jar' },
+      ];
+      
+      for (const { pattern, unit } of compoundUnits) {
+        if (pattern.test(originalText)) {
+          finalUnit = unit;
+          console.log(`[MiseScreen] 🔧 Fallback unit extraction: "${originalText}" → unit: "${unit}"`);
+          break;
+        }
+      }
+    }
+    
     const groceryItem = {
       id: item.id || `item_${index}`,
       name: item.item_name || item.name,
       amount: item.quantity_amount,
-      unit: item.display_unit || item.quantity_unit, // Use display_unit if available
+      unit: finalUnit, // Use fallback unit if available
       category: categoryName,
       checked: item.is_checked || false,
     };
@@ -134,26 +162,20 @@ const convertToGroceryCategories = (items: any[]): GroceryCategory[] => {
     categories[categoryName].push(groceryItem);
   });
   
-  // Convert to array format expected by UI
-  const result = Object.entries(categories).map(([categoryName, items]) => ({
-    name: categoryName,
-    items: items,
-  }));
-  
-  console.log('[MiseScreen] ✅ Final categorized result:', {
-    categoryCount: result.length,
-    categories: result.map(cat => ({
-      name: cat.name,
-      itemCount: cat.items.length,
-      items: cat.items.map(item => ({
-        name: item.name,
-        amount: item.amount,
-        unit: item.unit
-      }))
-    }))
-  });
-  
-  return result;
+  // Convert to sorted array of categories
+  return Object.entries(categories)
+    .map(([name, items]) => ({ name, items }))
+    .sort((a, b) => {
+      // Put common categories first
+      const order = ['Produce', 'Dairy & Eggs', 'Meat & Seafood', 'Pantry', 'Bakery', 'Frozen'];
+      const aIndex = order.indexOf(a.name);
+      const bIndex = order.indexOf(b.name);
+      
+      if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+      if (aIndex !== -1) return -1;
+      if (bIndex !== -1) return 1;
+      return a.name.localeCompare(b.name);
+    });
 };
 
 // Merge manual items into grocery categories
@@ -316,7 +338,7 @@ const filterHouseholdStaples = (
 };
 
 export default function MiseScreen() {
-  console.error('[MiseScreen] 🧨 FRESH BUILD MARKER vB2 - added cooking session invalidation');
+  console.error('[MiseScreen] 🧨 FRESH BUILD MARKER vB6 - added fallback parsing for compound units (oz can, lb bag, etc)');
   
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -542,18 +564,121 @@ export default function MiseScreen() {
       setMiseRecipes(fetchedRecipes);
       setGroceryList(mergedGroceryList);
 
-      // Check if cooking session needs invalidation due to recipe changes
+      // Check if cooking session needs invalidation due to recipe changes or modifications
       if (cookingState.activeRecipes.length > 0) {
-        const currentRecipeIds = cookingState.activeRecipes.map(r => r.recipeId).sort();
+        const currentRecipeIds = cookingState.activeRecipes.map((r: any) => r.recipeId).sort();
         const freshRecipeIds = fetchedRecipes.map((r: any) => String(r.id)).sort();
         
-        const recipesChanged = currentRecipeIds.length !== freshRecipeIds.length ||
-          !currentRecipeIds.every((id, index) => id === freshRecipeIds[index]);
+        console.log('[MiseScreen] 🔍 Comparing recipe IDs for changes:');
+        console.log('[MiseScreen] 📊 Current cooking context IDs:', currentRecipeIds);
+        console.log('[MiseScreen] 📊 Fresh fetched IDs:', freshRecipeIds);
         
-        if (recipesChanged) {
-          console.log('[MiseScreen] 🔄 Recipes changed - invalidating cooking session');
-          console.log('[MiseScreen] 📊 Current cooking recipes:', currentRecipeIds);
-          console.log('[MiseScreen] 📊 Fresh mise recipes:', freshRecipeIds);
+        // Check if recipe IDs changed (added/removed recipes)  
+        const lengthChanged = currentRecipeIds.length !== freshRecipeIds.length;
+        const orderChanged = !currentRecipeIds.every((id: string, index: number) => id === freshRecipeIds[index]);
+        const idsChanged = lengthChanged || orderChanged;
+        
+        console.log('[MiseScreen] 🔍 ID change analysis:', {
+          lengthChanged,
+          orderChanged,
+          idsChanged,
+          currentLength: currentRecipeIds.length,
+          freshLength: freshRecipeIds.length
+        });
+        
+        // Check if recipe content changed (serving size, ingredients, etc.)
+        let recipeContentChanged = false;
+        if (!idsChanged && currentRecipeIds.length > 0) {
+          // Compare recipe content for existing recipes
+          for (const freshRecipe of fetchedRecipes) {
+            const freshId = String(freshRecipe.id);
+            const currentRecipe = cookingState.activeRecipes.find(r => r.recipeId === freshId);
+            
+            if (currentRecipe && currentRecipe.recipe) {
+              const freshData = freshRecipe.prepared_recipe_data || freshRecipe.original_recipe_data;
+              const currentData = currentRecipe.recipe;
+              
+              // Compare key fields that indicate recipe modifications
+              const freshTitle = freshRecipe.title_override || freshData?.title;
+              const currentTitle = currentData.title;
+              const freshYield = freshData?.recipeYield;
+              const currentYield = currentData.recipeYield;
+              const freshIngredientsCount = freshData?.ingredientGroups?.reduce((sum: number, group: any) => 
+                sum + (group.ingredients?.length || 0), 0) || 0;
+              const currentIngredientsCount = currentData.ingredientGroups?.reduce((sum: number, group: any) => 
+                sum + (group.ingredients?.length || 0), 0) || 0;
+              const freshInstructionsCount = freshData?.instructions?.length || 0;
+              const currentInstructionsCount = currentData.instructions?.length || 0;
+              
+              // Compare ingredient content (not just count) - detect bacon → turkey bacon changes
+              let ingredientContentChanged = false;
+              if (freshIngredientsCount === currentIngredientsCount && freshIngredientsCount > 0) {
+                // Create simplified ingredient signatures for comparison
+                const getFlatIngredients = (ingredientGroups: any[]) => {
+                  return ingredientGroups?.flatMap(group => 
+                    group.ingredients?.map((ing: any) => ({
+                      name: ing.name?.toLowerCase().trim(),
+                      amount: ing.amount,
+                      unit: ing.unit?.toLowerCase().trim(),
+                      preparation: ing.preparation?.toLowerCase().trim()
+                    })) || []
+                  ) || [];
+                };
+                
+                const freshIngredients = getFlatIngredients(freshData?.ingredientGroups || []);
+                const currentIngredients = getFlatIngredients(currentData.ingredientGroups || []);
+                
+                // Compare ingredient signatures
+                if (freshIngredients.length === currentIngredients.length) {
+                  for (let i = 0; i < freshIngredients.length; i++) {
+                    const fresh = freshIngredients[i];
+                    const current = currentIngredients[i];
+                    
+                    if (fresh.name !== current.name ||
+                        fresh.amount !== current.amount ||
+                        fresh.unit !== current.unit ||
+                        fresh.preparation !== current.preparation) {
+                      console.log('[MiseScreen] 🥓 Ingredient content changed:', {
+                        index: i,
+                        fresh: fresh,
+                        current: current
+                      });
+                      ingredientContentChanged = true;
+                      break;
+                    }
+                  }
+                }
+              }
+              
+              if (freshTitle !== currentTitle ||
+                  freshYield !== currentYield ||
+                  freshIngredientsCount !== currentIngredientsCount ||
+                  freshInstructionsCount !== currentInstructionsCount ||
+                  ingredientContentChanged) {
+                console.log('[MiseScreen] 🔄 Recipe content changed for:', freshId);
+                console.log('[MiseScreen] 📊 Changes detected:', {
+                  titleChanged: freshTitle !== currentTitle,
+                  yieldChanged: freshYield !== currentYield,
+                  ingredientsCountChanged: freshIngredientsCount !== currentIngredientsCount,
+                  instructionsCountChanged: freshInstructionsCount !== currentInstructionsCount,
+                  ingredientContentChanged: ingredientContentChanged,
+                  fresh: { title: freshTitle, yield: freshYield, ingredientsCount: freshIngredientsCount, instructionsCount: freshInstructionsCount },
+                  current: { title: currentTitle, yield: currentYield, ingredientsCount: currentIngredientsCount, instructionsCount: currentInstructionsCount }
+                });
+                recipeContentChanged = true;
+                break;
+              }
+            }
+          }
+        }
+        
+        if (idsChanged || recipeContentChanged) {
+          console.log('[MiseScreen] 🔄 Recipe changes detected - invalidating cooking session');
+          console.log('[MiseScreen] 📊 Change type:', { idsChanged, recipeContentChanged });
+          if (idsChanged) {
+            console.log('[MiseScreen] 📊 Current cooking recipes:', currentRecipeIds);
+            console.log('[MiseScreen] 📊 Fresh mise recipes:', freshRecipeIds);
+          }
           invalidateSession();
         } else {
           console.log('[MiseScreen] ✅ Recipes unchanged - keeping cooking session');
@@ -626,14 +751,10 @@ export default function MiseScreen() {
         canGoBack: router.canGoBack(),
       });
       
-      // UX improvement: Skip API call if coming from cook screen (no edits possible)
-      if (router.canGoBack() && miseRecipes.length > 0) {
-        console.log('[MiseScreen] 🎯 Navigation from cook screen detected - skipping API call');
-        return;
-      }
-      
-      // Fetch fresh data when screen comes into focus (first load or from other screens)
-      console.log('[MiseScreen] 🔄 Navigation check - fetching fresh data');
+      // Always fetch fresh data to ensure deletion detection works properly
+      // Previous optimization skipped API calls from cook screen, but this prevented
+      // deletion detection when users deleted recipes and returned to cook
+      console.log('[MiseScreen] 🔄 Fetching fresh data for consistency');
       fetchMiseData();
     }, [fetchMiseData, router, miseRecipes.length])
   );

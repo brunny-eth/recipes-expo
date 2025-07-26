@@ -43,7 +43,7 @@ import {
 import { abbreviateUnit } from '@/utils/format';
 
 export default function CookScreen() {
-  console.error('[CookScreen] 🧨 FRESH BUILD MARKER vC3 - added session invalidation on recipe changes');
+  console.error('[CookScreen] 🧨 FRESH BUILD MARKER vC9 - fixed infinite render loop in dependencies');
   
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -142,154 +142,122 @@ export default function CookScreen() {
       console.log(`[CookScreen] 🎯 useFocusEffect triggered at ${timestamp}`);
       
       const loadAndInitializeRecipes = async () => {
+        const loadTimestamp = new Date().toISOString();
+        console.log(`[CookScreen] 🚀 LOAD START at ${loadTimestamp}`);
+        
+        // Always fetch fresh data for simplicity and consistency
+        // No session resumption, no race conditions, no complexity
+        console.log('[CookScreen] 🔄 Always fetching fresh data for consistency');
+        
         setIsLoading(true);
         const initialRecipeIdFromParams = params.recipeId ? String(params.recipeId) : undefined;
         console.log(`[CookScreen] 🔍 Initial recipe ID from params: ${initialRecipeIdFromParams}`);
 
-        // Determine if we need to fetch new data and re-initialize sessions
-        // We re-initialize if:
-        // 1. There are no active recipes in context OR
-        // 2. The session is not resumable (e.g., too old, empty) OR
-        // 3. The requested recipeId from params is different from the current activeRecipeId
-        
-        // DEFENSIVE: Extract context function to local constant to prevent minification issues
-        const hasResumableSessionFn = cookingContext.hasResumableSession;
-        const hasResumableSession = typeof hasResumableSessionFn === 'function' ? hasResumableSessionFn() : false;
-        
-        const shouldFetchAndInitialize = 
-          !cookingContext.state.activeRecipes || cookingContext.state.activeRecipes.length === 0 || 
-          !hasResumableSession ||
-          (initialRecipeIdFromParams && cookingContext.state.activeRecipeId !== initialRecipeIdFromParams);
-
-        console.log('[CookScreen] 🔍 shouldFetchAndInitialize:', shouldFetchAndInitialize);
-        console.log('[CookScreen] 🔍 Current context state for decision:', {
-          activeRecipesCount: cookingContext.state.activeRecipes?.length,
-          hasResumableSession: cookingContext.hasResumableSession(),
-          activeRecipeId: cookingContext.state.activeRecipeId,
-          initialRecipeIdFromParams: initialRecipeIdFromParams,
-        });
-
-        if (shouldFetchAndInitialize) {
-          console.log('[CookScreen] 🔄 Proceeding with fetching and initializing new sessions.');
+        try {
+          // Clear existing sessions to start fresh
+          console.log('[CookScreen] 🧹 Clearing existing cooking sessions before fresh fetch');
           try {
-            // Clear existing sessions to start fresh IF we are truly re-initializing
-            console.log('[CookScreen] 🧹 Clearing existing cooking sessions before fresh fetch');
-            try {
-              // DEFENSIVE: Extract context function to local constant to prevent minification issues
-              const endAllSessionsFn = cookingContext.endAllSessions;
-              if (typeof endAllSessionsFn === 'function') {
-                await endAllSessionsFn();
-              }
-            } catch (error) {
-              console.warn('[CookScreen] ⚠️ Error clearing sessions, continuing anyway:', error);
-            }
-            
-            // Fetch fresh mise data from API
-            if (!session?.user) {
-              console.log('[CookScreen] ❌ No user session found, cannot fetch mise recipes');
-              setRecipes([]);
-              setIsLoading(false);
-              return;
-            }
-            
-            const backendUrl = process.env.EXPO_PUBLIC_API_URL;
-            if (!backendUrl) {
-              throw new Error('API configuration error: EXPO_PUBLIC_API_URL is not defined.');
-            }
-            
-            const headers = {
-              'Authorization': `Bearer ${session.access_token}`,
-              'Content-Type': 'application/json',
-            };
-            
-            const response = await fetch(`${backendUrl}/api/mise/recipes?userId=${session.user.id}`, { headers });
-            
-            if (!response.ok) {
-              throw new Error(`Failed to fetch mise recipes: ${response.statusText}`);
-            }
-            
-            const recipesData = await response.json();
-            const miseRecipes = recipesData?.recipes || [];
-            
-            console.log('[CookScreen] 📊 Fetched mise recipes from API:', miseRecipes.length, 'recipes');
-            
-            if (miseRecipes.length === 0) {
-              console.log('[CookScreen] ❌ No mise recipes found after fetch');
-              setRecipes([]); // Clear local recipes if none fetched
-              setIsLoading(false);
-              return;
-            }
-            
-            // Extract recipe data from mise recipes for local state
-            const recipeList = miseRecipes.map((miseRecipe: any) => {
-              const recipeData = miseRecipe.prepared_recipe_data || miseRecipe.original_recipe_data;
-              
-              if (!recipeData) {
-                console.error('[CookScreen] ❌ No recipe data found for mise recipe:', miseRecipe.id);
-                return null;
-              }
-              
-              const cookingSessionId = String(miseRecipe.id);
-              
-              return {
-                ...recipeData,
-                id: cookingSessionId,
-                originalRecipeId: recipeData.id,
-                miseRecipeId: miseRecipe.id,
-                title: miseRecipe.title_override || recipeData.title,
-              };
-            }).filter(Boolean);
-            
-            setRecipes(recipeList); // Update local recipes state
-            
-            // Initialize sessions in context with fresh data
-            if (miseRecipes.length > 0) {
-              console.log('[CookScreen] 🚀 Initializing cooking sessions in context with fresh data');
-              
-              try {
-                // DEFENSIVE: Extract context function to local constant to prevent minification issues
-                const initializeSessionsFn = cookingContext.initializeSessions;
-                if (typeof initializeSessionsFn === 'function') {
-                  initializeSessionsFn(miseRecipes, initialRecipeIdFromParams); // Pass initialActiveRecipeId
-                  console.error('[CookScreen] ✅ Initialized cooking sessions in context successfully');
-                } else {
-                  console.error('[CookScreen] 🛑 initializeSessions function is undefined!');
-                }
-              } catch (error) {
-                console.error('[CookScreen] 💥 TypeError caught in initializeSessions call:', error);
-                console.error('[CookScreen] 💥 Error type:', typeof error);
-                console.error('[CookScreen] 💥 Error message:', error instanceof Error ? error.message : String(error));
-                console.error('[CookScreen] 💥 Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-                
-                // Continue without sessions rather than crashing the app
-                console.error('[CookScreen] ⚠️ Continuing without cooking sessions due to initialization error');
-              }
+            // DEFENSIVE: Extract context function to local constant to prevent minification issues
+            const endAllSessionsFn = cookingContext.endAllSessions;
+            if (typeof endAllSessionsFn === 'function') {
+              await endAllSessionsFn();
             }
           } catch (error) {
-            console.error('[CookScreen] 💥 Error fetching/initializing mise recipes:', error);
-            // DEFENSIVE: Extract context function to local constant to prevent minification issues
-            const showErrorFn = errorModalContext.showError;
-            if (typeof showErrorFn === 'function') {
-              showErrorFn('Loading Error', 'Failed to load recipes. Please check your connection.');
-            }
-            setRecipes([]); // Clear local recipes on error
-          } finally {
+            console.warn('[CookScreen] ⚠️ Error clearing sessions, continuing anyway:', error);
+          }
+          
+          // Fetch fresh mise data from API
+          if (!session?.user) {
+            console.log('[CookScreen] ❌ No user session found, cannot fetch mise recipes');
+            setRecipes([]);
             setIsLoading(false);
-            console.log('[CookScreen] 🏁 Finished fetching/initializing, isLoading set to false');
+            return;
           }
-        } else {
-          console.log('[CookScreen] ⏭️ Skipping re-initialization - sessions are already valid or being resumed.');
-          // If not re-initializing, ensure local 'recipes' state is synced with context's 'activeRecipes'
-          if (cookingContext.state.activeRecipes && cookingContext.state.activeRecipes.length > 0) {
-            const syncedRecipes = cookingContext.state.activeRecipes.map(sessionRecipe => sessionRecipe.recipe).filter(Boolean) as CombinedParsedRecipe[];
-            setRecipes(syncedRecipes);
-            console.log('[CookScreen] ✅ Local recipes state synced with context activeRecipes.');
-          } else {
-            setRecipes([]); // Ensure local recipes are empty if context is empty
-            console.log('[CookScreen] ⚠️ Context activeRecipes is empty, local recipes set to empty.');
+          
+          const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+          if (!backendUrl) {
+            throw new Error('API configuration error: EXPO_PUBLIC_API_URL is not defined.');
           }
+          
+          const headers = {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          };
+          
+          const response = await fetch(`${backendUrl}/api/mise/recipes?userId=${session.user.id}`, { headers });
+          
+          if (!response.ok) {
+            throw new Error(`Failed to fetch mise recipes: ${response.statusText}`);
+          }
+          
+          const recipesData = await response.json();
+          const miseRecipes = recipesData?.recipes || [];
+          
+          console.log('[CookScreen] 📊 Fetched mise recipes from API:', miseRecipes.length, 'recipes');
+          
+          if (miseRecipes.length === 0) {
+            console.log('[CookScreen] ❌ No mise recipes found after fetch');
+            setRecipes([]); // Clear local recipes if none fetched
+            setIsLoading(false);
+            return;
+          }
+          
+          // Extract recipe data from mise recipes for local state
+          const recipeList = miseRecipes.map((miseRecipe: any) => {
+            const recipeData = miseRecipe.prepared_recipe_data || miseRecipe.original_recipe_data;
+            
+            if (!recipeData) {
+              console.error('[CookScreen] ❌ No recipe data found for mise recipe:', miseRecipe.id);
+              return null;
+            }
+            
+            const cookingSessionId = String(miseRecipe.id);
+            
+            return {
+              ...recipeData,
+              id: cookingSessionId,
+              originalRecipeId: recipeData.id,
+              miseRecipeId: miseRecipe.id,
+              title: miseRecipe.title_override || recipeData.title,
+            };
+          }).filter(Boolean);
+          
+          setRecipes(recipeList); // Update local recipes state
+          
+          // Initialize sessions in context with fresh data
+          if (miseRecipes.length > 0) {
+            console.log('[CookScreen] 🚀 Initializing cooking sessions in context with fresh data');
+            
+            try {
+              // DEFENSIVE: Extract context function to local constant to prevent minification issues
+              const initializeSessionsFn = cookingContext.initializeSessions;
+              if (typeof initializeSessionsFn === 'function') {
+                initializeSessionsFn(miseRecipes, initialRecipeIdFromParams); // Pass initialActiveRecipeId
+                console.error('[CookScreen] ✅ Initialized cooking sessions in context successfully');
+              } else {
+                console.error('[CookScreen] 🛑 initializeSessions function is undefined!');
+              }
+            } catch (error) {
+              console.error('[CookScreen] 💥 TypeError caught in initializeSessions call:', error);
+              console.error('[CookScreen] 💥 Error type:', typeof error);
+              console.error('[CookScreen] 💥 Error message:', error instanceof Error ? error.message : String(error));
+              console.error('[CookScreen] 💥 Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+              
+              // Continue without sessions rather than crashing the app
+              console.error('[CookScreen] ⚠️ Continuing without cooking sessions due to initialization error');
+            }
+          }
+        } catch (error) {
+          console.error('[CookScreen] 💥 Error fetching/initializing mise recipes:', error);
+          // DEFENSIVE: Extract context function to local constant to prevent minification issues
+          const showErrorFn = errorModalContext.showError;
+          if (typeof showErrorFn === 'function') {
+            showErrorFn('Loading Error', 'Failed to load recipes. Please check your connection.');
+          }
+          setRecipes([]); // Clear local recipes on error
+        } finally {
           setIsLoading(false);
-          console.log('[CookScreen] 🏁 Skipping re-initialization, isLoading set to false');
+          console.log('[CookScreen] 🏁 Finished fetching/initializing, isLoading set to false');
         }
       };
       
@@ -298,8 +266,8 @@ export default function CookScreen() {
       return () => {
         console.error('[CookScreen] 🔍 useFocusEffect: Screen blurred/unfocused (cleanup function).');
       };
-    }, [session?.user?.id, session?.access_token, cookingContext.state.activeRecipes, cookingContext.state.activeRecipeId, cookingContext, params.recipeId, errorModalContext])
-  ); // Added state dependencies to trigger re-evaluation when context changes
+    }, [session?.user?.id, session?.access_token, params.recipeId, errorModalContext])
+      ); // Always fetch fresh data - no context dependencies needed
 
   // Handle app state changes for timer management
   useEffect(() => {

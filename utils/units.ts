@@ -74,6 +74,16 @@ export function getUnitDisplayName(unit: Unit | string | null, amount: number = 
         piece: { singular: 'piece', plural: 'pieces' },
         pinch: { singular: 'pinch', plural: 'pinches' },
         dash: { singular: 'dash', plural: 'dashes' },
+        
+        // Compound units (fallback for backend parsing failures)
+        'oz can': { singular: 'oz can', plural: 'oz cans' },
+        'ounce can': { singular: 'ounce can', plural: 'ounce cans' },
+        'lb bag': { singular: 'lb bag', plural: 'lb bags' },
+        'pound bag': { singular: 'pound bag', plural: 'pound bags' },
+        'oz package': { singular: 'oz package', plural: 'oz packages' },
+        'ounce package': { singular: 'ounce package', plural: 'ounce packages' },
+        'oz jar': { singular: 'oz jar', plural: 'oz jars' },
+        'ounce jar': { singular: 'ounce jar', plural: 'ounce jars' },
     };
 
     // Special cases for amounts that should use plural
