@@ -1,18 +1,27 @@
 import { supabase } from './supabaseClient';
 
 /**
+ * Result of saving a recipe operation.
+ */
+export type SaveRecipeResult = {
+  success: boolean;
+  alreadySaved?: boolean;
+  moved?: boolean;
+};
+
+/**
  * Saves a recipe for the current user to a specific folder.
  * @param recipeId The ID of the recipe to save.
  * @param folderId The ID of the folder to save the recipe to.
- * @returns {Promise<boolean>} True if the recipe was saved successfully or was already saved, false otherwise.
+ * @returns {Promise<SaveRecipeResult>} Result indicating success, if already saved, or if moved.
  */
-export async function saveRecipe(recipeId: number, folderId: number): Promise<boolean> {
+export async function saveRecipe(recipeId: number, folderId: number): Promise<SaveRecipeResult> {
   console.log("Attempting to save recipe:", recipeId, "to folder:", folderId);
 
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.user) {
     console.error("No user session found. Cannot save recipe.");
-    return false;
+    return { success: false };
   }
   const user = session.user;
 
@@ -26,14 +35,14 @@ export async function saveRecipe(recipeId: number, folderId: number): Promise<bo
 
   if (checkError) {
     console.error("Error checking if recipe is saved:", checkError);
-    return false;
+    return { success: false };
   }
 
   if (existing) {
     // If recipe is already saved, check if it's in a different folder
     if (existing.folder_id === folderId) {
       console.log("Recipe", recipeId, "is already saved in folder", folderId);
-      return true;
+      return { success: false, alreadySaved: true };
     } else {
       // Move recipe to the new folder
       console.log("Moving recipe", recipeId, "from folder", existing.folder_id, "to folder", folderId);
@@ -45,11 +54,11 @@ export async function saveRecipe(recipeId: number, folderId: number): Promise<bo
 
       if (updateError) {
         console.error("Error moving recipe to folder:", updateError);
-        return false;
+        return { success: false };
       }
 
       console.log("Successfully moved recipe", recipeId, "to folder", folderId);
-      return true;
+      return { success: true, moved: true };
     }
   }
 
@@ -63,7 +72,7 @@ export async function saveRecipe(recipeId: number, folderId: number): Promise<bo
 
   if (folderError || !folder) {
     console.error("Error verifying folder or folder doesn't exist:", folderError);
-    return false;
+    return { success: false };
   }
 
   // Fetch original recipe data for storage
@@ -75,7 +84,7 @@ export async function saveRecipe(recipeId: number, folderId: number): Promise<bo
 
   if (originalRecipeError || !originalRecipe) {
     console.error("Error fetching original recipe data:", originalRecipeError);
-    return false;
+    return { success: false };
   }
 
   // If not saved, insert a new record
@@ -90,11 +99,11 @@ export async function saveRecipe(recipeId: number, folderId: number): Promise<bo
 
   if (insertError) {
     console.error("Error saving recipe:", insertError);
-    return false;
+    return { success: false };
   }
 
   console.log("Successfully saved recipe:", recipeId, "to folder:", folderId, "for user:", user.id);
-  return true;
+  return { success: true };
 }
 
 /**

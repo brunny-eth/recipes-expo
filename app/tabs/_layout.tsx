@@ -112,13 +112,7 @@ const MemoizedTabsNavigator = React.memo(() => {
           unmountOnBlur: false,
         }}
       />
-      <Tabs.Screen
-        name="saved"
-        options={{
-          href: null, // Hide from tab bar
-          unmountOnBlur: false,
-        }}
-      />
+
     </Tabs>
   );
 });

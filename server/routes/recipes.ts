@@ -22,6 +22,7 @@ interface SaveModifiedRecipeRequestBody {
     ingredientChanges: IngredientChange[];
     scalingFactor: number;
   };
+  folderId: number; // Add folder support
 }
 
 const router = Router()
@@ -230,7 +231,7 @@ router.post('/save-modified', async (req: Request<any, any, SaveModifiedRecipeRe
   const requestId = (req as any).id;
 
   try {
-    const { originalRecipeId, originalRecipeData, userId, modifiedRecipeData, appliedChanges } = req.body;
+    const { originalRecipeId, originalRecipeData, userId, modifiedRecipeData, appliedChanges, folderId } = req.body;
 
     logger.info({ 
       requestId, 
@@ -243,9 +244,22 @@ router.post('/save-modified', async (req: Request<any, any, SaveModifiedRecipeRe
     }, 'Received request to save modified recipe');
 
     // --- Data Validation (basic, extend as needed) ---
-    if (!originalRecipeId || !originalRecipeData || !userId || !modifiedRecipeData || !appliedChanges) {
+    if (!originalRecipeId || !originalRecipeData || !userId || !modifiedRecipeData || !appliedChanges || !folderId) {
       logger.error({ requestId, body: req.body }, 'Missing required fields for saving modified recipe.');
       return res.status(400).json({ error: 'Missing required fields.' });
+    }
+
+    // Verify folder exists and belongs to user
+    const { data: folder, error: folderError } = await supabaseAdmin
+      .from('user_saved_folders')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('id', folderId)
+      .single();
+
+    if (folderError || !folder) {
+      logger.error({ requestId, userId, folderId, folderError }, 'Invalid folder or folder does not exist.');
+      return res.status(400).json({ error: 'Invalid folder selected.' });
     }
     if (!modifiedRecipeData.title || !modifiedRecipeData.instructions || modifiedRecipeData.instructions.length === 0 || !modifiedRecipeData.ingredientGroups || modifiedRecipeData.ingredientGroups.length === 0) {
         logger.error({ requestId, modifiedRecipeData }, 'Modified recipe data is incomplete or invalid.');
@@ -312,6 +326,7 @@ router.post('/save-modified', async (req: Request<any, any, SaveModifiedRecipeRe
       .insert({
         user_id: userId,
         base_recipe_id: newModifiedRecipeId, // Link to the newly created modified recipe
+        folder_id: folderId, // Save to selected folder
         title_override: modifiedRecipeData.title, // Use the (potentially LLM-suggested) title
         applied_changes: appliedChanges, // Store the explicit changes metadata
         original_recipe_data: originalRecipe.recipe_data, // Store original recipe data

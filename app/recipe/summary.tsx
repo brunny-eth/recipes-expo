@@ -1456,13 +1456,14 @@ export default function RecipeSummaryScreen() {
             userId: session.user.id,
             modifiedRecipeData,
             appliedChanges: appliedChangesData,
+            folderId: folderId, // Add folder selection support
           }),
         });
 
         const saveResult = await saveResponse.json();
         if (!saveResponse.ok) throw new Error(saveResult.error || 'Failed to save modified recipe');
 
-        router.replace('/tabs/saved' as any);
+        router.replace('/tabs/library' as any);
 
       } catch (error: any) {
         setIsSavingForLater(false);
@@ -1473,9 +1474,14 @@ export default function RecipeSummaryScreen() {
       // No modifications, save original recipe (instant - no loading state needed)
       try {
         const { saveRecipe } = require('@/lib/savedRecipes');
-        const success = await saveRecipe(recipe.id, folderId);
-        if (success) {
-          router.replace('/tabs/saved' as any);
+        const result = await saveRecipe(recipe.id, folderId);
+        if (result.success) {
+          router.replace('/tabs/library' as any);
+        } else if (result.alreadySaved) {
+          showError(
+            'Recipe Already Saved', 
+            'This recipe is already saved. Make modifications if you want to save a different variation.'
+          );
         } else {
           showError('Save Failed', 'Could not save recipe. Please try again.');
         }
@@ -1496,7 +1502,7 @@ export default function RecipeSummaryScreen() {
       const { unsaveRecipe } = require('@/lib/savedRecipes');
       const success = await unsaveRecipe(recipe.id);
       if (success) {
-        router.replace('/tabs/saved' as any);
+        router.replace('/tabs/library' as any);
       } else {
         showError('Remove Failed', 'Could not remove recipe from saved. Please try again.');
       }
