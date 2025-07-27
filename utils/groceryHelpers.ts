@@ -103,6 +103,19 @@ export function normalizeName(name: string): string {
     normalized = 'all purpose flour';
   }
   
+  // Fix common ingredient misspellings
+  const spellingCorrections: { [key: string]: string } = {
+    'tomatoe': 'tomato',
+    'roasted tomatoe': 'roasted tomato',
+    'potatoe': 'potato',
+    'roasted potatoe': 'roasted potato'
+  };
+  
+  if (spellingCorrections[normalized]) {
+    console.log('[groceryHelpers] ✏️ SPELLING CORRECTION:', normalized, '→', spellingCorrections[normalized]);
+    normalized = spellingCorrections[normalized];
+  }
+  
   // Simple pluralization check - remove trailing 's' but be careful with exceptions
   const pluralExceptions = [
     'beans', 'peas', 'lentils', 'oats', 'grits', 'grains',
@@ -193,6 +206,18 @@ function parseQuantity(amount: number | string | null): number | null {
     }
   }
   return null;
+}
+
+/**
+ * Checks if an ingredient can have both volume and count measurements
+ * (e.g., shallots can be measured as "2 shallots" or "1/2 cup diced shallots")
+ */
+function canHaveVolumeAndCountMeasurements(ingredientName: string): boolean {
+  const volumeAndCountIngredients = [
+    'shallot', 'onion', 'garlic', 'mushroom', 'bell pepper', 'jalapeño', 'serrano'
+  ];
+  const normalizedName = ingredientName.toLowerCase().trim();
+  return volumeAndCountIngredients.some(ingredient => normalizedName.includes(ingredient));
 }
 
 /**
@@ -335,7 +360,30 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
         if (processedIndices.has(j)) continue;
 
         const compareItem = itemList[j];
-        if (areUnitsCompatible(baseItem.quantity_unit, compareItem.quantity_unit)) {
+        
+        // Check if we can aggregate these items
+        let canAggregate = areUnitsCompatible(baseItem.quantity_unit, compareItem.quantity_unit);
+        
+        // Special case: volume/count combinations for certain ingredients (like shallots)
+        if (!canAggregate && canHaveVolumeAndCountMeasurements(baseItem.item_name)) {
+          const baseUnit = normalizeUnit(baseItem.quantity_unit);
+          const compareUnit = normalizeUnit(compareItem.quantity_unit);
+          
+          // Check if one is volume (cup/tbsp/etc) and the other is count (null/clove/etc)
+          const volumeUnits = new Set(['cup', 'tbsp', 'tsp', 'ml', 'fl_oz']);
+          const countUnits = new Set([null, 'clove', 'piece']);
+          
+          if ((volumeUnits.has(baseUnit as any) && countUnits.has(compareUnit as any)) ||
+              (countUnits.has(baseUnit as any) && volumeUnits.has(compareUnit as any))) {
+            console.log('[groceryHelpers] 🥄 Special volume/count aggregation for:', baseItem.item_name, {
+              baseUnit,
+              compareUnit
+            });
+            canAggregate = true;
+          }
+        }
+        
+        if (canAggregate) {
           const baseAmount = parseQuantity(baseItem.quantity_amount);
           const compareAmount = parseQuantity(compareItem.quantity_amount);
 
@@ -359,6 +407,30 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
               // Use the tbsp unit and add the amounts
               finalUnit = baseItem.quantity_unit || compareItem.quantity_unit;
               finalAmount = baseAmount + compareAmount;
+            }
+            // Special case: Handle volume/count combinations for ingredients like shallots
+            else if (canHaveVolumeAndCountMeasurements(baseItem.item_name)) {
+              const baseUnit = normalizeUnit(baseItem.quantity_unit);
+              const compareUnit = normalizeUnit(compareItem.quantity_unit);
+              const volumeUnits = new Set(['cup', 'tbsp', 'tsp', 'ml', 'fl_oz']);
+              const countUnits = new Set([null, 'clove', 'piece']);
+              
+              if ((volumeUnits.has(baseUnit as any) && countUnits.has(compareUnit as any)) ||
+                  (countUnits.has(baseUnit as any) && volumeUnits.has(compareUnit as any))) {
+                // Create a combined entry showing both measurements
+                console.log('[groceryHelpers] 🥄 Creating combined volume/count entry for:', baseItem.item_name);
+                
+                // Keep the base item's measurements for display, but note it's a combined entry
+                finalUnit = baseItem.quantity_unit; // Keep base unit
+                finalAmount = baseAmount; // Keep base amount
+                
+                // Update the item name to be more descriptive
+                const volumeItem = volumeUnits.has(baseUnit as any) ? baseItem : compareItem;
+                const countItem = volumeUnits.has(baseUnit as any) ? compareItem : baseItem;
+                
+                // Don't try to add amounts - just combine the descriptions
+                // The original_ingredient_text will be combined below
+              }
             } else if (baseItem.quantity_unit && compareItem.quantity_unit && baseItem.quantity_unit !== compareItem.quantity_unit) {
               const normalizedBaseUnit = normalizeUnit(baseItem.quantity_unit);
               const normalizedCompareUnit = normalizeUnit(compareItem.quantity_unit);

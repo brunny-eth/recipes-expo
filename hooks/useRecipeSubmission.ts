@@ -3,7 +3,6 @@ import { detectInputType } from '../server/utils/detectInputType';
 import { normalizeUrl } from '../utils/normalizeUrl';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
-import { useFreeUsage } from '../context/FreeUsageContext';
 import { getNetworkErrorMessage, getSubmissionErrorMessage } from '../utils/errorMessages';
 import type { 
   CacheCheckResult, 
@@ -26,7 +25,6 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
   const [submissionState, setSubmissionState] = useState<SubmissionState>('idle');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { session } = useAuth();
-  const { hasUsedFreeRecipe } = useFreeUsage();
 
   const validateInput = useCallback((input: string): ValidationResult => {
     const trimmedInput = input.trim();
@@ -49,30 +47,16 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
       return {
         isValid: false,
         inputType: 'invalid',
-        error: 'Please enter a valid recipe URL or recipe text.'
+        error: 'Please paste a valid recipe URL or recipe text.'
       };
     }
 
-    let normalizedInput = trimmedInput;
-    if (detectedType === 'url' || detectedType === 'video') {
-      try {
-        normalizedInput = normalizeUrl(trimmedInput);
-        console.log(`[useRecipeSubmission] validateInput: URL normalized to: ${normalizedInput}`); // NEW LOG
-      } catch (error) {
-        console.log('[useRecipeSubmission] validateInput: URL normalization failed, returning invalid.', error); // NEW LOG
-        return {
-          isValid: false,
-          inputType: 'invalid',
-          error: 'Please enter a valid recipe URL.'
-        };
-      }
-    }
-
-    console.log('[useRecipeSubmission] validateInput: Returning valid result.'); // NEW LOG
+    console.log('[useRecipeSubmission] validateInput: Input is valid, returning success.'); // NEW LOG
+    
     return {
       isValid: true,
       inputType: detectedType,
-      normalizedInput
+      normalizedInput: detectedType === 'url' ? normalizeUrl(trimmedInput) : trimmedInput
     };
   }, []);
 
@@ -140,12 +124,12 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
   }, []);
 
   const submitRecipe = useCallback(async (input: string): Promise<SubmissionResult> => {
-    // Check authentication and free usage
-    if (!session && hasUsedFreeRecipe) {
+    // Check authentication - users must be logged in to use the app
+    if (!session) {
       return {
         success: false,
         action: 'show_validation_error',
-        error: "You've already used your free recipe. Please log in to continue."
+        error: "Please log in to continue using the app."
       };
     }
 
@@ -178,28 +162,22 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
           // Cache hit - return recipe for navigation to summary
           setSubmissionState('idle');
           
-          const recipe: CombinedParsedRecipe = cacheResult;
-
-          const submissionResult = {
+          console.log('[useRecipeSubmission] submitRecipe: Cache hit, returning cached recipe for navigation');
+          return {
             success: true,
-            action: 'navigate_to_summary' as const,
-            recipe,
-            normalizedUrl: normalizedInput!
+            action: 'navigate_to_summary',
+            recipe: cacheResult
           };
-          console.log('[useRecipeSubmission] submitRecipe: Final SubmissionResult before return (cache hit):', JSON.stringify(submissionResult)); // NEW LOG
-          return submissionResult;
         } else {
           // Cache miss - return normalized URL for navigation to loading
           setSubmissionState('idle');
           
-          const submissionResult = {
+          return {
             success: true,
-            action: 'navigate_to_loading' as const,
+            action: 'navigate_to_loading',
             normalizedUrl: normalizedInput!,
             inputType: inputType
           };
-          console.log('[useRecipeSubmission] submitRecipe: Final SubmissionResult before return (cache miss):', JSON.stringify(submissionResult)); // NEW LOG
-          return submissionResult;
         }
       } else if (inputType === 'raw_text') {
         setSubmissionState('parsing');
@@ -283,21 +261,17 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
       }
     } catch (error) {
       console.error('[useRecipeSubmission] Submission error:', error);
-      const currentState = submissionState;
       setSubmissionState('idle');
-      
-      // Get context-specific error message based on what stage failed
-      const errorMessage = getSubmissionErrorMessage(currentState, error instanceof Error ? error : String(error));
       
       return {
         success: false,
         action: 'show_validation_error',
-        error: errorMessage
+        error: getSubmissionErrorMessage(submissionState, error instanceof Error ? error : String(error))
       };
     } finally {
       setIsSubmitting(false);
     }
-  }, [session, hasUsedFreeRecipe, validateInput, checkCache]);
+  }, [session, validateInput, checkCache]);
 
   const clearState = useCallback(() => {
     setSubmissionState('idle');

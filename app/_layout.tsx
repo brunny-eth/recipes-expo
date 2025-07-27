@@ -11,7 +11,6 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { ErrorModalProvider } from '@/context/ErrorModalContext';
-import { FreeUsageProvider, useFreeUsage } from '@/context/FreeUsageContext';
 import { CookingProvider } from '@/context/CookingContext';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -36,7 +35,6 @@ function RootLayoutNav() {
   console.log('[RootLayoutNav] Rendered');
   
   const { session, isLoading: isAuthLoading } = useAuth();
-  const { hasUsedFreeRecipe, isLoadingFreeUsage } = useFreeUsage();
   const router = useRouter();
   const segments = useSegments();
 
@@ -47,6 +45,9 @@ function RootLayoutNav() {
   // Add timeout mechanism to prevent getting stuck in loading states after inactivity
   const [forceReady, setForceReady] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Add navigation ref to prevent multiple rapid redirects
+  const navigationProcessedRef = useRef(false);
 
   const [fontsLoaded] = useFonts({
     'Ubuntu-Regular': require('../assets/fonts/Ubuntu-Regular.ttf'),
@@ -60,13 +61,13 @@ function RootLayoutNav() {
 
   // App readiness logic - separates concerns clearly
   const isFrameworkReady = fontsLoaded && assetsLoaded;
-  const isAuthReady = !isAuthLoading && !isLoadingFreeUsage;
+  const isAuthReady = !isAuthLoading;
   
   // Single source of truth for app hydration - when all initial data is loaded
   const isAppHydrated = isFrameworkReady && isFirstLaunch !== null && isAuthReady;
   
   // Routing logic - separate from app readiness
-  const isOnLoginScreen = segments[0] === 'login';
+  const isOnLoginScreen = segments[0] === 'login' || segments[0] === 'auth';
   const isReadyToRender = isAppHydrated || forceReady || isOnLoginScreen;
 
   // Add timeout to force readiness if stuck in loading state
@@ -162,17 +163,21 @@ function RootLayoutNav() {
   // Handle initial navigation for non-first launch scenario after everything is ready
   // This effect should only run when appReadyForContent is true AND isFirstLaunch has been determined.
   useEffect(() => {
-    // Only run this logic if it's not the first launch and app is fully hydrated
+    // Only run this logic if it's not the first launch and app is fully hydrated OR forced ready
     const appReadyForContent = fontsLoaded && assetsLoaded && isFirstLaunch !== null && isAuthReady;
-    if (appReadyForContent && isFirstLaunch === false) {
+    const shouldRunNavigation = (appReadyForContent && isFirstLaunch === false) || 
+                               (forceReady && isFirstLaunch !== true); // Run for forceReady unless it's explicitly first launch
+    
+    // Prevent multiple rapid navigation attempts
+    if (shouldRunNavigation && !navigationProcessedRef.current) {
+      navigationProcessedRef.current = true;
+      
       const currentPathSegments = segments.join('/');
       const inAuthFlow = segments[0] === 'login' || segments[0] === 'auth';
-      const inRecipeContentFlow = segments[0] === 'recipe';
       
-      console.log(`[RootLayoutNav][Effect: InitialNav] Processing navigation. Segments: [${segments.join(', ')}], currentPathSegments: "${currentPathSegments}"`);
+      console.log(`[RootLayoutNav][Effect: InitialNav] Processing navigation. Segments: [${segments.join(', ')}], currentPathSegments: "${currentPathSegments}", forceReady: ${forceReady}, appReadyForContent: ${appReadyForContent}, isFirstLaunch: ${isFirstLaunch}`);
 
       const PUBLIC_ALLOWED_ROUTES_PREFIXES = [
-        'tabs', 
         'login',
         'auth', 
         '+not-found', 
@@ -180,9 +185,6 @@ function RootLayoutNav() {
 
       const isCurrentlyOnAllowedPublicRoute = PUBLIC_ALLOWED_ROUTES_PREFIXES.some(
         (prefix) => {
-          if (prefix === 'tabs') {
-            return segments[0] === 'tabs';
-          }
           return (
             currentPathSegments === prefix ||
             currentPathSegments.startsWith(prefix + '/')
@@ -190,36 +192,70 @@ function RootLayoutNav() {
         },
       );
       
-      // If on '+not-found' or root, redirect to tabs.
+      // If on '+not-found' or root, redirect based on auth status
       if (segments[0] === '+not-found' || currentPathSegments === '') {
-        console.log(`[RootLayoutNav][Effect: InitialNav] Redirecting '+not-found' or empty path to /tabs. Segments: [${segments.join(', ')}], currentPathSegments: "${currentPathSegments}"`);
-        router.replace('/tabs');
+        console.log(`[RootLayoutNav][Effect: InitialNav] Redirecting '+not-found' or empty path. Segments: [${segments.join(', ')}], currentPathSegments: "${currentPathSegments}"`);
+        // Add small delay to ensure auth state is stable
+        setTimeout(() => {
+          if (session) {
+            router.replace('/tabs');
+          } else {
+            router.replace('/login');
+          }
+        }, 100);
         return;
       }
 
-      // AUTHENTICATION LOGIC for non-first launch
-      console.log(`[RootLayoutNav][Effect: InitialNav] Auth check - session: ${!!session}, hasUsedFreeRecipe: ${hasUsedFreeRecipe}, inAuthFlow: ${inAuthFlow}, inRecipeContentFlow: ${inRecipeContentFlow}`);
+      // TIMEOUT RECOVERY: If we're here due to forceReady but not normal readiness,
+      // use conservative navigation - go to main tabs if authenticated, login if not
+      if (forceReady && !appReadyForContent) {
+        console.log(`[RootLayoutNav][Effect: InitialNav] Force ready timeout - using conservative navigation (isFirstLaunch: ${isFirstLaunch})`);
+        if (session) {
+          if (segments[0] !== 'tabs') {
+            console.log(`[RootLayoutNav][Effect: InitialNav] Timeout recovery: authenticated user, redirecting to /tabs`);
+            router.replace('/tabs');
+          }
+        } else {
+          if (!isCurrentlyOnAllowedPublicRoute) {
+            console.log(`[RootLayoutNav][Effect: InitialNav] Timeout recovery: unauthenticated user, redirecting to /login`);
+            router.replace('/login');
+          }
+        }
+        return;
+      }
+
+      // SIMPLIFIED AUTHENTICATION LOGIC: Users must be authenticated to access the app
+      console.log(`[RootLayoutNav][Effect: InitialNav] Auth check - session: ${!!session}, inAuthFlow: ${inAuthFlow}`);
       
       if (session) {
+        // Authenticated user
         if (inAuthFlow) {
           console.log(`[RootLayoutNav][Effect: InitialNav] Authenticated user on auth page, redirecting to main app.`);
           router.replace('/tabs');
           return;
         }
+        // For authenticated users not in auth flow, let them continue to their intended route
+        console.log(`[RootLayoutNav][Effect: InitialNav] Authenticated user accessing protected content, allowing navigation.`);
       } else {
-        // Unauthenticated user
-        if (hasUsedFreeRecipe) {
-          // User has used their free recipe, restrict access to recipe content
-          if (inRecipeContentFlow && !isCurrentlyOnAllowedPublicRoute) {
-            console.log(`[RootLayoutNav][Effect: InitialNav] Unauthenticated, free recipe used, trying to access restricted recipe content, redirecting to login.`);
-            router.replace('/login');
-            return;
-          }
+        // Unauthenticated user - must login to access any protected content
+        if (!isCurrentlyOnAllowedPublicRoute) {
+          console.log(`[RootLayoutNav][Effect: InitialNav] Unauthenticated user trying to access protected content, redirecting to login.`);
+          router.replace('/login');
+          return;
         }
       }
       console.log(`[RootLayoutNav][Effect: InitialNav] Initial navigation path settled for current segments: ${currentPathSegments}.`);
     }
-  }, [fontsLoaded, assetsLoaded, isFirstLaunch, isAuthReady, session, hasUsedFreeRecipe, segments, router]);
+    
+    // Reset navigation flag when dependencies change significantly
+    return () => {
+      if (shouldRunNavigation) {
+        setTimeout(() => {
+          navigationProcessedRef.current = false;
+        }, 1000);
+      }
+    };
+  }, [fontsLoaded, assetsLoaded, isFirstLaunch, isAuthReady, forceReady, session, segments, router]);
 
   // === WELCOME SCREEN DISMISS HANDLER ===
   const handleWelcomeDismiss = useCallback(async () => {
@@ -240,32 +276,42 @@ function RootLayoutNav() {
   // === CRITICAL EFFECT FOR HIDING NATIVE SPLASH ===
   useEffect(() => {
     // Only hide native splash if both custom splash animation is done
-    // AND the app's initial data/state is fully resolved.
+    // AND the app's initial data/state is fully resolved OR we've forced ready due to timeout.
     const appReadyForContent = fontsLoaded && assetsLoaded && isFirstLaunch !== null && isAuthReady;
+    const shouldHideSplash = splashAnimationComplete && (appReadyForContent || forceReady);
 
-    if (splashAnimationComplete && appReadyForContent) {
-      console.log('[RootLayoutNav][Effect: hideNativeSplash] Conditions met: HIDING NATIVE SPLASH.');
+    if (shouldHideSplash) {
+      console.log('[RootLayoutNav][Effect: hideNativeSplash] Conditions met: HIDING NATIVE SPLASH.', {
+        appReadyForContent,
+        forceReady,
+        reason: forceReady && !appReadyForContent ? 'timeout_recovery' : 'normal_ready'
+      });
       SplashScreen.hideAsync();
     } else {
       console.log('[RootLayoutNav][Effect: hideNativeSplash] Not yet ready to hide native splash. Current state:', {
         splashAnimationComplete,
         appReadyForContent,
+        forceReady,
         fontsLoaded,
         assetsLoaded,
         isFirstLaunch,
         isAuthReady,
-        // Add more granular checks here if needed for debugging
       });
     }
-  }, [splashAnimationComplete, fontsLoaded, assetsLoaded, isFirstLaunch, isAuthReady]);
+  }, [splashAnimationComplete, fontsLoaded, assetsLoaded, isFirstLaunch, isAuthReady, forceReady]);
 
   // === CORE RENDERING LOGIC: WHAT TO SHOW ===
   const renderContent = useMemo(() => {
     const appReadyForContent = fontsLoaded && assetsLoaded && isFirstLaunch !== null && isAuthReady;
+    
+    // Consider forced ready state for timeout scenarios
+    const shouldRenderApp = appReadyForContent || forceReady;
 
     console.log('[RootLayoutNav][useMemo] Current state values for render decision:', {
       splashAnimationComplete,
       appReadyForContent,
+      shouldRenderApp,
+      forceReady,
       fontsLoaded,
       assetsLoaded,
       isFirstLaunch,
@@ -280,10 +326,10 @@ function RootLayoutNav() {
       return <SplashScreenMeez onFinish={handleSplashFinish} />;
     }
 
-    // 2. **NEXT**: Once custom splash animation is done, wait for app data readiness.
+    // 2. **NEXT**: Once custom splash animation is done, wait for app data readiness OR force ready timeout.
     // During this phase, the native splash is still likely visible *on top*
     // because hideNativeSplash needs both conditions.
-    if (!appReadyForContent) {
+    if (!shouldRenderApp) {
       console.log('[RootLayoutNav][useMemo] Custom splash complete, but app is still preparing. Showing temporary loader.');
       return (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background }}>
@@ -292,7 +338,19 @@ function RootLayoutNav() {
       );
     }
 
-    // 3. **FINALLY**: App is fully ready and custom splash is complete.
+    // 3. **TIMEOUT RECOVERY**: If we're here because of forceReady (not normal app readiness),
+    // assume it's a returning user and go straight to the main app
+    if (forceReady && !appReadyForContent) {
+      console.log('[RootLayoutNav][useMemo] Force ready timeout triggered, redirecting to main app.');
+      return (
+        <Animated.View style={{ flex: 1, backgroundColor: COLORS.background }} entering={FadeIn.duration(400)}>
+          <AppNavigators />
+          <StatusBar style="dark" />
+        </Animated.View>
+      );
+    }
+
+    // 4. **NORMAL FLOW**: App is fully ready and custom splash is complete.
     // The native splash *should* have hidden by now.
     if (isFirstLaunch === true) {
       console.log('[RootLayoutNav][useMemo] App fully ready. Rendering WelcomeScreen for first launch.');
@@ -303,7 +361,7 @@ function RootLayoutNav() {
       );
     }
 
-    // 4. **DEFAULT**: For returning users, render AppNavigators and let the useEffect handle routing.
+    // 5. **DEFAULT**: For returning users, render AppNavigators and let the useEffect handle routing.
     console.log('[RootLayoutNav][useMemo] App fully ready. Handling initial navigation.');
     // The useEffect for initial navigation handles routing decisions.
     // So, if appReadyForContent is true, we just render AppNavigators, and the
@@ -321,6 +379,7 @@ function RootLayoutNav() {
     assetsLoaded,
     isFirstLaunch,
     isAuthReady, // Depend on this instead of `isLoading` from context directly
+    forceReady,   // Add forceReady to dependencies
     handleSplashFinish,
     handleWelcomeDismiss,
     session, // Keep for logging purposes
@@ -350,13 +409,11 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ErrorModalProvider>
-        <FreeUsageProvider>
-          <AuthProvider>
-            <CookingProvider>
-              <RootLayoutNav />
-            </CookingProvider>
-          </AuthProvider>
-        </FreeUsageProvider>
+        <AuthProvider>
+          <CookingProvider>
+            <RootLayoutNav />
+          </CookingProvider>
+        </AuthProvider>
       </ErrorModalProvider>
     </GestureHandlerRootView>
   );

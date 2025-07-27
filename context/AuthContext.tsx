@@ -14,7 +14,6 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { supabase } from '@/lib/supabaseClient';
 import { useErrorModal } from './ErrorModalContext';
-import { useFreeUsage } from './FreeUsageContext';
 import { router, useSegments } from 'expo-router';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as SecureStore from 'expo-secure-store';
@@ -22,11 +21,22 @@ import * as SecureStore from 'expo-secure-store';
 interface UserMetadata {
   role?: 'beta_user' | 'control' | 'variant';
   first_login_at?: string;
-  has_used_free_recipe?: boolean;
   [key: string]: any;
 }
 
 type AuthProvider = 'google' | 'apple';
+
+// Helper function to check if user is new
+const isNewUser = async (userId: string): Promise<boolean> => {
+  const { data: userData, error } = await supabase.auth.getUser();
+  if (error || !userData.user) {
+    console.error('[AuthContext] Error checking if user is new:', error);
+    return false;
+  }
+  
+  const isNew = !userData.user.user_metadata?.first_login_at;
+  return isNew;
+};
 
 interface AuthContextType {
   session: Session | null;
@@ -42,46 +52,20 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const isFirstLogin = (session: Session) => {
-  const metadata = session?.user?.user_metadata as UserMetadata | undefined;
-  const isNewUser = !metadata?.first_login_at;
-  console.log(
-    `[AuthContext] isFirstLogin check: user ID ${session?.user?.id}, first_login_at: ${metadata?.first_login_at}, result: ${isNewUser}`,
-  );
-  return isNewUser;
-};
-
-
 
 export const AuthProvider = ({ children }: PropsWithChildren) => {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [justLoggedIn, setJustLoggedIn] = useState(false);
   const { showError } = useErrorModal();
-  const {
-    hasUsedFreeRecipe: localHasUsedFreeRecipe,
-    refetchFreeUsage,
-    resetFreeRecipeUsage,
-    isLoadingFreeUsage,
-  } = useFreeUsage();
 
   // Use refs to access the latest values without causing function re-creation
   const showErrorRef = useRef(showError);
-  const resetFreeRecipeUsageRef = useRef(resetFreeRecipeUsage);
-  const refetchFreeUsageRef = useRef(refetchFreeUsage);
 
   // Update refs whenever the values change
   useEffect(() => {
     showErrorRef.current = showError;
   }, [showError]);
-
-  useEffect(() => {
-    resetFreeRecipeUsageRef.current = resetFreeRecipeUsage;
-  }, [resetFreeRecipeUsage]);
-
-  useEffect(() => {
-    refetchFreeUsageRef.current = refetchFreeUsage;
-  }, [refetchFreeUsage]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -99,11 +83,9 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       // Add granular logging for useCallback recreation
       console.log('[AuthContext] handleUrl useCallback recreated. Empty dependencies array - should be stable.');
       
-      if (!url) {
-        return;
-      }
+      if (!url) return;
 
-      console.log(`[AuthContext][handleUrl] Processing URL: ${url}`);
+      console.log('[AuthContext] Handling deep link URL:', url);
 
       // Extract tokens from URL fragment and set session explicitly using setSession()
       const urlParts = url.split('#');
@@ -135,12 +117,31 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           if (sessionError) {
             showErrorRef.current(
               'Authentication Error',
-              `Failed to set session: ${sessionError.message}`,
+              `Authentication failed: ${sessionError.message}`,
             );
           } else if (newSession) {
-            if (__DEV__) {
-              console.log('[Auth] Session successfully set via deeplink.');
+            console.log('[AuthContext] Session successfully set via deeplink.');
+            setSession(newSession);
+            setJustLoggedIn(true);
+            
+            // Check if user is new and update metadata accordingly
+            const isNew = await isNewUser(newSession.user.id);
+            if (isNew) {
+              console.log('[AuthContext] New user detected, updating metadata');
+              const { error: metadataError } = await supabase.auth.updateUser({
+                data: { 
+                  first_login_at: new Date().toISOString(),
+                  role: 'beta_user',
+                },
+              });
+              
+              if (metadataError) {
+                console.error('[AuthContext] Error updating new user metadata:', metadataError);
+              }
             }
+
+            // Navigate to main app
+            router.replace('/tabs');
           }
         } catch (e: any) {
           showErrorRef.current(
@@ -157,115 +158,64 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
 
   // Effect to set up auth state change listener and deep link listener
   useEffect(() => {
-    Linking.getInitialURL().then(handleUrl);
+    console.log('[AuthContext] Setting up auth state change listener and URL listener.');
 
-    const linkingSubscription = Linking.addEventListener('url', (event) => {
-      handleUrl(event.url);
-    });
-
+    // Set up auth state change listener
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, sessionData) => {
-        console.log(`[Auth] onAuthStateChange event: ${event}, sessionData: ${sessionData ? 'exists' : 'null'}`);
-        console.log('[Auth] Incoming sessionData:', sessionData);
+      async (event, session) => {
+        console.log(`[AuthContext] Auth event: ${event}`, { sessionExists: !!session });
 
-        const newSession = sessionData;
-        // Determine the new isLoading state based on the event.
-        // If signed in, initial session, or signed out, it's not loading. Otherwise, it might be.
-        const newIsLoading = (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'SIGNED_OUT') ? false : true;
-
-        // --- Compare and Update Session State ---
-        let shouldUpdateSession = false;
-        if (newSession && session) {
-          // Both exist, compare key properties for meaningful change
-          // Only update if user ID, access token, or refresh token actually differ.
-          if (newSession.user?.id !== session.user?.id ||
-              newSession.access_token !== session.access_token ||
-              newSession.refresh_token !== session.refresh_token) {
-            shouldUpdateSession = true;
-            console.log('[Auth] Session content (user ID, access/refresh tokens) is DIFFERENT.');
+        if (event === 'SIGNED_IN' && session) {
+          console.log('[AuthContext] User signed in');
+          setSession(session);
+          setJustLoggedIn(true);
+          setIsLoading(false);
+        } else if (event === 'SIGNED_OUT') {
+          console.log('[AuthContext] User signed out');
+          setSession(null);
+          setJustLoggedIn(false);
+          setIsLoading(false);
+        } else if (event === 'TOKEN_REFRESHED' && session) {
+          console.log('[AuthContext] Token refreshed');
+          setSession(session);
+          setIsLoading(false);
+        } else if (event === 'INITIAL_SESSION') {
+          console.log('[AuthContext] Initial session event');
+          if (session) {
+            console.log('[AuthContext] Initial session found, setting session');
+            setSession(session);
           } else {
-            console.log('[Auth] Session content is IDENTICAL, skipping setSession.');
+            console.log('[AuthContext] No initial session found');
+            setSession(null);
           }
-        } else if (newSession !== session) {
-          // One is null/undefined and the other isn't, or both are null/undefined but different references.
-          // We want to update if it's truly a change from null to session or vice versa.
-          // If both are null, we don't need to update.
-          if (newSession === null && session === null) {
-              console.log('[Auth] Both sessions are null, skipping setSession.');
-          } else {
-              shouldUpdateSession = true;
-              console.log('[Auth] Session object reference is DIFFERENT (e.g., null to session or vice versa).');
-          }
+          setIsLoading(false);
         } else {
-            console.log('[Auth] Session object reference is the SAME (no change detected).');
-        }
-
-        if (shouldUpdateSession) {
-          console.log('[Auth] setSession() called. New session state:', newSession);
-          setSession(newSession);
-          
-          // Set justLoggedIn flag when user successfully logs in
-          if (newSession && event === 'SIGNED_IN' && !session) {
-            console.log('[Auth] User just logged in, setting justLoggedIn flag');
-            setJustLoggedIn(true);
-          }
-        }
-
-        // --- Compare and Update Loading State ---
-        if (newIsLoading !== isLoading) {
-          console.log(`[Auth] setIsLoading(${newIsLoading}) called.`);
-          setIsLoading(newIsLoading);
-        } else {
-          console.log('[Auth] isLoading value is the SAME, skipping setIsLoading.');
-        }
-
-        // Handle first login and sign out immediately after state updates
-        if (newSession && event === 'SIGNED_IN') {
-          if (__DEV__) {
-            console.log(
-              `[Auth] Rehydrated session for user: ${newSession.user.id}`,
-            );
-          }
-          
-          // Check if this is first login and update metadata if needed
-          if (!isLoadingFreeUsage) {
-            if (isFirstLogin(newSession)) {
-              if (localHasUsedFreeRecipe !== null) {
-                const { error: updateError } = await supabase.auth.updateUser(
-                  {
-                    data: {
-                      has_used_free_recipe: localHasUsedFreeRecipe,
-                      first_login_at: new Date().toISOString(),
-                    },
-                  },
-                );
-                if (updateError) {
-                  console.error(
-                    '[Auth] Error updating user metadata on first login:',
-                    updateError,
-                  );
-                }
-              }
-            }
-          }
-        } else if (!newSession && event === 'SIGNED_OUT') {
-          resetFreeRecipeUsageRef.current();
+          console.log('[AuthContext] Other auth event, setting loading to false');
+          setIsLoading(false);
         }
       },
     );
 
-    return () => {
-      if (authListener && authListener.subscription) {
-        authListener.subscription.unsubscribe();
+    // Set up URL listener for deep links
+    const urlSubscription = Linking.addEventListener('url', (event) => {
+      handleUrl(event.url);
+    });
+
+    // Check for initial URL when app starts
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        console.log('[AuthContext] Initial URL detected:', url);
+        handleUrl(url);
       }
-      linkingSubscription.remove();
+    });
+
+    // Cleanup function
+    return () => {
+      console.log('[AuthContext] Cleaning up auth state listener and URL listener.');
+      authListener?.subscription?.unsubscribe();
+      urlSubscription?.remove();
     };
-  }, [
-    localHasUsedFreeRecipe,
-    handleUrl,
-    isLoadingFreeUsage,
-    // Removed session dependency since we now do inline comparison
-  ]);
+  }, [handleUrl]);
 
   const signIn = useCallback(async (provider: AuthProvider): Promise<boolean> => {
     // Add granular logging for useCallback recreation
@@ -482,8 +432,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       setSession(null);
       console.log('[Auth] State update: setIsLoading(false) - setting loading to false');
       setIsLoading(false);
-      resetFreeRecipeUsageRef.current();
-      router.replace('/tabs/explore');
+      router.replace('/login');
     } catch (err: any) {
       console.error(
         '[Auth] Sign Out Error: Caught an error or timeout:',
@@ -501,8 +450,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       setSession(null);
       console.log('[Auth] State update: setIsLoading(false) - forcing loading to false');
       setIsLoading(false);
-      resetFreeRecipeUsageRef.current();
-      router.replace('/tabs/explore');
+      router.replace('/login');
     }
   }, []); // Empty dependency array - function is now truly stable
 

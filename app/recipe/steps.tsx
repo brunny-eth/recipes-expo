@@ -49,7 +49,6 @@ type AppliedRecipeChanges = {
 };
 import { parseAmountString } from '@/utils/recipeUtils';
 import { useAuth } from '@/context/AuthContext';
-import { useFreeUsage } from '@/context/FreeUsageContext';
 import RecipeStepsHeader from '@/components/recipe/RecipeStepsHeader';
 import StepsFooterButtons from '@/components/recipe/StepsFooterButtons';
 import {
@@ -80,7 +79,6 @@ export default function StepsScreen() {
   const router = useRouter();
   const { showError } = useErrorModal();
   const { session } = useAuth();
-  const { markFreeRecipeUsed } = useFreeUsage();
 
 
   const [isLoadingComplete, setIsLoadingComplete] = useState(false);
@@ -268,16 +266,11 @@ export default function StepsScreen() {
   }, [params.recipeData, params.editedInstructions, params.editedIngredients, params.newTitle, params.originalId, params.appliedChanges, showError]);
 
   useEffect(() => {
-    return () => {
-      // This cleanup function runs when the component unmounts
-      if (!session) {
-        console.log(
-          '[StepsScreen] User is NOT authenticated. Marking free recipe used via FreeUsageContext on unmount.',
-        );
-        markFreeRecipeUsed();
-      }
-    };
-  }, [session, markFreeRecipeUsed]); // Dependencies to ensure it reacts to auth state changes and function stability
+          return () => {
+        // This cleanup function runs when the component unmounts
+        console.log('[StepsScreen] Component unmounting');
+      };
+    }, []);
 
 
 

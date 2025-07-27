@@ -103,15 +103,7 @@ const MemoizedTabsNavigator = React.memo(() => {
           unmountOnBlur: false,
         }}
       />
-      
-      {/* Hidden tabs for backward compatibility */}
-      <Tabs.Screen
-        name="explore"
-        options={{
-          href: null, // Hide from tab bar
-          unmountOnBlur: false,
-        }}
-      />
+
 
     </Tabs>
   );

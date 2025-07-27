@@ -32,7 +32,6 @@ import {
   FONT,
 } from '@/constants/typography';
 import { useAuth } from '@/context/AuthContext';
-import { useFreeUsage } from '@/context/FreeUsageContext';
 import LogoHeader from '@/components/LogoHeader';
 import RecipeMatchSelectionModal from '@/components/RecipeMatchSelectionModal';
 import { CombinedParsedRecipe } from '@/common/types';
@@ -63,8 +62,7 @@ export default function HomeScreen() {
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const router = useRouter();
   const { showError, hideError } = useErrorModal();
-  const { session, justLoggedIn, clearJustLoggedIn } = useAuth();
-  const { hasUsedFreeRecipe } = useFreeUsage();
+  const { session } = useAuth();
   
   // Use the new submission hook
   const {
@@ -127,25 +125,7 @@ export default function HomeScreen() {
     };
   }, []);
 
-  // Show login success modal when user just logged in
-  useEffect(() => {
-    if (justLoggedIn) {
-      console.log('[HomeScreen] User just logged in, showing success modal');
-      Alert.alert(
-        'Welcome!', 
-        'You have successfully signed in.',
-        [
-          { 
-            text: 'Get Started', 
-            onPress: () => {
-              console.log('[HomeScreen] Login success modal dismissed');
-              clearJustLoggedIn();
-            }
-          }
-        ]
-      );
-    }
-  }, [justLoggedIn, clearJustLoggedIn]);
+
 
   // Component Mount/Unmount logging
   useEffect(() => {
@@ -252,10 +232,10 @@ export default function HomeScreen() {
         'Add a recipe link or dish name.\n\nLooking for ideas? Head to the Explore tab to see what others are cooking.',
         undefined,
         undefined,
-        'Go to Explore',
+        'Go to Library',
         () => {
           hideError();
-          router.push('/tabs/explore');
+          router.push('/tabs/library');
         }
       );
       setRecipeUrl(''); // Clear the input bar on error
@@ -268,10 +248,10 @@ export default function HomeScreen() {
         'Please enter a real dish name (like "chicken soup" or "tomato pasta") or a recipe link',
         undefined,
         undefined,
-        'Go to Explore',
+        'Go to Library',
         () => {
           hideError();
-          router.push('/tabs/explore');
+          router.push('/tabs/library');
         }
       );
       setRecipeUrl('');
@@ -280,25 +260,21 @@ export default function HomeScreen() {
 
     const recipeInput = recipeUrl.trim();
 
-    // If the user is not authenticated, we need to check their free usage
-    // and mark it as used if they are submitting a recipe.
+    // Users must be authenticated to use the app
     if (!session) {
-      if (hasUsedFreeRecipe) {
-        // This case should theoretically be handled by the layout redirect,
-        // but as a safeguard, we prevent submission and show an error.
-        showError(
-          'Login Required',
-          "You've already used your free recipe. Please log in to continue.",
-          () => router.replace('/login'),
-        );
-        return;
-      }
+      showError(
+        'Login Required',
+        'Please log in to continue using the app.',
+        () => router.replace('/login'),
+      );
+      setRecipeUrl('');
+      return;
     }
 
     try {
       console.log('[HomeScreen] Starting submission with:', {
         inputLength: recipeInput.length,
-        inputType: recipeInput.startsWith('http') ? 'url' : 'text'
+        inputType: detectInputType(recipeInput),
       });
 
       const result = await submitRecipe(recipeInput);

@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { COLORS, SPACING, ICON_SIZE } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
-import { useFreeUsage } from '@/context/FreeUsageContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function LoadingRoute() {
@@ -22,7 +21,6 @@ export default function LoadingRoute() {
     inputType?: string;
   }>();
   const { isAuthenticated } = useAuth();
-  const { markFreeRecipeUsed } = useFreeUsage();
 
   // Move navigation to useEffect to avoid setState during render
   React.useEffect(() => {
@@ -49,7 +47,7 @@ export default function LoadingRoute() {
         <TouchableOpacity style={styles.button} onPress={handleClose}>
           <MaterialCommunityIcons
             name="close"
-            size={24}
+            size={ICON_SIZE.lg}
             color={COLORS.textDark}
           />
         </TouchableOpacity>

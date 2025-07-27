@@ -4,38 +4,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CombinedParsedRecipe } from '../common/types';
 import { useAuth } from './AuthContext';
 
-// Helper for deep comparison (simple for arrays of primitives/objects without circular refs)
-// This is a basic deep equality check. For more complex objects, a dedicated library like 'fast-deep-equal' might be needed.
-const deepEqual = (a: any, b: any): boolean => {
-  if (a === b) return true;
-
-  if (a && b && typeof a == 'object' && typeof b == 'object') {
-    if (Array.isArray(a) && Array.isArray(b)) {
-      if (a.length !== b.length) return false;
-      for (let i = 0; i < a.length; i++) {
-        if (!deepEqual(a[i], b[i])) return false;
-      }
-      return true;
-    }
-
-    if (a.constructor !== b.constructor) return false;
-
-    const keysA = Object.keys(a);
-    const keysB = Object.keys(b);
-
-    if (keysA.length !== keysB.length) return false;
-
-    for (const key of keysA) {
-      if (!keysB.includes(key) || !deepEqual(a[key], b[key])) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  return a !== a && b !== b; // Handle NaN
-};
-
 // Types
 export type RecipeSession = {
   recipeId: string;
@@ -161,8 +129,13 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
             sessionAgeHours: Math.round(sessionAge / (60 * 60 * 1000) * 10) / 10
           });
           
-          // Use deepEqual to prevent unnecessary re-renders if state is identical
-          if (!deepEqual(activeRecipes, parsedState.activeRecipes)) {
+          // Use safe comparison to prevent unnecessary re-renders if state is identical
+          const needsActiveRecipesRestore = activeRecipes.length !== parsedState.activeRecipes?.length ||
+            !activeRecipes.every((existing, index) => 
+              parsedState.activeRecipes[index] && existing.recipeId === parsedState.activeRecipes[index].recipeId
+            );
+            
+          if (needsActiveRecipesRestore) {
             setActiveRecipes(parsedState.activeRecipes);
           }
           if (activeRecipeId !== parsedState.activeRecipeId) {
@@ -305,8 +278,14 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
           targetActiveRecipeId = newActiveRecipes.length > 0 ? String(newActiveRecipes[0].recipeId) : null;
         }
 
-        // Update state directly using useState setters, with deep comparison
-        if (!deepEqual(activeRecipes, newActiveRecipes)) {
+        // Update state directly using useState setters, with safe comparison
+        // Check if we need to update activeRecipes by comparing lengths and recipe IDs
+        const needsActiveRecipesUpdate = activeRecipes.length !== newActiveRecipes.length ||
+          !activeRecipes.every((existing, index) => 
+            newActiveRecipes[index] && existing.recipeId === newActiveRecipes[index].recipeId
+          );
+          
+        if (needsActiveRecipesUpdate) {
           setActiveRecipes(newActiveRecipes);
           console.error('[CookingContext] ✅ activeRecipes updated.');
         } else {
@@ -342,7 +321,7 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
         setSessionStartTime(undefined);
       }
     },
-    [activeRecipes, activeRecipeId, sessionStartTime] // Dependencies for useCallback to ensure deepEqual works with current state
+    [activeRecipes, activeRecipeId, sessionStartTime] // Dependencies for useCallback to ensure comparison works with current state
   );
 
   // All other functions refactored to use useState setters

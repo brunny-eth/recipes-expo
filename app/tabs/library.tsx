@@ -9,6 +9,7 @@ import {
   RefreshControl,
   ViewStyle,
   TextStyle,
+  TextInput,
   Alert,
 } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
@@ -17,7 +18,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
-import { useFreeUsage } from '@/context/FreeUsageContext';
 import { supabase } from '@/lib/supabaseClient';
 import { bodyText, screenTitleText, FONT, bodyStrongText } from '@/constants/typography';
 import { useAuth } from '@/context/AuthContext';
@@ -38,7 +38,6 @@ type SavedFolder = {
 export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { hasUsedFreeRecipe, isLoadingFreeUsage } = useFreeUsage();
   const { session, isAuthenticated } = useAuth();
   const { showError } = useErrorModal();
   
@@ -56,6 +55,11 @@ export default function LibraryScreen() {
   const [savedFolders, setSavedFolders] = useState<SavedFolder[]>([]);
   const [isSavedLoading, setIsSavedLoading] = useState(true);
   const [savedError, setSavedError] = useState<string | null>(null);
+  
+  // New folder creation state
+  const [showNewFolderInput, setShowNewFolderInput] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
 
   // Component Mount/Unmount logging
   useEffect(() => {
@@ -69,8 +73,8 @@ export default function LibraryScreen() {
   const loadCachedExploreRecipes = useCallback(async (): Promise<{ recipes: ParsedRecipe[] | null; shouldFetch: boolean }> => {
     try {
       const [lastFetchedStr, cachedRecipesStr] = await Promise.all([
-        AsyncStorage.getItem('exploreLastFetched'),
-        AsyncStorage.getItem('exploreRecipes')
+        AsyncStorage.getItem('libraryExploreLastFetched'),
+        AsyncStorage.getItem('libraryExploreRecipes')
       ]);
 
       if (!lastFetchedStr || !cachedRecipesStr) {
@@ -104,46 +108,52 @@ export default function LibraryScreen() {
     }
   }, []);
 
-  // Fetch explore recipes from API (keeping existing explore logic)
+  // Fetch explore recipes from API (using the working API endpoint)
   const fetchExploreRecipesFromAPI = useCallback(async () => {
-    console.log('[LibraryScreen] fetchExploreRecipesFromAPI called');
+    const startTime = performance.now();
+    console.log(`[PERF: LibraryScreen] Start fetchExploreRecipesFromAPI at ${startTime.toFixed(2)}ms`);
     
+    const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+    if (!backendUrl) {
+      console.error('[LibraryScreen] EXPO_PUBLIC_API_URL is not set.');
+      setExploreError('API configuration error. Please check your environment variables.');
+      setIsExploreLoading(false);
+      return;
+    }
+
     setIsExploreLoading(true);
     setExploreError(null);
-
+    
     try {
-      const { data, error } = await supabase
-        .from('processed_recipes_cache')
-        .select('id, recipe_data')
-        .eq('source_type', 'curated')
-        .order('created_at', { ascending: false })
-        .limit(30);
+      const apiUrl = `${backendUrl}/api/recipes/explore-random`;
+      console.log(`[LibraryScreen] Fetching from: ${apiUrl}`);
+      
+      const response = await fetch(apiUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch explore recipes: ${response.statusText}`);
+      }
 
-      if (error) throw error;
-
-      const recipes = (data || [])
-        .map(item => ({ ...item.recipe_data, id: item.id }))
-        .filter((recipe): recipe is ParsedRecipe => 
-          recipe && 
-          typeof recipe === 'object' && 
-          'title' in recipe && 
-          'id' in recipe
-        );
-
-      console.log(`[LibraryScreen] Fetched ${recipes.length} explore recipes from API`);
-      setExploreRecipes(recipes);
-
-      // Cache the new data
+      const recipes = await response.json();
+      console.log(`[LibraryScreen] Fetched ${recipes?.length || 0} explore recipes from API.`);
+      
+      setExploreRecipes(recipes || []);
+      
+      // Cache the results using library-specific keys
+      const now = Date.now().toString();
       await Promise.all([
-        AsyncStorage.setItem('exploreRecipes', JSON.stringify(recipes)),
-        AsyncStorage.setItem('exploreLastFetched', Date.now().toString())
+        AsyncStorage.setItem('libraryExploreLastFetched', now),
+        AsyncStorage.setItem('libraryExploreRecipes', JSON.stringify(recipes || []))
       ]);
-
+      console.log('[LibraryScreen] Stored fetch timestamp and recipe data');
+      
     } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load explore recipes';
       console.error('[LibraryScreen] Error fetching explore recipes:', err);
-      setExploreError('Failed to load community recipes. Please try again.');
+      setExploreError(errorMessage);
     } finally {
       setIsExploreLoading(false);
+      const totalTime = performance.now() - startTime;
+      console.log(`[PERF: LibraryScreen] Total fetchExploreRecipesFromAPI duration: ${totalTime.toFixed(2)}ms`);
     }
   }, []);
 
@@ -246,7 +256,7 @@ export default function LibraryScreen() {
       pathname: '/recipe/summary',
       params: {
         recipeData: JSON.stringify(recipe),
-        entryPoint: 'explore',
+        entryPoint: 'library',
       },
     });
   }, [router]);
@@ -306,6 +316,54 @@ export default function LibraryScreen() {
       ]
     );
   }, [session?.user]);
+
+  // Create new folder
+  const createNewFolder = useCallback(async () => {
+    if (!session?.user || !newFolderName.trim()) return;
+
+    setIsCreatingFolder(true);
+
+    try {
+      const { data: newFolder, error: createError } = await supabase
+        .from('user_saved_folders')
+        .insert({
+          user_id: session.user.id,
+          name: newFolderName.trim(),
+          display_order: savedFolders.length,
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('[LibraryScreen] Error creating folder:', createError);
+        
+        if (createError.code === '23505') { // Unique constraint violation
+          Alert.alert('Folder Exists', 'You already have a folder with this name.');
+        } else {
+          Alert.alert('Error', 'Could not create folder. Please try again.');
+        }
+        return;
+      }
+
+      // Add to local state
+      const newFolderWithCount = {
+        ...newFolder,
+        recipe_count: 0,
+      };
+      setSavedFolders(prev => [...prev, newFolderWithCount]);
+      
+      // Reset form
+      setNewFolderName('');
+      setShowNewFolderInput(false);
+      
+      console.log('[LibraryScreen] Successfully created folder:', newFolder.name);
+    } catch (err) {
+      console.error('[LibraryScreen] Unexpected error creating folder:', err);
+      Alert.alert('Error', 'An unexpected error occurred.');
+    } finally {
+      setIsCreatingFolder(false);
+    }
+  }, [session?.user, newFolderName, savedFolders.length]);
 
   // Handle image error
   const handleImageError = useCallback((recipeId: number) => {
@@ -483,26 +541,136 @@ export default function LibraryScreen() {
           <Text style={styles.emptySubtext}>
             Save recipes from the recipe summary screen to create your first folder.
           </Text>
+          {showNewFolderInput ? (
+            <View style={styles.newFolderContainer}>
+              <TextInput
+                style={styles.newFolderInput}
+                placeholder="Enter folder name"
+                value={newFolderName}
+                onChangeText={setNewFolderName}
+                maxLength={50}
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={createNewFolder}
+              />
+              <View style={styles.newFolderButtons}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={() => {
+                    setShowNewFolderInput(false);
+                    setNewFolderName('');
+                  }}
+                  disabled={isCreatingFolder}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.createButton,
+                    (!newFolderName.trim() || isCreatingFolder) && styles.createButtonDisabled
+                  ]}
+                  onPress={createNewFolder}
+                  disabled={!newFolderName.trim() || isCreatingFolder}
+                >
+                  {isCreatingFolder ? (
+                    <ActivityIndicator size="small" color={COLORS.white} />
+                  ) : (
+                    <Text style={styles.createButtonText}>Create</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.addFolderButton}
+              onPress={() => setShowNewFolderInput(true)}
+            >
+              <MaterialCommunityIcons
+                name="plus"
+                size={20}
+                color={COLORS.primary}
+              />
+              <Text style={styles.addFolderText}>Add new folder</Text>
+            </TouchableOpacity>
+          )}
         </View>
       );
     }
 
     return (
-      <FlatList
-        data={savedFolders}
-        renderItem={renderFolderItem}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            colors={[COLORS.primary]}
-            tintColor={COLORS.primary}
-          />
-        }
-        showsVerticalScrollIndicator={false}
-      />
+      <View style={{ flex: 1 }}>
+        <FlatList
+          data={savedFolders}
+          renderItem={renderFolderItem}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={[COLORS.primary]}
+              tintColor={COLORS.primary}
+            />
+          }
+          showsVerticalScrollIndicator={false}
+        />
+        
+        {/* Add New Folder Button at Bottom */}
+        <View style={styles.bottomButtonContainer}>
+          {showNewFolderInput ? (
+            <View style={styles.newFolderContainer}>
+              <TextInput
+                style={styles.newFolderInput}
+                placeholder="Enter folder name"
+                value={newFolderName}
+                onChangeText={setNewFolderName}
+                maxLength={50}
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={createNewFolder}
+              />
+              <View style={styles.newFolderButtons}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={() => {
+                    setShowNewFolderInput(false);
+                    setNewFolderName('');
+                  }}
+                  disabled={isCreatingFolder}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.createButton,
+                    (!newFolderName.trim() || isCreatingFolder) && styles.createButtonDisabled
+                  ]}
+                  onPress={createNewFolder}
+                  disabled={!newFolderName.trim() || isCreatingFolder}
+                >
+                  {isCreatingFolder ? (
+                    <ActivityIndicator size="small" color={COLORS.white} />
+                  ) : (
+                    <Text style={styles.createButtonText}>Create</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.addFolderButton}
+              onPress={() => setShowNewFolderInput(true)}
+            >
+              <MaterialCommunityIcons
+                name="plus"
+                size={20}
+                color={COLORS.primary}
+              />
+              <Text style={styles.addFolderText}>Add new folder</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
     );
   };
 
@@ -745,4 +913,76 @@ const styles = StyleSheet.create({
     fontSize: FONT.size.body,
     lineHeight: FONT.size.body * 1.3,
   },
+  
+  // Add new folder styles
+  bottomButtonContainer: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    backgroundColor: COLORS.background,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.lightGray,
+  } as ViewStyle,
+  addFolderButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    backgroundColor: 'transparent',
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  } as ViewStyle,
+  addFolderText: {
+    ...bodyStrongText,
+    color: COLORS.primary,
+    marginLeft: SPACING.sm,
+  } as TextStyle,
+  newFolderContainer: {
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.sm,
+    padding: SPACING.lg,
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  } as ViewStyle,
+  newFolderInput: {
+    ...bodyText,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    marginBottom: SPACING.md,
+  } as TextStyle,
+  newFolderButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  } as ViewStyle,
+  cancelButton: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    marginRight: SPACING.sm,
+  } as ViewStyle,
+  cancelButtonText: {
+    ...bodyText,
+    color: COLORS.textMuted,
+  } as TextStyle,
+  createButton: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.sm,
+    minWidth: 80,
+    alignItems: 'center',
+  } as ViewStyle,
+  createButtonDisabled: {
+    backgroundColor: COLORS.lightGray,
+  } as ViewStyle,
+  createButtonText: {
+    ...bodyStrongText,
+    color: COLORS.white,
+  } as TextStyle,
 }); 

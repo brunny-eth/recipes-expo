@@ -11,10 +11,10 @@ import {
   Image,
   Alert,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
 import { COLORS, SPACING, RADIUS, ICON_SIZE } from '@/constants/theme';
-import { FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
+import { FontAwesome } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Linking } from 'react-native';
 import { FONT, bodyText, bodyTextLoose, bodyStrongText } from '@/constants/typography';
@@ -26,7 +26,6 @@ type AuthProvider = 'google' | 'apple';
 const LoginScreen = () => {
   const { signIn, isLoading: isAuthLoading } = useAuth();
   const [isSigningIn, setIsSigningIn] = useState<AuthProvider | null>(null);
-  const insets = useSafeAreaInsets();
 
   // Create the same animated logo as the index page
   const animatedLogo = (
@@ -87,16 +86,6 @@ const LoginScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <TouchableOpacity
-        style={[styles.exitButton, { top: insets.top + SPACING.md }]}
-        onPress={() => router.back()}
-      >
-        <MaterialCommunityIcons
-          name="close"
-          size={ICON_SIZE.md}
-          color={COLORS.textDark}
-        />
-      </TouchableOpacity>
       <View style={styles.content}>
         <View style={styles.logoSection}>
           <LogoHeader animatedLogo={animatedLogo} />
@@ -242,22 +231,6 @@ const styles = StyleSheet.create({
   icon: {
     marginRight: SPACING.smMd,
   } as TextStyle,
-  exitButton: {
-    position: 'absolute',
-    right: SPACING.pageHorizontal,
-    padding: SPACING.sm,
-    zIndex: 1,
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.full,
-    shadowColor: COLORS.black,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  } as ViewStyle,
   tosText: {
     fontSize: 12,
     color: COLORS.textMuted,
