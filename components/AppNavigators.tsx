@@ -29,6 +29,10 @@ const AppNavigators = React.memo(() => {
         name="mise/cook"
         options={{ presentation: 'card', headerShown: false }}
       />
+      <Stack.Screen
+        name="saved/folder-detail"
+        options={{ headerShown: false }}
+      />
     </Stack>
   );
 });

@@ -191,7 +191,7 @@ export default function SavedFoldersScreen() {
 
     // Navigate to folder detail screen
     router.push({
-      pathname: '/(tabs)/saved/folder-detail' as any,
+      pathname: '/saved/folder-detail' as any,
       params: {
         folderId: folder.id.toString(),
         folderName: folder.name,
