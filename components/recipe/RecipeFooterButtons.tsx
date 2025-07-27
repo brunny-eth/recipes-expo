@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -11,12 +11,13 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { bodyStrongText } from '@/constants/typography';
 import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
+import FolderPickerModal from '@/components/FolderPickerModal';
 
 type RecipeFooterButtonsProps = {
   handleGoToSteps: () => void;
   isRewriting: boolean;
   isScalingInstructions: boolean;
-  handleSaveForLater: () => void;
+  handleSaveToFolder: (folderId: number) => void; // Updated to accept folderId
   handleRemoveFromSaved: () => void;
   handleSaveModifications: () => void;
   handleCookNow: () => void;
@@ -32,7 +33,7 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
   handleGoToSteps,
   isRewriting,
   isScalingInstructions,
-  handleSaveForLater,
+  handleSaveToFolder, // Updated prop name
   handleRemoveFromSaved,
   handleSaveModifications,
   handleCookNow,
@@ -43,6 +44,16 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
   hasModifications = false,
   isAlreadyInMise = false,
 }) => {
+  const [showFolderPicker, setShowFolderPicker] = useState(false);
+
+  const handleFolderPickerSelect = (folderId: number) => {
+    setShowFolderPicker(false);
+    handleSaveToFolder(folderId);
+  };
+
+  const handleSaveForLaterPress = () => {
+    setShowFolderPicker(true);
+  };
 
 
   const getMainButtonText = () => {
@@ -119,7 +130,7 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
               styles.saveButton,
               isSavingForLater && styles.saveButtonDisabled
             ]}
-            onPress={handleSaveForLater}
+            onPress={handleSaveForLaterPress} // Updated to show folder picker
             disabled={isSavingForLater}
           >
             {isSavingForLater && (
@@ -141,28 +152,39 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
   };
 
   return (
-    <View style={styles.footer}>
-      <TouchableOpacity
-        style={[
-          styles.nextButton,
-          buttonDisabled && styles.nextButtonDisabled,
-        ]}
-        onPress={getMainButtonHandler()}
-        disabled={buttonDisabled}
-      >
-        {(isRewriting || isScalingInstructions || isSavingModifications) && !isAlreadyInMise && (
-          <ActivityIndicator
-            size="small"
-            color={COLORS.white}
-            style={{ marginRight: 8 }}
-          />
-        )}
-        <Text style={styles.nextButtonText}>
-          {getMainButtonText()}
-        </Text>
-      </TouchableOpacity>
-      {getSecondaryButton()}
-    </View>
+    <>
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={[
+            styles.nextButton,
+            buttonDisabled && styles.nextButtonDisabled,
+          ]}
+          onPress={getMainButtonHandler()}
+          disabled={buttonDisabled}
+        >
+          {(isRewriting || isScalingInstructions || isSavingModifications) && (
+            <ActivityIndicator
+              size="small"
+              color={COLORS.white}
+              style={{ marginRight: 8 }}
+            />
+          )}
+          <Text style={styles.nextButtonText}>
+            {getMainButtonText()}
+          </Text>
+        </TouchableOpacity>
+
+        {getSecondaryButton()}
+      </View>
+
+      {/* Folder Picker Modal */}
+      <FolderPickerModal
+        visible={showFolderPicker}
+        onClose={() => setShowFolderPicker(false)}
+        onSelectFolder={handleFolderPickerSelect}
+        isLoading={isSavingForLater}
+      />
+    </>
   );
 };
 

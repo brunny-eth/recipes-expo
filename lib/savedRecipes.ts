@@ -1,12 +1,13 @@
 import { supabase } from './supabaseClient';
 
 /**
- * Saves a recipe for the current user.
+ * Saves a recipe for the current user to a specific folder.
  * @param recipeId The ID of the recipe to save.
+ * @param folderId The ID of the folder to save the recipe to.
  * @returns {Promise<boolean>} True if the recipe was saved successfully or was already saved, false otherwise.
  */
-export async function saveRecipe(recipeId: number): Promise<boolean> {
-  console.log("Attempting to save recipe:", recipeId);
+export async function saveRecipe(recipeId: number, folderId: number): Promise<boolean> {
+  console.log("Attempting to save recipe:", recipeId, "to folder:", folderId);
 
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.user) {
@@ -18,7 +19,7 @@ export async function saveRecipe(recipeId: number): Promise<boolean> {
   // First, check if the recipe is already saved to avoid duplicates
   const { data: existing, error: checkError } = await supabase
     .from('user_saved_recipes')
-    .select('base_recipe_id')
+    .select('base_recipe_id, folder_id')
     .eq('user_id', user.id)
     .eq('base_recipe_id', recipeId)
     .maybeSingle();
@@ -29,8 +30,40 @@ export async function saveRecipe(recipeId: number): Promise<boolean> {
   }
 
   if (existing) {
-    console.log("Recipe", recipeId, "is already saved for user", user.id);
-    return true;
+    // If recipe is already saved, check if it's in a different folder
+    if (existing.folder_id === folderId) {
+      console.log("Recipe", recipeId, "is already saved in folder", folderId);
+      return true;
+    } else {
+      // Move recipe to the new folder
+      console.log("Moving recipe", recipeId, "from folder", existing.folder_id, "to folder", folderId);
+      const { error: updateError } = await supabase
+        .from('user_saved_recipes')
+        .update({ folder_id: folderId })
+        .eq('user_id', user.id)
+        .eq('base_recipe_id', recipeId);
+
+      if (updateError) {
+        console.error("Error moving recipe to folder:", updateError);
+        return false;
+      }
+
+      console.log("Successfully moved recipe", recipeId, "to folder", folderId);
+      return true;
+    }
+  }
+
+  // Verify the folder exists and belongs to the user
+  const { data: folder, error: folderError } = await supabase
+    .from('user_saved_folders')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('id', folderId)
+    .single();
+
+  if (folderError || !folder) {
+    console.error("Error verifying folder or folder doesn't exist:", folderError);
+    return false;
   }
 
   // Fetch original recipe data for storage
@@ -51,6 +84,7 @@ export async function saveRecipe(recipeId: number): Promise<boolean> {
     .insert({ 
       user_id: user.id, 
       base_recipe_id: recipeId,
+      folder_id: folderId,
       original_recipe_data: originalRecipe.recipe_data
     });
 
@@ -59,7 +93,7 @@ export async function saveRecipe(recipeId: number): Promise<boolean> {
     return false;
   }
 
-  console.log("Successfully saved recipe:", recipeId, "for user:", user.id);
+  console.log("Successfully saved recipe:", recipeId, "to folder:", folderId, "for user:", user.id);
   return true;
 }
 
@@ -127,4 +161,49 @@ export async function isRecipeSaved(recipeId: number): Promise<boolean> {
     console.log("Recipe", recipeId, "is not saved.");
     return false;
   }
+}
+
+/**
+ * Moves multiple recipes to a specific folder.
+ * @param recipeIds Array of recipe IDs to move.
+ * @param targetFolderId The ID of the folder to move recipes to.
+ * @returns {Promise<boolean>} True if all recipes were moved successfully.
+ */
+export async function moveRecipesToFolder(recipeIds: number[], targetFolderId: number): Promise<boolean> {
+  console.log("Attempting to move recipes:", recipeIds, "to folder:", targetFolderId);
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) {
+    console.error("No user session found. Cannot move recipes.");
+    return false;
+  }
+  const user = session.user;
+
+  // Verify the target folder exists and belongs to the user
+  const { data: folder, error: folderError } = await supabase
+    .from('user_saved_folders')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('id', targetFolderId)
+    .single();
+
+  if (folderError || !folder) {
+    console.error("Error verifying target folder or folder doesn't exist:", folderError);
+    return false;
+  }
+
+  // Update all recipes to the new folder
+  const { error: updateError } = await supabase
+    .from('user_saved_recipes')
+    .update({ folder_id: targetFolderId })
+    .eq('user_id', user.id)
+    .in('base_recipe_id', recipeIds);
+
+  if (updateError) {
+    console.error("Error moving recipes to folder:", updateError);
+    return false;
+  }
+
+  console.log("Successfully moved", recipeIds.length, "recipes to folder:", targetFolderId);
+  return true;
 } 

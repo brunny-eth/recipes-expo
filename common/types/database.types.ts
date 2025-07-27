@@ -9,6 +9,61 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      user_saved_folders: {
+        Row: {
+          id: number;
+          user_id: string;
+          name: string;
+          color: string;
+          icon: string;
+          display_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          name: string;
+          color?: string;
+          icon?: string;
+          display_order?: number;
+        };
+        Update: {
+          name?: string;
+          color?: string;
+          icon?: string;
+          display_order?: number;
+        };
+      };
+      user_saved_recipes: {
+        Row: {
+          id: number;
+          user_id: string;
+          base_recipe_id: number;
+          folder_id: number | null;
+          title_override: string | null;
+          applied_changes: Json | null;
+          original_recipe_data: Json | null;
+          display_order: number;
+          created_at: string;
+          updated_at?: string;
+        };
+        Insert: {
+          user_id: string;
+          base_recipe_id: number;
+          folder_id?: number | null;
+          title_override?: string | null;
+          applied_changes?: Json | null;
+          original_recipe_data?: Json | null;
+          display_order?: number;
+        };
+        Update: {
+          folder_id?: number | null;
+          title_override?: string | null;
+          applied_changes?: Json | null;
+          original_recipe_data?: Json | null;
+          display_order?: number;
+        };
+      };
       recipes: {
         Row: {
           id: string

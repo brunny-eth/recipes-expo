@@ -1316,7 +1316,7 @@ export default function RecipeSummaryScreen() {
     router.replace('/tabs' as any);
   };
 
-  const handleSaveForLater = async () => {
+  const handleSaveToFolder = async (folderId: number) => {
     if (!recipe?.id || !session?.user) {
       showError(
         'Account Required',
@@ -1473,7 +1473,7 @@ export default function RecipeSummaryScreen() {
       // No modifications, save original recipe (instant - no loading state needed)
       try {
         const { saveRecipe } = require('@/lib/savedRecipes');
-        const success = await saveRecipe(recipe.id);
+        const success = await saveRecipe(recipe.id, folderId);
         if (success) {
           router.replace('/tabs/saved' as any);
         } else {
@@ -2001,7 +2001,7 @@ export default function RecipeSummaryScreen() {
         handleGoToSteps={handleGoToSteps}
         isRewriting={isRewriting}
         isScalingInstructions={isScalingInstructions}
-        handleSaveForLater={handleSaveForLater}
+        handleSaveToFolder={handleSaveToFolder}
         handleRemoveFromSaved={handleRemoveFromSaved}
         handleSaveModifications={handleSaveModifications}
         handleCookNow={handleCookNow}
