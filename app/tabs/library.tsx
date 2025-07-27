@@ -109,19 +109,24 @@ export default function LibraryScreen() {
   }, []);
 
   // Fetch explore recipes from API (using the working API endpoint)
-  const fetchExploreRecipesFromAPI = useCallback(async () => {
+  const fetchExploreRecipesFromAPI = useCallback(async (isRefresh: boolean = false) => {
     const startTime = performance.now();
-    console.log(`[PERF: LibraryScreen] Start fetchExploreRecipesFromAPI at ${startTime.toFixed(2)}ms`);
+    console.log(`[PERF: LibraryScreen] Start fetchExploreRecipesFromAPI at ${startTime.toFixed(2)}ms, isRefresh: ${isRefresh}`);
     
     const backendUrl = process.env.EXPO_PUBLIC_API_URL;
     if (!backendUrl) {
       console.error('[LibraryScreen] EXPO_PUBLIC_API_URL is not set.');
       setExploreError('API configuration error. Please check your environment variables.');
-      setIsExploreLoading(false);
+      if (!isRefresh) {
+        setIsExploreLoading(false);
+      }
       return;
     }
 
-    setIsExploreLoading(true);
+    // Only show full-screen loading indicator if it's not a refresh
+    if (!isRefresh) {
+      setIsExploreLoading(true);
+    }
     setExploreError(null);
     
     try {
@@ -151,7 +156,10 @@ export default function LibraryScreen() {
       console.error('[LibraryScreen] Error fetching explore recipes:', err);
       setExploreError(errorMessage);
     } finally {
-      setIsExploreLoading(false);
+      // Only hide full-screen loading indicator if it was shown
+      if (!isRefresh) {
+        setIsExploreLoading(false);
+      }
       const totalTime = performance.now() - startTime;
       console.log(`[PERF: LibraryScreen] Total fetchExploreRecipesFromAPI duration: ${totalTime.toFixed(2)}ms`);
     }
@@ -164,13 +172,13 @@ export default function LibraryScreen() {
     const { recipes: cachedRecipes, shouldFetch } = await loadCachedExploreRecipes();
     
     if (cachedRecipes && !shouldFetch) {
-      console.log('[LibraryScreen] Using cached recipes - no fetch needed');
+      console.log('[LibraryScreen] Using cached explore recipes');
       setExploreRecipes(cachedRecipes);
       setIsExploreLoading(false);
       return;
     }
-    
-    await fetchExploreRecipesFromAPI();
+
+    await fetchExploreRecipesFromAPI(false); // false = not a refresh, show full loading
   }, [loadCachedExploreRecipes, fetchExploreRecipesFromAPI]);
 
   // Fetch saved folders
@@ -239,12 +247,13 @@ export default function LibraryScreen() {
     
     if (selectedTab === 'explore') {
       setExploreError(null);
-      await fetchExploreRecipesFromAPI();
+      await fetchExploreRecipesFromAPI(true); // true = is a refresh, don't show full loading
     } else {
       await fetchSavedFolders();
     }
     
-    await new Promise(resolve => setTimeout(resolve, 300)); // Minimum refresh duration
+    // Ensure minimum refresh duration for smooth UX
+    await new Promise(resolve => setTimeout(resolve, 300));
     setRefreshing(false);
   }, [selectedTab, fetchExploreRecipesFromAPI, fetchSavedFolders]);
 
