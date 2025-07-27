@@ -115,24 +115,30 @@ export default function CookScreen() {
     }
   }, [cookingContext.state.activeRecipeId, cookingContext]);
 
-  // Component lifecycle monitoring with cleanup
+  // Component lifecycle monitoring with cleanup (scroll timeout only)
   useEffect(() => {
     console.error('[CookScreen] 🔍 Component mounted or dependencies changed.');
     
     return () => {
       console.error('[CookScreen] 🔍 Component unmounting (cleanup function).');
-      console.error('[CookScreen] 🔍 Cleaning up scroll timeout and timer interval');
+      console.error('[CookScreen] 🔍 Cleaning up scroll timeout');
       
       if (scrollPositionTimeoutRef.current) {
         console.error('[CookScreen] 🔍 Clearing scroll position timeout');
         clearTimeout(scrollPositionTimeoutRef.current);
       }
+    };
+  }, [cookingContext.state.activeRecipes, cookingContext.state.activeRecipeId, cookingContext.state.sessionStartTime, isLoading, router]);
+
+  // Timer cleanup - only on component unmount
+  useEffect(() => {
+    return () => {
+      console.error('[CookScreen] 🔍 Cleaning up timer interval on unmount');
       if (timerIntervalRef.current) {
-        console.error('[CookScreen] 🔍 Clearing timer interval');
         clearInterval(timerIntervalRef.current);
       }
     };
-  }, [cookingContext.state.activeRecipes, cookingContext.state.activeRecipeId, cookingContext.state.sessionStartTime, isLoading, router]);
+  }, []); // Empty dependency array = only runs on unmount
 
   // Main data fetching and session initialization logic
   useFocusEffect(

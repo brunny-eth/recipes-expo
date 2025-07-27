@@ -14,6 +14,7 @@ import {
   SafeAreaView,
   ActivityIndicator,
   InteractionManager,
+  Alert,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -62,7 +63,7 @@ export default function HomeScreen() {
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const router = useRouter();
   const { showError, hideError } = useErrorModal();
-  const { session } = useAuth();
+  const { session, justLoggedIn, clearJustLoggedIn } = useAuth();
   const { hasUsedFreeRecipe } = useFreeUsage();
   
   // Use the new submission hook
@@ -125,6 +126,26 @@ export default function HomeScreen() {
       keyboardDidHideListener?.remove();
     };
   }, []);
+
+  // Show login success modal when user just logged in
+  useEffect(() => {
+    if (justLoggedIn) {
+      console.log('[HomeScreen] User just logged in, showing success modal');
+      Alert.alert(
+        'Welcome!', 
+        'You have successfully signed in.',
+        [
+          { 
+            text: 'Get Started', 
+            onPress: () => {
+              console.log('[HomeScreen] Login success modal dismissed');
+              clearJustLoggedIn();
+            }
+          }
+        ]
+      );
+    }
+  }, [justLoggedIn, clearJustLoggedIn]);
 
   // Component Mount/Unmount logging
   useEffect(() => {

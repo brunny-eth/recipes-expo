@@ -63,8 +63,8 @@ const LoginScreen = () => {
     try {
       const success = await signIn(provider); // Get the boolean result
       if (success) {
-        console.log(`[LoginScreen] Sign-in flow initiated successfully with ${provider}. Waiting for AuthContext to confirm session.`);
-        // AuthContext handles navigation on successful session
+        console.log(`[LoginScreen] Sign-in successful with ${provider}. Success modal will show on home screen.`);
+        // AuthContext will set justLoggedIn flag, and home screen will show success modal
       } else {
         console.log(`[LoginScreen] Sign-in flow cancelled or failed for ${provider}.`);
         // No specific action needed here as AuthContext's error modal already showed
@@ -137,22 +137,22 @@ const LoginScreen = () => {
               accessibilityLabel="Continue with Apple"
               accessibilityHint="Logs you in using your Apple ID"
             >
-                          {isSigningIn === 'apple' ? (
-              <View style={styles.buttonContent}>
-                <ActivityIndicator color={COLORS.white} size="small" />
-                <Text style={styles.buttonText}>Signing in...</Text>
-              </View>
-            ) : (
-              <View style={styles.buttonContent}>
-                <FontAwesome
-                  name="apple"
-                  size={ICON_SIZE.lg}
-                  color={COLORS.white}
-                  style={styles.icon}
-                />
-                <Text style={styles.buttonText}>Continue with Apple</Text>
-              </View>
-            )}
+              {isSigningIn === 'apple' ? (
+                <View style={styles.buttonContent}>
+                  <ActivityIndicator color={COLORS.white} size="small" />
+                  <Text style={styles.buttonText}>Signing in...</Text>
+                </View>
+              ) : (
+                <View style={styles.buttonContent}>
+                  <FontAwesome
+                    name="apple"
+                    size={ICON_SIZE.lg}
+                    color={COLORS.white}
+                    style={styles.icon}
+                  />
+                  <Text style={styles.buttonText}>Continue with Apple</Text>
+                </View>
+              )}
             </TouchableOpacity>
           )}
         </View>

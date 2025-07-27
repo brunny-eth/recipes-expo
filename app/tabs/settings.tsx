@@ -31,6 +31,7 @@ export default function AccountScreen() {
   const insets = useSafeAreaInsets();
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   // Component Mount/Unmount logging
   useEffect(() => {
@@ -115,6 +116,30 @@ export default function AccountScreen() {
     }
   };
 
+  const handleSignOut = async () => {
+    setIsSigningOut(true);
+    console.log('[AccountScreen] Starting sign out process...');
+    
+    try {
+      await signOut();
+      console.log('[AccountScreen] Sign out completed successfully');
+      // The success feedback will show briefly before navigation
+      Alert.alert('Success', 'You have been signed out successfully.', [
+        { 
+          text: 'OK', 
+          onPress: () => {
+            console.log('[AccountScreen] Sign out success alert dismissed');
+          }
+        }
+      ]);
+    } catch (error) {
+      console.error('[AccountScreen] Sign out error:', error);
+      Alert.alert('Error', 'Failed to sign out. Please try again.');
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScreenHeader title="Account" />
@@ -143,8 +168,17 @@ export default function AccountScreen() {
                   {`Logged in as ${session?.user?.email}`}
                 </Text>
               </View>
-              <TouchableOpacity style={styles.signOutButton} onPress={signOut}>
-                <Text style={styles.signOutButtonText}>Sign Out</Text>
+              <TouchableOpacity 
+                style={[
+                  styles.signOutButton,
+                  isSigningOut && styles.signOutButtonDisabled
+                ]} 
+                onPress={handleSignOut}
+                disabled={isSigningOut}
+              >
+                <Text style={styles.signOutButtonText}>
+                  {isSigningOut ? 'Signing Out...' : 'Sign Out'}
+                </Text>
               </TouchableOpacity>
             </>
           ) : (
@@ -400,5 +434,8 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.lg,
     borderTopWidth: BORDER_WIDTH.default,
     borderTopColor: COLORS.lightGray,
+  } as ViewStyle,
+  signOutButtonDisabled: {
+    backgroundColor: COLORS.disabled,
   } as ViewStyle,
 });

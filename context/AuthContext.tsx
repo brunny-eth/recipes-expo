@@ -34,8 +34,10 @@ interface AuthContextType {
   isAuthenticated: boolean;
   userMetadata: UserMetadata | null;
   isLoading: boolean;
+  justLoggedIn: boolean;
   signIn: (provider: AuthProvider) => Promise<boolean>;
   signOut: () => Promise<void>;
+  clearJustLoggedIn: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -54,6 +56,7 @@ const isFirstLogin = (session: Session) => {
 export const AuthProvider = ({ children }: PropsWithChildren) => {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [justLoggedIn, setJustLoggedIn] = useState(false);
   const { showError } = useErrorModal();
   const {
     hasUsedFreeRecipe: localHasUsedFreeRecipe,
@@ -200,6 +203,12 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         if (shouldUpdateSession) {
           console.log('[Auth] setSession() called. New session state:', newSession);
           setSession(newSession);
+          
+          // Set justLoggedIn flag when user successfully logs in
+          if (newSession && event === 'SIGNED_IN' && !session) {
+            console.log('[Auth] User just logged in, setting justLoggedIn flag');
+            setJustLoggedIn(true);
+          }
         }
 
         // --- Compare and Update Loading State ---
@@ -497,6 +506,11 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     }
   }, []); // Empty dependency array - function is now truly stable
 
+  const clearJustLoggedIn = useCallback(() => {
+    console.log('[Auth] Clearing justLoggedIn flag');
+    setJustLoggedIn(false);
+  }, []);
+
   const value = useMemo(() => {
     // Strategic logging: Track when useMemo recalculates
     console.log('[AuthContext] 🔄 useMemo RECALCULATING. Dependencies changed:', {
@@ -514,8 +528,10 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       isAuthenticated: !!session,
       userMetadata: (session?.user?.user_metadata as UserMetadata) ?? null,
       isLoading,
+      justLoggedIn,
       signIn,
       signOut,
+      clearJustLoggedIn,
     };
 
     // Log the final value object reference
@@ -527,7 +543,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     });
 
     return contextValue;
-  }, [session?.user?.id, session?.access_token, session?.refresh_token, isLoading, signIn, signOut]);
+  }, [session?.user?.id, session?.access_token, session?.refresh_token, isLoading, justLoggedIn, signIn, signOut, clearJustLoggedIn]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
