@@ -425,9 +425,9 @@ export default function LibraryScreen() {
     >
       <View style={styles.folderIcon}>
         <MaterialCommunityIcons
-          name={item.icon as any}
-          size={24}
-          color={item.color}
+          name="folder"
+          size={28}
+          color={COLORS.primary}
         />
       </View>
       <View style={styles.folderInfo}>
@@ -597,7 +597,7 @@ export default function LibraryScreen() {
               <MaterialCommunityIcons
                 name="plus"
                 size={20}
-                color={COLORS.primary}
+                color={COLORS.white}
               />
               <Text style={styles.addFolderText}>Add new folder</Text>
             </TouchableOpacity>
@@ -673,7 +673,7 @@ export default function LibraryScreen() {
               <MaterialCommunityIcons
                 name="plus"
                 size={20}
-                color={COLORS.primary}
+                color={COLORS.white}
               />
               <Text style={styles.addFolderText}>Add new folder</Text>
             </TouchableOpacity>
@@ -856,8 +856,6 @@ const styles = StyleSheet.create({
   folderIcon: {
     width: 48,
     height: 48,
-    borderRadius: 24,
-    backgroundColor: COLORS.lightGray,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: SPACING.md,
@@ -928,8 +926,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
     backgroundColor: COLORS.background,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.lightGray,
   } as ViewStyle,
   addFolderButton: {
     flexDirection: 'row',
@@ -937,14 +933,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.lg,
-    backgroundColor: 'transparent',
+    backgroundColor: COLORS.primary,
     borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
   } as ViewStyle,
   addFolderText: {
     ...bodyStrongText,
-    color: COLORS.primary,
+    color: COLORS.white,
     marginLeft: SPACING.sm,
   } as TextStyle,
   newFolderContainer: {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -45,6 +45,7 @@ export default function FolderPickerModal({
   const [newFolderName, setNewFolderName] = useState('');
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<TextInput>(null);
 
   // Fetch user's folders
   const fetchFolders = async () => {
@@ -156,9 +157,9 @@ export default function FolderPickerModal({
     >
       <View style={styles.folderIcon}>
         <MaterialCommunityIcons
-          name={item.icon as any}
+          name="folder"
           size={20}
-          color={item.color}
+          color={COLORS.primary}
         />
       </View>
       <View style={styles.folderInfo}>
@@ -182,35 +183,56 @@ export default function FolderPickerModal({
     }
   };
 
+  const handleCreateFolder = () => {
+    setShowNewFolderInput(true);
+    // Auto-focus input after a brief delay
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 100);
+  };
+
+  const handleCancelNewFolder = () => {
+    setShowNewFolderInput(false);
+    setNewFolderName('');
+  };
+
   return (
     <Modal
       visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
+      transparent
+      animationType="fade"
       onRequestClose={handleClose}
     >
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={handleClose}
-            disabled={isLoading || isCreatingFolder}
-          >
-            <MaterialCommunityIcons name="close" size={24} color={COLORS.textDark} />
-          </TouchableOpacity>
-          <Text style={styles.title}>Save to folder</Text>
-          <View style={styles.placeholder} />
-        </View>
+      <TouchableOpacity 
+        style={styles.overlay} 
+        activeOpacity={1}
+        onPress={handleClose}
+      >
+        <TouchableOpacity 
+          style={styles.modalContainer}
+          activeOpacity={1}
+          onPress={(e) => e.stopPropagation()} // Prevent closing when tapping inside modal
+        >
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.title}>Save to folder</Text>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={handleClose}
+              disabled={isLoading || isCreatingFolder}
+            >
+              <MaterialCommunityIcons name="close" size={20} color={COLORS.textMuted} />
+            </TouchableOpacity>
+          </View>
 
-        {/* Content */}
-        <View style={styles.content}>
+          {/* Error Display */}
           {error && (
             <View style={styles.errorContainer}>
               <Text style={styles.errorText}>{error}</Text>
             </View>
           )}
 
+          {/* Content */}
           {isFetchingFolders ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={COLORS.primary} />
@@ -219,40 +241,40 @@ export default function FolderPickerModal({
           ) : (
             <>
               {/* Folders List */}
-              <FlatList
-                data={folders}
-                renderItem={renderFolderItem}
-                keyExtractor={(item) => item.id.toString()}
-                style={styles.foldersList}
-                showsVerticalScrollIndicator={false}
-              />
+              <View style={styles.foldersListContainer}>
+                <FlatList
+                  data={folders}
+                  renderItem={renderFolderItem}
+                  keyExtractor={(item) => item.id.toString()}
+                  style={styles.foldersList}
+                  showsVerticalScrollIndicator={false}
+                />
+              </View>
 
-              {/* Add New Folder Section */}
+              {/* New Folder Section */}
               {showNewFolderInput ? (
                 <View style={styles.newFolderContainer}>
                   <TextInput
+                    ref={inputRef}
                     style={styles.newFolderInput}
                     placeholder="Enter folder name"
                     value={newFolderName}
                     onChangeText={setNewFolderName}
                     maxLength={50}
-                    autoFocus
                     returnKeyType="done"
                     onSubmitEditing={createNewFolder}
                   />
-                  <View style={styles.newFolderButtons}>
+                  <View style={styles.buttonContainer}>
                     <TouchableOpacity
-                      style={styles.cancelButton}
-                      onPress={() => {
-                        setShowNewFolderInput(false);
-                        setNewFolderName('');
-                      }}
+                      style={[styles.button, styles.cancelButton]}
+                      onPress={handleCancelNewFolder}
                       disabled={isCreatingFolder}
                     >
                       <Text style={styles.cancelButtonText}>Cancel</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[
+                        styles.button,
                         styles.createButton,
                         (!newFolderName.trim() || isCreatingFolder) && styles.createButtonDisabled
                       ]}
@@ -270,12 +292,12 @@ export default function FolderPickerModal({
               ) : (
                 <TouchableOpacity
                   style={styles.addFolderButton}
-                  onPress={() => setShowNewFolderInput(true)}
+                  onPress={handleCreateFolder}
                   disabled={isLoading}
                 >
                   <MaterialCommunityIcons
                     name="plus"
-                    size={20}
+                    size={16}
                     color={COLORS.primary}
                   />
                   <Text style={styles.addFolderText}>Add new folder</Text>
@@ -283,46 +305,53 @@ export default function FolderPickerModal({
               )}
             </>
           )}
-        </View>
-      </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  overlay: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    width: '90%',
+    maxWidth: 400,
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.lg,
+    overflow: 'hidden',
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.lightGray,
   },
-  closeButton: {
-    padding: SPACING.xs,
-  },
   title: {
     ...bodyStrongText,
     fontSize: 18,
   },
-  placeholder: {
-    width: 32, // Same as close button
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: SPACING.lg,
+  closeButton: {
+    padding: SPACING.xs,
   },
   errorContainer: {
     backgroundColor: COLORS.errorBackground,
     padding: SPACING.md,
-    borderRadius: RADIUS.sm,
+    marginHorizontal: SPACING.lg,
     marginTop: SPACING.md,
-    marginBottom: SPACING.md,
+    borderRadius: RADIUS.sm,
   },
   errorText: {
     ...bodyText,
@@ -330,8 +359,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
+    padding: SPACING.xl,
     alignItems: 'center',
   },
   loadingText: {
@@ -339,8 +367,11 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     marginTop: SPACING.md,
   },
+  foldersListContainer: {
+    maxHeight: 300,
+    paddingHorizontal: SPACING.lg,
+  },
   foldersList: {
-    flex: 1,
     paddingTop: SPACING.md,
   },
   folderItem: {
@@ -351,17 +382,12 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.sm,
     marginBottom: SPACING.sm,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
   },
   folderIcon: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.lightGray,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: SPACING.md,
@@ -388,8 +414,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm,
     borderWidth: 1,
     borderColor: COLORS.primary,
-    marginVertical: SPACING.md,
-    marginBottom: SPACING.xxl,
+    margin: SPACING.lg,
   },
   addFolderText: {
     ...bodyStrongText,
@@ -398,14 +423,11 @@ const styles = StyleSheet.create({
   },
   newFolderContainer: {
     backgroundColor: COLORS.white,
-    borderRadius: RADIUS.sm,
     padding: SPACING.lg,
-    marginVertical: SPACING.md,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    margin: SPACING.lg,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
   },
   newFolderInput: {
     ...bodyText,
@@ -416,13 +438,16 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     marginBottom: SPACING.md,
   },
-  newFolderButtons: {
+  buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
   },
-  cancelButton: {
+  button: {
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.sm,
+  },
+  cancelButton: {
     marginRight: SPACING.sm,
   },
   cancelButtonText: {
@@ -431,9 +456,6 @@ const styles = StyleSheet.create({
   },
   createButton: {
     backgroundColor: COLORS.primary,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.sm,
     minWidth: 80,
     alignItems: 'center',
   },
