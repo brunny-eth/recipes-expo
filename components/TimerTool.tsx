@@ -214,6 +214,8 @@ export default function TimerTool({
           />
         </TouchableOpacity>
       </View>
+      
+
     </View>
   );
 }
@@ -294,4 +296,5 @@ const styles = StyleSheet.create({
     borderWidth: BORDER_WIDTH.default,
     borderColor: COLORS.primary,
   },
+
 });

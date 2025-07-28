@@ -14,12 +14,14 @@ type StepsFooterButtonsProps = {
   onTimersPress: () => void;
   onRecipeTipsPress: () => void;
   hasRecipeTips?: boolean;
+  onEndCookingSessions?: () => void;
 };
 
 const StepsFooterButtons: React.FC<StepsFooterButtonsProps> = ({
   onTimersPress,
   onRecipeTipsPress,
   hasRecipeTips = false,
+  onEndCookingSessions,
 }) => {
   return (
     <View style={styles.footer}>
@@ -39,6 +41,17 @@ const StepsFooterButtons: React.FC<StepsFooterButtonsProps> = ({
             onPress={onRecipeTipsPress}
           >
             <Text style={styles.recipeTipsButtonText}>Recipe Tips</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      
+      {onEndCookingSessions && (
+        <View style={styles.buttonRow}>
+          <TouchableOpacity
+            style={styles.endSessionsButton}
+            onPress={onEndCookingSessions}
+          >
+            <Text style={styles.endSessionsButtonText}>End Cooking Sessions</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -96,6 +109,23 @@ const styles = StyleSheet.create({
   timerButtonText: {
     ...bodyStrongText,
     color: COLORS.primary,
+    fontSize: 14,
+  } as TextStyle,
+  endSessionsButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.sm,
+    borderRadius: RADIUS.sm,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: COLORS.error || '#FF4444',
+  } as ViewStyle,
+  endSessionsButtonText: {
+    ...bodyStrongText,
+    color: COLORS.error || '#FF4444',
     fontSize: 14,
   } as TextStyle,
 });

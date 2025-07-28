@@ -46,29 +46,116 @@ export interface GroceryListItem {
  * - Makes singular (simple implementation)
  */
 export function normalizeName(name: string): string {
+  console.log('[groceryHelpers] 🔄 normalizeName called with:', name);
   let normalized = name.toLowerCase().trim();
 
-  // A more robust way to remove adjectives without brittle regex
-  // Be more careful about removing adjectives that are part of compound terms
+  // Convert hyphens to spaces for consistent splitting and matching of multi-word adjectives
+  normalized = normalized.replace(/-/g, ' ');
+
+  // Add a new list/set for adjective-noun pairs to preserve
+  // This list will be the primary mechanism for preserving critical modifiers.
+  const preservedAdjectiveNounPairs = new Set([
+    'toasted_pecans',
+    'ground_beef',
+    'shredded_cheese',
+    'smoked_salmon',
+    'roasted_red_peppers',
+    'sun_dried_tomatoes', // Using 'sun_dried' for consistency if it appears as two words
+    'aged_cheddar',
+    'whole_wheat_flour',
+    'active_dry_yeast',
+    'all_purpose_flour', // Important to keep "all purpose" as it defines the flour type
+    'ground_pork',
+    'ground_chicken',
+    'ground_turkey',
+    'smoked_paprika',
+    'hot_paprika',
+    'sweet_paprika',
+    'powdered_sugar',
+    'confectioners_sugar',
+    'brown_sugar', // While "brown" is generic, "brown sugar" is a distinct product
+    'white_sugar', // Same for white sugar
+    'fine_salt',
+    'coarse_salt',
+    // Add more as you identify them through monitoring or specific recipe needs
+  ]);
+
+  // Revised and more focused list of generic adjectives to remove
   const adjectivesToRemove = [
-    'fresh', 'dried', 'chopped', 'sliced', 'diced', 'minced', 'crushed', 'peeled', 'seeded',
-    'large', 'medium', 'small', 'thin', 'thick', 'whole', 'optional', 'for garnish', 'to taste',
-    'plus more for garnish', 'cooked', 'uncooked', 'raw', 'ripe', 'unripe', 'sweet', 'unsweetened',
-    'salted', 'unsalted', 'low-sodium', 'lower-sodium', 'toasted'
+    'fresh', 'dried', 'chopped', 'diced', 'minced', 'crushed',
+    'peeled', 'seeded', 'pitted', 'canned', 'frozen',
+    'cooked', 'raw', 'boiled', 'fried', 'baked', 'grilled', 'steamed',
+    'large', 'medium', 'small', 'jumbo', 'extra', 'super',
+    'ripe', 'unripe', 'organic', 'gluten-free', 'sugar-free', 'low-fat', 'fat-free',
+    'whole', 'half', 'quarter', 'light', 'dark', 'sweet', 'sour', 'spicy', 'mild',
+    'fine', 'coarse',
+    'cubed', 'drained', 'flaked', 'melted', 'softened', 'unsalted', 'salted',
+    'plain', 'clarified', 'boneless', 'skinless', 'shelled',
+    'pureed', 'mashed', 'whipped', 'beaten', 'sifted',
+    'instant', 'pre-cooked', 'quick-cooking', 'self-rising',
+    'reduced-sodium', 'unsweetened', 'powdered', 'granulated', 'brown', 'white',
+    'yellow', 'red', 'green', 'black', 'pink', 'orange',
+    'prepared', 'kosher', 'free-range', 'grass-fed', 'wild',
+    'pasteurized', 'unpasteurized', 'seasoned', 'unseasoned', 'pure',
+    'extra-virgin', 'virgin', 'thick', 'thin', 'regular', 'concentrated', 'diluted',
+    'chilled', 'room-temperature',
+    // Specific words that *can* be adjectives but are more likely to be part of a distinct ingredient name:
+    // These should be moved to 'preservedAdjectiveNounPairs' if they create common problems.
+    // For now, remove 'ground', 'shredded', 'smoked', 'roasted', 'toasted' from this general list
+    // as they are explicitly handled in preservedAdjectiveNounPairs.
   ];
   
-  // Special handling for "ground" - only remove if it's not part of "ground pepper" or similar
-  if (normalized.includes('ground pepper') || normalized.includes('ground black pepper')) {
-    // Keep "ground" in these cases - it's part of the ingredient name
-    console.log('[groceryHelpers] 🌶️ Keeping "ground" in pepper terms:', normalized);
-  } else {
-    // Remove "ground" only if it's not part of a compound term
-    normalized = normalized.replace(/\bground\b/gi, '');
+  // 2. Remove adjectives with contextual preservation
+  let words = normalized.split(/\s+/).filter(Boolean); // filter(Boolean) removes empty strings from split
+
+  let filteredWords: string[] = [];
+
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    // Look ahead up to 2 words for potential multi-word pairs
+    const nextWord = words[i + 1] || '';
+    const nextTwoWords = words[i + 2] || '';
+
+    // Construct potential pairs for checking
+    const potentialPair1 = `${word}_${nextWord}`; // e.g., 'ground_beef'
+    const potentialPair2 = `${word}_${nextWord}_${nextTwoWords}`; // e.g., 'roasted_red_peppers'
+
+    // Check if the current word is in adjectivesToRemove.
+    // However, if the current word is part of a *preserved* multi-word phrase,
+    // then we should *not* remove it.
+
+    let isPartiallyPreserved = false;
+    // Check if current word starts a preserved two-word pair
+    if (preservedAdjectiveNounPairs.has(potentialPair1)) {
+        isPartiallyPreserved = true;
+        console.log('[groceryHelpers] 🛡️ Preserving adjective-noun pair:', potentialPair1);
+    }
+    // Check if current word starts a preserved three-word pair
+    if (preservedAdjectiveNounPairs.has(potentialPair2)) {
+        isPartiallyPreserved = true;
+        console.log('[groceryHelpers] 🛡️ Preserving adjective-noun pair:', potentialPair2);
+    }
+    // Also consider cases where the adjective might be after the noun,
+    // though the `normalizeName` design usually puts adjectives first.
+    // For now, we'll focus on adjective-noun patterns.
+
+    if (
+        adjectivesToRemove.includes(word) && // Is it a general adjective we usually remove?
+        !isPartiallyPreserved && // AND is it *not* part of a specific preserved phrase starting with this word?
+        // Your previous `!preservedAdjectiveNounPairs.has(`${word}_${words[i-1]}`)` implies checking if current word is a *second* word in a preserved pair.
+        // This is tricky with simple string splitting. For now, let's simplify and focus on adjective-noun patterns.
+        // If "cheese, shredded" is a common input, consider a pre-processing step to reorder "noun, adjective" to "adjective noun".
+        !(word === 'ground' && nextWord === 'pepper') // Keep specific exception for "ground pepper" if needed, though now 'ground_pepper' could be added to set
+    ) {
+        // Skip this adjective as it's not critical in this context
+        console.log('[groceryHelpers] 🗑️ Removing adjective:', word, 'from context:', words.join(' '));
+        continue;
+    }
+
+    filteredWords.push(word);
   }
-  
-  // Create a regex pattern that matches any of the other adjectives as whole words
-  const pattern = new RegExp(`\\b(${adjectivesToRemove.join('|')})\\b`, 'gi');
-  normalized = normalized.replace(pattern, '');
+
+  normalized = filteredWords.join(' ');
 
   // Clean up extra spaces that may have been left by removing adjectives
   normalized = normalized.replace(/\s+/g, ' ').trim();
@@ -98,7 +185,8 @@ export function normalizeName(name: string): string {
   }
   
   // Handle flour variations - normalize plain flour to "all purpose flour"
-  if (normalized === 'flour' || normalized === 'all purpose flour' || normalized === 'all-purpose flour') {
+  // Note: "all purpose flour" is now preserved by the preservedAdjectiveNounPairs system
+  if (normalized === 'flour') {
     console.log('[groceryHelpers] 🌾 FLOUR MATCH! Converting:', normalized, '→ all purpose flour');
     normalized = 'all purpose flour';
   }
@@ -138,6 +226,7 @@ export function normalizeName(name: string): string {
     }
   }
   
+  console.log('[groceryHelpers] ✅ normalizeName result:', name, '→', normalized);
   return normalized;
 }
 
@@ -161,15 +250,28 @@ const unitDictionary: { [key: string]: string } = {
   'gallon': 'gallon', 'gallons': 'gallon', 'gal': 'gallon',
   'milliliter': 'ml', 'milliliters': 'ml', 'mL': 'ml',
   'liter': 'liter', 'liters': 'liter', 'L': 'liter', 'l': 'liter',
-  // Count units
-  'clove': 'clove', 'cloves': 'clove',
-  'pinch': 'pinch', 'pinches': 'pinch',
-  'dash': 'dash', 'dashes': 'dash',
   // Weight units (not converted, must match exactly)
   'g': 'g', 'gram': 'g', 'grams': 'g',
   'kg': 'kg', 'kgs': 'kg', 'kilogram': 'kg', 'kilograms': 'kg',
   'oz': 'oz', 'ounce': 'oz', 'ounces': 'oz',
-  'lb': 'lb', 'lbs': 'lb', 'pound': 'lb', 'pounds': 'lb'
+  'lb': 'lb', 'lbs': 'lb', 'pound': 'lb', 'pounds': 'lb',
+  // Count-based units - standardize all to 'each' for consistent aggregation
+  'clove': 'each', 'cloves': 'each',
+  'head': 'each', 'heads': 'each',
+  'bunch': 'each', 'bunches': 'each',
+  'piece': 'each', 'pieces': 'each',
+  'stalk': 'each', 'stalks': 'each',
+  'sprig': 'each', 'sprigs': 'each',
+  'can': 'each', 'cans': 'each',
+  'bottle': 'each', 'bottles': 'each',
+  'box': 'each', 'boxes': 'each',
+  'bag': 'each', 'bags': 'each',
+  'package': 'each', 'packages': 'each',
+  'jar': 'each', 'jars': 'each',
+  'container': 'each', 'containers': 'each',
+  'pinch': 'each', 'pinches': 'each',
+  'dash': 'each', 'dashes': 'each',
+  'each': 'each', 'count': 'each'
 };
 
 /**
@@ -234,10 +336,10 @@ function areUnitsCompatible(unit1: string | null, unit2: string | null): boolean
     return true;
   }
   
-  // Special case: cloves and null are compatible for garlic aggregation
-  if ((normalizedUnit1 === 'clove' && normalizedUnit2 === null) || 
-      (normalizedUnit1 === null && normalizedUnit2 === 'clove')) {
-    console.log(`[groceryHelpers] ✅ Special case: clove and null are compatible for garlic`);
+  // Special case: each units and null are compatible for count-based aggregation
+  if ((normalizedUnit1 === 'each' && normalizedUnit2 === null) || 
+      (normalizedUnit1 === null && normalizedUnit2 === 'each')) {
+    console.log(`[groceryHelpers] ✅ Special case: each and null are compatible for count-based aggregation`);
     return true;
   }
   
@@ -280,7 +382,7 @@ function areUnitsCompatible(unit1: string | null, unit2: string | null): boolean
   
   const weightUnits = new Set(['gram', 'kilogram', 'ounce', 'pound']);
   
-  const countUnits = new Set(['clove', 'piece', 'pinch', 'dash']);
+  const countUnits = new Set(['each']);
 
   // Check if both units are volume units (these can be converted)
   if (volumeUnits.has(normalizedUnit1) && volumeUnits.has(normalizedUnit2)) {
@@ -369,9 +471,9 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
           const baseUnit = normalizeUnit(baseItem.quantity_unit);
           const compareUnit = normalizeUnit(compareItem.quantity_unit);
           
-          // Check if one is volume (cup/tbsp/etc) and the other is count (null/clove/etc)
+          // Check if one is volume (cup/tbsp/etc) and the other is count (null/each/etc)
           const volumeUnits = new Set(['cup', 'tbsp', 'tsp', 'ml', 'fl_oz']);
-          const countUnits = new Set([null, 'clove', 'piece']);
+          const countUnits = new Set([null, 'each']);
           
           if ((volumeUnits.has(baseUnit as any) && countUnits.has(compareUnit as any)) ||
               (countUnits.has(baseUnit as any) && volumeUnits.has(compareUnit as any))) {
@@ -570,10 +672,32 @@ export function formatIngredientsForGroceryList(
         });
         
         // Standardize the unit immediately
-        const standardizedUnit = normalizeUnit(ingredient.unit);
+        // If ingredient.unit is null/empty, try to extract from the original text
+        let standardizedUnit = normalizeUnit(ingredient.unit);
+        if (standardizedUnit === null && ingredient.unit === null) {
+          // Fallback: try to extract unit from the original text
+          console.log('[groceryHelpers] 🔄 Unit is null, trying to extract from original text:', originalText);
+          
+          // Simple unit extraction from original text
+          const unitMatch = originalText.match(/\b(cup|cups|tbsp|tbs|tablespoon|tablespoons|tsp|teaspoon|teaspoons|oz|ounce|ounces|lb|pound|pounds|g|gram|grams|kg|kilogram|kilograms|ml|milliliter|milliliters|l|liter|liters|clove|cloves|head|heads|bunch|bunches|piece|pieces|stalk|stalks|sprig|sprigs|can|cans|bottle|bottles|box|boxes|bag|bags|package|packages|jar|jars|container|containers|pinch|pinches|dash|dashes|each|count)\b/i);
+          if (unitMatch) {
+            const extractedUnit = unitMatch[1].toLowerCase();
+            standardizedUnit = normalizeUnit(extractedUnit);
+            console.log('[groceryHelpers] ✅ Successfully extracted unit from original text:', extractedUnit, '→', standardizedUnit);
+          }
+        }
         
         // Parse amount first to use for display unit
-        const amount = parseAmountString(ingredient.amount);
+        // If ingredient.amount is null/empty, try to parse from the original text
+        let amount = parseAmountString(ingredient.amount);
+        if (amount === null && ingredient.amount === null) {
+          // Fallback: try to parse amount from the original text
+          console.log('[groceryHelpers] 🔄 Amount is null, trying to parse from original text:', originalText);
+          amount = parseAmountString(originalText);
+          if (amount !== null) {
+            console.log('[groceryHelpers] ✅ Successfully parsed amount from original text:', amount);
+          }
+        }
         
         // Create grocery list item from final ingredient
         const groceryItem = {

@@ -15,6 +15,7 @@ const conversions: { [key: string]: number } = {
   quart: 946.352946,          // US quart (1/4 gallon exactly)
   gallon: 3785.411784,        // US gallon (231 cubic inches exactly)
   liter: 1000,               // Metric liter
+  each: 1,                   // Count-based unit for consistent aggregation
   // Weight (approximate for common liquids like water/milk - very inaccurate for solids)
   // It's generally better NOT to convert between volume and weight without density info
   // g: 1,            // Gram (base for weight)
@@ -69,11 +70,8 @@ export function getUnitDisplayName(unit: Unit | string | null, amount: number = 
         gallon: { singular: 'gallon', plural: 'gallons' },
         liter: { singular: 'liter', plural: 'liters' },
         
-        // Count units
-        clove: { singular: 'clove', plural: 'cloves' },
-        piece: { singular: 'piece', plural: 'pieces' },
-        pinch: { singular: 'pinch', plural: 'pinches' },
-        dash: { singular: 'dash', plural: 'dashes' },
+        // Count units - standardized to 'each'
+        each: { singular: 'each', plural: 'each' },
         
         // Compound units (fallback for backend parsing failures)
         'oz can': { singular: 'oz can', plural: 'oz cans' },

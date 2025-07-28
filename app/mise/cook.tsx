@@ -120,29 +120,21 @@ export default function CookScreen() {
   // Keep screen awake while cooking
   useKeepAwake();
 
-  // Component lifecycle monitoring with cleanup (scroll timeout only)
+  // Timer and scroll cleanup - only on component unmount
   useEffect(() => {
-    console.error('[CookScreen] 🔍 Component mounted or dependencies changed.');
-    
     return () => {
       console.error('[CookScreen] 🔍 Component unmounting (cleanup function).');
-      console.error('[CookScreen] 🔍 Cleaning up scroll timeout');
       
-      if (scrollPositionTimeoutRef.current) {
-        console.error('[CookScreen] 🔍 Clearing scroll position timeout');
-        clearTimeout(scrollPositionTimeoutRef.current);
-      }
-    };
-  }, [cookingContext.state.activeRecipes, cookingContext.state.activeRecipeId, cookingContext.state.sessionStartTime, isLoading, router]);
-
-  // Timer cleanup - only on component unmount
-  useEffect(() => {
-    return () => {
-      console.error('[CookScreen] 🔍 Cleaning up timer interval on unmount');
+      // Clean up timer
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
       }
       setTimerStartTimestamp(null);
+      
+      // Clean up scroll timeout
+      if (scrollPositionTimeoutRef.current) {
+        clearTimeout(scrollPositionTimeoutRef.current);
+      }
     };
   }, []); // Empty dependency array = only runs on unmount
 
@@ -166,16 +158,22 @@ export default function CookScreen() {
         console.log(`[CookScreen] 🔍 Initial recipe ID from params: ${initialRecipeIdFromParams}`);
 
         try {
-          // Clear existing sessions to start fresh
-          console.log('[CookScreen] 🧹 Clearing existing cooking sessions before fresh fetch');
-          try {
-            // DEFENSIVE: Extract context function to local constant to prevent minification issues
-            const endAllSessionsFn = cookingContext.endAllSessions;
-            if (typeof endAllSessionsFn === 'function') {
-              await endAllSessionsFn();
-            }
-          } catch (error) {
-            console.warn('[CookScreen] ⚠️ Error clearing sessions, continuing anyway:', error);
+          // Check if we already have active sessions - if so, don't clear them
+          const hasActiveSessions = cookingContext.state.activeRecipes.length > 0;
+          console.log('[CookScreen] 🔍 Checking for existing sessions:', hasActiveSessions ? 'Found active sessions' : 'No active sessions');
+          
+          if (hasActiveSessions) {
+            console.log('[CookScreen] ✅ Using existing cooking sessions');
+            
+            // Populate local recipes state from existing sessions
+            const existingRecipes = cookingContext.state.activeRecipes
+              .filter(session => session.recipe)
+              .map(session => session.recipe!);
+            
+            console.log('[CookScreen] 📊 Populated local recipes from existing sessions:', existingRecipes.length, 'recipes');
+            setRecipes(existingRecipes);
+            setIsLoading(false);
+            return;
           }
           
           // Fetch fresh mise data from API
@@ -566,6 +564,28 @@ export default function CookScreen() {
     setInitialToolToShow(null);
   };
 
+  const handleEndCookingSessions = async () => {
+    console.log('[CookScreen] 🛑 User requested to end cooking sessions');
+    
+    try {
+      // End all cooking sessions
+      await endAllSessions();
+      
+      // Close the tools modal
+      closeToolsModal();
+      
+      // Navigate back to the mise screen (prep station)
+      router.back();
+      
+      console.log('[CookScreen] ✅ Successfully ended cooking sessions and navigated back');
+    } catch (error) {
+      console.error('[CookScreen] 💥 Error ending cooking sessions:', error);
+      // Still try to navigate back even if there's an error
+      closeToolsModal();
+      router.back();
+    }
+  };
+
   const handleTimersPress = () => {
     openToolsModal('timer');
   };
@@ -748,6 +768,7 @@ export default function CookScreen() {
           onTimersPress={handleTimersPress}
           onRecipeTipsPress={handleRecipeTipsPress}
           hasRecipeTips={!!currentRecipeData?.tips}
+          onEndCookingSessions={handleEndCookingSessions}
         />
 
         {/* Tools Modal */}
@@ -1017,4 +1038,6 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     fontSize: 16,
   },
+
+
 });
