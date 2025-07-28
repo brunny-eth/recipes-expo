@@ -6,7 +6,6 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
 
@@ -17,6 +16,7 @@ import {
   bodyText,
   bodyTextLoose,
   FONT,
+  screenTitleText,
 } from '@/constants/typography';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
@@ -27,6 +27,7 @@ import { parseServingsValue } from '@/utils/recipeUtils';
 import { moveRecipesToFolder } from '@/lib/savedRecipes';
 import ScreenHeader from '@/components/ScreenHeader';
 import FolderPickerModal from '@/components/FolderPickerModal';
+import ConfirmationModal from '@/components/ConfirmationModal';
 
 type SavedRecipe = {
   base_recipe_id: number;
@@ -58,6 +59,11 @@ export default function SavedFolderDetailScreen() {
   const [selectedRecipes, setSelectedRecipes] = useState<Set<number>>(new Set());
   const [showFolderPicker, setShowFolderPicker] = useState(false);
   const [isMovingRecipes, setIsMovingRecipes] = useState(false);
+  
+  // Confirmation modals state
+  const [showDeleteFolderModal, setShowDeleteFolderModal] = useState(false);
+  const [showDeleteRecipeModal, setShowDeleteRecipeModal] = useState(false);
+  const [recipeToDelete, setRecipeToDelete] = useState<number | null>(null);
 
   const folderId = params.folderId ? parseInt(params.folderId) : null;
 
@@ -214,41 +220,43 @@ export default function SavedFolderDetailScreen() {
   }, [router, isSelectionMode]);
 
   // Handle delete recipe
-  const handleDeleteRecipe = useCallback(async (baseRecipeId: number) => {
+  const handleDeleteRecipe = useCallback((baseRecipeId: number) => {
     if (!session?.user) {
       console.warn('[SavedFolderDetailScreen] No user session found. Cannot delete recipe.');
       return;
     }
 
-    Alert.alert(
-      'Remove Recipe',
-      'Are you sure you want to remove this recipe from your saved recipes?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            setIsLoading(true);
-            const { error: deleteError } = await supabase
-              .from('user_saved_recipes')
-              .delete()
-              .eq('user_id', session.user.id)
-              .eq('base_recipe_id', baseRecipeId);
-
-            if (deleteError) {
-              console.error('[SavedFolderDetailScreen] Error deleting recipe:', deleteError);
-              setError('Failed to remove recipe. Please try again.');
-            } else {
-              console.log(`[SavedFolderDetailScreen] Recipe ${baseRecipeId} removed.`);
-              setSavedRecipes(prev => prev.filter(recipe => recipe.base_recipe_id !== baseRecipeId));
-            }
-            setIsLoading(false);
-          },
-        },
-      ]
-    );
+    setRecipeToDelete(baseRecipeId);
+    setShowDeleteRecipeModal(true);
   }, [session?.user]);
+
+  const confirmDeleteRecipe = useCallback(async () => {
+    if (!recipeToDelete || !session?.user) return;
+    
+    setIsLoading(true);
+    try {
+      const { error: deleteError } = await supabase
+        .from('user_saved_recipes')
+        .delete()
+        .eq('user_id', session.user.id)
+        .eq('base_recipe_id', recipeToDelete);
+
+      if (deleteError) {
+        console.error('[SavedFolderDetailScreen] Error deleting recipe:', deleteError);
+        setError('Failed to remove recipe. Please try again.');
+      } else {
+        console.log(`[SavedFolderDetailScreen] Recipe ${recipeToDelete} removed.`);
+        setSavedRecipes(prev => prev.filter(recipe => recipe.base_recipe_id !== recipeToDelete));
+      }
+    } catch (error) {
+      console.error('[SavedFolderDetailScreen] Unexpected error deleting recipe:', error);
+      setError('Failed to remove recipe. Please try again.');
+    } finally {
+      setIsLoading(false);
+      setShowDeleteRecipeModal(false);
+      setRecipeToDelete(null);
+    }
+  }, [recipeToDelete, session?.user]);
 
   // Bulk move functionality
   const handleStartSelection = useCallback(() => {
@@ -408,10 +416,12 @@ export default function SavedFolderDetailScreen() {
         {/* Bulk actions bar */}
         {isSelectionMode && (
           <View style={styles.bulkActionsBar}>
-            <Text style={styles.selectedCountText}>
-              {selectedRecipes.size} selected
-            </Text>
-            <View style={styles.bulkActions}>
+            <View style={styles.bulkActionsHeader}>
+              <Text style={styles.selectedCountText}>
+                {selectedRecipes.size} recipe{selectedRecipes.size !== 1 ? 's' : ''} selected
+              </Text>
+            </View>
+            <View style={styles.bulkActionsButtons}>
               <TouchableOpacity 
                 style={styles.cancelButton}
                 onPress={handleCancelSelection}
@@ -449,8 +459,9 @@ export default function SavedFolderDetailScreen() {
       <TouchableOpacity
         style={styles.selectButton}
         onPress={handleStartSelection}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
-        <Text style={styles.selectButtonText}>Select</Text>
+        <MaterialCommunityIcons name="checkbox-multiple-marked-outline" size={24} color={COLORS.primary} />
       </TouchableOpacity>
     );
   };
@@ -481,6 +492,21 @@ export default function SavedFolderDetailScreen() {
         onSelectFolder={handleFolderPickerSelect}
         isLoading={isMovingRecipes}
       />
+
+      {/* Delete Recipe Confirmation Modal */}
+      <ConfirmationModal
+        visible={showDeleteRecipeModal}
+        title="Remove Recipe"
+        message="Are you sure you want to remove this recipe from your saved recipes?"
+        confirmLabel="Remove"
+        cancelLabel="Cancel"
+        onConfirm={confirmDeleteRecipe}
+        onCancel={() => {
+          setShowDeleteRecipeModal(false);
+          setRecipeToDelete(null);
+        }}
+        destructive={false}
+      />
     </View>
   );
 }
@@ -505,8 +531,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    ...bodyStrongText,
-    fontSize: 20,
+    ...screenTitleText,
     color: COLORS.textDark,
     flex: 1,
     textAlign: 'center',
@@ -593,58 +618,85 @@ const styles = StyleSheet.create({
     padding: SPACING.xs,
   },
   selectButton: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
-  },
-  selectButtonText: {
-    ...bodyStrongText,
-    color: COLORS.primary,
+    padding: SPACING.xs,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   bulkActionsBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     backgroundColor: COLORS.white,
-    paddingHorizontal: SPACING.pageHorizontal,
-    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.xl,
     borderTopWidth: 1,
     borderTopColor: COLORS.lightGray,
+    marginTop: SPACING.lg,
+    marginHorizontal: -SPACING.pageHorizontal,
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 8,
+  },
+  bulkActionsHeader: {
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  selectedCountText: {
+    ...bodyStrongText,
+    color: COLORS.textDark,
+    fontSize: FONT.size.lg,
+    textAlign: 'center',
+  },
+  bulkActionsButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  selectedCountText: {
-    ...bodyText,
-    color: COLORS.textDark,
-  },
-  bulkActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    gap: SPACING.lg,
   },
   cancelButton: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-    marginRight: SPACING.sm,
+    flex: 1,
+    paddingVertical: SPACING.lg,
+    paddingHorizontal: SPACING.xl,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
   },
   cancelButtonText: {
-    ...bodyText,
-    color: COLORS.textMuted,
+    ...bodyStrongText,
+    color: COLORS.primary,
+    fontSize: FONT.size.body,
+    letterSpacing: 0.5,
   },
   moveButton: {
+    flex: 1,
     backgroundColor: COLORS.primary,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.sm,
-    minWidth: 120,
+    paddingVertical: SPACING.lg,
+    paddingHorizontal: SPACING.xl,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
     alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+    minHeight: 48,
   },
   moveButtonDisabled: {
     backgroundColor: COLORS.lightGray,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   moveButtonText: {
     ...bodyStrongText,
     color: COLORS.white,
+    fontSize: FONT.size.body,
+    letterSpacing: 0.5,
   },
   errorText: {
     ...bodyText,

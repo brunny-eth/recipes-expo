@@ -24,6 +24,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import ScreenHeader from '@/components/ScreenHeader';
 import AddNewFolderModal from '@/components/AddNewFolderModal';
+import ConfirmationModal from '@/components/ConfirmationModal';
 import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
 
 // Types for folders
@@ -59,6 +60,10 @@ export default function LibraryScreen() {
   
   // Add new folder modal state
   const [showAddFolderModal, setShowAddFolderModal] = useState(false);
+  
+  // Confirmation modal state
+  const [showDeleteFolderModal, setShowDeleteFolderModal] = useState(false);
+  const [folderToDelete, setFolderToDelete] = useState<SavedFolder | null>(null);
 
   // Component Mount/Unmount logging
   useEffect(() => {
@@ -283,47 +288,53 @@ export default function LibraryScreen() {
   }, [router]);
 
   // Handle delete folder
-  const handleDeleteFolder = useCallback(async (folder: SavedFolder) => {
+  const handleDeleteFolder = useCallback((folder: SavedFolder) => {
     if (!session?.user) return;
 
     if (folder.recipe_count > 0) {
-      Alert.alert(
-        'Cannot Delete Folder', 
-        `This folder contains ${folder.recipe_count} recipe${folder.recipe_count !== 1 ? 's' : ''}. Please move or delete the recipes first.`,
-        [{ text: 'OK' }]
-      );
+      setFolderToDelete(folder);
+      setShowDeleteFolderModal(true);
       return;
     }
 
-    Alert.alert(
-      'Delete Folder',
-      `Are you sure you want to delete "${folder.name}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            setIsSavedLoading(true);
-            const { error: deleteError } = await supabase
-              .from('user_saved_folders')
-              .delete()
-              .eq('user_id', session.user.id)
-              .eq('id', folder.id);
-
-            if (deleteError) {
-              console.error('[LibraryScreen] Error deleting folder:', deleteError);
-              setSavedError('Failed to delete folder. Please try again.');
-            } else {
-              console.log(`[LibraryScreen] Folder "${folder.name}" deleted.`);
-              setSavedFolders(prev => prev.filter(f => f.id !== folder.id));
-            }
-            setIsSavedLoading(false);
-          },
-        },
-      ]
-    );
+    setFolderToDelete(folder);
+    setShowDeleteFolderModal(true);
   }, [session?.user]);
+
+  const confirmDeleteFolder = useCallback(async () => {
+    if (!folderToDelete || !session?.user) return;
+    
+    // If folder has recipes, just close the modal (it's an info message)
+    if (folderToDelete.recipe_count > 0) {
+      setShowDeleteFolderModal(false);
+      setFolderToDelete(null);
+      return;
+    }
+    
+    setIsSavedLoading(true);
+    try {
+      const { error: deleteError } = await supabase
+        .from('user_saved_folders')
+        .delete()
+        .eq('user_id', session.user.id)
+        .eq('id', folderToDelete.id);
+
+      if (deleteError) {
+        console.error('[LibraryScreen] Error deleting folder:', deleteError);
+        setSavedError('Failed to delete folder. Please try again.');
+      } else {
+        console.log(`[LibraryScreen] Folder "${folderToDelete.name}" deleted.`);
+        setSavedFolders(prev => prev.filter(f => f.id !== folderToDelete.id));
+      }
+    } catch (error) {
+      console.error('[LibraryScreen] Unexpected error deleting folder:', error);
+      setSavedError('Failed to delete folder. Please try again.');
+    } finally {
+      setIsSavedLoading(false);
+      setShowDeleteFolderModal(false);
+      setFolderToDelete(null);
+    }
+  }, [folderToDelete, session?.user]);
 
 
 
@@ -624,6 +635,26 @@ export default function LibraryScreen() {
         onClose={() => setShowAddFolderModal(false)}
         onFolderCreated={fetchSavedFolders}
       />
+
+      {/* Delete Folder Confirmation Modal */}
+      {folderToDelete && (
+        <ConfirmationModal
+          visible={showDeleteFolderModal}
+          title={folderToDelete.recipe_count > 0 ? "Cannot Delete Folder" : "Delete Folder"}
+          message={folderToDelete.recipe_count > 0 
+            ? `This folder contains ${folderToDelete.recipe_count} recipe${folderToDelete.recipe_count !== 1 ? 's' : ''}. Please move or delete the recipes first.`
+            : `Are you sure you want to delete "${folderToDelete.name}"?`
+          }
+          confirmLabel={folderToDelete.recipe_count > 0 ? "OK" : "Delete"}
+          cancelLabel={folderToDelete.recipe_count > 0 ? undefined : "Cancel"}
+          onConfirm={confirmDeleteFolder}
+          onCancel={() => {
+            setShowDeleteFolderModal(false);
+            setFolderToDelete(null);
+          }}
+          destructive={false}
+        />
+      )}
     </View>
   );
 }
