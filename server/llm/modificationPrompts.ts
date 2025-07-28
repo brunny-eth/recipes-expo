@@ -18,7 +18,8 @@ export function buildModificationPrompt(
     originalIngredients: any[],
     scaledIngredients: any[],
     scalingFactor: number,
-    skipTitleUpdate?: boolean
+    skipTitleUpdate?: boolean,
+    ingredientGroups?: { name: string; ingredients: any[] }[]
 ): PromptPayload {
 
     // Build substitution lines (from substitutionPrompts.ts)
@@ -91,9 +92,25 @@ export function buildModificationPrompt(
 
     let modificationsSection = '';
     
+    // Add ingredient groups section if provided
+    let ingredientGroupsSection = '';
+    if (ingredientGroups && ingredientGroups.length > 0) {
+        const groupsText = ingredientGroups.map(group => {
+            const ingredientsList = group.ingredients.map(ing => 
+                `${ing.amount || ''} ${ing.unit || ''} ${ing.name}`.trim()
+            ).join(', ');
+            return `"${group.name}": [${ingredientsList}]`;
+        }).join('\n');
+        
+        ingredientGroupsSection = `
+INGREDIENT GROUPS:
+${groupsText}
+`;
+    }
+    
     if (needsSubstitution && needsScaling) {
         modificationsSection = `
-INGREDIENT SUBSTITUTIONS:
+${ingredientGroupsSection}INGREDIENT SUBSTITUTIONS:
 ${substitutionLines}
 
 QUANTITY SCALING:
@@ -102,15 +119,17 @@ Scaled ingredients (${scalingFactor}x): [${scaledIngredientsDesc}]
 `;
     } else if (needsSubstitution) {
         modificationsSection = `
-INGREDIENT SUBSTITUTIONS:
+${ingredientGroupsSection}INGREDIENT SUBSTITUTIONS:
 ${substitutionLines}
 `;
     } else if (needsScaling) {
         modificationsSection = `
-QUANTITY SCALING:
+${ingredientGroupsSection}QUANTITY SCALING:
 Original ingredients: [${originalIngredientsDesc}]
 Scaled ingredients (${scalingFactor}x): [${scaledIngredientsDesc}]
 `;
+    } else if (ingredientGroupsSection) {
+        modificationsSection = ingredientGroupsSection;
     }
 
     const systemPrompt = `
@@ -123,21 +142,30 @@ ${modificationsSection}
 2. For any ingredients marked REPLACE, update wording/preparation to use the substitute. Adjust timings/prep if needed to incorporate the new ingredient appropriately.
 3. Output natural instructions without phrases like "omit" or "instead"—just the corrected steps.
 
+**INGREDIENT GROUP REFERENCE EXPANSION** (if ingredient groups are provided):
+4. When a vague reference (e.g., "mix all marinade ingredients", "add the sauce", "combine dressing ingredients") appears in an instruction, and a matching group is found in the INGREDIENT GROUPS section, rewrite the instruction using the full, comma-separated ingredient list from that group.
+5. Match group names loosely (case-insensitive, partial match is OK). For example, "marinade" should match "Marinade" or "The Marinade".
+6. Replace vague phrases with explicit ingredient names and quantities. For example:
+   - "Mix all dressing ingredients" → "Mix olive oil, red wine vinegar, and mustard"
+   - "Add the marinade" → "Add soy sauce, garlic, and ginger"
+   - "Stir in the sauce" → "Stir in tomatoes, onions, and herbs"
+7. This expansion is CRITICAL for app functionality - users need to see exactly which ingredients to use.
+
 **SCALING RULES** (if applicable):
-4. Update **only** ingredient quantities that are explicitly stated (e.g., "2 cups flour"). Do not modify vague references like "the onion" or "some salt".
-5. Use the exact scaled quantity if numeric.
-6. For whole or indivisible ingredients (e.g. eggs, bay leaves, cinnamon sticks), round sensibly upwards.
-7. Be precise. If the original says "Add 2 tbsp olive oil" and the scaled amount is "1 tbsp", rewrite as "Add 1 tbsp olive oil".
+8. Update **only** ingredient quantities that are explicitly stated (e.g., "2 cups flour"). Do not modify vague references like "the onion" or "some salt".
+9. Use the exact scaled quantity if numeric.
+10. For whole or indivisible ingredients (e.g. eggs, bay leaves, cinnamon sticks), round sensibly upwards.
+11. Be precise. If the original says "Add 2 tbsp olive oil" and the scaled amount is "1 tbsp", rewrite as "Add 1 tbsp olive oil".
 
 **COMBINED REASONING** (when both substitutions and scaling apply):
-8. Consider both changes holistically. For example, if substituting chicken with tofu AND doubling the recipe, think about how cooking times, temperatures, and preparation methods might need adjustment for both the ingredient change and the quantity change.
-9. Prioritize food safety and proper cooking techniques when combining substitutions with scaling.
+12. Consider both changes holistically. For example, if substituting chicken with tofu AND doubling the recipe, think about how cooking times, temperatures, and preparation methods might need adjustment for both the ingredient change and the quantity change.
+13. Prioritize food safety and proper cooking techniques when combining substitutions with scaling.
 
 **GENERAL RULES**:
-10. Preserve step order and DO NOT number the steps.
+14. Preserve step order and DO NOT number the steps.
 ${skipTitleUpdate ? 
-`11. Title Rewriting: DO NOT suggest title changes. Keep newTitle as null since the user has already set a custom title.` :
-`11. Title Rewriting: Suggest a newTitle if a primary/key ingredient is significantly substituted or removed. Primary ingredients are typically those that:
+`15. Title Rewriting: DO NOT suggest title changes. Keep newTitle as null since the user has already set a custom title.` :
+`15. Title Rewriting: Suggest a newTitle if a primary/key ingredient is significantly substituted or removed. Primary ingredients are typically those that:
     - Appear in common recipe names (e.g., "chicken" in "chicken quesadillas", "blueberry" in "blueberry muffins")
     - Are the main protein, featured fruit, or one of the defining characteristics of the dish
     - When substituted/removed, should change what the dish is called logically.
