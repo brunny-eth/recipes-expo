@@ -20,6 +20,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useKeepAwake } from 'expo-keep-awake';
 
 import { useCooking } from '@/context/CookingContext';
 import { useAuth } from '@/context/AuthContext';
@@ -75,6 +76,7 @@ export default function CookScreen() {
   // --- Timer State (Persistent Across Recipes) ---
   const [timerTimeRemaining, setTimerTimeRemaining] = useState(0);
   const [isTimerActive, setIsTimerActive] = useState(false);
+  const [timerStartTimestamp, setTimerStartTimestamp] = useState<number | null>(null);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   // --- End Timer State ---
 
@@ -115,6 +117,9 @@ export default function CookScreen() {
     }
   }, [cookingContext.state.activeRecipeId, cookingContext]);
 
+  // Keep screen awake while cooking
+  useKeepAwake();
+
   // Component lifecycle monitoring with cleanup (scroll timeout only)
   useEffect(() => {
     console.error('[CookScreen] 🔍 Component mounted or dependencies changed.');
@@ -137,6 +142,7 @@ export default function CookScreen() {
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
       }
+      setTimerStartTimestamp(null);
     };
   }, []); // Empty dependency array = only runs on unmount
 
@@ -493,38 +499,46 @@ export default function CookScreen() {
         clearInterval(timerIntervalRef.current);
         timerIntervalRef.current = null;
       }
+      setTimerStartTimestamp(null);
       setIsTimerActive(false);
     } else {
       // Start timer
       if (timerTimeRemaining > 0) {
+        const startTime = Date.now();
+        setTimerStartTimestamp(startTime);
         setIsTimerActive(true);
+        
         timerIntervalRef.current = setInterval(() => {
-          setTimerTimeRemaining(prev => {
-            if (prev <= 1) {
-              // Timer finished
-              setIsTimerActive(false);
-              if (timerIntervalRef.current) {
-                clearInterval(timerIntervalRef.current);
-                timerIntervalRef.current = null;
-              }
-              // Show notification when timer finishes
-              console.error('[CookScreen] 🔍 About to call showError for timer completion');
-              try {
-                // DEFENSIVE: Extract showError again inside the interval closure
-                const showErrorInternalFn = errorModalContext.showError;
-                if (typeof showErrorInternalFn === 'function') {
-                  showErrorInternalFn('Timer', "Time's up!");
-                } else {
-                  console.error('[CookScreen] ⚠️ showError is not a function!');
-                }
-              } catch (showErrorError: any) {
-                console.error('[CookScreen] 💥 Error calling showError:', showErrorError);
-                console.error('[CookScreen] 💥 showError error stack:', showErrorError.stack);
-              }
-              return 0;
+          const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+          const newTimeRemaining = Math.max(0, timerTimeRemaining - elapsedSeconds);
+          
+          if (newTimeRemaining <= 0) {
+            // Timer finished
+            setIsTimerActive(false);
+            setTimerStartTimestamp(null);
+            if (timerIntervalRef.current) {
+              clearInterval(timerIntervalRef.current);
+              timerIntervalRef.current = null;
             }
-            return prev - 1;
-          });
+            setTimerTimeRemaining(0);
+            
+            // Show notification when timer finishes
+            console.error('[CookScreen] 🔍 About to call showError for timer completion');
+            try {
+              // DEFENSIVE: Extract showError again inside the interval closure
+              const showErrorInternalFn = errorModalContext.showError;
+              if (typeof showErrorInternalFn === 'function') {
+                showErrorInternalFn('Timer', "Time's up!");
+              } else {
+                console.error('[CookScreen] ⚠️ showError is not a function!');
+              }
+            } catch (showErrorError: any) {
+              console.error('[CookScreen] 💥 Error calling showError:', showErrorError);
+              console.error('[CookScreen] 💥 showError error stack:', showErrorError.stack);
+            }
+          } else {
+            setTimerTimeRemaining(newTimeRemaining);
+          }
         }, 1000);
       }
     }
@@ -536,6 +550,7 @@ export default function CookScreen() {
       timerIntervalRef.current = null;
     }
     setIsTimerActive(false);
+    setTimerStartTimestamp(null);
     setTimerTimeRemaining(0);
   };
   // --- End Timer Functions ---

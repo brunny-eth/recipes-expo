@@ -18,11 +18,12 @@ import {
   ImageStyle,
   FlatList,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
+import { useKeepAwake } from 'expo-keep-awake';
 import {
   COLORS,
   OVERLAYS,
@@ -119,6 +120,7 @@ export default function StepsScreen() {
   // --- Lifted Timer State ---
   const [timerTimeRemaining, setTimerTimeRemaining] = useState(0); // Time in seconds
   const [isTimerActive, setIsTimerActive] = useState(false);
+  const [timerStartTimestamp, setTimerStartTimestamp] = useState<number | null>(null);
   const timerIntervalRef = useRef<any>(null);
   // --- End Lifted Timer State ---
 
@@ -133,6 +135,20 @@ export default function StepsScreen() {
       console.log('[StepsScreen] 🌀 Component WILL UNMOUNT');
     };
   }, []);
+
+  // Timer cleanup - only on component unmount
+  useEffect(() => {
+    return () => {
+      console.log('[StepsScreen] 🔍 Cleaning up timer interval on unmount');
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+      setTimerStartTimestamp(null);
+    };
+  }, []); // Empty dependency array = only runs on unmount
+
+  // Keep screen awake while cooking
+  useKeepAwake();
 
   // Effect to initialize recipe state from params
   useEffect(() => {
@@ -288,15 +304,23 @@ export default function StepsScreen() {
   };
 
   useEffect(() => {
-    if (isTimerActive && timerTimeRemaining > 0) {
+    if (isTimerActive && timerTimeRemaining > 0 && timerStartTimestamp) {
       timerIntervalRef.current = setInterval(() => {
-        setTimerTimeRemaining((prev) => prev - 1);
+        const elapsedSeconds = Math.floor((Date.now() - timerStartTimestamp) / 1000);
+        const newTimeRemaining = Math.max(0, timerTimeRemaining - elapsedSeconds);
+        
+        if (newTimeRemaining <= 0) {
+          // Timer finished
+          setIsTimerActive(false);
+          setTimerStartTimestamp(null);
+          if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+          setTimerTimeRemaining(0);
+          // Optional: Add sound/vibration feedback here
+          showError('Timer', "Time's up!");
+        } else {
+          setTimerTimeRemaining(newTimeRemaining);
+        }
       }, 1000);
-    } else if (timerTimeRemaining === 0 && isTimerActive) {
-      setIsTimerActive(false);
-      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-      // Optional: Add sound/vibration feedback here
-      showError('Timer', "Time's up!");
     }
 
     // Cleanup interval
@@ -305,14 +329,22 @@ export default function StepsScreen() {
         clearInterval(timerIntervalRef.current);
       }
     };
-  }, [isTimerActive, timerTimeRemaining, showError]);
+  }, [isTimerActive, timerTimeRemaining, timerStartTimestamp, showError]);
 
   const handleTimerStartPause = () => {
     if (timerTimeRemaining > 0) {
-      setIsTimerActive((prev) => !prev);
-      // Clear interval when pausing explicitly
-      if (isTimerActive && timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
+      if (isTimerActive) {
+        // Pause timer
+        if (timerIntervalRef.current) {
+          clearInterval(timerIntervalRef.current);
+        }
+        setTimerStartTimestamp(null);
+        setIsTimerActive(false);
+      } else {
+        // Start timer
+        const startTime = Date.now();
+        setTimerStartTimestamp(startTime);
+        setIsTimerActive(true);
       }
     }
   };
@@ -322,6 +354,7 @@ export default function StepsScreen() {
       clearInterval(timerIntervalRef.current);
     }
     setIsTimerActive(false);
+    setTimerStartTimestamp(null);
     setTimerTimeRemaining(0);
   };
   // --- End Lifted Timer Logic ---

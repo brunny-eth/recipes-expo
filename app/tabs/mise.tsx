@@ -31,6 +31,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useErrorModal } from '@/context/ErrorModalContext';
+import { useKeepAwake } from 'expo-keep-awake';
 import ScreenHeader from '@/components/ScreenHeader';
 import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
 import { parseServingsValue } from '@/utils/recipeUtils';
@@ -369,6 +370,9 @@ export default function MiseScreen() {
       console.log(`[MiseScreen] 💀 Component WILL UNMOUNT at ${unmountTimestamp}`);
     };
   }, []);
+
+  // Keep screen awake while using shopping list
+  useKeepAwake();
 
   // Load manual items from storage on component mount
   const loadManualItemsFromStorage = useCallback(async () => {
