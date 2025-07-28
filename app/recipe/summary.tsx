@@ -1463,7 +1463,8 @@ export default function RecipeSummaryScreen() {
         const saveResult = await saveResponse.json();
         if (!saveResponse.ok) throw new Error(saveResult.error || 'Failed to save modified recipe');
 
-        router.replace('/tabs/library' as any);
+        // Navigate to the specific folder that the recipe was saved to
+        router.replace(`/saved/folder-detail?folderId=${folderId}` as any);
 
       } catch (error: any) {
         setIsSavingForLater(false);
@@ -1476,7 +1477,8 @@ export default function RecipeSummaryScreen() {
         const { saveRecipe } = require('@/lib/savedRecipes');
         const result = await saveRecipe(recipe.id, folderId);
         if (result.success) {
-          router.replace('/tabs/library' as any);
+          // Navigate to the specific folder that the recipe was saved to
+          router.replace(`/saved/folder-detail?folderId=${folderId}` as any);
         } else if (result.alreadySaved) {
           showError(
             'Recipe Already Saved', 

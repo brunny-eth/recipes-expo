@@ -51,6 +51,7 @@ export default function SavedFolderDetailScreen() {
   const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [folderName, setFolderName] = useState<string>('Folder'); // State for actual folder name
   
   // Bulk move state
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -59,7 +60,6 @@ export default function SavedFolderDetailScreen() {
   const [isMovingRecipes, setIsMovingRecipes] = useState(false);
 
   const folderId = params.folderId ? parseInt(params.folderId) : null;
-  const folderName = params.folderName || 'Folder';
 
   // Component Mount/Unmount logging
   useEffect(() => {
@@ -68,6 +68,32 @@ export default function SavedFolderDetailScreen() {
       console.log('[SavedFolderDetailScreen] Component WILL UNMOUNT');
     };
   }, [folderId]);
+
+  // Fetch folder name from database
+  const fetchFolderName = useCallback(async () => {
+    if (!session?.user || !folderId) return;
+
+    try {
+      const { data: folderData, error: folderError } = await supabase
+        .from('user_saved_folders')
+        .select('name')
+        .eq('id', folderId)
+        .eq('user_id', session.user.id)
+        .single();
+
+      if (folderError) {
+        console.error('[SavedFolderDetailScreen] Error fetching folder name:', folderError);
+        return;
+      }
+
+      if (folderData) {
+        console.log('[SavedFolderDetailScreen] Fetched folder name:', folderData.name);
+        setFolderName(folderData.name);
+      }
+    } catch (err) {
+      console.error('[SavedFolderDetailScreen] Unexpected error fetching folder name:', err);
+    }
+  }, [session?.user, folderId]);
 
   // Fetch recipes in this folder
   const fetchFolderRecipes = useCallback(async () => {
@@ -129,7 +155,8 @@ export default function SavedFolderDetailScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchFolderRecipes();
-    }, [fetchFolderRecipes])
+      fetchFolderName(); // Fetch folder name on focus
+    }, [fetchFolderRecipes, fetchFolderName])
   );
 
   // Handle recipe press
@@ -473,6 +500,9 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: SPACING.xs,
+    width: 85, // Fixed width to match headerRight
+    alignItems: 'flex-start',
+    justifyContent: 'center',
   },
   headerTitle: {
     ...bodyStrongText,
@@ -482,8 +512,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   headerRight: {
-    minWidth: 40, // Same width as back button to center title
+    width: 85, // Wider to accommodate "Select" button without wrapping
     alignItems: 'flex-end',
+    justifyContent: 'center',
   },
   centered: {
     flex: 1,

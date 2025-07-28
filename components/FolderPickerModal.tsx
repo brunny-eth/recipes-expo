@@ -6,13 +6,15 @@ import {
   Modal,
   TouchableOpacity,
   FlatList,
-  TextInput,
   ActivityIndicator,
   Alert,
+  ViewStyle,
+  TextStyle,
+  TextInput,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
-import { bodyStrongText, bodyText, captionText } from '@/constants/typography';
+import { bodyStrongText, bodyText, captionText, FONT, screenTitleText } from '@/constants/typography';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/context/AuthContext';
 
@@ -32,6 +34,8 @@ type FolderPickerModalProps = {
   isLoading?: boolean;
 };
 
+type ModalMode = 'select' | 'create';
+
 export default function FolderPickerModal({
   visible,
   onClose,
@@ -41,10 +45,15 @@ export default function FolderPickerModal({
   const { session } = useAuth();
   const [folders, setFolders] = useState<SavedFolder[]>([]);
   const [isFetchingFolders, setIsFetchingFolders] = useState(true);
-  const [showNewFolderInput, setShowNewFolderInput] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Modal mode state
+  const [mode, setMode] = useState<ModalMode>('select');
+  
+  // Create folder state
   const [newFolderName, setNewFolderName] = useState('');
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
   const inputRef = useRef<TextInput>(null);
 
   // Fetch user's folders
@@ -78,12 +87,13 @@ export default function FolderPickerModal({
       const formattedFolders = foldersData?.map(folder => ({
         id: folder.id,
         name: folder.name,
-        color: folder.color,
-        icon: folder.icon,
+        color: folder.color || '#3B82F6',
+        icon: folder.icon || 'folder',
         display_order: folder.display_order,
         recipe_count: (folder.user_saved_recipes as any)?.[0]?.count || 0,
       })) || [];
 
+      console.log('[FolderPickerModal] Loaded folders:', formattedFolders);
       setFolders(formattedFolders);
     } catch (err) {
       console.error('[FolderPickerModal] Unexpected error:', err);
@@ -94,58 +104,91 @@ export default function FolderPickerModal({
   };
 
   // Create new folder
-  const createNewFolder = async () => {
-    if (!session?.user || !newFolderName.trim()) return;
+  const handleCreateFolder = async () => {
+    if (!newFolderName.trim() || !session?.user) {
+      console.log('[FolderPickerModal] Cannot create folder - missing name or session:', {
+        folderName: newFolderName.trim(),
+        hasSession: !!session?.user
+      });
+      return;
+    }
 
+    console.log('[FolderPickerModal] Starting folder creation:', newFolderName.trim());
     setIsCreatingFolder(true);
+    setCreateError(null);
 
     try {
+      // Get current folder count to determine display order
+      const { count: folderCount } = await supabase
+        .from('user_saved_folders')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', session.user.id);
+
+      const displayOrder = (folderCount || 0) + 1;
+      console.log('[FolderPickerModal] Using display order:', displayOrder);
+
       const { data: newFolder, error: createError } = await supabase
         .from('user_saved_folders')
         .insert({
           user_id: session.user.id,
           name: newFolderName.trim(),
-          display_order: folders.length,
+          display_order: displayOrder,
         })
         .select()
         .single();
 
+      console.log('[FolderPickerModal] Supabase response:', { newFolder, createError });
+
       if (createError) {
-        console.error('[FolderPickerModal] Error creating folder:', createError);
-        
+        console.error('[FolderPickerModal] Database error creating folder:', createError);
         if (createError.code === '23505') { // Unique constraint violation
-          Alert.alert('Folder Exists', 'You already have a folder with this name.');
+          setCreateError('You already have a folder with this name.');
         } else {
-          Alert.alert('Error', 'Could not create folder. Please try again.');
+          setCreateError('Could not create folder. Please try again.');
         }
         return;
       }
 
-      // Add to local state
-      const newFolderWithCount = {
-        ...newFolder,
-        recipe_count: 0,
-      };
-      setFolders(prev => [...prev, newFolderWithCount]);
-
-      // Select the newly created folder
-      onSelectFolder(newFolder.id);
+      // Success - auto-select the newly created folder and navigate
+      console.log('[FolderPickerModal] Folder created successfully, auto-selecting:', newFolder);
       
-      // Reset form
+      // Reset state
       setNewFolderName('');
-      setShowNewFolderInput(false);
+      setCreateError(null);
+      
+      // Call the onSelectFolder callback which should handle saving the recipe
+      // Don't set mode back to 'select' since the modal will close
+      onSelectFolder(newFolder.id);
     } catch (err) {
       console.error('[FolderPickerModal] Unexpected error creating folder:', err);
-      Alert.alert('Error', 'An unexpected error occurred.');
+      setCreateError('An unexpected error occurred.');
     } finally {
       setIsCreatingFolder(false);
     }
+  };
+
+  // Switch to create mode
+  const handleShowCreateMode = () => {
+    setMode('create');
+    setCreateError(null);
+    // Focus input after modal transition
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 100);
+  };
+
+  // Switch back to select mode
+  const handleBackToSelect = () => {
+    setMode('select');
+    setNewFolderName('');
+    setCreateError(null);
   };
 
   // Load folders when modal opens
   useEffect(() => {
     if (visible) {
       fetchFolders();
+      setMode('select'); // Always start in select mode
     }
   }, [visible, session?.user?.id]);
 
@@ -176,24 +219,115 @@ export default function FolderPickerModal({
 
   const handleClose = () => {
     if (!isLoading && !isCreatingFolder) {
-      setShowNewFolderInput(false);
-      setNewFolderName('');
       setError(null);
+      setCreateError(null);
+      setNewFolderName('');
+      // Don't set mode back to 'select' since the modal will close
       onClose();
     }
   };
 
-  const handleCreateFolder = () => {
-    setShowNewFolderInput(true);
-    // Auto-focus input after a brief delay
-    setTimeout(() => {
-      inputRef.current?.focus();
-    }, 100);
+  const renderSelectMode = () => {
+    if (isFetchingFolders) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Loading folders...</Text>
+        </View>
+      );
+    }
+
+    if (error) {
+      return (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={fetchFolders}
+          >
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (folders.length === 0) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No folders yet</Text>
+          <Text style={styles.emptySubtext}>
+            Create your first folder to organize your recipes
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <FlatList
+        data={folders}
+        renderItem={renderFolderItem}
+        keyExtractor={(item) => item.id.toString()}
+        style={styles.foldersList}
+        showsVerticalScrollIndicator={false}
+      />
+    );
   };
 
-  const handleCancelNewFolder = () => {
-    setShowNewFolderInput(false);
-    setNewFolderName('');
+  const renderCreateMode = () => {
+    return (
+      <View style={styles.createContainer}>
+        {createError && (
+          <View style={styles.createErrorContainer}>
+            <Text style={styles.createErrorText}>{createError}</Text>
+          </View>
+        )}
+
+        <TextInput
+          ref={inputRef}
+          style={[styles.createInput, createError && styles.createInputError]}
+          value={newFolderName}
+          onChangeText={setNewFolderName}
+          placeholder="Enter folder name"
+          placeholderTextColor={COLORS.textMuted}
+          multiline={false}
+          returnKeyType="done"
+          onSubmitEditing={handleCreateFolder}
+          editable={!isCreatingFolder}
+          maxLength={50}
+        />
+
+        <View style={styles.createButtons}>
+          <TouchableOpacity
+            style={[styles.createButton, styles.cancelButton]}
+            onPress={handleBackToSelect}
+            disabled={isCreatingFolder}
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.createButton, 
+              styles.confirmButton,
+              (!newFolderName.trim() || isCreatingFolder) && styles.confirmButtonDisabled
+            ]}
+            onPress={handleCreateFolder}
+            disabled={!newFolderName.trim() || isCreatingFolder}
+          >
+            {isCreatingFolder ? (
+              <ActivityIndicator size="small" color={COLORS.white} />
+            ) : (
+              <Text style={[
+                styles.confirmButtonText,
+                (!newFolderName.trim() || isCreatingFolder) && styles.confirmButtonTextDisabled
+              ]}>
+                Create
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
   };
 
   return (
@@ -211,11 +345,22 @@ export default function FolderPickerModal({
         <TouchableOpacity 
           style={styles.modalContainer}
           activeOpacity={1}
-          onPress={(e) => e.stopPropagation()} // Prevent closing when tapping inside modal
+          onPress={(e) => e.stopPropagation()}
         >
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>Save to folder</Text>
+            {mode === 'create' && (
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={handleBackToSelect}
+                disabled={isCreatingFolder}
+              >
+                <MaterialCommunityIcons name="arrow-left" size={20} color={COLORS.textDark} />
+              </TouchableOpacity>
+            )}
+            <Text style={styles.title}>
+              {mode === 'select' ? 'Save to folder' : 'Add new folder'}
+            </Text>
             <TouchableOpacity
               style={styles.closeButton}
               onPress={handleClose}
@@ -225,85 +370,25 @@ export default function FolderPickerModal({
             </TouchableOpacity>
           </View>
 
-          {/* Error Display */}
-          {error && (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          )}
-
           {/* Content */}
-          {isFetchingFolders ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={COLORS.primary} />
-              <Text style={styles.loadingText}>Loading folders...</Text>
-            </View>
-          ) : (
-            <>
-              {/* Folders List */}
-              <View style={styles.foldersListContainer}>
-                <FlatList
-                  data={folders}
-                  renderItem={renderFolderItem}
-                  keyExtractor={(item) => item.id.toString()}
-                  style={styles.foldersList}
-                  showsVerticalScrollIndicator={false}
-                />
-              </View>
+          <View style={styles.content}>
+            {mode === 'select' ? renderSelectMode() : renderCreateMode()}
+          </View>
 
-              {/* New Folder Section */}
-              {showNewFolderInput ? (
-                <View style={styles.newFolderContainer}>
-                  <TextInput
-                    ref={inputRef}
-                    style={styles.newFolderInput}
-                    placeholder="Enter folder name"
-                    value={newFolderName}
-                    onChangeText={setNewFolderName}
-                    maxLength={50}
-                    returnKeyType="done"
-                    onSubmitEditing={createNewFolder}
-                  />
-                  <View style={styles.buttonContainer}>
-                    <TouchableOpacity
-                      style={[styles.button, styles.cancelButton]}
-                      onPress={handleCancelNewFolder}
-                      disabled={isCreatingFolder}
-                    >
-                      <Text style={styles.cancelButtonText}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[
-                        styles.button,
-                        styles.createButton,
-                        (!newFolderName.trim() || isCreatingFolder) && styles.createButtonDisabled
-                      ]}
-                      onPress={createNewFolder}
-                      disabled={!newFolderName.trim() || isCreatingFolder}
-                    >
-                      {isCreatingFolder ? (
-                        <ActivityIndicator size="small" color={COLORS.white} />
-                      ) : (
-                        <Text style={styles.createButtonText}>Create</Text>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  style={styles.addFolderButton}
-                  onPress={handleCreateFolder}
-                  disabled={isLoading}
-                >
-                  <MaterialCommunityIcons
-                    name="plus"
-                    size={16}
-                    color={COLORS.primary}
-                  />
-                  <Text style={styles.addFolderText}>Add new folder</Text>
-                </TouchableOpacity>
-              )}
-            </>
+          {/* Add New Folder Button - only show in select mode */}
+          {mode === 'select' && (
+            <TouchableOpacity
+              style={styles.addFolderButton}
+              onPress={handleShowCreateMode}
+              disabled={isLoading}
+            >
+              <MaterialCommunityIcons
+                name="plus"
+                size={16}
+                color={COLORS.primary}
+              />
+              <Text style={styles.addFolderText}>Add new folder</Text>
+            </TouchableOpacity>
           )}
         </TouchableOpacity>
       </TouchableOpacity>
@@ -314,96 +399,132 @@ export default function FolderPickerModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
+    paddingHorizontal: SPACING.lg,
+  } as ViewStyle,
   modalContainer: {
-    width: '90%',
-    maxWidth: 400,
     backgroundColor: COLORS.white,
-    borderRadius: RADIUS.lg,
-    overflow: 'hidden',
+    borderRadius: RADIUS.md,
+    width: '100%',
+    maxWidth: 400,
+    maxHeight: '80%',
     shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
+    shadowRadius: 20,
+    elevation: 10,
+  } as ViewStyle,
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.md,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.lightGray,
-  },
+  } as ViewStyle,
+  backButton: {
+    padding: SPACING.xs,
+  } as ViewStyle,
   title: {
-    ...bodyStrongText,
-    fontSize: 18,
-  },
+    ...screenTitleText,
+    fontSize: FONT.size.xl,
+    color: COLORS.textDark,
+    flex: 1,
+    textAlign: 'center',
+  } as TextStyle,
   closeButton: {
     padding: SPACING.xs,
-  },
-  errorContainer: {
-    backgroundColor: COLORS.errorBackground,
-    padding: SPACING.md,
-    marginHorizontal: SPACING.lg,
-    marginTop: SPACING.md,
-    borderRadius: RADIUS.sm,
-  },
-  errorText: {
-    ...bodyText,
-    color: COLORS.error,
-    textAlign: 'center',
-  },
+  } as ViewStyle,
+  content: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    minHeight: 200,
+  } as ViewStyle,
+  // Select mode styles
   loadingContainer: {
-    padding: SPACING.xl,
     alignItems: 'center',
-  },
+    justifyContent: 'center',
+    paddingVertical: SPACING.xl,
+  } as ViewStyle,
   loadingText: {
     ...bodyText,
     color: COLORS.textMuted,
     marginTop: SPACING.md,
-  },
-  foldersListContainer: {
-    maxHeight: 300,
+  } as TextStyle,
+  errorContainer: {
+    alignItems: 'center',
+    paddingVertical: SPACING.lg,
+  } as ViewStyle,
+  errorText: {
+    ...bodyText,
+    color: COLORS.error,
+    textAlign: 'center',
+    marginBottom: SPACING.md,
+  } as TextStyle,
+  retryButton: {
+    backgroundColor: COLORS.primary,
     paddingHorizontal: SPACING.lg,
-  },
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.sm,
+  } as ViewStyle,
+  retryButtonText: {
+    ...bodyStrongText,
+    color: COLORS.white,
+  } as TextStyle,
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: SPACING.xl,
+  } as ViewStyle,
+  emptyText: {
+    ...bodyStrongText,
+    fontSize: FONT.size.body,
+    color: COLORS.textMuted,
+    marginBottom: SPACING.xs,
+  } as TextStyle,
+  emptySubtext: {
+    ...bodyText,
+    fontSize: FONT.size.caption,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+  } as TextStyle,
   foldersList: {
-    paddingTop: SPACING.md,
-  },
+    flexGrow: 0,
+    maxHeight: 300,
+  } as ViewStyle,
   folderItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.sm,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.background,
     borderRadius: RADIUS.sm,
     marginBottom: SPACING.sm,
     borderWidth: 1,
     borderColor: COLORS.lightGray,
-  },
+  } as ViewStyle,
   folderIcon: {
     width: 40,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: SPACING.md,
-  },
+  } as ViewStyle,
   folderInfo: {
     flex: 1,
-  },
+  } as ViewStyle,
   folderName: {
     ...bodyStrongText,
     color: COLORS.textDark,
-  },
+  } as TextStyle,
   folderCount: {
     ...captionText,
     color: COLORS.textMuted,
     marginTop: 2,
-  },
+  } as TextStyle,
   addFolderButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -415,21 +536,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.primary,
     margin: SPACING.lg,
-  },
+    marginTop: SPACING.md,
+  } as ViewStyle,
   addFolderText: {
     ...bodyStrongText,
     color: COLORS.primary,
-    marginLeft: SPACING.sm,
-  },
-  newFolderContainer: {
-    backgroundColor: COLORS.white,
-    padding: SPACING.lg,
-    margin: SPACING.lg,
+    marginLeft: SPACING.xs,
+  } as TextStyle,
+  // Create mode styles
+  createContainer: {
+    paddingVertical: SPACING.sm,
+  } as ViewStyle,
+  createErrorContainer: {
+    backgroundColor: COLORS.errorBackground,
+    padding: SPACING.sm,
     borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
-  },
-  newFolderInput: {
+    marginBottom: SPACING.md,
+  } as ViewStyle,
+  createErrorText: {
+    ...bodyText,
+    color: COLORS.error,
+    textAlign: 'center',
+    fontSize: FONT.size.caption,
+  } as TextStyle,
+  createInput: {
     ...bodyText,
     borderWidth: 1,
     borderColor: COLORS.lightGray,
@@ -437,33 +567,46 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     marginBottom: SPACING.md,
-  },
-  buttonContainer: {
+    fontSize: FONT.size.body,
+    backgroundColor: COLORS.background,
+  } as TextStyle,
+  createInputError: {
+    borderColor: COLORS.error,
+  } as TextStyle,
+  createButtons: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  button: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.sm,
-  },
-  cancelButton: {
-    marginRight: SPACING.sm,
-  },
-  cancelButtonText: {
-    ...bodyText,
-    color: COLORS.textMuted,
-  },
+    gap: SPACING.md,
+    paddingTop: SPACING.xxxl,
+  } as ViewStyle,
   createButton: {
-    backgroundColor: COLORS.primary,
-    minWidth: 80,
+    flex: 1,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.sm,
     alignItems: 'center',
-  },
-  createButtonDisabled: {
+    justifyContent: 'center',
+    minHeight: 44,
+  } as ViewStyle,
+  cancelButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  } as ViewStyle,
+  cancelButtonText: {
+    ...bodyStrongText,
+    color: COLORS.primary,
+  } as TextStyle,
+  confirmButton: {
+    backgroundColor: COLORS.primary,
+  } as ViewStyle,
+  confirmButtonDisabled: {
     backgroundColor: COLORS.lightGray,
-  },
-  createButtonText: {
+  } as ViewStyle,
+  confirmButtonText: {
     ...bodyStrongText,
     color: COLORS.white,
-  },
+  } as TextStyle,
+  confirmButtonTextDisabled: {
+    color: COLORS.textMuted,
+  } as TextStyle,
 }); 

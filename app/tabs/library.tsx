@@ -23,6 +23,7 @@ import { bodyText, screenTitleText, FONT, bodyStrongText } from '@/constants/typ
 import { useAuth } from '@/context/AuthContext';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import ScreenHeader from '@/components/ScreenHeader';
+import AddNewFolderModal from '@/components/AddNewFolderModal';
 import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
 
 // Types for folders
@@ -56,10 +57,8 @@ export default function LibraryScreen() {
   const [isSavedLoading, setIsSavedLoading] = useState(true);
   const [savedError, setSavedError] = useState<string | null>(null);
   
-  // New folder creation state
-  const [showNewFolderInput, setShowNewFolderInput] = useState(false);
-  const [newFolderName, setNewFolderName] = useState('');
-  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  // Add new folder modal state
+  const [showAddFolderModal, setShowAddFolderModal] = useState(false);
 
   // Component Mount/Unmount logging
   useEffect(() => {
@@ -326,53 +325,7 @@ export default function LibraryScreen() {
     );
   }, [session?.user]);
 
-  // Create new folder
-  const createNewFolder = useCallback(async () => {
-    if (!session?.user || !newFolderName.trim()) return;
 
-    setIsCreatingFolder(true);
-
-    try {
-      const { data: newFolder, error: createError } = await supabase
-        .from('user_saved_folders')
-        .insert({
-          user_id: session.user.id,
-          name: newFolderName.trim(),
-          display_order: savedFolders.length,
-        })
-        .select()
-        .single();
-
-      if (createError) {
-        console.error('[LibraryScreen] Error creating folder:', createError);
-        
-        if (createError.code === '23505') { // Unique constraint violation
-          Alert.alert('Folder Exists', 'You already have a folder with this name.');
-        } else {
-          Alert.alert('Error', 'Could not create folder. Please try again.');
-        }
-        return;
-      }
-
-      // Add to local state
-      const newFolderWithCount = {
-        ...newFolder,
-        recipe_count: 0,
-      };
-      setSavedFolders(prev => [...prev, newFolderWithCount]);
-      
-      // Reset form
-      setNewFolderName('');
-      setShowNewFolderInput(false);
-      
-      console.log('[LibraryScreen] Successfully created folder:', newFolder.name);
-    } catch (err) {
-      console.error('[LibraryScreen] Unexpected error creating folder:', err);
-      Alert.alert('Error', 'An unexpected error occurred.');
-    } finally {
-      setIsCreatingFolder(false);
-    }
-  }, [session?.user, newFolderName, savedFolders.length]);
 
   // Handle image error
   const handleImageError = useCallback((recipeId: number) => {
@@ -431,7 +384,9 @@ export default function LibraryScreen() {
         />
       </View>
       <View style={styles.folderInfo}>
-        <Text style={styles.folderName}>{item.name}</Text>
+        <Text style={styles.folderName} numberOfLines={1} ellipsizeMode="tail">
+          {item.name}
+        </Text>
         <Text style={styles.recipeCountText}>
           {item.recipe_count} recipe{item.recipe_count !== 1 ? 's' : ''}
         </Text>
@@ -544,55 +499,20 @@ export default function LibraryScreen() {
 
     if (savedFolders.length === 0) {
       return (
-        <View style={styles.emptyContainer}>
-          <MaterialCommunityIcons name="folder-outline" size={48} color={COLORS.lightGray} />
-          <Text style={styles.emptyText}>No recipe folders yet</Text>
-          <Text style={styles.emptySubtext}>
-            Save recipes from the recipe summary screen to create your first folder.
-          </Text>
-          {showNewFolderInput ? (
-            <View style={styles.newFolderContainer}>
-              <TextInput
-                style={styles.newFolderInput}
-                placeholder="Enter folder name"
-                value={newFolderName}
-                onChangeText={setNewFolderName}
-                maxLength={50}
-                autoFocus
-                returnKeyType="done"
-                onSubmitEditing={createNewFolder}
-              />
-              <View style={styles.newFolderButtons}>
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={() => {
-                    setShowNewFolderInput(false);
-                    setNewFolderName('');
-                  }}
-                  disabled={isCreatingFolder}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.createButton,
-                    (!newFolderName.trim() || isCreatingFolder) && styles.createButtonDisabled
-                  ]}
-                  onPress={createNewFolder}
-                  disabled={!newFolderName.trim() || isCreatingFolder}
-                >
-                  {isCreatingFolder ? (
-                    <ActivityIndicator size="small" color={COLORS.white} />
-                  ) : (
-                    <Text style={styles.createButtonText}>Create</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : (
+        <View style={styles.savedContent}>
+          <View style={styles.emptyContainer}>
+            <MaterialCommunityIcons name="folder-outline" size={48} color={COLORS.lightGray} />
+            <Text style={styles.emptyText}>No recipe folders yet</Text>
+            <Text style={styles.emptySubtext}>
+              Create your first folder to organize your saved recipes.
+            </Text>
+          </View>
+          
+          {/* Add New Folder Button at Bottom */}
+          <View style={styles.bottomButtonContainer}>
             <TouchableOpacity
               style={styles.addFolderButton}
-              onPress={() => setShowNewFolderInput(true)}
+              onPress={() => setShowAddFolderModal(true)}
             >
               <MaterialCommunityIcons
                 name="plus"
@@ -601,13 +521,13 @@ export default function LibraryScreen() {
               />
               <Text style={styles.addFolderText}>Add new folder</Text>
             </TouchableOpacity>
-          )}
+          </View>
         </View>
       );
     }
 
     return (
-      <View style={{ flex: 1 }}>
+      <View style={styles.savedContent}>
         <FlatList
           data={savedFolders}
           renderItem={renderFolderItem}
@@ -621,63 +541,29 @@ export default function LibraryScreen() {
               tintColor={COLORS.primary}
             />
           }
-          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No folders yet</Text>
+              <Text style={styles.emptySubtext}>
+                Create your first folder to organize your saved recipes
+              </Text>
+            </View>
+          }
         />
-        
+
         {/* Add New Folder Button at Bottom */}
         <View style={styles.bottomButtonContainer}>
-          {showNewFolderInput ? (
-            <View style={styles.newFolderContainer}>
-              <TextInput
-                style={styles.newFolderInput}
-                placeholder="Enter folder name"
-                value={newFolderName}
-                onChangeText={setNewFolderName}
-                maxLength={50}
-                autoFocus
-                returnKeyType="done"
-                onSubmitEditing={createNewFolder}
-              />
-              <View style={styles.newFolderButtons}>
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={() => {
-                    setShowNewFolderInput(false);
-                    setNewFolderName('');
-                  }}
-                  disabled={isCreatingFolder}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.createButton,
-                    (!newFolderName.trim() || isCreatingFolder) && styles.createButtonDisabled
-                  ]}
-                  onPress={createNewFolder}
-                  disabled={!newFolderName.trim() || isCreatingFolder}
-                >
-                  {isCreatingFolder ? (
-                    <ActivityIndicator size="small" color={COLORS.white} />
-                  ) : (
-                    <Text style={styles.createButtonText}>Create</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={styles.addFolderButton}
-              onPress={() => setShowNewFolderInput(true)}
-            >
-              <MaterialCommunityIcons
-                name="plus"
-                size={20}
-                color={COLORS.white}
-              />
-              <Text style={styles.addFolderText}>Add new folder</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            style={styles.addFolderButton}
+            onPress={() => setShowAddFolderModal(true)}
+          >
+            <MaterialCommunityIcons
+              name="plus"
+              size={20}
+              color={COLORS.white}
+            />
+            <Text style={styles.addFolderText}>Add new folder</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -687,7 +573,7 @@ export default function LibraryScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScreenHeader title="Recipe library" />
       
-      {/* Tab selector */}
+      {/* Tab selector - underline style */}
       <View style={styles.tabContainer}>
         <TouchableOpacity
           style={styles.tabButton}
@@ -697,7 +583,7 @@ export default function LibraryScreen() {
             styles.tabButtonText,
             selectedTab === 'explore' && styles.tabButtonTextActive
           ]}>
-            EXPLORE
+            Explore
           </Text>
           {selectedTab === 'explore' && <View style={styles.tabUnderline} />}
         </TouchableOpacity>
@@ -709,18 +595,20 @@ export default function LibraryScreen() {
             styles.tabButtonText,
             selectedTab === 'saved' && styles.tabButtonTextActive
           ]}>
-            SAVED
+            Saved
           </Text>
           {selectedTab === 'saved' && <View style={styles.tabUnderline} />}
         </TouchableOpacity>
       </View>
 
-      {/* Subheading */}
+      {/* Subheading for explore tab */}
       {selectedTab === 'explore' && (
         <Text style={styles.subheading}>
-          Recipes from the Meez community.
+          Discover recipes from our community
         </Text>
       )}
+
+      {/* Subheading for saved tab */}
       {selectedTab === 'saved' && (
         <Text style={styles.subheading}>
           Recipes you're saving for later.
@@ -729,6 +617,13 @@ export default function LibraryScreen() {
 
       {/* Content */}
       {selectedTab === 'explore' ? renderExploreContent() : renderSavedContent()}
+
+      {/* Add New Folder Modal */}
+      <AddNewFolderModal
+        visible={showAddFolderModal}
+        onClose={() => setShowAddFolderModal(false)}
+        onFolderCreated={fetchSavedFolders}
+      />
     </View>
   );
 }
@@ -741,42 +636,37 @@ const styles = StyleSheet.create({
   },
   tabContainer: {
     flexDirection: 'row',
-    marginTop: SPACING.md,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.lightGray,
+    borderBottomColor: COLORS.surface,
+    marginBottom: SPACING.md,
   },
   tabButton: {
     flex: 1,
-    paddingVertical: SPACING.md,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
     alignItems: 'center',
     position: 'relative',
+    backgroundColor: COLORS.background,
   },
   tabButtonText: {
-    ...bodyText,
-    fontSize: FONT.size.body,
+    ...bodyStrongText,
     color: COLORS.textMuted,
-    fontWeight: '500',
+    fontSize: FONT.size.body,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase' as const,
   },
   tabButtonTextActive: {
-    color: COLORS.primary,
-    fontWeight: '600',
+    color: COLORS.textDark,
   },
   tabUnderline: {
     position: 'absolute',
-    bottom: -1,
-    left: 0,
-    right: 0,
-    height: 3,
+    bottom: 2,
+    height: 2,
+    width: '60%',
     backgroundColor: COLORS.primary,
+    borderRadius: 1,
   },
-  subheading: {
-    ...bodyText,
-    fontSize: FONT.size.caption,
-    color: COLORS.textMuted,
-    textAlign: 'center',
-    marginTop: SPACING.sm,
-    marginBottom: SPACING.md,
-  },
+
   centered: {
     flex: 1,
     justifyContent: 'center',
@@ -862,6 +752,7 @@ const styles = StyleSheet.create({
   },
   folderInfo: {
     flex: 1,
+    marginRight: SPACING.sm, // Ensure consistent spacing from actions
   },
   folderName: {
     ...bodyStrongText,
@@ -877,6 +768,8 @@ const styles = StyleSheet.create({
   folderActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    minWidth: 60, // Ensure consistent width for actions
+    justifyContent: 'flex-end',
   },
   deleteButton: {
     padding: SPACING.xs,
@@ -941,51 +834,18 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     marginLeft: SPACING.sm,
   } as TextStyle,
-  newFolderContainer: {
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.sm,
-    padding: SPACING.lg,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+
+  // New styles for saved content
+  savedContent: {
+    flex: 1,
   } as ViewStyle,
-  newFolderInput: {
+  subheading: {
     ...bodyText,
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
-    borderRadius: RADIUS.sm,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    marginBottom: SPACING.md,
-  } as TextStyle,
-  newFolderButtons: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  } as ViewStyle,
-  cancelButton: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-    marginRight: SPACING.sm,
-  } as ViewStyle,
-  cancelButtonText: {
-    ...bodyText,
+    fontSize: FONT.size.body,
+    fontWeight: '300',
     color: COLORS.textMuted,
-  } as TextStyle,
-  createButton: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.sm,
-    minWidth: 80,
-    alignItems: 'center',
-  } as ViewStyle,
-  createButtonDisabled: {
-    backgroundColor: COLORS.lightGray,
-  } as ViewStyle,
-  createButtonText: {
-    ...bodyStrongText,
-    color: COLORS.white,
+    textAlign: 'center',
+    marginBottom: SPACING.md,
+    marginTop: SPACING.xs,
   } as TextStyle,
 }); 
