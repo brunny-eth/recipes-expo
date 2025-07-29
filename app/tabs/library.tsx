@@ -41,7 +41,7 @@ type SavedFolder = {
 export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { session, isAuthenticated } = useAuth();
+  const { session } = useAuth();
   const { showError } = useErrorModal();
   const { track } = useAnalytics();
   
@@ -67,13 +67,7 @@ export default function LibraryScreen() {
   const [showDeleteFolderModal, setShowDeleteFolderModal] = useState(false);
   const [folderToDelete, setFolderToDelete] = useState<SavedFolder | null>(null);
 
-  // Component Mount/Unmount logging
-  useEffect(() => {
-    console.log('[LibraryScreen] Component DID MOUNT');
-    return () => {
-      console.log('[LibraryScreen] Component WILL UNMOUNT');
-    };
-  }, []);
+
 
   // Load cached explore recipes (keeping existing explore logic)
   const loadCachedExploreRecipes = useCallback(async (): Promise<{ recipes: ParsedRecipe[] | null; shouldFetch: boolean }> => {
@@ -84,7 +78,6 @@ export default function LibraryScreen() {
       ]);
 
       if (!lastFetchedStr || !cachedRecipesStr) {
-        console.log('[LibraryScreen] No cached explore data found');
         return { recipes: null, shouldFetch: true };
       }
 
@@ -94,7 +87,6 @@ export default function LibraryScreen() {
       const timeSinceLastFetch = now - lastFetched;
 
       if (timeSinceLastFetch >= sixHours) {
-        console.log(`[LibraryScreen] Cache expired (${Math.round(timeSinceLastFetch / (60 * 60 * 1000))}h old) - will fetch`);
         return { recipes: null, shouldFetch: true };
       }
 
@@ -102,11 +94,9 @@ export default function LibraryScreen() {
       const hoursLeft = Math.round((sixHours - timeSinceLastFetch) / (60 * 60 * 1000) * 10) / 10;
       
       if (!recipes || recipes.length === 0) {
-        console.log('[LibraryScreen] Cached data is empty - will fetch');
         return { recipes: null, shouldFetch: true };
       }
 
-      console.log(`[LibraryScreen] Using cached recipes (${recipes.length} recipes, ${hoursLeft}h left)`);
       return { recipes, shouldFetch: false };
     } catch (error) {
       console.error('[LibraryScreen] Error loading cached recipes:', error);
@@ -117,11 +107,14 @@ export default function LibraryScreen() {
   // Fetch explore recipes from API (using the working API endpoint)
   const fetchExploreRecipesFromAPI = useCallback(async (isRefresh: boolean = false) => {
     const startTime = performance.now();
-    console.log(`[PERF: LibraryScreen] Start fetchExploreRecipesFromAPI at ${startTime.toFixed(2)}ms, isRefresh: ${isRefresh}`);
     
     const backendUrl = process.env.EXPO_PUBLIC_API_URL;
     if (!backendUrl) {
-      console.error('[LibraryScreen] EXPO_PUBLIC_API_URL is not set.');
+      track('api_config_error', { 
+        screen: 'LibraryScreen', 
+        error: 'EXPO_PUBLIC_API_URL not set',
+        userId: session?.user?.id,
+      });
       setExploreError('API configuration error. Please check your environment variables.');
       if (!isRefresh) {
         setIsExploreLoading(false);
@@ -137,7 +130,6 @@ export default function LibraryScreen() {
     
     try {
       const apiUrl = `${backendUrl}/api/recipes/explore-random`;
-      console.log(`[LibraryScreen] Fetching from: ${apiUrl}`);
       
       const response = await fetch(apiUrl);
       if (!response.ok) {
@@ -145,7 +137,6 @@ export default function LibraryScreen() {
       }
 
       const recipes = await response.json();
-      console.log(`[LibraryScreen] Fetched ${recipes?.length || 0} explore recipes from API.`);
       
       setExploreRecipes(recipes || []);
       
@@ -155,30 +146,28 @@ export default function LibraryScreen() {
         AsyncStorage.setItem('libraryExploreLastFetched', now),
         AsyncStorage.setItem('libraryExploreRecipes', JSON.stringify(recipes || []))
       ]);
-      console.log('[LibraryScreen] Stored fetch timestamp and recipe data');
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load explore recipes';
-      console.error('[LibraryScreen] Error fetching explore recipes:', err);
+      track('fetch_explore_recipes_error', { 
+        screen: 'LibraryScreen', 
+        error: errorMessage,
+        userId: session?.user?.id,
+      });
       setExploreError(errorMessage);
     } finally {
       // Only hide full-screen loading indicator if it was shown
       if (!isRefresh) {
         setIsExploreLoading(false);
       }
-      const totalTime = performance.now() - startTime;
-      console.log(`[PERF: LibraryScreen] Total fetchExploreRecipesFromAPI duration: ${totalTime.toFixed(2)}ms`);
     }
   }, []);
 
   // Fetch explore recipes (keeping existing explore logic)
   const fetchExploreRecipes = useCallback(async () => {
-    console.log('[LibraryScreen] fetchExploreRecipes called - checking cache');
-    
     const { recipes: cachedRecipes, shouldFetch } = await loadCachedExploreRecipes();
     
     if (cachedRecipes && !shouldFetch) {
-      console.log('[LibraryScreen] Using cached explore recipes');
       setExploreRecipes(cachedRecipes);
       setIsExploreLoading(false);
       return;
@@ -189,10 +178,7 @@ export default function LibraryScreen() {
 
   // Fetch saved folders
   const fetchSavedFolders = useCallback(async () => {
-    console.log('[LibraryScreen] Fetching saved folders');
-    
     if (!session?.user) {
-      console.log('[LibraryScreen] No user session for saved folders');
       setIsSavedLoading(false);
       setSavedFolders([]);
       return;
@@ -226,11 +212,14 @@ export default function LibraryScreen() {
         recipe_count: (folder.user_saved_recipes as any)?.[0]?.count || 0,
       })) || [];
 
-      console.log(`[LibraryScreen] Fetched ${formattedFolders.length} saved folders`);
       setSavedFolders(formattedFolders);
       
     } catch (err) {
-      console.error('[LibraryScreen] Error fetching saved folders:', err);
+      track('fetch_saved_folders_error', { 
+        screen: 'LibraryScreen', 
+        error: 'Failed to load saved folders',
+        userId: session?.user?.id,
+      });
       setSavedError('Failed to load saved folders. Please try again.');
     } finally {
       setIsSavedLoading(false);
@@ -240,7 +229,6 @@ export default function LibraryScreen() {
   // Load data on focus
   useFocusEffect(
     useCallback(() => {
-      console.log('[LibraryScreen] Focus effect triggered');
       fetchExploreRecipes();
       fetchSavedFolders();
     }, [fetchExploreRecipes, fetchSavedFolders])
@@ -248,7 +236,6 @@ export default function LibraryScreen() {
 
   // Handle refresh
   const handleRefresh = useCallback(async () => {
-    console.log('[LibraryScreen] Pull-to-refresh triggered');
     setRefreshing(true);
     
     if (selectedTab === 'explore') {
@@ -265,14 +252,16 @@ export default function LibraryScreen() {
 
   // Navigate to recipe
   const navigateToRecipe = useCallback(async (recipe: ParsedRecipe) => {
-    console.log('[LibraryScreen] Navigating to recipe:', recipe.title);
-    
     // Track input mode selection if user is on explore tab
     if (selectedTab === 'explore') {
       try {
         await track('input_mode_selected', { inputType: 'explore' });
       } catch (error) {
-        console.error('[LibraryScreen] Error tracking explore recipe selection:', error);
+        track('track_explore_recipe_selection_error', { 
+          screen: 'LibraryScreen', 
+          error: error instanceof Error ? error.message : String(error),
+          userId: session?.user?.id,
+        });
       }
     }
     
@@ -287,8 +276,6 @@ export default function LibraryScreen() {
 
   // Navigate to folder
   const navigateToFolder = useCallback((folder: SavedFolder) => {
-    console.log(`[LibraryScreen] Opening folder: ${folder.name}`);
-
     router.push({
       pathname: '/saved/folder-detail' as any,
       params: {
@@ -331,14 +318,23 @@ export default function LibraryScreen() {
         .eq('id', folderToDelete.id);
 
       if (deleteError) {
-        console.error('[LibraryScreen] Error deleting folder:', deleteError);
+        track('delete_folder_error', { 
+          screen: 'LibraryScreen', 
+          folderId: folderToDelete?.id, 
+          error: deleteError.message,
+          userId: session?.user?.id,
+        });
         setSavedError('Failed to delete folder. Please try again.');
       } else {
-        console.log(`[LibraryScreen] Folder "${folderToDelete.name}" deleted.`);
         setSavedFolders(prev => prev.filter(f => f.id !== folderToDelete.id));
       }
     } catch (error) {
-      console.error('[LibraryScreen] Unexpected error deleting folder:', error);
+      track('unexpected_delete_folder_error', { 
+        screen: 'LibraryScreen', 
+        folderId: folderToDelete?.id, 
+        error: error instanceof Error ? error.message : String(error),
+        userId: session?.user?.id,
+      });
       setSavedError('Failed to delete folder. Please try again.');
     } finally {
       setIsSavedLoading(false);
@@ -357,7 +353,7 @@ export default function LibraryScreen() {
   // Render explore recipe item - using original explore styling
   const renderExploreItem = useCallback(({ item }: { item: ParsedRecipe }) => {
     const imageUrl = item.image || item.thumbnailUrl;
-    const itemId = item.id || 'unknown';
+    const itemId = (item.id as number).toString();
     const hasImageError = imageErrors[itemId];
 
     return (
@@ -456,7 +452,7 @@ export default function LibraryScreen() {
       <FlatList
         data={exploreRecipes}
         renderItem={renderExploreItem}
-        keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
+        keyExtractor={(item) => (item.id as number).toString()}
         contentContainerStyle={styles.listContent}
         refreshControl={
           <RefreshControl
@@ -553,7 +549,7 @@ export default function LibraryScreen() {
         <FlatList
           data={savedFolders}
           renderItem={renderFolderItem}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item) => (item.id as number).toString()}
           contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl

@@ -3,8 +3,8 @@ import { Logtail } from '@logtail/node';
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
-// Initialize Logtail only in production
-const logtail = isDevelopment ? null : new Logtail(process.env.LOGTAIL_TOKEN!);
+// Initialize Logtail only in production and only if token is available
+const logtail = isDevelopment || !process.env.LOGTAIL_TOKEN ? null : new Logtail(process.env.LOGTAIL_TOKEN);
 
 const logger = pino({
   level: isDevelopment ? 'debug' : 'info',
