@@ -1,7 +1,6 @@
 import { CombinedParsedRecipe, StructuredIngredient } from '../common/types';
 import { parseIngredientDisplayName } from './ingredientHelpers';
 import { parseAmountString } from './recipeUtils';
-import { parse } from 'fraction.js';
 import { formatMeasurement } from './format';
 import { convertUnits, availableUnits, Unit, getUnitDisplayName } from './units';
 
@@ -36,198 +35,396 @@ export interface GroceryListItem {
   source_recipe_title: string;
 }
 
-// === AGGREGATION LOGIC (consolidated from ingredientAggregation.ts) ===
+// === INGREDIENT NORMALIZATION DATA ===
+
+/**
+ * Map of ingredient aliases to their canonical forms
+ * This helps consolidate ingredients that are essentially the same but named differently
+ */
+const INGREDIENT_ALIASES: Record<string, string> = {
+  // Onion variations
+  'green onions': 'scallions',
+  'spring onions': 'scallions', 
+  'green onion': 'scallions',
+  'spring onion': 'scallions',
+  
+  // Garlic variations
+  'garlic clove': 'garlic',
+  'clove garlic': 'garlic',
+  'garlic cloves': 'garlic',
+  'cloves garlic': 'garlic',
+  'clove of garlic': 'garlic',
+  'cloves of garlic': 'garlic',
+  
+  // Egg variations
+  'egg': 'eggs',
+  'chicken egg': 'eggs',
+  'chicken eggs': 'eggs',
+  
+  // Flour variations
+  'flour': 'all purpose flour',
+  'plain flour': 'all purpose flour',
+  'white flour': 'all purpose flour',
+  
+  // Tomato variations
+  'roma tomato': 'tomato',
+  'roma tomatoes': 'tomatoes',
+  'cherry tomato': 'cherry tomatoes',
+  'grape tomato': 'grape tomatoes',
+  'plum tomato': 'plum tomatoes',
+  
+  // Pepper variations
+  'bell peppers': 'bell pepper',
+  'sweet pepper': 'bell pepper',
+  'sweet peppers': 'bell pepper',
+  
+  // Herb variations
+  'fresh herbs': 'herbs',
+  'chopped herbs': 'herbs',
+  'mixed herbs': 'herbs',
+  
+  // Common spelling corrections and variations
+  'tomatoe': 'tomato',
+  'tomatoes': 'tomatoes', // Keep this plural
+  'tomatos': 'tomatoes', // Fix common misspelling
+  'potatoe': 'potato',
+  'potatoes': 'potatoes', // Keep this plural
+  'potatos': 'potatoes', // Fix common misspelling
+  
+  // Cheese variations
+  'shredded cheese': 'cheese',
+  'grated cheese': 'cheese',
+  'sliced cheese': 'cheese',
+  
+  // Oil variations
+  'cooking oil': 'oil',
+  'vegetable cooking oil': 'vegetable oil',
+  'extra virgin olive oil': 'olive oil',
+  'evoo': 'olive oil',
+  
+  // Common ingredient variations and cleanup
+  'diced tomatoes': 'tomatoes', // Preserve plural for canned tomatoes
+  'crushed tomatoes': 'tomatoes',
+  'whole tomatoes': 'tomatoes',
+  'cherry tomatoes': 'cherry tomatoes', // Keep specific type
+  'grape tomatoes': 'grape tomatoes', // Keep specific type
+  
+  // Meat variations
+  'chicken breast': 'chicken breast',
+  'chicken breasts': 'chicken breast', // Singularize for consistency
+  'ground chicken': 'ground chicken',
+  'ground turkey': 'ground turkey',
+  'ground pork': 'ground pork',
+  'ground lamb': 'ground lamb',
+  
+  // Unit-based cleanup (remove unit words from ingredient names)
+  'fluid ounces': '', // Remove when it appears in ingredient name
+  'ounces': '', // Remove when it appears in ingredient name
+};
+
+/**
+ * Adjective-noun combinations that should be preserved as they represent distinct ingredients
+ */
+const PRESERVED_COMBINATIONS = new Set([
+  'ground beef', 'ground pork', 'ground chicken', 'ground turkey', 'ground lamb',
+  'shredded cheese', 'grated cheese', 'sliced cheese',
+  'smoked salmon', 'smoked paprika', 'smoked salt', 'smoked bacon',
+  'roasted red peppers', 'roasted tomatoes', 'roasted garlic',
+  'sun dried tomatoes', 'sun dried',
+  'toasted nuts', 'toasted seeds', 'toasted bread',
+  'aged cheddar', 'aged cheese',
+  'whole wheat flour', 'whole wheat',
+  'all purpose flour', 'all purpose',
+  'active dry yeast', 'active dry',
+  'brown sugar', 'white sugar', 'powdered sugar', 'confectioners sugar',
+  'hot paprika', 'sweet paprika',
+  'fine salt', 'coarse salt', 'kosher salt', 'sea salt',
+  'heavy cream', 'light cream', 'sour cream', 'whipped cream',
+  'cottage cheese', 'cream cheese', 'goat cheese', 'blue cheese',
+  'green beans', 'black beans', 'kidney beans', 'navy beans',
+  'bell pepper', 'hot pepper', 'chili pepper',
+  'olive oil', 'vegetable oil', 'canola oil', 'sesame oil', 'coconut oil',
+  'red wine vinegar', 'white wine vinegar', 'apple cider vinegar', 'balsamic vinegar',
+  'soy sauce', 'hot sauce', 'barbecue sauce', 'tomato sauce',
+  'chicken broth', 'beef broth', 'vegetable broth',
+  'greek yogurt', 'plain yogurt'
+]);
+
+/**
+ * Adjectives that should typically be removed unless part of a preserved combination
+ */
+const REMOVABLE_ADJECTIVES = new Set([
+  'fresh', 'dried', 'chopped', 'diced', 'minced', 'crushed', 'sliced',
+  'peeled', 'seeded', 'pitted', 'canned', 'frozen', 'defrosted',
+  'cooked', 'raw', 'boiled', 'fried', 'baked', 'grilled', 'steamed', 'roasted',
+  'large', 'medium', 'small', 'jumbo', 'extra', 'super', 'mini', 'baby',
+  'ripe', 'unripe', 'organic', 'natural', 'wild', 'free-range', 'grass-fed',
+  'whole', 'half', 'quarter', 'thick', 'thin', 'regular',
+  'cubed', 'drained', 'flaked', 'melted', 'softened', 'room-temperature',
+  'plain', 'clarified', 'boneless', 'skinless', 'shelled', 'hulled',
+  'pureed', 'mashed', 'whipped', 'beaten', 'sifted', 'strained',
+  'instant', 'pre-cooked', 'quick-cooking', 'self-rising',
+  'reduced-sodium', 'low-sodium', 'unsalted', 'salted',
+  'unsweetened', 'sweetened', 'sugar-free', 'fat-free', 'low-fat',
+  'prepared', 'pre-made', 'ready-made',
+  'pasteurized', 'unpasteurized', 'homogenized',
+  'chilled', 'cold', 'warm', 'hot',
+  'tender', 'firm', 'soft', 'hard', 'crisp', 'crunchy',
+  'mild', 'medium', 'hot', 'spicy', 'sweet', 'sour', 'bitter',
+  'light', 'dark', 'golden', 'pale',
+  'imported', 'domestic', 'local', 'artisanal', 'homemade'
+]);
+
+/**
+ * Words that should remain plural (exceptions to singularization)
+ */
+const PLURAL_EXCEPTIONS = new Set([
+  'beans', 'peas', 'lentils', 'chickpeas', 'oats', 'grits', 'grains',
+  'noodles', 'brussels sprouts', 'green beans', 'black beans', 'kidney beans',
+  'sesame seeds', 'sunflower seeds', 'pumpkin seeds', 'pine nuts',
+  'blueberries', 'strawberries', 'raspberries', 'blackberries', 'cranberries',
+  'eggs', 'nuts', 'almonds', 'walnuts', 'pecans', 'cashews', 'peanuts',
+  'tomatoes', 'potatoes', 'avocados', 'mangoes', 'onions', 'shallots',
+  'cloves', 'spices', 'herbs', 'greens', 'sprouts', 'leftovers'
+]);
+
+/**
+ * Irregular plural to singular mappings
+ */
+const IRREGULAR_PLURALS: Record<string, string> = {
+  'children': 'child',
+  'feet': 'foot',
+  'geese': 'goose', 
+  'men': 'man',
+  'mice': 'mouse',
+  'people': 'person',
+  'teeth': 'tooth',
+  'women': 'woman',
+  'leaves': 'leaf',
+  'loaves': 'loaf',
+  'halves': 'half',
+  'shelves': 'shelf',
+  'knives': 'knife',
+  'lives': 'life',
+  'wives': 'wife',
+  'calves': 'calf'
+};
+
+/**
+ * Applies ingredient aliases to normalize common variations
+ */
+function applyIngredientAliases(name: string): string {
+  const normalized = name.toLowerCase().trim();
+  
+  // Check for exact matches first
+  if (INGREDIENT_ALIASES[normalized]) {
+    console.log('[groceryHelpers] 🔄 Applied alias:', normalized, '→', INGREDIENT_ALIASES[normalized]);
+    return INGREDIENT_ALIASES[normalized];
+  }
+  
+  // Check for partial matches (useful for compound ingredients)
+  for (const [alias, canonical] of Object.entries(INGREDIENT_ALIASES)) {
+    if (normalized.includes(alias)) {
+      const result = normalized.replace(alias, canonical);
+      console.log('[groceryHelpers] 🔄 Applied partial alias:', normalized, '→', result);
+      return result;
+    }
+  }
+  
+  return normalized;
+}
+
+/**
+ * Removes non-essential adjectives while preserving important combinations
+ */
+function removeAdjectives(name: string): string {
+  console.log('[groceryHelpers] ✂️ removeAdjectives called with:', name);
+  
+  // Convert hyphens to spaces for consistent processing
+  let processed = name.replace(/-/g, ' ');
+  let words = processed.split(/\s+/).filter(Boolean);
+  
+  // Check if the entire phrase should be preserved
+  const fullPhrase = words.join(' ');
+  if (PRESERVED_COMBINATIONS.has(fullPhrase)) {
+    console.log('[groceryHelpers] 🛡️ Preserving entire phrase:', fullPhrase);
+    return fullPhrase;
+  }
+  
+  // Look for preserved multi-word combinations
+  for (let i = 0; i < words.length - 1; i++) {
+    const twoWordPhrase = `${words[i]} ${words[i + 1]}`;
+    const threeWordPhrase = i < words.length - 2 ? `${words[i]} ${words[i + 1]} ${words[i + 2]}` : '';
+    
+    if (PRESERVED_COMBINATIONS.has(twoWordPhrase) || 
+        (threeWordPhrase && PRESERVED_COMBINATIONS.has(threeWordPhrase))) {
+      console.log('[groceryHelpers] 🛡️ Found preserved combination:', twoWordPhrase || threeWordPhrase);
+      // Don't remove adjectives from preserved combinations
+      return fullPhrase;
+    }
+  }
+  
+  // Remove individual adjectives that aren't part of preserved combinations
+  const filteredWords = words.filter(word => {
+    if (!REMOVABLE_ADJECTIVES.has(word)) {
+      return true; // Keep non-adjectives
+    }
+    
+    // Check if this adjective is part of a preserved combination
+    const wordIndex = words.indexOf(word);
+    if (wordIndex !== -1 && wordIndex < words.length - 1) {
+      const nextWord = words[wordIndex + 1];
+      if (PRESERVED_COMBINATIONS.has(`${word} ${nextWord}`)) {
+        return true; // Keep adjective that's part of preserved combination
+      }
+    }
+    
+    console.log('[groceryHelpers] ✂️ Removing adjective:', word);
+    return false; // Remove standalone adjective
+  });
+  
+  const result = filteredWords.join(' ').trim();
+  console.log('[groceryHelpers] ✂️ removeAdjectives result:', name, '→', result);
+  return result || name; // Fallback to original if everything was removed
+}
+
+/**
+ * Converts plural forms to singular while respecting exceptions
+ */
+function singularize(name: string): string {
+  console.log('[groceryHelpers] 📝 singularize called with:', name);
+  
+  const words = name.split(/\s+/);
+  const lastWord = words[words.length - 1];
+  
+  // Check if the full phrase or last word should remain plural
+  if (PLURAL_EXCEPTIONS.has(name) || PLURAL_EXCEPTIONS.has(lastWord)) {
+    console.log('[groceryHelpers] 🚫 Skipping singularization (exception):', name);
+    return name;
+  }
+  
+  // Handle irregular plurals
+  if (IRREGULAR_PLURALS[lastWord]) {
+    words[words.length - 1] = IRREGULAR_PLURALS[lastWord];
+    const result = words.join(' ');
+    console.log('[groceryHelpers] 🔄 Applied irregular plural:', name, '→', result);
+    return result;
+  }
+  
+  // Handle regular plurals ending in 's'
+  if (lastWord.endsWith('s') && lastWord.length > 3) {
+    // Special cases for words ending in specific patterns
+    if (lastWord.endsWith('ies') && lastWord.length > 4) {
+      // berries → berry, cherries → cherry
+      const singular = lastWord.slice(0, -3) + 'y';
+      words[words.length - 1] = singular;
+    } else if (lastWord.endsWith('ves')) {
+      // leaves → leaf, shelves → shelf
+      const singular = lastWord.slice(0, -3) + 'f';
+      words[words.length - 1] = singular;
+    } else if (lastWord.endsWith('es') && 
+               (lastWord.endsWith('ches') || lastWord.endsWith('shes') || 
+                lastWord.endsWith('ses') || lastWord.endsWith('xes') || lastWord.endsWith('zes'))) {
+      // matches → match, dishes → dish, boxes → box
+      const singular = lastWord.slice(0, -2);
+      words[words.length - 1] = singular;
+    } else if (!lastWord.endsWith('ss') && !lastWord.endsWith('us')) {
+      // Simple case: remove trailing 's' but avoid 'grass' → 'gras' or 'radius' → 'radiu'
+      const singular = lastWord.slice(0, -1);
+      if (singular.length >= 3) {
+        words[words.length - 1] = singular;
+      }
+    }
+  }
+  
+  const result = words.join(' ');
+  console.log('[groceryHelpers] 📝 singularize result:', name, '→', result);
+  return result;
+}
+
+/**
+ * Handles special ingredient-specific normalizations
+ */
+function applySpecialCases(name: string): string {
+  console.log('[groceryHelpers] 🎯 applySpecialCases called with:', name);
+  
+  // Handle complex herb patterns like "fresh chopped herbs scallions" → "scallions"
+  if (name.includes('herbs') && (name.includes('scallion') || name.includes('cilantro') || name.includes('parsley'))) {
+    if (name.includes('scallion')) {
+      console.log('[groceryHelpers] 🌿 HERB EXTRACTION: scallions');
+      return 'scallions';
+    } else if (name.includes('cilantro')) {
+      console.log('[groceryHelpers] 🌿 HERB EXTRACTION: cilantro');
+      return 'cilantro';
+    } else if (name.includes('parsley')) {
+      console.log('[groceryHelpers] 🌿 HERB EXTRACTION: parsley');
+      return 'parsley';
+    }
+  }
+  
+  // Handle size/unit patterns that should be cleaned up
+  // "14.5 oz can" in ingredient name → "can" (size already captured in unit)
+  name = name.replace(/\d+(?:\.\d+)?\s*(?:oz|lb|g|kg)\s+/gi, '');
+  
+  // Handle duplicated words caused by alias replacement
+  // "scallions (scallions)" → "scallions"
+  name = name.replace(/\b(\w+)\s*\(\1\)/gi, '$1');
+  
+  // Handle leftover punctuation artifacts
+  name = name.replace(/\s*,\s*$/, ''); // Remove trailing commas
+  name = name.replace(/^\s*,\s*/, ''); // Remove leading commas
+  name = name.replace(/\s{2,}/g, ' '); // Collapse multiple spaces
+  
+  // Handle common parsing artifacts
+  name = name.replace(/^-\d+\s+/, ''); // Remove range artifacts like "-2 "
+  name = name.replace(/^~\d*\s+/, ''); // Remove tilde artifacts like "~2 "
+  name = name.replace(/^about\s+\d+\/\d+\s+/, ''); // Remove "about 1/2 " artifacts
+  
+  // Clean up empty parentheses and extra spaces
+  name = name.replace(/\s*\(\s*\)/g, '');
+  name = name.trim();
+  
+  console.log('[groceryHelpers] 🎯 applySpecialCases result:', name);
+  return name;
+}
 
 /**
  * Normalizes an ingredient name for consistent aggregation.
- * - Converts to lowercase
- * - Removes extra whitespace
- * - Removes irrelevant adjectives (but keeps important ones like "toasted")
- * - Makes singular (simple implementation)
+ * This is the main entry point for ingredient name normalization.
  */
 export function normalizeName(name: string): string {
   console.log('[groceryHelpers] 🔄 normalizeName called with:', name);
+  
+  if (!name || typeof name !== 'string') {
+    console.log('[groceryHelpers] ⚠️ Invalid input to normalizeName:', name);
+    return '';
+  }
+  
+  // Step 1: Basic cleanup and artifact removal
   let normalized = name.toLowerCase().trim();
-
-  // Convert hyphens to spaces for consistent splitting and matching of multi-word adjectives
-  normalized = normalized.replace(/-/g, ' ');
-
-  // Add a new list/set for adjective-noun pairs to preserve
-  // This list will be the primary mechanism for preserving critical modifiers.
-  const preservedAdjectiveNounPairs = new Set([
-    'toasted_pecans',
-    'ground_beef',
-    'shredded_cheese',
-    'smoked_salmon',
-    'roasted_red_peppers',
-    'sun_dried_tomatoes', // Using 'sun_dried' for consistency if it appears as two words
-    'aged_cheddar',
-    'whole_wheat_flour',
-    'active_dry_yeast',
-    'all_purpose_flour', // Important to keep "all purpose" as it defines the flour type
-    'ground_pork',
-    'ground_chicken',
-    'ground_turkey',
-    'smoked_paprika',
-    'hot_paprika',
-    'sweet_paprika',
-    'powdered_sugar',
-    'confectioners_sugar',
-    'brown_sugar', // While "brown" is generic, "brown sugar" is a distinct product
-    'white_sugar', // Same for white sugar
-    'fine_salt',
-    'coarse_salt',
-    // Add more as you identify them through monitoring or specific recipe needs
-  ]);
-
-  // Revised and more focused list of generic adjectives to remove
-  const adjectivesToRemove = [
-    'fresh', 'dried', 'chopped', 'diced', 'minced', 'crushed',
-    'peeled', 'seeded', 'pitted', 'canned', 'frozen',
-    'cooked', 'raw', 'boiled', 'fried', 'baked', 'grilled', 'steamed',
-    'large', 'medium', 'small', 'jumbo', 'extra', 'super',
-    'ripe', 'unripe', 'organic', 'gluten-free', 'sugar-free', 'low-fat', 'fat-free',
-    'whole', 'half', 'quarter', 'light', 'dark', 'sweet', 'sour', 'spicy', 'mild',
-    'fine', 'coarse',
-    'cubed', 'drained', 'flaked', 'melted', 'softened', 'unsalted', 'salted',
-    'plain', 'clarified', 'boneless', 'skinless', 'shelled',
-    'pureed', 'mashed', 'whipped', 'beaten', 'sifted',
-    'instant', 'pre-cooked', 'quick-cooking', 'self-rising',
-    'reduced-sodium', 'unsweetened', 'powdered', 'granulated', 'brown', 'white',
-    'yellow', 'red', 'green', 'black', 'pink', 'orange',
-    'prepared', 'kosher', 'free-range', 'grass-fed', 'wild',
-    'pasteurized', 'unpasteurized', 'seasoned', 'unseasoned', 'pure',
-    'extra-virgin', 'virgin', 'thick', 'thin', 'regular', 'concentrated', 'diluted',
-    'chilled', 'room-temperature',
-    // Specific words that *can* be adjectives but are more likely to be part of a distinct ingredient name:
-    // These should be moved to 'preservedAdjectiveNounPairs' if they create common problems.
-    // For now, remove 'ground', 'shredded', 'smoked', 'roasted', 'toasted' from this general list
-    // as they are explicitly handled in preservedAdjectiveNounPairs.
-  ];
   
-  // 2. Remove adjectives with contextual preservation
-  let words = normalized.split(/\s+/).filter(Boolean); // filter(Boolean) removes empty strings from split
-
-  let filteredWords: string[] = [];
-
-  for (let i = 0; i < words.length; i++) {
-    const word = words[i];
-    // Look ahead up to 2 words for potential multi-word pairs
-    const nextWord = words[i + 1] || '';
-    const nextTwoWords = words[i + 2] || '';
-
-    // Construct potential pairs for checking
-    const potentialPair1 = `${word}_${nextWord}`; // e.g., 'ground_beef'
-    const potentialPair2 = `${word}_${nextWord}_${nextTwoWords}`; // e.g., 'roasted_red_peppers'
-
-    // Check if the current word is in adjectivesToRemove.
-    // However, if the current word is part of a *preserved* multi-word phrase,
-    // then we should *not* remove it.
-
-    let isPartiallyPreserved = false;
-    // Check if current word starts a preserved two-word pair
-    if (preservedAdjectiveNounPairs.has(potentialPair1)) {
-        isPartiallyPreserved = true;
-        console.log('[groceryHelpers] 🛡️ Preserving adjective-noun pair:', potentialPair1);
-    }
-    // Check if current word starts a preserved three-word pair
-    if (preservedAdjectiveNounPairs.has(potentialPair2)) {
-        isPartiallyPreserved = true;
-        console.log('[groceryHelpers] 🛡️ Preserving adjective-noun pair:', potentialPair2);
-    }
-    // Also consider cases where the adjective might be after the noun,
-    // though the `normalizeName` design usually puts adjectives first.
-    // For now, we'll focus on adjective-noun patterns.
-
-    if (
-        adjectivesToRemove.includes(word) && // Is it a general adjective we usually remove?
-        !isPartiallyPreserved && // AND is it *not* part of a specific preserved phrase starting with this word?
-        // Your previous `!preservedAdjectiveNounPairs.has(`${word}_${words[i-1]}`)` implies checking if current word is a *second* word in a preserved pair.
-        // This is tricky with simple string splitting. For now, let's simplify and focus on adjective-noun patterns.
-        // If "cheese, shredded" is a common input, consider a pre-processing step to reorder "noun, adjective" to "adjective noun".
-        !(word === 'ground' && nextWord === 'pepper') // Keep specific exception for "ground pepper" if needed, though now 'ground_pepper' could be added to set
-    ) {
-        // Skip this adjective as it's not critical in this context
-        console.log('[groceryHelpers] 🗑️ Removing adjective:', word, 'from context:', words.join(' '));
-        continue;
-    }
-
-    filteredWords.push(word);
-  }
-
-  normalized = filteredWords.join(' ');
-
-  // Clean up extra spaces that may have been left by removing adjectives
+  // Remove trailing punctuation and common artifacts
+  normalized = normalized.replace(/[,;:.!?]+$/, '').trim(); // Remove trailing punctuation
+  normalized = normalized.replace(/\s*\([^)]*\)$/, '').trim(); // Remove trailing parenthetical notes
+  normalized = normalized.replace(/\s*,\s*$/, '').trim(); // Remove trailing commas with spaces
+  
+  // Step 2: Apply ingredient aliases (consolidate common variations)
+  normalized = applyIngredientAliases(normalized);
+  
+  // Step 3: Remove non-essential adjectives while preserving important combinations
+  normalized = removeAdjectives(normalized);
+  
+  // Step 4: Apply special ingredient-specific rules
+  normalized = applySpecialCases(normalized);
+  
+  // Step 5: Singularize while respecting exceptions
+  normalized = singularize(normalized);
+  
+  // Step 6: Final cleanup
   normalized = normalized.replace(/\s+/g, ' ').trim();
-
-  // Handle complex herb patterns like "fresh chopped herbs scallions" -> "scallions"
-  if (normalized.includes('herbs') && (normalized.includes('scallion') || normalized.includes('cilantro') || normalized.includes('parsley'))) {
-    // Extract the specific herb from patterns like "fresh chopped herbs scallions"
-    if (normalized.includes('scallion')) {
-      normalized = 'scallion';
-    } else if (normalized.includes('cilantro')) {
-      normalized = 'cilantro';
-    } else if (normalized.includes('parsley')) {
-      normalized = 'parsley';
-    }
-  }
   
-  // Handle garlic variations - normalize all to "garlic"
-  if (normalized === 'garlic clove' || normalized === 'clove garlic' || normalized === 'garlic cloves' || normalized === 'cloves garlic') {
-    console.log('[groceryHelpers] 🧄 GARLIC MATCH! Converting:', normalized, '→ garlic');
-    normalized = 'garlic';
-  }
-  
-  // Handle egg variations - normalize all to "eggs" (plural is more common for shopping)
-  if (normalized === 'egg' || normalized === 'eggs') {
-    console.log('[groceryHelpers] 🥚 EGG MATCH! Converting:', normalized, '→ eggs');
-    normalized = 'eggs';
-  }
-  
-  // Handle flour variations - normalize plain flour to "all purpose flour"
-  // Note: "all purpose flour" is now preserved by the preservedAdjectiveNounPairs system
-  if (normalized === 'flour') {
-    console.log('[groceryHelpers] 🌾 FLOUR MATCH! Converting:', normalized, '→ all purpose flour');
-    normalized = 'all purpose flour';
-  }
-  
-  // Fix common ingredient misspellings
-  const spellingCorrections: { [key: string]: string } = {
-    'tomatoe': 'tomato',
-    'roasted tomatoe': 'roasted tomato',
-    'potatoe': 'potato',
-    'roasted potatoe': 'roasted potato'
-  };
-  
-  if (spellingCorrections[normalized]) {
-    console.log('[groceryHelpers] ✏️ SPELLING CORRECTION:', normalized, '→', spellingCorrections[normalized]);
-    normalized = spellingCorrections[normalized];
-  }
-  
-  // Simple pluralization check - remove trailing 's' but be careful with exceptions
-  const pluralExceptions = [
-    'beans', 'peas', 'lentils', 'oats', 'grits', 'grains',
-    'noodles', 'brussels sprouts', 'green beans',
-    'sesame seeds', 'sunflower seeds', 'pumpkin seeds',
-    'blueberries', 'strawberries', 'raspberries', 'blackberries', 'cranberries',
-    'eggs'
-  ];
-  
-  // Check if the normalized name contains any plural exception as a substring
-  // This handles compound names like "frozen blueberries"
-  const containsPlural = pluralExceptions.some(exception => normalized.includes(exception));
-  
-  // Only singularize if it's not an exception and ends with 's' and doesn't contain plural words
-  if (normalized.endsWith('s') && !pluralExceptions.includes(normalized) && !containsPlural) {
-    // Additional check: don't singularize if it would create a very short word
-    const singular = normalized.slice(0, -1);
-    if (singular.length >= 3) {
-      normalized = singular;
-    }
-  }
-  
-  console.log('[groceryHelpers] ✅ normalizeName result:', name, '→', normalized);
-  return normalized;
+  console.log('[groceryHelpers] ✅ normalizeName final result:', name, '→', normalized);
+  return normalized || name; // Fallback to original if somehow empty
 }
 
 /**
@@ -297,15 +494,10 @@ function parseQuantity(amount: number | string | null): number | null {
     return amount;
   }
   if (typeof amount === 'string' && amount.trim() !== '') {
-    try {
-      // Use fraction.js to handle mixed numbers like "1 1/2"
-      const result = parse(amount.trim());
-      console.log('[groceryHelpers] 🔢 Parsed quantity result:', result);
-      return result;
-    } catch (e) {
-      console.warn('[groceryHelpers] ⚠️ Failed to parse quantity:', amount, e);
-      return null; // Return null if parsing fails
-    }
+    // Use parseAmountString to handle mixed numbers like "1 1/2", fractions, etc.
+    const result = parseAmountString(amount.trim());
+    console.log('[groceryHelpers] 🔢 Parsed quantity result:', result);
+    return result;
   }
   return null;
 }
@@ -443,7 +635,7 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
   const finalAggregatedList: GroceryListItem[] = [];
 
   // Step 2: Iterate through each group and aggregate compatible units.
-  for (const [name, itemList] of groupedByName.entries()) {
+  for (const [name, itemList] of Array.from(groupedByName.entries())) {
     if (itemList.length === 1) {
       finalAggregatedList.push(itemList[0]);
       continue;

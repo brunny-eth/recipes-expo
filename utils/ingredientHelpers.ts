@@ -1,223 +1,425 @@
 import { StructuredIngredient, IngredientGroup } from '../common/types/recipes';
+import { parseAmountString } from './recipeUtils';
+import { availableUnits, Unit } from './units';
 
-// Standardized unit mapping for consistent unit normalization
-const standardizedUnits: Record<string, string> = {
-  // Volume units
-  'cups': 'cup',
-  'c': 'cup',
-  'cup': 'cup',
-  'tablespoons': 'tbsp',
-  'tablespoon': 'tbsp',
-  'tbsp': 'tbsp',
-  'tbs': 'tbsp',
-  'T': 'tbsp',
-  'teaspoons': 'tsp',
-  'teaspoon': 'tsp',
-  'tsp': 'tsp',
-  't': 'tsp',
-  'fluid ounces': 'fl_oz',
-  'fl oz': 'fl_oz',
-  'fl. oz': 'fl_oz',
-  'ounces': 'oz',
-  'oz': 'oz',
-  'pints': 'pint',
-  'pint': 'pint',
-  'pt': 'pint',
-  'quarts': 'quart',
-  'quart': 'quart',
-  'qt': 'quart',
-  'gallons': 'gallon',
-  'gallon': 'gallon',
-  'gal': 'gallon',
-  'liters': 'l',
-  'liter': 'l',
-  'l': 'l',
-  'L': 'l',
-  'milliliters': 'ml',
-  'milliliter': 'ml',
-  'ml': 'ml',
-  'mL': 'ml',
+// === COMPREHENSIVE UNIT SYSTEM ===
+
+/**
+ * Comprehensive unit mapping aligned with units.ts system
+ * Maps all common variations to their standardized internal form
+ */
+const UNIT_MAPPINGS: Record<string, string> = {
+  // Volume units - aligned with units.ts
+  'ml': 'ml', 'mL': 'ml', 'milliliter': 'ml', 'milliliters': 'ml', 'millilitre': 'ml', 'millilitres': 'ml',
+  'tsp': 'tsp', 't': 'tsp', 'teaspoon': 'tsp', 'teaspoons': 'tsp', 
+  'tbsp': 'tbsp', 'T': 'tbsp', 'tbs': 'tbsp', 'tablespoon': 'tbsp', 'tablespoons': 'tbsp',
+  'fl oz': 'fl_oz', 'fl. oz': 'fl_oz', 'fl.oz': 'fl_oz', 'floz': 'fl_oz', 
+  'fluid ounce': 'fl_oz', 'fluid ounces': 'fl_oz', 'fl ounce': 'fl_oz', 'fl ounces': 'fl_oz',
+  'cup': 'cup', 'cups': 'cup', 'c': 'cup',
+  'pint': 'pint', 'pints': 'pint', 'pt': 'pint', 'pts': 'pint',
+  'quart': 'quart', 'quarts': 'quart', 'qt': 'quart', 'qts': 'quart',
+  'gallon': 'gallon', 'gallons': 'gallon', 'gal': 'gallon', 'gals': 'gallon',
+  'liter': 'liter', 'liters': 'liter', 'l': 'liter', 'L': 'liter', 'litre': 'liter', 'litres': 'liter',
+
+  // Count-based units - all mapped to 'each' for aggregation consistency
+  'each': 'each', 'piece': 'each', 'pieces': 'each', 'item': 'each', 'items': 'each',
+  'clove': 'each', 'cloves': 'each', 'bulb': 'each', 'bulbs': 'each',
+  'head': 'each', 'heads': 'each', 'ear': 'each', 'ears': 'each',
+  'bunch': 'each', 'bunches': 'each', 'bundle': 'each', 'bundles': 'each',
+  'stalk': 'each', 'stalks': 'each', 'stem': 'each', 'stems': 'each',
+  'sprig': 'each', 'sprigs': 'each', 'branch': 'each', 'branches': 'each',
+  'leaf': 'each', 'leaves': 'each', 'sheet': 'each', 'sheets': 'each',
+  'slice': 'each', 'slices': 'each', 'strip': 'each', 'strips': 'each',
+  'wedge': 'each', 'wedges': 'each', 'segment': 'each', 'segments': 'each',
+
+  // Container units - mapped to 'each' but preserve original for display
+  'can': 'each', 'cans': 'each', 'tin': 'each', 'tins': 'each',
+  'jar': 'each', 'jars': 'each', 'bottle': 'each', 'bottles': 'each',
+  'package': 'each', 'packages': 'each', 'pkg': 'each', 'pkgs': 'each',
+  'box': 'each', 'boxes': 'each', 'carton': 'each', 'cartons': 'each',
+  'bag': 'each', 'bags': 'each', 'pouch': 'each', 'pouches': 'each',
+  'container': 'each', 'containers': 'each', 'tub': 'each', 'tubs': 'each',
+
+  // Special measurement units
+  'pinch': 'each', 'pinches': 'each', 'dash': 'each', 'dashes': 'each',
+  'splash': 'each', 'splashes': 'each', 'handful': 'each', 'handfuls': 'each',
+  'drop': 'each', 'drops': 'each', 'squeeze': 'each', 'squeezes': 'each',
+
+  // Weight units (note: not convertible with volume in units.ts)
+  'g': 'g', 'gram': 'g', 'grams': 'g', 'gr': 'g',
+  'kg': 'kg', 'kilogram': 'kg', 'kilograms': 'kg', 'kilo': 'kg', 'kilos': 'kg',
+  'oz': 'oz', 'ounce': 'oz', 'ounces': 'oz', // Weight ounces (distinct from fl_oz)
+  'lb': 'lb', 'pound': 'lb', 'pounds': 'lb', 'lbs': 'lb', '#': 'lb',
+
+  // Compound units (preserve full form for clarity) - patterns for sizes + containers
+  'oz can': 'oz can', 'ounce can': 'ounce can', 'oz jar': 'oz jar', 'ounce jar': 'ounce jar',
+  'oz package': 'oz package', 'ounce package': 'ounce package', 'oz bag': 'oz bag', 'ounce bag': 'ounce bag',
+  'lb bag': 'lb bag', 'pound bag': 'pound bag', 'lb box': 'lb box', 'pound box': 'pound box',
+  'fl oz bottle': 'fl oz bottle', 'fl oz can': 'fl oz can', 'fl oz jar': 'fl oz jar',
   
-  // Weight units
-  'pounds': 'lb',
-  'pound': 'lb',
-  'lbs': 'lb',
-  'lb': 'lb',
-  'grams': 'g',
-  'gram': 'g',
-  'g': 'g',
-  'kilograms': 'kg',
-  'kilogram': 'kg',
-  'kg': 'kg',
-  
-  // Count/descriptive units that should be preserved
-  'cloves': 'clove',
-  'clove': 'clove',
-  'heads': 'head',
-  'head': 'head',
-  'bunches': 'bunch',
-  'bunch': 'bunch',
-  'pieces': 'piece',
-  'piece': 'piece',
-  'slices': 'slice',
-  'slice': 'slice',
-  'stalks': 'stalk',
-  'stalk': 'stalk',
-  'sprigs': 'sprig',
-  'sprig': 'sprig',
-  'leaves': 'leaf',
-  'leaf': 'leaf',
-  'cans': 'can',
-  'can': 'can',
-  'packages': 'package',
-  'package': 'package',
-  'pkg': 'package',
-  'bottles': 'bottle',
-  'bottle': 'bottle',
-  'jars': 'jar',
-  'jar': 'jar',
-  'containers': 'container',
-  'container': 'container',
+  // Dynamic compound unit patterns (handled specially in parsing)
+  // These are matched by regex: /\d+(?:\.\d+)?\s+(?:oz|fl\s*oz|lb|g|kg)\s+(?:can|jar|bottle|bag|box|package|container)/
 };
 
-// Descriptive "units" that should be treated as part of the name instead
-const descriptiveUnits = new Set([
-  'small', 'medium', 'large', 'extra large', 'jumbo',
-  'thin', 'thick', 'fine', 'coarse', 'rough',
-  'fresh', 'dried', 'frozen', 'canned', 'whole',
-  'half', 'quarter', 'ripe', 'unripe', 'green', 'red'
+/**
+ * Unit display names for user-friendly output
+ * Maps internal units to their preferred display forms
+ */
+const UNIT_DISPLAY_NAMES: Record<string, { singular: string, plural: string }> = {
+  // Volume units
+  'ml': { singular: 'ml', plural: 'ml' },
+  'tsp': { singular: 'tsp', plural: 'tsp' },
+  'tbsp': { singular: 'Tbsp', plural: 'Tbsp' },
+  'fl_oz': { singular: 'fl oz', plural: 'fl oz' },
+  'cup': { singular: 'cup', plural: 'cups' },
+  'pint': { singular: 'pint', plural: 'pints' },
+  'quart': { singular: 'quart', plural: 'quarts' },
+  'gallon': { singular: 'gallon', plural: 'gallons' },
+  'liter': { singular: 'liter', plural: 'liters' },
+  
+  // Count and weight units
+  'each': { singular: '', plural: '' }, // Empty for count units
+  'g': { singular: 'g', plural: 'g' },
+  'kg': { singular: 'kg', plural: 'kg' },
+  'oz': { singular: 'oz', plural: 'oz' },
+  'lb': { singular: 'lb', plural: 'lb' },
+  
+  // Container units (preserve original for display)
+  'oz can': { singular: 'oz can', plural: 'oz cans' },
+  'ounce can': { singular: 'ounce can', plural: 'ounce cans' },
+  'oz jar': { singular: 'oz jar', plural: 'oz jars' },
+  'oz bag': { singular: 'oz bag', plural: 'oz bags' },
+  'oz package': { singular: 'oz package', plural: 'oz packages' },
+  'lb bag': { singular: 'lb bag', plural: 'lb bags' },
+  'lb box': { singular: 'lb box', plural: 'lb boxes' },
+  'fl oz bottle': { singular: 'fl oz bottle', plural: 'fl oz bottles' },
+  'fl oz can': { singular: 'fl oz can', plural: 'fl oz cans' },
+  'fl oz jar': { singular: 'fl oz jar', plural: 'fl oz jars' },
+};
+
+/**
+ * Words that look like units but should be treated as descriptive adjectives
+ * These get moved back into the ingredient name
+ */
+const DESCRIPTIVE_WORDS = new Set([
+  'small', 'medium', 'large', 'extra large', 'jumbo', 'mini', 'baby',
+  'thin', 'thick', 'fine', 'coarse', 'rough', 'smooth',
+  'fresh', 'dried', 'frozen', 'canned', 'bottled', 'whole', 'ground',
+  'half', 'quarter', 'ripe', 'unripe', 'green', 'red', 'yellow', 'white',
+  'organic', 'free-range', 'grass-fed', 'wild', 'raw', 'cooked',
+  'chopped', 'diced', 'minced', 'sliced', 'grated', 'shredded',
+  'peeled', 'seeded', 'pitted', 'trimmed', 'cleaned',
+  'hot', 'mild', 'sweet', 'sour', 'spicy', 'plain', 'salted', 'unsalted'
 ]);
 
 /**
- * Parses a raw ingredient string to extract amount, unit, and name components
- * Handles various numerical formats and common cooking units
+ * Common measurement prefixes that indicate approximate amounts
+ */
+const APPROXIMATION_PREFIXES = [
+  'about', 'approximately', 'roughly', 'around', 'nearly', 'almost',
+  'just over', 'just under', 'a little over', 'a little under',
+  'up to', 'at least', 'or so', 'give or take'
+];
+
+/**
+ * Normalized unit lookup - converts any unit variation to standardized form
+ */
+function normalizeUnit(rawUnit: string | null): string | null {
+  console.log('[ingredientHelpers] 📏 normalizeUnit called with:', rawUnit);
+  
+  if (!rawUnit) {
+    console.log('[ingredientHelpers] 📏 normalizeUnit returning null - no input');
+    return null;
+  }
+  
+  const cleaned = rawUnit.toLowerCase().trim();
+  const normalized = UNIT_MAPPINGS[cleaned] || null;
+  
+  console.log('[ingredientHelpers] 📏 normalizeUnit result:', { input: rawUnit, cleaned, normalized });
+  return normalized;
+}
+
+/**
+ * Gets appropriate display name for a unit based on quantity
+ */
+function getDisplayUnit(unit: string | null, amount: number | null): string | null {
+  console.log('[ingredientHelpers] 🎨 getDisplayUnit called with:', { unit, amount });
+  
+  if (!unit) {
+    console.log('[ingredientHelpers] 🎨 getDisplayUnit returning null - no unit');
+    return null;
+  }
+  
+  const displayInfo = UNIT_DISPLAY_NAMES[unit];
+  if (!displayInfo) {
+    console.log('[ingredientHelpers] 🎨 getDisplayUnit returning original unit - no display info');
+    return unit;
+  }
+  
+  // Use plural for amounts != 1, or when amount is null/unknown
+  const shouldUsePlural = amount === null || amount === 0 || amount > 1 || (amount > 0 && amount < 1);
+  const result = shouldUsePlural ? displayInfo.plural : displayInfo.singular;
+  
+  console.log('[ingredientHelpers] 🎨 getDisplayUnit result:', { 
+    unit, 
+    amount, 
+    shouldUsePlural, 
+    result 
+  });
+  
+  return result || unit;
+}
+
+/**
+ * Advanced ingredient string parser with comprehensive unit recognition
+ * and robust amount parsing using existing parseAmountString utility
  */
 function parseIngredientString(ingredientString: string): {
   amount: string | null;
   unit: string | null;
   name: string;
   preparation: string | null;
+  displayUnit: string | null;
+  parsedAmount: number | null;
 } {
+  console.log('[ingredientHelpers] 🔍 parseIngredientString called with:', ingredientString);
+  
   const original = ingredientString.trim();
+  if (!original) {
+    console.log('[ingredientHelpers] ⚠️ Empty ingredient string');
+    return {
+      amount: null,
+      unit: null, 
+      name: '',
+      preparation: null,
+      displayUnit: null,
+      parsedAmount: null
+    };
+  }
   
-  // First, check for preparation notes (typically after a comma)
-  const [mainPart, ...prepParts] = original.split(',');
-  const preparation = prepParts.length > 0 ? prepParts.join(',').trim() : null;
+  // Step 1: Extract preparation notes (after comma or in parentheses)
+  let workingString = original;
+  let preparation: string | null = null;
   
-  let remaining = mainPart.trim();
+  // Handle comma-separated preparation
+  const commaIndex = workingString.indexOf(',');
+  if (commaIndex !== -1) {
+    preparation = workingString.substring(commaIndex + 1).trim();
+    workingString = workingString.substring(0, commaIndex).trim();
+    console.log('[ingredientHelpers] 📝 Found comma-separated preparation:', preparation);
+  }
   
-  // Regex patterns for different amount formats
-  const amountPatterns = [
-    // Mixed fractions: "1 1/2", "2 3/4"
-    /^(\d+\s+\d+\/\d+)\s+/,
-    // Simple fractions: "1/2", "3/4"
-    /^(\d+\/\d+)\s+/,
-    // Decimal numbers: "1.5", "0.25", "2.75"
-    /^(\d*\.?\d+)\s+/,
-    // Whole numbers: "1", "2", "10"
-    /^(\d+)\s+/,
-    // Range amounts: "1-2", "2 to 3"
-    /^(\d+\s*[-–]\s*\d+|\d+\s+to\s+\d+)\s+/,
-    // Approximate amounts: "about 1", "approximately 2"
-    /^(about\s+\d+\.?\d*|approximately\s+\d+\.?\d*)\s+/i,
+  // Handle parenthetical preparation (but not substitutions)
+  const parenMatch = workingString.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+  if (parenMatch && !parenMatch[2].includes(' or ') && !parenMatch[2].includes('/')) {
+    if (!preparation) {
+      preparation = parenMatch[2].trim();
+    } else {
+      preparation += ', ' + parenMatch[2].trim();
+    }
+    workingString = parenMatch[1].trim();
+    console.log('[ingredientHelpers] 📝 Found parenthetical preparation:', preparation);
+  }
+  
+  // Step 2: Handle special non-numeric amount patterns first
+  const specialAmountPatterns = [
+    { pattern: /^(a\s+(?:pinch|dash|splash|handful|squeeze|drop)\s+of)\s+(.+)$/i, amount: '1' },
+    { pattern: /^(some|several|few|many)\s+(.+)$/i, amount: null },
+    { pattern: /^(to\s+taste)\s+(.+)$/i, amount: null },
+    { pattern: /^(as\s+needed)\s+(.+)$/i, amount: null },
   ];
   
   let amount: string | null = null;
+  let remainingText = workingString;
   
-  // Try to match amount patterns
-  for (const pattern of amountPatterns) {
-    const match = remaining.match(pattern);
+  for (const { pattern, amount: defaultAmount } of specialAmountPatterns) {
+    const match = workingString.match(pattern);
     if (match) {
-      amount = match[1].trim();
-      remaining = remaining.substring(match[0].length).trim();
+      amount = defaultAmount;
+      remainingText = match[2].trim();
+      console.log('[ingredientHelpers] 🎯 Matched special amount pattern:', {
+        pattern: pattern.source,
+        amount,
+        remaining: remainingText
+      });
       break;
     }
   }
   
-  // If no amount found, try to match unit-only patterns (like "a pinch of")
-  if (!amount) {
-    const unitOnlyPatterns = [
-      /^(a\s+pinch\s+of)\s+/i,
-      /^(a\s+dash\s+of)\s+/i,
-      /^(a\s+splash\s+of)\s+/i,
-      /^(a\s+handful\s+of)\s+/i,
-      /^(some)\s+/i,
+  // Step 3: Extract numeric amounts if no special pattern matched
+  if (amount === null) {
+    // Enhanced amount extraction patterns with better approximation and range handling
+    const amountExtractionPatterns = [
+      // Approximation prefix with tilde: "~2", "~ 1.5"
+      /^(~\s*\d+(?:\.\d+)?(?:\s+\d+\/\d+)?)\s+/,
+      // Complex approximations with amounts: "about 1 1/2", "roughly 2.5", "approximately 3"
+      /^((?:about|approximately|roughly|around|nearly|almost)\s+\d+(?:\s+\d+\/\d+|\.\d+)?)\s+/i,
+      // Ranges with various separators: "1-2", "2 to 3", "1–2" (en dash), "1—2" (em dash)
+      /^(\d+(?:\.\d+)?\s*(?:[-–—]|to)\s*\d+(?:\.\d+)?)\s+/i,
+      // Compound measurements: "1 14.5 oz", "2 16 fl oz" (amount + size + unit)
+      /^(\d+)\s+(\d+(?:\.\d+)?)\s+(oz|fl\s*oz|lb|g|kg)\s+/i,
+      // Unicode fractions: "½", "1½", "2¾"
+      /^(\d*[¼½¾⅐⅑⅒⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞])\s+/,
+      // Mixed fractions: "1 1/2", "2 3/4", "1 2/16"
+      /^(\d+\s+\d+\/\d+)\s+/,
+      // Simple fractions: "1/2", "3/4", "15/16"
+      /^(\d+\/\d+)\s+/,
+      // Decimal numbers: "1.5", "0.25", "2.75"
+      /^(\d*\.?\d+)\s+/,
+      // Whole numbers: "1", "2", "10"
+      /^(\d+)\s+/
     ];
     
-    for (const pattern of unitOnlyPatterns) {
-      const match = remaining.match(pattern);
+    for (const pattern of amountExtractionPatterns) {
+      const match = workingString.match(pattern);
       if (match) {
-        amount = '1'; // Normalize to 1 for counting purposes
-        remaining = remaining.substring(match[0].length).trim();
+        // Handle compound measurements specially
+        if (match[2] && match[3]) {
+          // This is a compound measurement like "1 14.5 oz can"
+          amount = match[1].trim(); // Just the count (1)
+          // Reconstruct the remaining text with the size and unit preserved
+          remainingText = `${match[2]} ${match[3]} ${workingString.substring(match[0].length)}`.trim();
+          console.log('[ingredientHelpers] 📦 Extracted compound measurement:', {
+            count: amount,
+            remaining: remainingText
+          });
+        } else {
+          amount = match[1].trim();
+          remainingText = workingString.substring(match[0].length).trim();
+          console.log('[ingredientHelpers] 🔢 Extracted amount:', {
+            pattern: pattern.source,
+            amount,
+            remaining: remainingText
+          });
+        }
         break;
       }
     }
   }
   
+  // Step 4: Extract unit from remaining text
   let unit: string | null = null;
+  let finalName = remainingText;
   
-  // Try to extract unit if we have an amount
-  if (amount) {
-    // Create a regex pattern for all known units (case-insensitive)
-    const unitKeys = Object.keys(standardizedUnits);
-    const unitPattern = new RegExp(`^(${unitKeys.join('|')})\\b`, 'i');
+  if (remainingText) {
+    // Enhanced unit extraction with better fluid ounce and compound unit handling
+    const enhancedUnitPatterns = [
+      // Fluid ounces with various formats: "fluid ounces", "fl oz", "fl. oz"
+      /^(fluid\s+ounces?|fl\s*\.?\s*oz|fl\s+ounces?)\b/i,
+      // Compound units with sizes: "14.5 oz can", "16 fl oz bottle"
+      /^(\d+(?:\.\d+)?\s+(?:oz|fl\s*oz|lb|g|kg)\s+(?:can|jar|bottle|bag|box|package|container))\b/i,
+      // Weight ounces (not fluid): "ounces", "oz" when not preceded by "fl"
+      /^(ounces?|oz)(?!\s+(?:can|jar|bottle|bag|box|package|container))\b/i,
+      // Standard unit pattern for all other units
+      null // Will be filled below
+    ];
     
-    const unitMatch = remaining.match(unitPattern);
-    if (unitMatch) {
-      const rawUnit = unitMatch[1].toLowerCase();
-      unit = standardizedUnits[rawUnit] || rawUnit;
-      remaining = remaining.substring(unitMatch[0].length).trim();
+    // Add the comprehensive unit pattern as the last fallback
+    const allUnitVariations = Object.keys(UNIT_MAPPINGS).sort((a, b) => b.length - a.length);
+    enhancedUnitPatterns[3] = new RegExp(`^(${allUnitVariations.map(u => u.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\b`, 'i');
+    
+    for (const pattern of enhancedUnitPatterns) {
+      if (!pattern) continue;
       
-      // Check if this is a descriptive unit that should be part of the name
-      if (descriptiveUnits.has(rawUnit)) {
-        // Put the descriptive unit back into the name
-        remaining = `${rawUnit} ${remaining}`.trim();
-        unit = null;
+      const unitMatch = remainingText.match(pattern);
+      if (unitMatch) {
+        const rawUnit = unitMatch[1];
+        
+        // Special handling for compound units
+        if (rawUnit.includes(' ') && /\d/.test(rawUnit)) {
+          // This is a compound unit like "14.5 oz can"
+          unit = normalizeUnit(rawUnit);
+          if (!unit) {
+            // If normalization failed, preserve the compound unit as-is
+            unit = rawUnit.toLowerCase().replace(/\s+/g, ' ');
+          }
+        } else {
+          // Standard unit normalization
+          unit = normalizeUnit(rawUnit);
+        }
+        
+        finalName = remainingText.substring(unitMatch[0].length).trim();
+        
+        console.log('[ingredientHelpers] 📏 Extracted unit:', {
+          rawUnit,
+          normalizedUnit: unit,
+          remaining: finalName
+        });
+        
+        // Check if this is actually a descriptive word that should stay with the name
+        if (DESCRIPTIVE_WORDS.has(rawUnit.toLowerCase())) {
+          console.log('[ingredientHelpers] 🔄 Unit is descriptive, moving back to name:', rawUnit);
+          finalName = `${rawUnit} ${finalName}`.trim();
+          unit = null;
+          continue; // Try next pattern
+        }
+        
+        break; // Found a valid unit, stop looking
       }
     }
   }
   
-  // What's left is the ingredient name
-  let name = remaining || original;
-  
-  // If we couldn't parse confidently (no amount and no clear unit), 
-  // fall back to using the entire original string as the name
-  if (!amount && !unit) {
-    name = original;
-    amount = null;
-    unit = null;
+  // Step 5: Handle compound units (e.g., "14.5 oz can")
+  if (unit && finalName) {
+    const compoundUnitPattern = /^(can|jar|bag|box|bottle|package|container|tub)\b/i;
+    const compoundMatch = finalName.match(compoundUnitPattern);
+    if (compoundMatch) {
+      const containerType = compoundMatch[1].toLowerCase();
+      const compoundUnit = `${unit} ${containerType}`;
+      
+      // Check if we have a mapping for this compound unit
+      if (UNIT_MAPPINGS[compoundUnit]) {
+        unit = compoundUnit;
+        finalName = finalName.substring(compoundMatch[0].length).trim();
+        console.log('[ingredientHelpers] 📦 Found compound unit:', compoundUnit);
+      }
+    }
   }
   
-  // Clean up the name
-  name = name.trim();
-  
-  // Handle edge cases where descriptive terms got parsed as units
-  if (unit && descriptiveUnits.has(unit) && !name) {
-    name = unit;
-    unit = null;
+  // Step 6: Parse the numeric amount for calculations
+  let parsedAmount: number | null = null;
+  if (amount) {
+    parsedAmount = parseAmountString(amount);
+    console.log('[ingredientHelpers] 🧮 Parsed amount:', { amount, parsedAmount });
   }
   
-  return {
+  // Step 7: Generate display unit
+  const displayUnit = getDisplayUnit(unit, parsedAmount);
+  
+  // Step 8: Final cleanup and validation
+  if (!finalName && !unit && !amount) {
+    finalName = original; // Fallback to original if nothing was parsed
+  }
+  
+  finalName = finalName.trim() || original;
+  
+  const result = {
     amount,
     unit,
-    name,
-    preparation
+    name: finalName,
+    preparation,
+    displayUnit,
+    parsedAmount
   };
+  
+  console.log('[ingredientHelpers] ✅ parseIngredientString result:', result);
+  return result;
 }
+
+// === EXPORT UPDATED FUNCTIONS ===
 
 /**
  * Coerces an array of mixed ingredient types (string or StructuredIngredient objects)
  * into a standardized array of StructuredIngredient objects.
- *
- * - Converts string ingredients to StructuredIngredient format with intelligent parsing of amounts, units, and names
- * - Ensures object ingredients have essential fields (name, amount, unit, suggested_substitutions), defaulting to null if missing
- * - Filters out any null or undefined items from the input array before processing
- * - Returns an empty array if the input is null, undefined, or results in no valid structured ingredients
+ * Now uses enhanced parseIngredientString with better unit handling.
  */
 export const coerceToStructuredIngredients = (
   ingredients: (StructuredIngredient | string | null | undefined)[] | null | undefined
 ): StructuredIngredient[] => {
+  console.log('[ingredientHelpers] 🔄 coerceToStructuredIngredients called with:', ingredients?.length, 'items');
+  
   if (!ingredients || !Array.isArray(ingredients)) {
+    console.log('[ingredientHelpers] ⚠️ Invalid ingredients input, returning empty array');
     return [];
   }
 
@@ -225,12 +427,12 @@ export const coerceToStructuredIngredients = (
 
   for (const ing of ingredients) {
     if (ing === null || ing === undefined) {
-      continue; // Skip null or undefined entries in the array
+      continue; // Skip null or undefined entries
     }
 
     if (typeof ing === 'string') {
       if (ing.trim()) { // Ensure string is not empty or just whitespace
-        // Parse the ingredient string to extract components
+        console.log('[ingredientHelpers] 📝 Processing string ingredient:', ing);
         const parsed = parseIngredientString(ing.trim());
         
         processedIngredients.push({
@@ -241,22 +443,23 @@ export const coerceToStructuredIngredients = (
           preparation: parsed.preparation,
         });
       }
-    } else if (typeof ing === 'object' && ing.name) { // Basic check for an object that could be an ingredient
+    } else if (typeof ing === 'object' && ing.name) { 
+      console.log('[ingredientHelpers] 📦 Processing object ingredient:', ing.name);
       processedIngredients.push({
         name: ing.name,
         amount: ing.amount !== undefined ? ing.amount : null,
         unit: ing.unit !== undefined ? ing.unit : null,
         suggested_substitutions: Array.isArray(ing.suggested_substitutions) 
             ? ing.suggested_substitutions 
-            : null, // Ensure it's an array or null
+            : null, 
         preparation: ing.preparation !== undefined ? ing.preparation : null,
       });
     } else {
-      // Log or handle cases where an object is not a valid ingredient structure if necessary
-      console.warn('Skipping invalid ingredient item:', ing);
+      console.warn('[ingredientHelpers] ⚠️ Skipping invalid ingredient item:', ing);
     }
   }
 
+  console.log('[ingredientHelpers] ✅ coerceToStructuredIngredients processed:', processedIngredients.length, 'items');
   return processedIngredients;
 };
 
@@ -454,132 +657,5 @@ export function parseIngredientDisplayName(name: string): {
   };
 }
 
-/**
- * Parses a raw ingredient name to extract the canonical ingredient name
- * Handles disjunctive phrases, unit separation, and common patterns
- */
-function parseCanonicalIngredientName(name: string): string {
-  let workingName = name.toLowerCase().trim();
-  
-  // Handle disjunctive phrases: "tamari or soy sauce" -> prefer first option
-  // Common patterns: "A or B", "A/B", "A, or B"
-  const disjunctivePatterns = [
-    /^([^,\/]+?)\s+or\s+.+$/i,           // "tamari or soy sauce"
-    /^([^,\/]+?)\s*\/\s*.+$/i,           // "tamari/soy sauce"
-    /^([^,\/]+?),\s*or\s+.+$/i,          // "tamari, or soy sauce"
-  ];
-  
-  for (const pattern of disjunctivePatterns) {
-    const match = workingName.match(pattern);
-    if (match) {
-      workingName = match[1].trim();
-      break;
-    }
-  }
-  
-  // Handle complex ingredient lists with slashes: "fresh chopped herbs scallions/cilantro"
-  // Extract the main ingredient type before the slash
-  const complexSlashPattern = /^(.*?)\s+([^\/\s]+)\/([^\/\s]+)$/i;
-  const complexMatch = workingName.match(complexSlashPattern);
-  if (complexMatch) {
-    const baseDescription = complexMatch[1].trim(); // "fresh chopped herbs"
-    const option1 = complexMatch[2].trim(); // "scallions"
-    const option2 = complexMatch[3].trim(); // "cilantro"
-    
-    // For herbs, prefer the base description without the specific options
-    if (baseDescription.includes('herb')) {
-      workingName = baseDescription;
-    } else {
-      // Otherwise, prefer the first option
-      workingName = option1;
-    }
-  }
-  
-  // Handle unit-name confusion patterns
-  // "9 cloves garlic" -> "garlic" (unit should be parsed elsewhere)
-  // "garlic cloves" -> "garlic"
-  // "chicken breasts" -> "chicken" (but keep "chicken breasts" as it's more specific)
-  
-  // Common unit words that should be removed from ingredient names
-  const unitWords = [
-    'cloves?', 'clove', 'pieces?', 'piece', 'slices?', 'slice',
-    'strips?', 'strip', 'stalks?', 'stalk', 'sprigs?', 'sprig',
-    'bunches?', 'bunch', 'heads?', 'head', 'ears?', 'ear'
-  ];
-  
-  // Remove unit words when they appear at the end
-  // "garlic cloves" -> "garlic", but keep "chicken breasts" as "chicken breasts"
-  const unitPattern = new RegExp(`\\s+(${unitWords.join('|')})$`, 'i');
-  const unitMatch = workingName.match(unitPattern);
-  if (unitMatch) {
-    // Special cases where we want to keep the unit as part of the name
-    const keepUnitCases = [
-      'chicken breast', 'chicken thigh', 'pork chop', 'beef roast',
-      'lamb chop', 'fish fillet', 'turkey breast'
-    ];
-    
-    const potentialName = workingName.replace(unitPattern, '').trim();
-    const fullName = workingName;
-    
-    // Check if this is a case where we should keep the unit
-    const shouldKeepUnit = keepUnitCases.some(keepCase => 
-      fullName.includes(keepCase) || potentialName.length < 3
-    );
-    
-    if (!shouldKeepUnit) {
-      workingName = potentialName;
-    }
-  }
-  
-  // Remove common preparation words that don't affect aggregation
-  const preparationWords = [
-    'fresh', 'frozen', 'dried', 'canned', 'bottled',
-    'chopped', 'diced', 'minced', 'sliced', 'grated',
-    'whole', 'ground', 'crushed', 'organic', 'raw'
-  ];
-  
-  // Only remove preparation words if they're at the beginning
-  const prepPattern = new RegExp(`^(${preparationWords.join('|')})\\s+`, 'i');
-  workingName = workingName.replace(prepPattern, '');
-  
-  // Handle specific common cases for better canonicalization
-  const canonicalMappings: { [key: string]: string } = {
-    // Garlic variations
-    'garlic clove': 'garlic',
-    'clove garlic': 'garlic',
-    'cloves garlic': 'garlic',
-    'garlic cloves': 'garlic',
-    
-    // Onion variations  
-    'onion': 'onion',
-    'onions': 'onion',
-    'yellow onion': 'onion',
-    'white onion': 'onion',
-    
-    // Common ingredient standardizations
-    'scallion': 'green onion',
-    'scallions': 'green onion',
-    'spring onion': 'green onion',
-    'spring onions': 'green onion',
-    
-    // Herb standardizations
-    'cilantro': 'cilantro',
-    'fresh cilantro': 'cilantro',
-    'coriander leaves': 'cilantro',
-  };
-  
-  // Apply canonical mappings
-  if (canonicalMappings[workingName]) {
-    workingName = canonicalMappings[workingName];
-  }
-  
-  // Final cleanup
-  workingName = workingName.trim();
-  
-  // Ensure we don't return an empty string
-  if (!workingName) {
-    return name.trim(); // Fallback to original
-  }
-  
-  return workingName;
-}
+// Removed parseCanonicalIngredientName function - functionality moved to 
+// normalizeName in groceryHelpers.ts for better consistency

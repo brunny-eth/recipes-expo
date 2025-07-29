@@ -513,7 +513,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     alignItems: 'center',
-    marginTop: SPACING.xxs,
+    marginTop: -SPACING.md,
   },
   headerContainer: {
     alignItems: 'center',
@@ -521,7 +521,7 @@ const styles = StyleSheet.create({
     maxWidth: 365,
     alignSelf: 'center',
     paddingHorizontal: SPACING.md,
-    marginTop: -SPACING.lg,
+    marginTop: -SPACING.xl,
   },
   keyboardAvoidingView: {
     flex: 1,
