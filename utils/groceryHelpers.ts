@@ -185,7 +185,8 @@ const PLURAL_EXCEPTIONS = new Set([
   'blueberries', 'strawberries', 'raspberries', 'blackberries', 'cranberries',
   'eggs', 'nuts', 'almonds', 'walnuts', 'pecans', 'cashews', 'peanuts',
   'tomatoes', 'potatoes', 'avocados', 'mangoes', 'onions', 'shallots',
-  'cloves', 'spices', 'herbs', 'greens', 'sprouts', 'leftovers'
+  'cloves', 'spices', 'herbs', 'greens', 'sprouts', 'leftovers',
+  'chives', 'olives'
 ]);
 
 /**

@@ -65,11 +65,7 @@ const LoginScreen = () => {
       const success = await signIn(provider); // Get the boolean result
       if (success) {
         console.log(`[LoginScreen] Sign-in successful with ${provider}.`);
-        showSuccess(
-          'Sign-in Successful!',
-          `You have successfully signed in with ${provider}. Redirecting to the main app...`,
-          2000 // Show for 2 seconds before navigation
-        );
+        // Success message will be shown by AuthNavigationHandler
       } else {
         console.log(`[LoginScreen] Sign-in flow cancelled or failed for ${provider}.`);
         // No specific action needed here as AuthContext's error modal already showed
@@ -98,7 +94,7 @@ const LoginScreen = () => {
         </View>
         <View style={styles.authSection}>
           <Text style={styles.subtitle}>
-            Create an account with Google or Apple Login to use, save, and find new recipes.
+            Create an account or login to your account to use Meez.
           </Text>
 
           <TouchableOpacity

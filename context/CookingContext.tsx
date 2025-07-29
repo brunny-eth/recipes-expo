@@ -50,9 +50,7 @@ const initialState: CookingState = {
   sessionStartTime: undefined,
 };
 
-console.error('[CookingContext] 🌟 Initial state - activeRecipes length:', initialState.activeRecipes?.length || 'N/A');
-console.error('[CookingContext] 🌟 Initial state - activeRecipeId:', initialState.activeRecipeId);
-console.error('[CookingContext] 🌟 Initial state - sessionStartTime:', initialState.sessionStartTime);
+
 
 // Context
 const CookingContext = createContext<CookingContextType | null>(null);
@@ -64,70 +62,29 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
   const [activeRecipeId, setActiveRecipeId] = useState<string | null>(initialState.activeRecipeId);
   const [sessionStartTime, setSessionStartTime] = useState<number | undefined>(initialState.sessionStartTime);
 
-  console.error('[CookingContext] ✅ useState hooks initialized successfully.');
 
-  // State monitoring effect with timestamps to track when state changes
-  useEffect(() => {
-    const timestamp = new Date().toISOString();
-    console.error(`[CookingContext] 📊 STATE CHANGE at ${timestamp}: activeRecipes: ${activeRecipes?.length}, activeRecipeId: ${activeRecipeId}, sessionStartTime: ${sessionStartTime}`);
-    
-    // Log what might have triggered this state change
-    if (activeRecipes?.length > 0) {
-      console.error('[CookingContext] 📊 Active recipes detected:', activeRecipes.map(r => ({ id: r.recipeId, hasRecipe: !!r.recipe })));
-    }
-  }, [activeRecipes, activeRecipeId, sessionStartTime]);
   
   const { session } = useAuth();
 
   // Load state from storage on mount with recovery logic
   useEffect(() => {
     const loadState = async () => {
-      const loadTimestamp = new Date().toISOString();
-      console.error(`[CookingContext] 🔄 ASYNCSTORAGE LOAD START at ${loadTimestamp}`);
-      
       try {
         const savedState = await AsyncStorage.getItem('meez.cookingSession');
         
         if (!savedState) {
-          console.error('[CookingContext] ❌ No saved cooking state found');
           return;
         }
         
-        console.error('[CookingContext] 📦 Found saved state, length:', savedState.length, 'characters');
         const parsedState = JSON.parse(savedState);
-        
-        console.error('[CookingContext] 📊 Parsed saved state:', {
-          activeRecipesCount: parsedState.activeRecipes?.length || 0,
-          activeRecipeId: parsedState.activeRecipeId,
-          sessionStartTime: parsedState.sessionStartTime,
-          hasSessionStartTime: !!parsedState.sessionStartTime,
-        });
         
         // Check if session is recent (within 24 hours)
         const now = Date.now();
         const sessionAge = now - (parsedState.sessionStartTime || 0);
         const maxAge = 24 * 60 * 60 * 1000; // 24 hours
         
-        console.error('[CookingContext] ⏰ Session age check:', {
-          sessionStartTime: parsedState.sessionStartTime,
-          now,
-          sessionAge,
-          sessionAgeHours: Math.round(sessionAge / (60 * 60 * 1000) * 10) / 10,
-          maxAgeHours: 24,
-          isWithinLimit: sessionAge < maxAge,
-          hasActiveRecipes: parsedState.activeRecipes?.length > 0,
-        });
-        
         if (sessionAge < maxAge && parsedState.activeRecipes?.length > 0) {
           // Valid session found - can be resumed
-          const restoreTimestamp = new Date().toISOString();
-          console.error(`[CookingContext] ✅ RESTORING SESSION from AsyncStorage at ${restoreTimestamp}`);
-          console.error('[CookingContext] ✅ Restoring data:', {
-            activeRecipesCount: parsedState.activeRecipes?.length,
-            activeRecipeId: parsedState.activeRecipeId,
-            sessionStartTime: parsedState.sessionStartTime,
-            sessionAgeHours: Math.round(sessionAge / (60 * 60 * 1000) * 10) / 10
-          });
           
           // Use safe comparison to prevent unnecessary re-renders if state is identical
           const needsActiveRecipesRestore = activeRecipes.length !== parsedState.activeRecipes?.length ||
@@ -146,14 +103,11 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
           }
         } else {
           // Session too old or empty, clear it
-          console.error('[CookingContext] 🗑️ Session too old or empty, clearing stored state');
           await AsyncStorage.removeItem('meez.cookingSession');
         }
       } catch (error) {
         console.error('[CookingContext] 💥 Error loading cooking state:', error);
-        console.error('[CookingContext] 💥 Error stack:', error instanceof Error ? error.stack : 'No stack trace');
         // Clear corrupted state
-        console.error('[CookingContext] 🗑️ Clearing corrupted state');
         await AsyncStorage.removeItem('meez.cookingSession');
       }
     };
@@ -163,8 +117,6 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
   // Save state to storage on changes
   useEffect(() => {
     const saveState = async () => {
-      console.error(`[CookingContext] 💾 Saving state: ${activeRecipes.length} recipes, activeId: ${activeRecipeId}`);
-      
       try {
         // Only save if there are active recipes
         if (activeRecipes.length > 0) {
@@ -173,17 +125,13 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
             activeRecipeId, 
             sessionStartTime
           });
-          console.error('[CookingContext] 📤 Saving state to AsyncStorage, size:', stateToSave.length, 'characters');
           await AsyncStorage.setItem('meez.cookingSession', stateToSave);
-          console.error('[CookingContext] ✅ State saved successfully');
         } else {
           // Clear storage if no active recipes
-          console.error('[CookingContext] 🗑️ No active recipes, clearing stored state');
           await AsyncStorage.removeItem('meez.cookingSession');
         }
       } catch (error) {
         console.error('[CookingContext] 💥 Error saving cooking state:', error);
-        console.error('[CookingContext] 💥 Error stack:', error instanceof Error ? error.stack : 'No stack trace');
       }
     };
     saveState();
@@ -192,10 +140,8 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
   // --- initializeSessions function refactored to use useState setters directly ---
   const initializeSessions = useCallback(
     (miseRecipes: any[], initialActiveRecipeId?: string) => { // Added optional initialActiveRecipeId
-      console.error('[CookingContext] 🚀 initializeSessions called (useState version). Recipes Count:', miseRecipes.length, 'Initial Active ID:', initialActiveRecipeId);
 
       if (!miseRecipes || !Array.isArray(miseRecipes) || miseRecipes.length === 0) {
-        console.error('[CookingContext] ⚠️ initializeSessions called with empty or invalid recipes array.');
         // Only update if state is not already empty
         if (activeRecipes.length > 0 || activeRecipeId !== null || sessionStartTime !== undefined) {
           setActiveRecipes([]);
@@ -219,7 +165,6 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
                              miseRecipe.original_recipe_data;
             
             if (!recipeData) {
-              console.error('[CookingContext] ❌ No recipe data found for mise recipe:', miseRecipe.id);
               return null;
             }
 
@@ -231,31 +176,19 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
               miseRecipeId: miseRecipe.id, // Keep mise recipe ID for reference
             };
 
-            console.error('[CookingContext] 📋 Processed mise recipe:', {
-              miseRecipeId: miseRecipe.id,
-              recipeId: recipe.id,
-              title: recipe.title,
-              hasInstructions: !!recipe.instructions,
-              instructionsCount: recipe.instructions?.length || 0,
-              hasIngredientGroups: !!recipe.ingredientGroups,
-              ingredientGroupsCount: recipe.ingredientGroups?.length || 0,
-              totalIngredients: recipe.ingredientGroups?.reduce((total: number, group: any) => 
-                total + (group.ingredients?.length || 0), 0) || 0,
-            });
+
 
             return recipe;
           } catch (error) {
-            console.error('[CookingContext] 💥 Error processing mise recipe:', miseRecipe.id, error);
             return null;
           }
         }).filter(Boolean) as CombinedParsedRecipe[];
 
-        console.error('[CookingContext] 📊 Processed recipes count:', recipes.length);
+
 
         const newActiveRecipes: RecipeSession[] = recipes.map(recipe => {
           // Add validation for recipe properties if needed
           if (!recipe || !recipe.id) {
-            console.error('[CookingContext] ❌ Invalid recipe object found during mapping:', recipe);
             return null as any;
           }
           // Preserve existing scroll position if recipe already exists in activeRecipes
@@ -274,7 +207,6 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
         let targetActiveRecipeId = initialActiveRecipeId || (newActiveRecipes.length > 0 ? String(newActiveRecipes[0].recipeId) : null);
         // Ensure the targetActiveRecipeId actually exists in the newActiveRecipes list
         if (targetActiveRecipeId && !newActiveRecipes.some(r => r.recipeId === targetActiveRecipeId)) {
-          console.warn(`[CookingContext] ⚠️ Initial active recipe ID "${targetActiveRecipeId}" not found in new recipes. Defaulting to first recipe.`);
           targetActiveRecipeId = newActiveRecipes.length > 0 ? String(newActiveRecipes[0].recipeId) : null;
         }
 
@@ -287,34 +219,20 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
           
         if (needsActiveRecipesUpdate) {
           setActiveRecipes(newActiveRecipes);
-          console.error('[CookingContext] ✅ activeRecipes updated.');
-        } else {
-          console.error('[CookingContext] ℹ️ activeRecipes are identical, skipping update.');
         }
         
         if (activeRecipeId !== targetActiveRecipeId) {
           setActiveRecipeId(targetActiveRecipeId);
-          console.error('[CookingContext] ✅ activeRecipeId updated.');
-        } else {
-          console.error('[CookingContext] ℹ️ activeRecipeId is identical, skipping update.');
         }
 
         // Always set session start time on initialization
         const newSessionStartTime = Date.now();
         if (sessionStartTime !== newSessionStartTime) {
           setSessionStartTime(newSessionStartTime);
-          console.error('[CookingContext] ✅ sessionStartTime updated.');
-        } else {
-          console.error('[CookingContext] ℹ️ sessionStartTime is identical, skipping update.');
         }
 
-        console.error('[CookingContext] ✅ State update checks completed via useState setters.');
-        console.error(`[CookingContext] ✅ Final activeRecipes count: ${newActiveRecipes.length}`);
-        console.error(`[CookingContext] ✅ Final activeRecipeId: ${targetActiveRecipeId}`);
-
       } catch (e: any) {
-        console.error('[CookingContext] 💥 CRITICAL ERROR in initializeSessions (useState refactor):', e);
-        console.error('[CookingContext] 💥 Error stack:', e.stack);
+        console.error('[CookingContext] 💥 CRITICAL ERROR in initializeSessions:', e);
         // Reset state on error
         setActiveRecipes([]);
         setActiveRecipeId(null);
@@ -326,8 +244,6 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
 
   // All other functions refactored to use useState setters
   const endSession = useCallback((recipeId: string) => {
-    console.error('[CookingContext] 🛑 Ending session for recipe:', recipeId);
-    
     setActiveRecipes(prevRecipes => {
       const updatedRecipes = prevRecipes.filter(recipe => recipe.recipeId !== recipeId);
       
@@ -339,79 +255,48 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
         setActiveRecipeId(updatedRecipes[0].recipeId);
       }
       
-      console.error('[CookingContext] ✅ Session ended:', {
-        endedRecipeId: recipeId,
-        remainingRecipesCount: updatedRecipes.length,
-      });
-      
       return updatedRecipes;
     });
   }, [activeRecipeId]); // Dependency on activeRecipeId to ensure correct switch logic
 
   const endAllSessions = useCallback(() => {
-    console.error('[CookingContext] 🛑 Ending all cooking sessions');
-    console.error('[CookingContext] 📊 Current sessions to end:', {
-      activeRecipesCount: activeRecipes.length,
-      activeRecipeId: activeRecipeId,
-    });
-
     if (!activeRecipes || activeRecipes.length === 0) {
-      console.error('[CookingContext] ⚠️ No active recipes to end');
       return;
     }
-
-    activeRecipes.forEach(recipe => {
-      console.error('[CookingContext] 🛑 Ending session for recipe:', recipe.recipeId);
-    });
 
     setActiveRecipes([]);
     setActiveRecipeId(null);
     setSessionStartTime(undefined);
 
-    console.error('[CookingContext] 🗑️ Clearing cooking session from AsyncStorage');
-    AsyncStorage.removeItem('meez.cookingSession').then(() => {
-      console.error('[CookingContext] ✅ AsyncStorage cleared successfully');
-    }).catch(error => {
+    AsyncStorage.removeItem('meez.cookingSession').catch(error => {
       console.error('[CookingContext] 💥 Error clearing AsyncStorage:', error);
     });
   }, [activeRecipes, activeRecipeId]); // Dependencies to ensure accurate logging before state clear
 
   const switchRecipe = useCallback((recipeId: string) => {
-    console.error('[CookingContext] 🔄 Switching to recipe:', recipeId);
-    
     // DEFENSIVE: Check if activeRecipes is valid before calling .some()
     if (!activeRecipes || !Array.isArray(activeRecipes)) {
-      console.error('[CookingContext] 🛑 CRITICAL: activeRecipes is not a valid array:', typeof activeRecipes, activeRecipes);
       return;
     }
     
     // DEFENSIVE: Check if setActiveRecipeId is still a function
     if (typeof setActiveRecipeId !== 'function') {
-      console.error('[CookingContext] 🛑 CRITICAL: setActiveRecipeId is not a function:', typeof setActiveRecipeId);
       return;
     }
     
     // Safe to call .some() now
     const recipeExists = activeRecipes.some(r => r && r.recipeId === recipeId);
     if (!recipeExists) {
-      console.error('[CookingContext] ⚠️ Cannot switch to recipe - not found in active recipes:', recipeId);
-      console.error('[CookingContext] 🔍 Available recipes:', activeRecipes.map(r => r?.recipeId));
       return;
     }
     
     // Only update if the activeRecipeId is actually changing
     if (activeRecipeId !== recipeId) {
-      console.error('[CookingContext] 🧪 About to call setActiveRecipeId with:', recipeId);
       setActiveRecipeId(recipeId);
-      console.error('[CookingContext] ✅ Switched to recipe:', recipeId);
-    } else {
-      console.error('[CookingContext] ℹ️ Already on target recipe, skipping switch.');
     }
   }, [activeRecipes, activeRecipeId, setActiveRecipeId]); // Added setActiveRecipeId to dependencies
 
   const completeStep = useCallback((recipeId: string, stepId: string) => {
-    console.error('[CookingContext] ✅ Completing step:', { recipeId, stepId });
-    
     setActiveRecipes(prevRecipes =>
       prevRecipes.map(recipe =>
         recipe.recipeId === recipeId
@@ -427,8 +312,6 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const uncompleteStep = useCallback((recipeId: string, stepId: string) => {
-    console.error('[CookingContext] ❌ Uncompleting step:', { recipeId, stepId });
-    
     setActiveRecipes(prevRecipes =>
       prevRecipes.map(recipe =>
         recipe.recipeId === recipeId
@@ -442,8 +325,6 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const startTimer = useCallback((recipeId: string, stepId: string, duration: number) => {
-    console.error(`[CookingContext] ⏰ Starting timer for recipe ${recipeId}, step ${stepId}, duration ${duration}`);
-    
     setActiveRecipes(prevRecipes =>
       prevRecipes.map(recipe =>
         recipe.recipeId === recipeId
@@ -465,8 +346,6 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const pauseTimer = useCallback((recipeId: string, stepId: string) => {
-    console.error(`[CookingContext] ⏸️ Pausing timer for recipe ${recipeId}, step ${stepId}`);
-    
     setActiveRecipes(prevRecipes =>
       prevRecipes.map(recipe =>
         recipe.recipeId === recipeId
@@ -484,8 +363,6 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const resumeTimer = useCallback((recipeId: string, stepId: string) => {
-    console.error(`[CookingContext] ▶️ Resuming timer for recipe ${recipeId}, step ${stepId}`);
-    
     setActiveRecipes(prevRecipes =>
       prevRecipes.map(recipe =>
         recipe.recipeId === recipeId
@@ -503,8 +380,6 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const endTimer = useCallback((recipeId: string, stepId: string) => {
-    console.error(`[CookingContext] 🛑 Ending timer for recipe ${recipeId}, step ${stepId}`);
-    
     setActiveRecipes(prevRecipes =>
       prevRecipes.map(recipe =>
         recipe.recipeId === recipeId
@@ -542,7 +417,6 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
 
     // Check if session is not too old (24 hour expiration)
     if (!sessionStartTime) {
-      console.warn('[CookingContext] No sessionStartTime found - session not resumable');
       return false;
     }
 
@@ -551,33 +425,19 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
     const maxAge = 24 * 60 * 60 * 1000; // 24 hours
     
     if (sessionAge > maxAge) {
-      console.log('[CookingContext] Session expired (age:', Math.round(sessionAge / (60 * 60 * 1000)), 'hours) - not resumable');
       return false;
     }
 
-    console.log('[CookingContext] Session is resumable (age:', Math.round(sessionAge / (60 * 60 * 1000)), 'hours)');
     return true;
   }, [activeRecipes, sessionStartTime]);
 
   const invalidateSession = useCallback(() => {
-    const timestamp = new Date().toISOString();
-    console.log(`[CookingContext] 🗑️ INVALIDATING SESSION at ${timestamp}`);
-    console.log('[CookingContext] 🗑️ Before invalidation:', { 
-      activeRecipesCount: activeRecipes.length, 
-      activeRecipeId, 
-      sessionStartTime 
-    });
-    
     setActiveRecipes([]);
     setActiveRecipeId(null);
     setSessionStartTime(undefined);
     
-    console.log('[CookingContext] 🗑️ After invalidation state set - should be empty');
-    
     // Also clear AsyncStorage
-    AsyncStorage.removeItem('meez.cookingSession').then(() => {
-      console.log('[CookingContext] 🗑️ AsyncStorage cleared successfully');
-    }).catch(error => {
+    AsyncStorage.removeItem('meez.cookingSession').catch(error => {
       console.warn('[CookingContext] Warning: Failed to clear AsyncStorage during invalidation:', error);
     });
   }, [activeRecipes, activeRecipeId, sessionStartTime]);
@@ -627,9 +487,7 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
     ]
   );
 
-  useEffect(() => {
-    console.error('[CookingContext] ✅ CookingProvider has rendered/re-rendered. State:', state);
-  }, [state]);
+
 
   return (
     <CookingContext.Provider value={contextValue}>

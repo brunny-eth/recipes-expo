@@ -92,8 +92,7 @@ export default function AccountScreen() {
     
     try {
       await signOut();
-      // The success feedback will show briefly before navigation
-      showSuccess('Signed Out', 'You have been signed out successfully.');
+      // Success message will be shown by AuthNavigationHandler
     } catch (error) {
       console.error('[AccountScreen] Sign out error:', error);
       showError('Sign Out Error', 'Failed to sign out. Please try again.');

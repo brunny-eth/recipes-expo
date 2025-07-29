@@ -88,7 +88,7 @@ const SuccessModal: React.FC<SuccessModalProps> = ({
           <MaterialCommunityIcons 
             name="check-circle" 
             size={48} 
-            color={COLORS.success} 
+            color={COLORS.primary} 
           />
         </View>
         <Text style={styles.title}>{title}</Text>
@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   } as TextStyle,
   button: {
-    backgroundColor: COLORS.success,
+    backgroundColor: COLORS.primary,
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.xl,
     borderRadius: RADIUS.md,

@@ -28,17 +28,16 @@ export function AuthNavigationHandler() {
             'You have successfully signed in. Start exploring recipes!',
             4000 // Show for 4 seconds
           );
-          router.replace('/tabs');
+          // Delay navigation to allow modal to show
+          setTimeout(() => {
+            router.replace('/tabs');
+          }, 500);
           break;
         
         case 'SIGNED_OUT':
-          logger.info('Navigating to login after sign out');
-          showSuccess(
-            'Signed Out',
-            'You have been successfully signed out.',
-            3000 // Show for 3 seconds
-          );
-          router.replace('/login');
+          logger.info('User signed out, auth state change will trigger re-render');
+          // No need to navigate - the auth state change will trigger RootLayoutNav to re-render
+          // and show the LoginScreen component directly
           break;
         
         case 'AUTH_ERROR':
@@ -55,7 +54,7 @@ export function AuthNavigationHandler() {
     });
 
     return unsubscribe;
-  }, [onAuthNavigation, router]);
+  }, [onAuthNavigation, router, showSuccess, showError]);
 
   // This component doesn't render anything
   return null;
