@@ -20,6 +20,7 @@ import AppNavigators from '@/components/AppNavigators';
 import LoginScreen from '@/app/login';
 import { COLORS } from '@/constants/theme';
 import SplashScreenMeez from './SplashScreen';
+import { AuthNavigationHandler } from '@/components/AuthNavigationHandler';
 
 SplashScreen.preventAutoHideAsync();
 console.log('[GLOBAL] SplashScreen.preventAutoHideAsync called.');
@@ -338,6 +339,7 @@ export default function RootLayout() {
         <ErrorModalProvider>
           <AuthProvider>
             <CookingProvider>
+              <AuthNavigationHandler />
               <RootLayoutNav />
             </CookingProvider>
           </AuthProvider>

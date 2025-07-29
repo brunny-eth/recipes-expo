@@ -14,7 +14,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { supabase } from '@/lib/supabaseClient';
 import { useErrorModal } from './ErrorModalContext';
-import { router, useSegments } from 'expo-router';
+import { useSegments } from 'expo-router';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as SecureStore from 'expo-secure-store';
 import { createLogger } from '@/utils/logger';
@@ -29,11 +29,17 @@ interface UserMetadata {
 
 type AuthProvider = 'google' | 'apple';
 
+// Navigation events that auth context can emit
+export type AuthNavigationEvent = 
+  | { type: 'SIGNED_IN'; userId: string }
+  | { type: 'SIGNED_OUT' }
+  | { type: 'AUTH_ERROR'; error: string };
+
 // Helper function to check if user is new
 const isNewUser = async (userId: string): Promise<boolean> => {
   const { data: userData, error } = await supabase.auth.getUser();
   if (error || !userData.user) {
-    console.error('[AuthContext] Error checking if user is new:', error);
+    logger.error('Error checking if user is new', { userId, error: error?.message });
     return false;
   }
   
@@ -51,6 +57,8 @@ interface AuthContextType {
   signIn: (provider: AuthProvider) => Promise<boolean>;
   signOut: () => Promise<void>;
   clearJustLoggedIn: () => void;
+  // Navigation event emitter
+  onAuthNavigation: (callback: (event: AuthNavigationEvent) => void) => () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -62,6 +70,9 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   const [justLoggedIn, setJustLoggedIn] = useState(false);
   const { showError } = useErrorModal();
 
+  // Navigation event listeners
+  const navigationListeners = useRef<Set<(event: AuthNavigationEvent) => void>>(new Set());
+
   // Use refs to access the latest values without causing function re-creation
   const showErrorRef = useRef(showError);
 
@@ -70,12 +81,38 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     showErrorRef.current = showError;
   }, [showError]);
 
+  // Navigation event emitter
+  const emitNavigationEvent = useCallback((event: AuthNavigationEvent) => {
+    logger.info('Emitting auth navigation event', { eventType: event.type, userId: 'userId' in event ? event.userId : undefined });
+    navigationListeners.current.forEach(listener => {
+      try {
+        listener(event);
+      } catch (error) {
+        logger.error('Error in auth navigation listener', { error: error instanceof Error ? error.message : String(error) });
+      }
+    });
+  }, []);
+
+  // Navigation event subscription
+  const onAuthNavigation = useCallback((callback: (event: AuthNavigationEvent) => void) => {
+    navigationListeners.current.add(callback);
+    return () => {
+      navigationListeners.current.delete(callback);
+    };
+  }, []);
+
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (!session && isLoading) {
-        console.warn('[Auth] ⚠️ Session hydration is taking over 3 seconds.');
+        logger.warn('Session hydration is taking over 3 seconds', { 
+          sessionExists: !!session, 
+          isLoading 
+        });
       } else if (!session && !isLoading) {
-        console.warn('[Auth] No session found after initial hydration.');
+        logger.warn('No session found after initial hydration', { 
+          sessionExists: !!session, 
+          isLoading 
+        });
       }
     }, 3000);
     return () => clearTimeout(timeout);
@@ -83,12 +120,9 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
 
   const handleUrl = useCallback(
     async (url: string | null) => {
-      // Add granular logging for useCallback recreation
-      console.log('[AuthContext] handleUrl useCallback recreated. Empty dependencies array - should be stable.');
-      
       if (!url) return;
 
-      console.log('[AuthContext] Handling deep link URL:', url);
+      logger.info('Handling deep link URL', { url });
 
       // Extract tokens from URL fragment and set session explicitly using setSession()
       const urlParts = url.split('#');
@@ -98,7 +132,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       }
 
       if (!fragment) {
-        console.log('[AuthContext][handleUrl] No URL fragment found.');
+        logger.warn('No URL fragment found in deep link', { url });
         return;
       }
 
@@ -107,7 +141,11 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       const refreshToken = params.get('refresh_token');
 
       if (accessToken && refreshToken) {
-        console.log('[AuthContext][handleUrl] Found access and refresh tokens.');
+        logger.info('Tokens found in deep link URL', { 
+          accessTokenPresent: !!accessToken, 
+          refreshTokenPresent: !!refreshToken 
+        });
+        
         try {
           const {
             data: { session: newSession },
@@ -118,19 +156,24 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           });
 
           if (sessionError) {
+            logger.error('Authentication Error: Failed to set session via deeplink', { 
+              error: sessionError.message, 
+              url 
+            });
             showErrorRef.current(
               'Authentication Error',
               `Authentication failed: ${sessionError.message}`,
             );
+            emitNavigationEvent({ type: 'AUTH_ERROR', error: sessionError.message });
           } else if (newSession) {
-            console.log('[AuthContext] Session successfully set via deeplink.');
+            logger.info('Session set via deep link', { userId: newSession.user.id });
             setSession(newSession);
             setJustLoggedIn(true);
             
             // Check if user is new and update metadata accordingly
             const isNew = await isNewUser(newSession.user.id);
             if (isNew) {
-              console.log('[AuthContext] New user detected, updating metadata');
+              logger.info('New user detected, updating metadata', { userId: newSession.user.id });
               const { error: metadataError } = await supabase.auth.updateUser({
                 data: { 
                   first_login_at: new Date().toISOString(),
@@ -139,61 +182,77 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
               });
               
               if (metadataError) {
-                console.error('[AuthContext] Error updating new user metadata:', metadataError);
+                logger.error('Error updating new user metadata', { 
+                  userId: newSession.user.id, 
+                  error: metadataError.message 
+                });
               }
             }
 
-            // Navigate to main app
-            router.replace('/tabs');
+            // Emit navigation event instead of direct navigation
+            emitNavigationEvent({ type: 'SIGNED_IN', userId: newSession.user.id });
           }
         } catch (e: any) {
+          logger.error('Authentication Error: Unexpected error setting session via deeplink', { 
+            error: e.message, 
+            url 
+          });
           showErrorRef.current(
             'Authentication Error',
             `Unexpected error setting session: ${e.message}`,
           );
+          emitNavigationEvent({ type: 'AUTH_ERROR', error: e.message });
         }
       } else {
-        console.log('[AuthContext][handleUrl] No access/refresh tokens found in URL fragment.');
+        logger.warn('No access/refresh tokens found in URL fragment', { url });
       }
     },
-    [], // Empty dependency array - function is now truly stable
+    [emitNavigationEvent], // Add emitNavigationEvent to dependencies
   );
 
   // Effect to set up auth state change listener and deep link listener
   useEffect(() => {
-    console.log('[AuthContext] Setting up auth state change listener and URL listener.');
+    logger.info('Setting up auth state change listener and URL listener');
 
     // Set up auth state change listener
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log(`[AuthContext] Auth event: ${event}`, { sessionExists: !!session });
+        logger.info('Auth Event', { 
+          event, 
+          sessionExists: !!session, 
+          userId: session?.user?.id 
+        });
 
         if (event === 'SIGNED_IN' && session) {
-          console.log('[AuthContext] User signed in');
+          logger.info('User signed in', { userId: session.user.id });
           setSession(session);
           setJustLoggedIn(true);
           setIsLoading(false);
+          // Emit navigation event
+          emitNavigationEvent({ type: 'SIGNED_IN', userId: session.user.id });
         } else if (event === 'SIGNED_OUT') {
-          console.log('[AuthContext] User signed out');
+          logger.info('User signed out', { userId: session?.user?.id || 'unknown' });
           setSession(null);
           setJustLoggedIn(false);
           setIsLoading(false);
+          // Emit navigation event
+          emitNavigationEvent({ type: 'SIGNED_OUT' });
         } else if (event === 'TOKEN_REFRESHED' && session) {
-          console.log('[AuthContext] Token refreshed');
+          logger.info('Session token refreshed', { userId: session.user.id });
           setSession(session);
           setIsLoading(false);
         } else if (event === 'INITIAL_SESSION') {
-          console.log('[AuthContext] Initial session event');
+          logger.info('Initial session check', { 
+            sessionFound: !!session, 
+            userId: session?.user?.id 
+          });
           if (session) {
-            console.log('[AuthContext] Initial session found, setting session');
             setSession(session);
           } else {
-            console.log('[AuthContext] No initial session found');
             setSession(null);
           }
           setIsLoading(false);
         } else {
-          console.log('[AuthContext] Other auth event, setting loading to false');
           setIsLoading(false);
         }
       },
@@ -207,28 +266,21 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     // Check for initial URL when app starts
     Linking.getInitialURL().then((url) => {
       if (url) {
-        console.log('[AuthContext] Initial URL detected:', url);
+        logger.info('Initial URL detected', { url });
         handleUrl(url);
       }
     });
 
     // Cleanup function
     return () => {
-      console.log('[AuthContext] Cleaning up auth state listener and URL listener.');
+      logger.info('Cleaning up auth state listener and URL listener');
       authListener?.subscription?.unsubscribe();
       urlSubscription?.remove();
     };
-  }, [handleUrl]);
+  }, [handleUrl, emitNavigationEvent]); // Add emitNavigationEvent to dependencies
 
   const signIn = useCallback(async (provider: AuthProvider): Promise<boolean> => {
-    // Add granular logging for useCallback recreation
-    console.log('[AuthContext] signIn useCallback recreated. Current dependencies:', {
-      handleUrlDep: handleUrl,
-    });
-    
-    logger.info('User sign-in attempt started', { provider });
-    console.log(`[Auth] Attempting to sign in with ${provider}...`);
-    console.log('[Auth] State update: setIsLoading(true)');
+    logger.info('Sign-in process started', { provider });
     setIsLoading(true);
 
     try { // Wrap the entire logic in a try-finally
@@ -237,11 +289,13 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         try {
           const isAvailable = await AppleAuthentication.isAvailableAsync();
           if (!isAvailable) {
-            logger.error('Apple authentication is not available on this device', { provider, error: 'Apple authentication not available' });
+            logger.error('Apple Sign-In Error: Authentication not available', { 
+              error: 'Apple authentication not available on this device' 
+            });
             throw new Error('Apple authentication is not available on this device');
           }
 
-          console.log('[Apple] Starting Apple Sign In process...');
+          logger.info('Apple Sign In process started', { provider });
           
           const credential = await AppleAuthentication.signInAsync({
             requestedScopes: [
@@ -252,20 +306,18 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
 
           const { identityToken, email, fullName } = credential;
           if (!identityToken) {
-            logger.error('No identity token returned from Apple', { provider, error: 'No identity token returned' });
+            logger.error('Apple Sign-In Error: No identity token returned', { 
+              error: 'No identity token returned from Apple' 
+            });
             throw new Error('No identity token returned from Apple');
           }
 
-          console.log('[Apple] Identity token received, signing in with Supabase...');
-          // Log the identityToken to inspect its 'aud' claim later if needed (copy-paste to jwt.io)
-          console.log('[Apple] Identity Token:', identityToken);
+          logger.info('Apple identity token received, signing in with Supabase', { provider });
 
           // *** THIS IS THE CRITICAL CHANGE ***
           // For native Apple Sign In, the clientId for Supabase's verification
           // should typically be your app's Bundle ID, not the Service ID (which is more for web flows).
           const supabaseClientId = 'com.meez.recipes';
-
-          console.log('[Apple] Supabase signInWithIdToken clientId:', supabaseClientId);
 
           const { data, error } = await supabase.auth.signInWithIdToken({
             provider: 'apple',
@@ -275,7 +327,9 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           });
 
           if (error) {
-            logger.error('Supabase sign-in failed', { provider, error: error.message });
+            logger.error('Apple Sign-In Error: Supabase signInWithIdToken failed', { 
+              error: error.message 
+            });
             throw error;
           }
 
@@ -291,19 +345,18 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
             if (fullNameStr) metadataUpdate.full_name = fullNameStr;
 
             if (Object.keys(metadataUpdate).length > 0) {
-              console.log(
-                '[Apple] Updating user metadata with Apple-provided values:',
-                metadataUpdate,
-              );
+              logger.info('Updating user metadata with Apple-provided values', { 
+                userId: data.user.id,
+                metadataKeys: Object.keys(metadataUpdate)
+              });
               const { error: metadataError } = await supabase.auth.updateUser({
                 data: metadataUpdate,
               });
               if (metadataError) {
-                logger.error('Failed to update user metadata', { provider, error: metadataError.message });
-                console.error(
-                  '[Apple] Failed to update user metadata:',
-                  metadataError,
-                );
+                logger.error('Apple Sign-In Error: Failed to update user metadata', { 
+                  userId: data.user.id,
+                  error: metadataError.message 
+                });
               }
             }
           }
@@ -317,7 +370,6 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           return true; // Indicate success for Apple
         } catch (err: any) {
           logger.error('Apple sign-in failed', { provider, error: err.message });
-          console.error('[Apple] Native Sign-In Error:', err.message);
           showErrorRef.current(
             'Sign In Error',
             err.message || 'An unknown error occurred during Apple sign-in.',
@@ -330,15 +382,12 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         if (!redirectTo) {
           const errorMsg =
             'Missing EXPO_PUBLIC_AUTH_URL environment variable. Cannot proceed with authentication.';
-          logger.error('Configuration error: Missing auth URL', { provider, error: errorMsg });
-          console.error(`[Auth] ${errorMsg}`);
+          logger.error('Configuration Error: Missing EXPO_PUBLIC_AUTH_URL', { error: errorMsg });
           showErrorRef.current('Configuration Error', errorMsg);
           return false; // Indicate failure
         }
 
-        console.log(
-          `[Auth] Attempting Google sign-in. Redirect URL: ${redirectTo}`,
-        );
+        logger.info('Web browser session opened', { provider, redirectTo });
 
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider,
@@ -356,18 +405,21 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
             redirectTo,
           );
           if (result.type === 'success' && result.url) {
-            console.log('[Auth] WebBrowser.openAuthSessionAsync: Success.');
+            logger.info('Web browser session success', { provider, url: result.url });
             await handleUrl(result.url);
             return true; // Indicate that browser flow completed successfully
           } else if (result.type === 'cancel') {
-            console.log('[Auth] WebBrowser.openAuthSessionAsync: Cancelled by user.');
+            logger.warn('Web browser session cancelled by user', { provider });
             showErrorRef.current(
               'Sign In Cancelled',
               'You cancelled the sign-in process.',
             );
             return false; // Indicate cancellation
           } else {
-            console.log(`[Auth] WebBrowser.openAuthSessionAsync: Unknown result type: ${result.type}`);
+            logger.error('Web browser session unknown result type', { 
+              provider, 
+              resultType: result.type 
+            });
             showErrorRef.current(
               'Sign In Error',
               `Sign-in was not completed. Reason: ${result.type}`,
@@ -375,6 +427,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
             return false; // Indicate other failure
           }
         } else {
+          logger.error('Sign-in failed: No redirect URL received', { provider });
           showErrorRef.current(
             'Sign In Error',
             'No redirect URL received. Please try again.',
@@ -383,7 +436,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         }
       }
     } catch (err: any) {
-      console.error('[Auth] Sign-In Error caught:', err.message);
+      logger.error('Generic Sign-In Error', { error: err.message, provider });
       showErrorRef.current(
         'Sign In Error',
         err.message || 'An unknown error occurred during sign-in.',
@@ -392,28 +445,23 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     } finally {
       // Always ensure isLoading is set to false when the signIn process finishes,
       // regardless of success, error, or cancellation.
-      console.log('[Auth] State update: setIsLoading(false) in finally block of signIn');
       setIsLoading(false);
     }
   }, [handleUrl, showErrorRef]); // Added showErrorRef to dependencies
 
   const signOut = useCallback(async () => {
-    // Add granular logging for useCallback recreation
-    console.log('[AuthContext] signOut useCallback recreated. Empty dependencies array - should be stable.');
-    
-    console.log('[Auth] Attempting to sign out.');
+    logger.info('Sign-out process initiated', { userId: session?.user?.id });
 
     try {
-      console.log('[Auth] Initiating supabase.auth.signOut() promise.');
       const signOutPromise = supabase.auth.signOut();
-      console.log('[Auth] supabase.auth.signOut() promise initiated.');
 
       const timeoutPromise = new Promise<{ error: Error | null }>((resolve) => {
         const id = setTimeout(() => {
           clearTimeout(id);
-          console.warn(
-            '[Auth] Sign out operation timed out (Timeout Promise resolved).',
-          );
+          logger.warn('Sign out operation timed out', { 
+            userId: session?.user?.id, 
+            timeout: '10s' 
+          });
           resolve({
             error: new Error(
               'Sign out timed out after 10 seconds. Forcing local logout.',
@@ -425,16 +473,13 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       const result = await Promise.race([
         signOutPromise
           .then(() => {
-            console.log(
-              '[Auth] supabase.auth.signOut() promise resolved successfully.',
-            );
             return { error: null };
           })
           .catch((e) => {
-            console.error(
-              '[Auth] supabase.auth.signOut() promise rejected immediately:',
-              e.message,
-            );
+            logger.error('Sign out promise rejected', { 
+              userId: session?.user?.id, 
+              error: e.message 
+            });
             return { error: e };
           }),
         timeoutPromise,
@@ -444,51 +489,37 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         throw result.error;
       }
 
-      console.log('[Auth] User signed out successfully via Supabase call.');
+      logger.info('User signed out successfully via Supabase call', { userId: session?.user?.id });
 
       // ✅ App-level session cleanup
-      console.log('[Auth] State update: setSession(null) - clearing session');
       setSession(null);
-      console.log('[Auth] State update: setIsLoading(false) - setting loading to false');
       setIsLoading(false);
-      router.replace('/login');
+      // Emit navigation event instead of direct navigation
+      emitNavigationEvent({ type: 'SIGNED_OUT' });
     } catch (err: any) {
-      console.error(
-        '[Auth] Sign Out Error: Caught an error or timeout:',
-        err.message,
-      );
+      logger.error('Sign out error or timeout', { 
+        userId: session?.user?.id, 
+        error: err.message 
+      });
       showErrorRef.current(
         'Sign Out Error',
         err.message || 'An unknown error occurred during sign-out.',
       );
 
-      console.log(
-        '[Auth] Forcing local session clear due to sign out error/timeout.',
-      );
-      console.log('[Auth] State update: setSession(null) - forcing session clear');
+      logger.info('Local session cleared due to sign out error/timeout', { userId: session?.user?.id });
       setSession(null);
-      console.log('[Auth] State update: setIsLoading(false) - forcing loading to false');
       setIsLoading(false);
-      router.replace('/login');
+      // Emit navigation event even on error
+      emitNavigationEvent({ type: 'SIGNED_OUT' });
     }
-  }, []); // Empty dependency array - function is now truly stable
+  }, [session?.user?.id, emitNavigationEvent]); // Added emitNavigationEvent to dependencies
 
   const clearJustLoggedIn = useCallback(() => {
-    console.log('[Auth] Clearing justLoggedIn flag');
+    logger.info('Clearing justLoggedIn flag', { userId: session?.user?.id });
     setJustLoggedIn(false);
-  }, []);
+  }, [session?.user?.id]); // Added session?.user?.id to dependencies for proper logging
 
   const value = useMemo(() => {
-    // Strategic logging: Track when useMemo recalculates
-    console.log('[AuthContext] 🔄 useMemo RECALCULATING. Dependencies changed:', {
-      'session?.user?.id': session?.user?.id,
-      'session?.access_token': session?.access_token ? `${session.access_token.substring(0, 10)}...` : null,
-      'session?.refresh_token': session?.refresh_token ? `${session.refresh_token.substring(0, 10)}...` : null,
-      'isLoading': isLoading,
-      'signIn reference': signIn,
-      'signOut reference': signOut,
-    });
-
     const contextValue = {
       session,
       user: session?.user ?? null,
@@ -499,18 +530,11 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       signIn,
       signOut,
       clearJustLoggedIn,
+      onAuthNavigation,
     };
 
-    // Log the final value object reference
-    console.log('[AuthContext] 📦 Provider value object created:', {
-      reference: contextValue,
-      sessionExists: !!contextValue.session,
-      isAuthenticated: contextValue.isAuthenticated,
-      isLoading: contextValue.isLoading,
-    });
-
     return contextValue;
-  }, [session?.user?.id, session?.access_token, session?.refresh_token, isLoading, justLoggedIn, signIn, signOut, clearJustLoggedIn]);
+  }, [session?.user?.id, session?.access_token, session?.refresh_token, isLoading, justLoggedIn, signIn, signOut, clearJustLoggedIn, onAuthNavigation]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
