@@ -430,8 +430,9 @@ export function normalizeName(name: string): string {
 /**
  * A dictionary to normalize common units to the canonical short-form
  * required by the `units.ts` conversion utility.
+ * null values indicate descriptive words that should be moved to the ingredient name
  */
-const unitDictionary: { [key: string]: string } = {
+const unitDictionary: { [key: string]: string | null } = {
   // Teaspoon
   tsp: 'tsp', tsps: 'tsp', teaspoon: 'tsp', teaspoons: 'tsp',
   'Tsp': 'tsp', 'Tsps': 'tsp',
@@ -468,7 +469,11 @@ const unitDictionary: { [key: string]: string } = {
   'container': 'each', 'containers': 'each',
   'pinch': 'each', 'pinches': 'each',
   'dash': 'each', 'dashes': 'each',
-  'each': 'each', 'count': 'each'
+  'each': 'each', 'count': 'each',
+  // Size descriptors - these should be treated as descriptive, not units
+  'small': null, 'medium': null, 'large': null, 'extra large': null,
+  'small-size': null, 'medium-size': null, 'large-size': null,
+  'small pinch': 'each', 'medium pinch': 'each', 'large pinch': 'each'
 };
 
 /**
@@ -892,23 +897,34 @@ export function formatIngredientsForGroceryList(
         // Handle unit - normalize it if it exists, but preserve original for display
         let standardizedUnit: string | null = null;
         let displayUnit: string | null = null;
+        let descriptiveSize: string | null = null;
         
         if (ingredient.unit !== null && ingredient.unit !== undefined && ingredient.unit !== '') {
           const originalUnit = ingredient.unit.toLowerCase().trim();
           standardizedUnit = normalizeUnit(ingredient.unit);
           
+          // Check if this is a descriptive size that should be moved to name
+          if (standardizedUnit === null) {
+            const descriptiveSizes = ['small', 'medium', 'large', 'extra large', 'small-size', 'medium-size', 'large-size'];
+            if (descriptiveSizes.some(size => originalUnit.includes(size.toLowerCase()))) {
+              descriptiveSize = ingredient.unit; // Preserve original capitalization
+              console.log('[groceryHelpers] 📏 Descriptive size detected, will add to name:', descriptiveSize);
+            }
+          }
           // Preserve specific unit types for better display
-          if (originalUnit === 'cloves' || originalUnit === 'clove') {
+          else if (originalUnit === 'cloves' || originalUnit === 'clove') {
             displayUnit = 'cloves';
           } else if (originalUnit === 'pinches' || originalUnit === 'pinch') {
             displayUnit = 'pinch';
           } else if (originalUnit === 'dashes' || originalUnit === 'dash') {
             displayUnit = 'dash';
+          } else if (originalUnit === 'small pinch' || originalUnit === 'medium pinch' || originalUnit === 'large pinch') {
+            displayUnit = originalUnit; // Keep the full descriptive pinch
           } else {
             displayUnit = null; // Use standardized unit for display
           }
           
-          console.log('[groceryHelpers] 📏 Normalized unit:', ingredient.unit, '→', standardizedUnit, '(display:', displayUnit, ')');
+          console.log('[groceryHelpers] 📏 Normalized unit:', ingredient.unit, '→', standardizedUnit, '(display:', displayUnit, ', descriptive:', descriptiveSize, ')');
         }
         
         // If no unit from structured ingredient, try to extract from original text as fallback
@@ -939,17 +955,36 @@ export function formatIngredientsForGroceryList(
           const ingredientName = parsedName.baseName.toLowerCase();
           
           // Check if this is a spice/seasoning that should get a pinch unit
+          // Be more specific to avoid catching vegetable peppers
           const spiceKeywords = [
-            'cumin', 'paprika', 'turmeric', 'cinnamon', 'nutmeg', 'cloves', 'allspice',
+            'cumin', 'paprika', 'turmeric', 'cinnamon', 'nutmeg', 'allspice',
             'cardamom', 'coriander', 'fennel', 'caraway', 'anise', 'saffron',
             'cayenne', 'chili powder', 'curry powder', 'garam masala',
             'oregano', 'thyme', 'rosemary', 'sage', 'basil', 'marjoram',
             'bay leaves', 'dill', 'tarragon', 'herbs',
-            'black pepper', 'white pepper', 'pepper', 'peppercorn',
             'garlic powder', 'onion powder', 'ginger powder'
           ];
           
-          const isSpice = spiceKeywords.some(spice => ingredientName.includes(spice));
+          // Handle pepper separately to avoid catching vegetable peppers
+          const isVegetablePepper = ingredientName.includes('bell') || 
+                                  ingredientName.includes('jalapeño') || 
+                                  ingredientName.includes('serrano') ||
+                                  ingredientName.includes('poblano') ||
+                                  ingredientName.includes('habanero') ||
+                                  ingredientName.includes('anaheim') ||
+                                  ingredientName.includes('chipotle') ||
+                                  ingredientName.includes('fresno');
+          
+          const isPepperSpice = !isVegetablePepper && (
+            ingredientName === 'pepper' || 
+            ingredientName === 'black pepper' || 
+            ingredientName === 'white pepper' ||
+            ingredientName === 'ground pepper' ||
+            ingredientName.includes('peppercorn')
+          );
+          
+          const isRegularSpice = spiceKeywords.some(spice => ingredientName.includes(spice));
+          const isSpice = isRegularSpice || isPepperSpice;
           
           if (isSpice && amount <= 5) { // Small amounts of spices get pinch
             standardizedUnit = 'each'; // For aggregation (pinch normalizes to each)
@@ -959,8 +994,14 @@ export function formatIngredientsForGroceryList(
         }
         
         // Create grocery list item from final ingredient
+        // Include descriptive size in the item name if present
+        let finalItemName = parsedName.baseName;
+        if (descriptiveSize) {
+          finalItemName = `${descriptiveSize} ${parsedName.baseName}`;
+        }
+        
         const groceryItem = {
-          item_name: parsedName.baseName, // Use base name without substitution text
+          item_name: finalItemName,
           original_ingredient_text: originalText,
           quantity_amount: amount, // Use proper amount parsing
           quantity_unit: standardizedUnit, // Use standardized unit internally
