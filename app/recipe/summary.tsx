@@ -57,6 +57,7 @@ import {
 } from '@/constants/typography';
 import { useAuth } from '@/context/AuthContext';
 import IngredientSubstitutionModal from '@/app/recipe/IngredientSubstitutionModal';
+import { useAnalytics } from '@/utils/analytics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CollapsibleSection from '@/components/CollapsibleSection';
 import IngredientList from '@/components/recipe/IngredientList';
@@ -224,6 +225,7 @@ export default function RecipeSummaryScreen() {
   const router = useRouter();
   const { showError, hideError } = useErrorModal();
   const { session } = useAuth();
+  const { track } = useAnalytics();
 
   // Extract and validate entryPoint with logging
   const entryPoint = params.entryPoint || 'new'; // Default to 'new' for backward compatibility
@@ -1463,6 +1465,12 @@ export default function RecipeSummaryScreen() {
         const saveResult = await saveResponse.json();
         if (!saveResponse.ok) throw new Error(saveResult.error || 'Failed to save modified recipe');
 
+        // Track recipe saved event
+        await track('recipe_saved', { 
+          recipeId: recipe.id.toString(), 
+          inputType: entryPoint 
+        });
+
         // Navigate to the specific folder that the recipe was saved to
         router.replace(`/saved/folder-detail?folderId=${folderId}` as any);
 
@@ -1477,6 +1485,12 @@ export default function RecipeSummaryScreen() {
         const { saveRecipe } = require('@/lib/savedRecipes');
         const result = await saveRecipe(recipe.id, folderId);
         if (result.success) {
+          // Track recipe saved event
+          await track('recipe_saved', { 
+            recipeId: recipe.id.toString(), 
+            inputType: entryPoint 
+          });
+          
           // Navigate to the specific folder that the recipe was saved to
           router.replace(`/saved/folder-detail?folderId=${folderId}` as any);
         } else if (result.alreadySaved) {

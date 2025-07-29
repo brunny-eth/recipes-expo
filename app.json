@@ -8,7 +8,7 @@
     "scheme": "meez",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "jsEngine": "hermes", 
+    "jsEngine": "hermes",
     "splash": {
       "image": "./assets/images/meezblue_underline.png",
       "resizeMode": "contain",
@@ -19,8 +19,12 @@
       "bundleIdentifier": "com.meez.recipes",
       "usesAppleSignIn": true,
       "entitlements": {
-        "com.apple.developer.applesignin": ["Default"],
-        "com.apple.developer.associated-domains": ["applinks:meez.app"]
+        "com.apple.developer.applesignin": [
+          "Default"
+        ],
+        "com.apple.developer.associated-domains": [
+          "applinks:meez.app"
+        ]
       },
       "splash": {
         "image": "./assets/images/meezblue_underline.png",
@@ -30,12 +34,14 @@
       "infoPlist": {
         "CFBundleURLTypes": [
           {
-            "CFBundleURLSchemes": ["meez"]
+            "CFBundleURLSchemes": [
+              "meez"
+            ]
           }
         ],
         "ITSAppUsesNonExemptEncryption": false
       },
-      "jsEngine": "hermes" 
+      "jsEngine": "hermes"
     },
     "android": {
       "package": "com.meez.recipes",
@@ -54,7 +60,8 @@
     "plugins": [
       "expo-router",
       "expo-web-browser",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true

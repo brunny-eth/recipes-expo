@@ -22,6 +22,7 @@ import { useHandleError } from '@/hooks/useHandleError';
 import { normalizeError } from '@/utils/normalizeError';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import { CombinedParsedRecipe as ParsedRecipe } from '../../common/types';
+import { useAnalytics } from '@/utils/analytics';
 import { FONT } from '@/constants/typography';
 import { Image } from 'react-native';
 import { getErrorMessage, getNetworkErrorMessage } from '../../utils/errorMessages';
@@ -56,6 +57,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
   const handleError = useHandleError();
   const { showError } = useErrorModal();
   const isMountedRef = useRef(true);
+  const { track } = useAnalytics();
   
   // Animation values
   const rotation = useSharedValue(0);
@@ -213,6 +215,13 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
 
         if (result.recipe) {
           setRecipeData(result.recipe);
+          
+          // Track successful recipe parsing
+          await track('recipe_parsed', { 
+            inputType, 
+            ingredientsCount: result.recipe.ingredients?.length || 0 
+          });
+          
           return result.recipe;
         } else {
           // Show error modal globally

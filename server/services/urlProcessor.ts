@@ -1,6 +1,8 @@
 import { fetchHtmlWithFallback } from './htmlFetch';
 import { extractRecipeContent, ExtractedContent } from './extractContent'; // Import ExtractedContent type
-import logger from '../lib/logger';
+import { createLogger } from '../lib/logger';
+
+const logger = createLogger('urlProcessor');
 
 type FetchExtractTimings = {
   fetchHtml: number;
@@ -29,7 +31,7 @@ export async function fetchAndExtractFromUrl(
   scraperClient: any
 ): Promise<FetchExtractResult> {
   const handlerStartTime = Date.now(); // Keep track of total time within this specific function if needed, though parseAndCacheRecipe does overall timing.
-  console.log(`[${requestId}] Starting URL fetch & extract for: ${url}`);
+  logger.info({ requestId, url }, 'Starting URL fetch & extract');
   let timings: FetchExtractTimings = { fetchHtml: -1, extractContent: -1 };
   let fetchMethodUsed = 'Direct Fetch';
   let processingError: string | null = null;
@@ -44,11 +46,22 @@ export async function fetchAndExtractFromUrl(
   timings.fetchHtml = Date.now() - fetchStartTime;
 
   if (fetchError) {
-      console.error(`[${requestId}] Fetch process failed for URL ${url}: ${fetchError.message}`);
+      logger.error({ 
+        requestId, 
+        url, 
+        fetchError: fetchError.message,
+        fetchMethodUsed,
+        fetchTime: timings.fetchHtml 
+      }, 'Fetch process failed for URL');
       processingError = `Failed to retrieve recipe content from ${url}: ${fetchError.message}`;
   } else if (htmlContent.length === 0) {
       const finalErrorMessage = 'HTML content was empty after fetch attempts';
-      console.error(`[${requestId}] Fetch process failed for URL ${url}: ${finalErrorMessage}`);
+      logger.error({ 
+        requestId, 
+        url, 
+        fetchMethodUsed,
+        fetchTime: timings.fetchHtml 
+      }, 'Fetch process failed: HTML content was empty after fetch attempts');
       processingError = `Failed to retrieve recipe content from ${url}: ${finalErrorMessage}`;
   }
 
@@ -57,10 +70,16 @@ export async function fetchAndExtractFromUrl(
     return { extractedContent: null, error: processingError, fetchMethodUsed, timings };
   }
 
-  console.log(`[${requestId}] Using HTML content obtained via: ${fetchMethodUsed} (URL: ${url}, Length: ${htmlContent.length})`);
+  logger.info({ 
+    requestId, 
+    url, 
+    fetchMethodUsed, 
+    htmlContentLength: htmlContent.length,
+    fetchTime: timings.fetchHtml 
+  }, 'HTML content fetched successfully');
 
   // Step 2: Extract Content
-  console.log(`[${requestId}] Pre-processing HTML with cheerio for URL: ${url}...`);
+  logger.info({ requestId, url }, 'Pre-processing HTML with cheerio');
   const extractStartTime = Date.now();
   try {
       extractedContent = extractRecipeContent(htmlContent, requestId, url);
@@ -68,26 +87,56 @@ export async function fetchAndExtractFromUrl(
 
       // --- ADDED DEBUG LOG ---
       if (extractedContent) {
-        logger.debug({ requestId, url, ingredientsTextPreview: extractedContent.ingredientsText ? extractedContent.ingredientsText.substring(0, 500) : 'null/empty' }, '[DEBUG urlProcessor] Extracted ingredientsText');
-        logger.debug({ requestId, url, instructionsTextPreview: extractedContent.instructionsText ? extractedContent.instructionsText.substring(0, 500) : 'null/empty' }, '[DEBUG urlProcessor] Extracted instructionsText');
+        logger.debug({ 
+          requestId, 
+          url, 
+          ingredientsTextPreview: extractedContent.ingredientsText ? extractedContent.ingredientsText.substring(0, 500) : 'null/empty' 
+        }, 'Extracted ingredientsText');
+        logger.debug({ 
+          requestId, 
+          url, 
+          instructionsTextPreview: extractedContent.instructionsText ? extractedContent.instructionsText.substring(0, 500) : 'null/empty' 
+        }, 'Extracted instructionsText');
       } else {
-        logger.debug({ requestId, url }, '[DEBUG urlProcessor] extractedContent is null after extractRecipeContent');
+        logger.debug({ requestId, url }, 'extractedContent is null after extractRecipeContent');
       }
       // --- END DEBUG LOG ---
 
       if (extractedContent && (!extractedContent.ingredientsText || !extractedContent.instructionsText)) {
-          console.warn(`[${requestId}] Failed to extract clear ingredients or instructions using cheerio for URL: ${url}. Proceeding with partial data.`);
+          logger.warn({ 
+            requestId, 
+            url,
+            hasIngredients: !!extractedContent.ingredientsText,
+            hasInstructions: !!extractedContent.instructionsText,
+            extractTime: timings.extractContent 
+          }, 'Failed to extract clear ingredients or instructions using cheerio. Proceeding with partial data');
       } else {
-          console.log(`[${requestId}] Successfully extracted content sections for URL: ${url}.`);
+          logger.info({ 
+            requestId, 
+            url,
+            extractTime: timings.extractContent 
+          }, 'Successfully extracted content sections');
       }
   } catch (extractErr: any) {
-      console.error(`[${requestId}] Error during content extraction for URL ${url}:`, extractErr);
+      logger.error({ 
+        requestId, 
+        url, 
+        error: extractErr.message,
+        stack: extractErr.stack,
+        extractTime: Date.now() - extractStartTime 
+      }, 'Error during content extraction');
       timings.extractContent = Date.now() - extractStartTime;
       processingError = `Failed to extract content from HTML for ${url}: ${extractErr.message}`;
       extractedContent = null; // Ensure content is null if extraction fails
   }
 
-  console.log(`[${requestId}] Fetch & Extract finished for ${url}. Fetch=${timings.fetchHtml}ms, Extract=${timings.extractContent}ms`);
+  logger.info({ 
+    requestId, 
+    url, 
+    fetchTime: timings.fetchHtml,
+    extractTime: timings.extractContent,
+    totalTime: Date.now() - handlerStartTime 
+  }, 'Fetch & Extract finished');
 
   return { extractedContent, error: processingError, fetchMethodUsed, timings };
 }

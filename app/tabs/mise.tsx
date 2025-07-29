@@ -14,7 +14,6 @@ import {
   Share,
   Modal,
 } from 'react-native';
-import FastImage from '@d11/react-native-fast-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -31,7 +30,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useErrorModal } from '@/context/ErrorModalContext';
-import { useKeepAwake } from 'expo-keep-awake';
+import { useAnalytics } from '@/utils/analytics';
 import ScreenHeader from '@/components/ScreenHeader';
 import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
 import { parseServingsValue } from '@/utils/recipeUtils';
@@ -92,23 +91,10 @@ type GroceryCategory = {
 
 // Convert flat grocery items array to categorized format
 const convertToGroceryCategories = (items: any[]): GroceryCategory[] => {
-  console.log('[MiseScreen] 🔄 Starting convertToGroceryCategories with items:', items.length);
-  
   const categories: { [key: string]: GroceryItem[] } = {};
   
   items.forEach((item, index) => {
     const categoryName = item.grocery_category || 'Other';
-    
-    console.log(`[MiseScreen] 📝 Processing item ${index + 1}:`, {
-      item_name: item.item_name,
-      original_category: item.grocery_category,
-      final_category: categoryName,
-      original_ingredient_text: item.original_ingredient_text,
-      quantity_amount: item.quantity_amount,
-      quantity_unit: item.quantity_unit,
-      display_unit: item.display_unit,
-      raw_item_data: item // Log the entire raw item for debugging
-    });
     
     if (!categories[categoryName]) {
       categories[categoryName] = [];
@@ -136,7 +122,6 @@ const convertToGroceryCategories = (items: any[]): GroceryCategory[] => {
       for (const { pattern, unit } of compoundUnits) {
         if (pattern.test(originalText)) {
           finalUnit = unit;
-          console.log(`[MiseScreen] 🔧 Fallback unit extraction: "${originalText}" → unit: "${unit}"`);
           break;
         }
       }
@@ -150,15 +135,6 @@ const convertToGroceryCategories = (items: any[]): GroceryCategory[] => {
       category: categoryName,
       checked: item.is_checked || false,
     };
-    
-    console.log(`[MiseScreen] 🛒 Created grocery item:`, {
-      id: groceryItem.id,
-      name: groceryItem.name,
-      amount: groceryItem.amount,
-      unit: groceryItem.unit,
-      category: groceryItem.category,
-      checked: groceryItem.checked
-    });
     
     categories[categoryName].push(groceryItem);
   });
@@ -184,11 +160,6 @@ const mergeManualItemsIntoCategories = (
   recipeCategories: GroceryCategory[], 
   manualItems: ManualGroceryItem[]
 ): GroceryCategory[] => {
-  console.log('[MiseScreen] 🔄 Merging manual items into categories:', {
-    recipeCategoriesCount: recipeCategories.length,
-    manualItemsCount: manualItems.length
-  });
-
   // Start with a copy of recipe categories
   const mergedCategories: { [key: string]: GroceryItem[] } = {};
   
@@ -231,22 +202,11 @@ const mergeManualItemsIntoCategories = (
       items: items,
     }));
   
-  console.log('[MiseScreen] ✅ Merged categories result:', {
-    categoryCount: result.length,
-    categories: result.map(cat => ({
-      name: cat.name,
-      itemCount: cat.items.length,
-      manualItemCount: cat.items.filter(item => item.isManual).length
-    }))
-  });
-  
   return result;
 };
 
 // Sort grocery items alphabetically (flatten all categories)
 const sortGroceryItemsAlphabetically = (groceryCategories: GroceryCategory[]): GroceryCategory[] => {
-  console.log('[MiseScreen] 🔤 Sorting grocery items alphabetically...');
-  
   // Flatten all items from all categories
   const allItems = groceryCategories.flatMap(category => category.items);
   
@@ -258,8 +218,6 @@ const sortGroceryItemsAlphabetically = (groceryCategories: GroceryCategory[]): G
     name: 'All Items',
     items: sortedItems
   }];
-  
-  console.log('[MiseScreen] ✅ Alphabetically sorted', sortedItems.length, 'items');
   
   return result;
 };
@@ -273,12 +231,6 @@ const filterHouseholdStaples = (
   if (!enabled || selectedStaples.length === 0) {
     return categories;
   }
-  
-  console.log('[MiseScreen] 🏠 Filtering household staples:', {
-    enabled,
-    selectedStaplesCount: selectedStaples.length,
-    selectedStaples: selectedStaples.slice(0, 3), // Log first 3 for debugging
-  });
   
   return categories.map(category => ({
     ...category,
@@ -329,22 +281,17 @@ const filterHouseholdStaples = (
         return false;
       });
       
-      if (isStaple) {
-        console.log('[MiseScreen] 🚫 Filtering out staple:', item.name);
-      }
-      
       return !isStaple;
     })
   })).filter(category => category.items.length > 0); // Remove empty categories
 };
 
 export default function MiseScreen() {
-  console.error('[MiseScreen] 🧨 FRESH BUILD MARKER vB6 - added fallback parsing for compound units (oz can, lb bag, etc)');
-  
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { session } = useAuth();
   const { showError } = useErrorModal();
+  const { track } = useAnalytics();
   const { hasResumableSession, state: cookingState, invalidateSession } = useCooking();
   const [miseRecipes, setMiseRecipes] = useState<MiseRecipe[]>([]);
   const [groceryList, setGroceryList] = useState<GroceryCategory[]>([]);
@@ -361,32 +308,28 @@ export default function MiseScreen() {
 
   // Removed caching strategy - always fetch fresh data for consistency
 
-  // Component Mount/Unmount logging
-  useEffect(() => {
-    const timestamp = new Date().toISOString();
-    console.log(`[MiseScreen] 🚀 Component DID MOUNT at ${timestamp}`);
-    return () => {
-      const unmountTimestamp = new Date().toISOString();
-      console.log(`[MiseScreen] 💀 Component WILL UNMOUNT at ${unmountTimestamp}`);
-    };
-  }, []);
 
-  // Keep screen awake while using shopping list
-  useKeepAwake();
+
+
 
   // Load manual items from storage on component mount
   const loadManualItemsFromStorage = useCallback(async () => {
     try {
-      console.log('[MiseScreen] 📖 Loading manual items from storage...');
       const items = await loadManualItems();
       setManualItems(items);
-      console.log('[MiseScreen] ✅ Loaded', items.length, 'manual items');
     } catch (error) {
-      console.error('[MiseScreen] ❌ Error loading manual items:', error);
+      // Track error without causing re-renders
+      if (session?.user?.id) {
+        track('mise_manual_items_load_error', {
+          errorMessage: error instanceof Error ? error.message : String(error),
+          errorStack: error instanceof Error ? error.stack : undefined,
+          userId: session.user.id,
+        });
+      }
       // Don't show error to user for manual items - graceful degradation
       setManualItems([]);
     }
-  }, []);
+  }, []); // Remove dependencies to prevent infinite re-renders
 
   // Load sort mode preference from storage
   const loadSortModeFromStorage = useCallback(async () => {
@@ -394,23 +337,36 @@ export default function MiseScreen() {
       const stored = await AsyncStorage.getItem(GROCERY_SORT_MODE_KEY);
       if (stored && (stored === 'category' || stored === 'alphabetical')) {
         setSortMode(stored as 'category' | 'alphabetical');
-        console.log('[MiseScreen] 📖 Loaded sort mode:', stored);
       }
     } catch (error) {
-      console.error('[MiseScreen] ❌ Error loading sort mode:', error);
+      // Track error without causing re-renders
+      if (session?.user?.id) {
+        track('mise_sort_mode_load_error', {
+          errorMessage: error instanceof Error ? error.message : String(error),
+          errorStack: error instanceof Error ? error.stack : undefined,
+          userId: session.user.id,
+        });
+      }
       // Default to category mode on error
     }
-  }, []);
+  }, []); // Remove dependencies to prevent infinite re-renders
 
   // Save sort mode preference to storage
   const saveSortModeToStorage = useCallback(async (mode: 'category' | 'alphabetical') => {
     try {
       await AsyncStorage.setItem(GROCERY_SORT_MODE_KEY, mode);
-      console.log('[MiseScreen] 💾 Saved sort mode:', mode);
     } catch (error) {
-      console.error('[MiseScreen] ❌ Error saving sort mode:', error);
+      // Track error without causing re-renders
+      if (session?.user?.id) {
+        track('mise_sort_mode_save_error', {
+          errorMessage: error instanceof Error ? error.message : String(error),
+          errorStack: error instanceof Error ? error.stack : undefined,
+          userId: session.user.id,
+          sortMode: mode,
+        });
+      }
     }
-  }, []);
+  }, []); // Remove dependencies to prevent infinite re-renders
 
   // Load household staples preferences from storage
   const loadStaplesPreferences = useCallback(async () => {
@@ -422,18 +378,23 @@ export default function MiseScreen() {
       
       if (enabledStored !== null) {
         setStaplesEnabled(enabledStored === 'true');
-        console.log('[MiseScreen] 📖 Loaded staples enabled:', enabledStored === 'true');
       }
       
       if (staplesStored) {
         const staples = JSON.parse(staplesStored);
         setSelectedStaples(staples);
-        console.log('[MiseScreen] 📖 Loaded selected staples:', staples.length, 'items');
       }
     } catch (error) {
-      console.error('[MiseScreen] ❌ Error loading staples preferences:', error);
+      // Track error without causing re-renders
+      if (session?.user?.id) {
+        track('mise_staples_preferences_load_error', {
+          errorMessage: error instanceof Error ? error.message : String(error),
+          errorStack: error instanceof Error ? error.stack : undefined,
+          userId: session.user.id,
+        });
+      }
     }
-  }, []);
+  }, []); // Remove dependencies to prevent infinite re-renders
 
   // Save household staples preferences to storage
   const saveStaplesPreferences = useCallback(async (enabled: boolean, staples: string[]) => {
@@ -442,11 +403,19 @@ export default function MiseScreen() {
         AsyncStorage.setItem(STAPLES_ENABLED_KEY, enabled.toString()),
         AsyncStorage.setItem(HOUSEHOLD_STAPLES_KEY, JSON.stringify(staples)),
       ]);
-      console.log('[MiseScreen] 💾 Saved staples preferences:', { enabled, staplesCount: staples.length });
     } catch (error) {
-      console.error('[MiseScreen] ❌ Error saving staples preferences:', error);
+      // Track error without causing re-renders
+      if (session?.user?.id) {
+        track('mise_staples_preferences_save_error', {
+          errorMessage: error instanceof Error ? error.message : String(error),
+          errorStack: error instanceof Error ? error.stack : undefined,
+          userId: session.user.id,
+          enabled,
+          staplesCount: staples.length,
+        });
+      }
     }
-  }, []);
+  }, []); // Remove dependencies to prevent infinite re-renders
 
   // Load preferences on component mount
   useEffect(() => {
@@ -455,18 +424,26 @@ export default function MiseScreen() {
     loadStaplesPreferences();
   }, [loadManualItemsFromStorage, loadSortModeFromStorage, loadStaplesPreferences]);
 
+  // Keep screen awake only when on grocery tab to prevent battery drain
+  useEffect(() => {
+    if (selectedTab === 'grocery') {
+      const { activateKeepAwake, deactivateKeepAwake } = require('expo-keep-awake');
+      activateKeepAwake();
+      return () => deactivateKeepAwake();
+    }
+  }, [selectedTab]);
+
   // Removed loadCachedMiseData function - always fetch fresh data
 
   const fetchMiseDataFromAPI = useCallback(async () => {
     const startTime = performance.now();
-    console.log(`[PERF: MiseScreen] Start fetchMiseDataFromAPI at ${startTime.toFixed(2)}ms`);
 
     if (!session?.user) {
       console.warn('[MiseScreen] No user session found. Skipping fetch.');
       setIsLoading(false);
       setMiseRecipes([]);
       setGroceryList([]);
-              setError('Please log in to access your prep station.');
+      setError('Please log in to access your prep station.');
       return;
     }
 
@@ -484,10 +461,7 @@ export default function MiseScreen() {
         'Content-Type': 'application/json',
       };
 
-      console.log('[MiseScreen] 🛒 Starting sequential fetch to avoid race conditions...');
-
       // First fetch recipes to ensure they exist
-      console.log('[MiseScreen] 📋 Step 1: Fetching recipes...');
       const recipesResponse = await fetch(`${backendUrl}/api/mise/recipes?userId=${session.user.id}`, { headers });
 
       if (!recipesResponse.ok) {
@@ -498,7 +472,6 @@ export default function MiseScreen() {
       await new Promise(resolve => setTimeout(resolve, 100));
       
       // Then fetch grocery list based on those recipes
-      console.log('[MiseScreen] 🛒 Step 2: Fetching grocery list...');
       const groceryResponse = await fetch(`${backendUrl}/api/mise/grocery-list?userId=${session.user.id}`, { headers });
 
       if (!groceryResponse.ok) {
@@ -511,59 +484,11 @@ export default function MiseScreen() {
       ]);
 
       const fetchedRecipes = recipesData?.recipes || [];
-      
-      console.log('[MiseScreen] 📦 Raw grocery data received:', {
-        itemsCount: groceryData?.items?.length || 0,
-        items: groceryData?.items?.map((item: any) => ({
-          item_name: item.item_name,
-          grocery_category: item.grocery_category,
-          original_ingredient_text: item.original_ingredient_text,
-          quantity_amount: item.quantity_amount,
-          quantity_unit: item.quantity_unit,
-          display_unit: item.display_unit
-        })) || []
-      });
 
       const recipeCategorizedList = convertToGroceryCategories(groceryData?.items || []);
       const mergedGroceryList = mergeManualItemsIntoCategories(recipeCategorizedList, manualItems);
-      
-      console.log('[MiseScreen] 🎯 Final grocery list with manual items:', {
-        categoryCount: mergedGroceryList.length,
-        categories: mergedGroceryList.map(cat => ({
-          name: cat.name,
-          itemCount: cat.items.length,
-          manualItemCount: cat.items.filter(item => item.isManual).length,
-          recipeItemCount: cat.items.filter(item => !item.isManual).length
-        }))
-      });
 
-      // Log memory pressure for each recipe
-      console.log('[MiseScreen] 💾 Memory analysis for fetched recipes:');
-      fetchedRecipes.forEach((recipe: any, index: number) => {
-        const recipeJson = JSON.stringify(recipe);
-        const sizeInKB = (recipeJson.length / 1024).toFixed(2);
-        const preparedDataSize = recipe.prepared_recipe_data ? 
-          (JSON.stringify(recipe.prepared_recipe_data).length / 1024).toFixed(2) : '0';
-        const originalDataSize = recipe.original_recipe_data ? 
-          (JSON.stringify(recipe.original_recipe_data).length / 1024).toFixed(2) : '0';
-        
-        console.log(`[MiseScreen] 📊 Recipe ${index + 1}/${fetchedRecipes.length}:`, {
-          id: recipe.id,
-          title: recipe.title_override || recipe.prepared_recipe_data?.title || 'Unknown',
-          totalSizeKB: sizeInKB,
-          preparedDataKB: preparedDataSize,
-          originalDataKB: originalDataSize,
-          hasAppliedChanges: !!recipe.applied_changes,
-          ingredientGroupsCount: recipe.prepared_recipe_data?.ingredientGroups?.length || 0,
-          instructionsCount: recipe.prepared_recipe_data?.instructions?.length || 0,
-        });
-      });
 
-      const totalMemoryKB = fetchedRecipes.reduce((total: number, recipe: any) => {
-        return total + (JSON.stringify(recipe).length / 1024);
-      }, 0).toFixed(2);
-      
-      console.log(`[MiseScreen] 📈 Total memory usage: ${totalMemoryKB} KB for ${fetchedRecipes.length} recipes`);
 
       setMiseRecipes(fetchedRecipes);
       setGroceryList(mergedGroceryList);
@@ -573,22 +498,10 @@ export default function MiseScreen() {
         const currentRecipeIds = cookingState.activeRecipes.map((r: any) => r.recipeId).sort();
         const freshRecipeIds = fetchedRecipes.map((r: any) => String(r.id)).sort();
         
-        console.log('[MiseScreen] 🔍 Comparing recipe IDs for changes:');
-        console.log('[MiseScreen] 📊 Current cooking context IDs:', currentRecipeIds);
-        console.log('[MiseScreen] 📊 Fresh fetched IDs:', freshRecipeIds);
-        
         // Check if recipe IDs changed (added/removed recipes)  
         const lengthChanged = currentRecipeIds.length !== freshRecipeIds.length;
         const orderChanged = !currentRecipeIds.every((id: string, index: number) => id === freshRecipeIds[index]);
         const idsChanged = lengthChanged || orderChanged;
-        
-        console.log('[MiseScreen] 🔍 ID change analysis:', {
-          lengthChanged,
-          orderChanged,
-          idsChanged,
-          currentLength: currentRecipeIds.length,
-          freshLength: freshRecipeIds.length
-        });
         
         // Check if recipe content changed (serving size, ingredients, etc.)
         let recipeContentChanged = false;
@@ -659,16 +572,6 @@ export default function MiseScreen() {
                   freshIngredientsCount !== currentIngredientsCount ||
                   freshInstructionsCount !== currentInstructionsCount ||
                   ingredientContentChanged) {
-                console.log('[MiseScreen] 🔄 Recipe content changed for:', freshId);
-                console.log('[MiseScreen] 📊 Changes detected:', {
-                  titleChanged: freshTitle !== currentTitle,
-                  yieldChanged: freshYield !== currentYield,
-                  ingredientsCountChanged: freshIngredientsCount !== currentIngredientsCount,
-                  instructionsCountChanged: freshInstructionsCount !== currentInstructionsCount,
-                  ingredientContentChanged: ingredientContentChanged,
-                  fresh: { title: freshTitle, yield: freshYield, ingredientsCount: freshIngredientsCount, instructionsCount: freshInstructionsCount },
-                  current: { title: currentTitle, yield: currentYield, ingredientsCount: currentIngredientsCount, instructionsCount: currentInstructionsCount }
-                });
                 recipeContentChanged = true;
                 break;
               }
@@ -677,15 +580,14 @@ export default function MiseScreen() {
         }
         
         if (idsChanged || recipeContentChanged) {
-          console.log('[MiseScreen] 🔄 Recipe changes detected - invalidating cooking session');
-          console.log('[MiseScreen] 📊 Change type:', { idsChanged, recipeContentChanged });
-          if (idsChanged) {
-            console.log('[MiseScreen] 📊 Current cooking recipes:', currentRecipeIds);
-            console.log('[MiseScreen] 📊 Fresh mise recipes:', freshRecipeIds);
-          }
+          track('mise_cooking_session_invalidated', {
+            idsChanged,
+            recipeContentChanged,
+            currentRecipesCount: currentRecipeIds.length,
+            freshRecipesCount: freshRecipeIds.length,
+            userId: session?.user?.id,
+          });
           invalidateSession();
-        } else {
-          console.log('[MiseScreen] ✅ Recipes unchanged - keeping cooking session');
         }
       }
 
@@ -698,13 +600,16 @@ export default function MiseScreen() {
     } finally {
       setIsLoading(false);
       const totalTime = performance.now() - startTime;
-      console.log(`[PERF: MiseScreen] Total fetchMiseDataFromAPI duration: ${totalTime.toFixed(2)}ms`);
+      track('mise_data_fetch_performance', {
+        durationMs: totalTime,
+        userId: session?.user?.id,
+        success: !error,
+      });
     }
-  }, [session?.user?.id, session?.access_token]);
+  }, []); // Remove dependencies to prevent infinite re-renders
 
   // Simplified - always fetch fresh data from API
   const fetchMiseData = useCallback(async () => {
-    console.log('[MiseScreen] 🎯 fetchMiseData called - always fetching fresh data');
     await fetchMiseDataFromAPI();
   }, [fetchMiseDataFromAPI]);
 
@@ -715,8 +620,6 @@ export default function MiseScreen() {
     try {
       const backendUrl = process.env.EXPO_PUBLIC_API_URL;
       if (!backendUrl) return;
-      
-      console.log('[MiseScreen] 🛒 Silently refreshing grocery list');
       
       const groceryResponse = await fetch(
         `${backendUrl}/api/mise/grocery-list?userId=${session.user.id}`, 
@@ -733,34 +636,34 @@ export default function MiseScreen() {
         const recipeCategorizedList = convertToGroceryCategories(groceryData?.items || []);
         const mergedGroceryList = mergeManualItemsIntoCategories(recipeCategorizedList, manualItems);
         setGroceryList(mergedGroceryList); // Only update grocery list, no loading states
-        console.log('[MiseScreen] ✅ Grocery list silently refreshed after recipe deletion');
       } else {
-        console.warn('[MiseScreen] Failed to refresh grocery list:', groceryResponse.statusText);
+        if (session?.user?.id) {
+          track('mise_grocery_refresh_error', {
+            statusText: groceryResponse.statusText,
+            status: groceryResponse.status,
+            userId: session.user.id,
+          });
+        }
       }
     } catch (error) {
-      console.warn('[MiseScreen] Failed to refresh grocery list after deletion:', error);
+      if (session?.user?.id) {
+        track('mise_grocery_refresh_exception', {
+          errorMessage: error instanceof Error ? error.message : String(error),
+          errorStack: error instanceof Error ? error.stack : undefined,
+          userId: session.user.id,
+        });
+      }
       // Fail silently - recipe deletion was successful, just grocery refresh failed
     }
-  }, [session?.user?.id, session?.access_token, manualItems]);
+  }, []); // Remove dependencies to prevent infinite re-renders
 
   useFocusEffect(
     useCallback(() => {
-      const timestamp = new Date().toISOString();
-      console.log(`[MiseScreen] 🎯 useFocusEffect triggered at ${timestamp}`);
-      console.log('[MiseScreen] 🔍 Focus effect context:', {
-        sessionExists: !!session?.user?.id,
-        currentSessionId: session?.user?.id,
-        miseRecipesCount: miseRecipes.length,
-        groceryListCount: groceryList.length,
-        canGoBack: router.canGoBack(),
-      });
-      
       // Always fetch fresh data to ensure deletion detection works properly
       // Previous optimization skipped API calls from cook screen, but this prevented
       // deletion detection when users deleted recipes and returned to cook
-      console.log('[MiseScreen] 🔄 Fetching fresh data for consistency');
       fetchMiseData();
-    }, [fetchMiseData, router, miseRecipes.length])
+    }, []) // Remove dependencies to prevent infinite re-renders
   );
 
 
@@ -788,12 +691,21 @@ export default function MiseScreen() {
         prev.map((r) => (r.id === recipeId ? { ...r, is_completed: isCompleted } : r))
       );
       
-      console.log(`[MiseScreen] Recipe ${recipeId} completion status updated to ${isCompleted}`);
+      track('mise_recipe_completion_updated', {
+        recipeId,
+        isCompleted,
+        userId: session?.user?.id,
+      });
     } catch (err) {
-      console.error('[MiseScreen] Error completing recipe:', err);
+      track('mise_recipe_completion_error', {
+        recipeId,
+        errorMessage: err instanceof Error ? err.message : String(err),
+        errorStack: err instanceof Error ? err.stack : undefined,
+        userId: session?.user?.id,
+      });
       showError('Recipe Error', 'Failed to update completion status. Please try again.');
     }
-  }, [session, showError]);
+  }, [session, showError, track]);
 
   // Handle recipe deletion
   const handleDeleteRecipe = useCallback(async (recipeId: string) => {
@@ -827,13 +739,21 @@ export default function MiseScreen() {
       // Silently refresh grocery list to ensure it reflects the deletion
       await refreshGroceryListOnly();
 
-      console.log(`[MiseScreen] Recipe ${recipeId} deleted successfully.`);
+      track('mise_recipe_deleted', {
+        recipeId,
+        userId: session?.user?.id,
+      });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
-      console.error('[MiseScreen] Error deleting recipe:', err);
+      track('mise_recipe_deletion_error', {
+        recipeId,
+        errorMessage: err instanceof Error ? err.message : String(err),
+        errorStack: err instanceof Error ? err.stack : undefined,
+        userId: session?.user?.id,
+      });
       showError('Error', errorMessage);
     }
-  }, [session, showError, refreshGroceryListOnly]);
+  }, [session, showError, refreshGroceryListOnly, track]);
 
   // Handle grocery item toggle
   const handleGroceryToggle = useCallback((categoryName: string, itemIndex: number) => {
@@ -866,7 +786,13 @@ export default function MiseScreen() {
           isChecked: newCheckedState,
         }),
       }).catch(err => {
-        console.error('Failed to save grocery item state:', err);
+        track('mise_grocery_item_toggle_error', {
+          itemName: itemToUpdate.name,
+          isChecked: newCheckedState,
+          errorMessage: err instanceof Error ? err.message : String(err),
+          errorStack: err instanceof Error ? err.stack : undefined,
+          userId: session.user.id,
+        });
         // Optionally, revert the optimistic update and show an error
         showError('Sync Error', 'Could not save check state. Please try again.');
         itemToUpdate.checked = !newCheckedState;
@@ -923,24 +849,23 @@ export default function MiseScreen() {
         plainText += '\n'; // Add spacing between categories
       });
 
-      console.log('Attempting to share grocery list:', plainText);
-
       await Share.share({
         message: plainText,
         title: 'Grocery List',
       });
-      
-      console.log('Share successful');
     } catch (error) {
-      console.error('Share failed:', error);
+      track('mise_grocery_share_error', {
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+        userId: session?.user?.id,
+      });
       showError('Share Error', 'Failed to share grocery list');
     }
-  }, [groceryList, miseRecipes, showError, staplesEnabled, selectedStaples, sortMode]);
+  }, [groceryList, miseRecipes, showError, staplesEnabled, selectedStaples, sortMode, track, session?.user?.id]);
 
   // Manual item management functions
   const handleAddManualItem = useCallback(async (category: string, itemText: string) => {
     try {
-      console.log('[MiseScreen] ➕ Adding manual item:', { category, itemText });
       const newItem = await addManualItem(category, itemText);
       
       // Update local state
@@ -960,17 +885,20 @@ export default function MiseScreen() {
       const updatedManualItems = [...manualItems, newItem];
       const mergedGroceryList = mergeManualItemsIntoCategories(recipeCategorizedList, updatedManualItems);
       setGroceryList(mergedGroceryList);
-      
-      console.log('[MiseScreen] ✅ Manual item added and grocery list updated');
     } catch (error) {
-      console.error('[MiseScreen] ❌ Error adding manual item:', error);
+      track('mise_manual_item_add_error', {
+        category,
+        itemText,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+        userId: session?.user?.id,
+      });
       showError('Error', 'Failed to add item. Please try again.');
     }
-  }, [manualItems, groceryList, showError]);
+  }, [manualItems, groceryList, showError, track, session?.user?.id]);
 
   const handleDeleteManualItem = useCallback(async (itemId: string) => {
     try {
-      console.log('[MiseScreen] 🗑️ Deleting manual item:', itemId);
       await deleteManualItem(itemId);
       
       // Update local state
@@ -990,17 +918,19 @@ export default function MiseScreen() {
       ));
       const mergedGroceryList = mergeManualItemsIntoCategories(recipeCategorizedList, updatedManualItems);
       setGroceryList(mergedGroceryList);
-      
-      console.log('[MiseScreen] ✅ Manual item deleted and grocery list updated');
     } catch (error) {
-      console.error('[MiseScreen] ❌ Error deleting manual item:', error);
+      track('mise_manual_item_delete_error', {
+        itemId,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+        userId: session?.user?.id,
+      });
       showError('Error', 'Failed to delete item. Please try again.');
     }
-  }, [manualItems, groceryList, showError]);
+  }, [manualItems, groceryList, showError, track, session?.user?.id]);
 
   const handleClearAllManualItems = useCallback(async () => {
     try {
-      console.log('[MiseScreen] 🧹 Clearing all manual items');
       await clearAllManualItems();
       
       // Update local state
@@ -1019,13 +949,15 @@ export default function MiseScreen() {
       ));
       const mergedGroceryList = mergeManualItemsIntoCategories(recipeCategorizedList, []);
       setGroceryList(mergedGroceryList);
-      
-      console.log('[MiseScreen] ✅ All manual items cleared and grocery list updated');
     } catch (error) {
-      console.error('[MiseScreen] ❌ Error clearing manual items:', error);
+      track('mise_manual_items_clear_error', {
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+        userId: session?.user?.id,
+      });
       showError('Error', 'Failed to clear items. Please try again.');
     }
-  }, [groceryList, showError]);
+  }, [groceryList, showError, track, session?.user?.id]);
 
   // Modal handlers
   const handleOpenAddModal = useCallback((categoryName: string) => {
@@ -1078,22 +1010,9 @@ export default function MiseScreen() {
     const enabled = staples.length > 0;
     setStaplesEnabled(enabled);
     await saveStaplesPreferences(enabled, staples);
-    
-    console.log('[MiseScreen] 🏠 Staples changed:', {
-      staples,
-      enabled,
-      isDefaultSelection: staples.length === 2 && staples.includes('salt') && staples.includes('black pepper')
-    });
   }, [saveStaplesPreferences]);
 
-  // Use focus effect to refresh data when tab becomes active
-  // This useFocusEffect is now redundant as the caching strategy handles refetches
-  // useFocusEffect(
-  //   useCallback(() => {
-  //     console.log('[MiseScreen] 🎯 useFocusEffect triggered');
-  //     fetchMiseRecipes();
-  //   }, [fetchMiseRecipes])
-  // );
+
 
   // Render recipe item
   const renderRecipeItem = useCallback(({ item }: { item: MiseRecipe }) => {
@@ -1104,16 +1023,6 @@ export default function MiseScreen() {
         <TouchableOpacity
           style={styles.cardContent}
           onPress={() => {
-            console.log('[MiseScreen] 🚀 Attempting to navigate to summary for recipe:', {
-              recipeId: item.id,
-              title: displayTitle,
-              hasPreparedData: !!item.prepared_recipe_data,
-              preparedDataKeys: Object.keys(item.prepared_recipe_data || {}),
-              finalYield: item.final_yield,
-              hasAppliedChanges: !!item.applied_changes,
-              appliedChanges: item.applied_changes,
-            });
-            
             // Navigate to recipe summary with the prepared recipe data and mise entry point
             router.push({
               pathname: '/recipe/summary',
@@ -1136,8 +1045,6 @@ export default function MiseScreen() {
                 }),
               },
             });
-            
-            console.log('[MiseScreen] ✅ Navigation to summary completed');
           }}
         >
           <View style={styles.cardTextContainer}>
@@ -1181,17 +1088,6 @@ export default function MiseScreen() {
         )}
       </View>
       {item.items.map((groceryItem, index) => {
-        // Add detailed logging for each grocery item being rendered
-        console.log(`[MiseScreen] 🎨 Rendering grocery item:`, {
-          id: groceryItem.id,
-          name: groceryItem.name,
-          amount: groceryItem.amount,
-          unit: groceryItem.unit,
-          amountFormatted: groceryItem.amount ? formatAmountForGroceryDisplay(groceryItem.amount) : 'null',
-          unitDisplay: getUnitDisplayName(groceryItem.unit as any, groceryItem.amount || 1),
-          finalDisplayText: `${groceryItem.amount ? formatAmountForGroceryDisplay(groceryItem.amount) : ''}${getUnitDisplayName(groceryItem.unit as any, groceryItem.amount || 1) ? ` ${getUnitDisplayName(groceryItem.unit as any, groceryItem.amount || 1)}` : ''}${groceryItem.amount || groceryItem.unit ? ' ' : ''}${groceryItem.name}`
-        });
-        
         return (
           <View key={groceryItem.id} style={styles.groceryItem}>
             <TouchableOpacity
@@ -1209,7 +1105,7 @@ export default function MiseScreen() {
                 styles.groceryItemText,
                 groceryItem.checked && styles.groceryItemChecked
               ]}
-              numberOfLines={0}
+              numberOfLines={2}
             >
               {(() => {
                 const amountText = groceryItem.amount ? formatAmountForGroceryDisplay(groceryItem.amount) : '';
@@ -1557,68 +1453,7 @@ const styles = StyleSheet.create({
     ...bodyStrongText,
     color: COLORS.white,
   } as TextStyle,
-  recipeCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.sm,
-    paddingVertical: SPACING.lg, // Consistent vertical padding
-    paddingHorizontal: SPACING.md,
-    marginBottom: SPACING.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: BORDER_WIDTH.hairline,
-    borderColor: COLORS.primaryLight,
-    ...SHADOWS.small, // Add subtle elevation
-  } as ViewStyle,
-  recipeItem: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-  } as ViewStyle,
-  recipeInfo: {
-    flex: 1,
-    justifyContent: 'center', // Center content vertically
-  } as ViewStyle,
-  recipeTitle: {
-    ...bodyStrongText,
-    color: COLORS.textDark,
-    marginBottom: SPACING.md, // Consistent spacing below title
-  } as TextStyle,
-  recipeTitleInput: {
-    ...bodyStrongText,
-    color: COLORS.textDark,
-    borderBottomWidth: 1,
-    borderColor: COLORS.primary,
-    paddingBottom: 2,
-  } as TextStyle,
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.xs,
-  } as ViewStyle,
 
-  titleActions: {
-    flexDirection: 'row',
-  },
-  recipeYield: {
-    ...bodyText,
-    color: COLORS.primary,
-    fontSize: FONT.size.body, // Increased font size for better visibility
-    marginTop: 2, // less space
-  } as TextStyle,
-  recipeActions: {
-    flexDirection: 'column', // Stack icons vertically
-    justifyContent: 'center', // Center them vertically
-    marginLeft: SPACING.lg, // More space from the content
-    paddingLeft: SPACING.sm, // Additional padding
-  } as ViewStyle,
-  actionButton: {
-    padding: SPACING.sm, // Better touch target
-    marginVertical: SPACING.xs, // Space between buttons when editing
-  } as ViewStyle,
-  deleteButton: {
-    padding: SPACING.sm, // Better touch target
-    alignSelf: 'center', // Center the delete button
-  } as ViewStyle,
 
   // New card styles to match saved.tsx
   card: {
@@ -1674,30 +1509,6 @@ const styles = StyleSheet.create({
   groceryContainer: {
     flex: 1,
   } as ViewStyle,
-  groceryHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SPACING.sm,
-  } as ViewStyle,
-  groceryTitle: {
-    ...sectionHeaderText,
-    fontSize: FONT.size.lg,
-    color: COLORS.textDark,
-  } as TextStyle,
-  shareButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.sm,
-  } as ViewStyle,
-  shareButtonText: {
-    ...bodyStrongText,
-    color: COLORS.primary,
-    marginLeft: SPACING.xs,
-  } as TextStyle,
   groceryCategory: {
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.sm,

@@ -3,11 +3,13 @@ import { createHash } from 'crypto';
 import { detectInputType, InputType } from '../utils/detectInputType';
 import { generateCacheKeyHash } from '../utils/hash';
 import { StandardizedUsage } from '../utils/usageUtils';
-import logger from '../lib/logger';
+import { createLogger } from '../lib/logger';
 import { parseUrlRecipe } from './parseUrlRecipe';
 import { parseTextRecipe } from './parseTextRecipe';
 import { parseVideoRecipe } from './parseVideoRecipe';
 import { StructuredError, ParseErrorCode } from '../../common/types/errors';
+
+const logger = createLogger('parseRecipe');
 
 export type ParseResult = {
     recipe: CombinedParsedRecipe | null;
@@ -87,7 +89,14 @@ export async function parseAndCacheRecipe(
     } catch (err) {
         const error = err as Error;
         const totalTime = Date.now() - requestStartTime;
-        logger.error({ requestId, error: error.message, stack: error.stack }, `Unhandled exception in parseAndCacheRecipe dispatcher.`);
+        logger.error({ 
+            requestId, 
+            error: error.message, 
+            stack: error.stack,
+            inputType: detectInputType(input),
+            inputLength: input?.length || 0,
+            totalTime 
+        }, 'Unhandled exception in parseAndCacheRecipe dispatcher');
         return {
             recipe: null,
             error: {

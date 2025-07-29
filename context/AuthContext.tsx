@@ -17,6 +17,9 @@ import { useErrorModal } from './ErrorModalContext';
 import { router, useSegments } from 'expo-router';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as SecureStore from 'expo-secure-store';
+import { createLogger } from '@/utils/logger';
+
+const logger = createLogger('auth');
 
 interface UserMetadata {
   role?: 'beta_user' | 'control' | 'variant';
@@ -223,6 +226,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       handleUrlDep: handleUrl,
     });
     
+    logger.info('User sign-in attempt started', { provider });
     console.log(`[Auth] Attempting to sign in with ${provider}...`);
     console.log('[Auth] State update: setIsLoading(true)');
     setIsLoading(true);
@@ -233,6 +237,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         try {
           const isAvailable = await AppleAuthentication.isAvailableAsync();
           if (!isAvailable) {
+            logger.error('Apple authentication is not available on this device', { provider, error: 'Apple authentication not available' });
             throw new Error('Apple authentication is not available on this device');
           }
 
@@ -247,6 +252,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
 
           const { identityToken, email, fullName } = credential;
           if (!identityToken) {
+            logger.error('No identity token returned from Apple', { provider, error: 'No identity token returned' });
             throw new Error('No identity token returned from Apple');
           }
 
@@ -268,7 +274,10 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
             clientId: supabaseClientId,
           });
 
-          if (error) throw error;
+          if (error) {
+            logger.error('Supabase sign-in failed', { provider, error: error.message });
+            throw error;
+          }
 
           if (data?.user && (email || fullName)) {
             const fullNameStr = fullName
@@ -290,6 +299,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
                 data: metadataUpdate,
               });
               if (metadataError) {
+                logger.error('Failed to update user metadata', { provider, error: metadataError.message });
                 console.error(
                   '[Apple] Failed to update user metadata:',
                   metadataError,
@@ -297,8 +307,16 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
               }
             }
           }
+          
+          logger.info('User signed in successfully', { 
+            provider, 
+            userId: data?.user?.id,
+            hasEmail: !!email,
+            hasFullName: !!fullName 
+          });
           return true; // Indicate success for Apple
         } catch (err: any) {
+          logger.error('Apple sign-in failed', { provider, error: err.message });
           console.error('[Apple] Native Sign-In Error:', err.message);
           showErrorRef.current(
             'Sign In Error',
@@ -312,6 +330,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         if (!redirectTo) {
           const errorMsg =
             'Missing EXPO_PUBLIC_AUTH_URL environment variable. Cannot proceed with authentication.';
+          logger.error('Configuration error: Missing auth URL', { provider, error: errorMsg });
           console.error(`[Auth] ${errorMsg}`);
           showErrorRef.current('Configuration Error', errorMsg);
           return false; // Indicate failure

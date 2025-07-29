@@ -52,6 +52,7 @@ import { parseAmountString } from '@/utils/recipeUtils';
 import { useAuth } from '@/context/AuthContext';
 import RecipeStepsHeader from '@/components/recipe/RecipeStepsHeader';
 import StepsFooterButtons from '@/components/recipe/StepsFooterButtons';
+import { useAnalytics } from '@/utils/analytics';
 import {
   titleText,
   sectionHeaderText,
@@ -80,6 +81,7 @@ export default function StepsScreen() {
   const router = useRouter();
   const { showError } = useErrorModal();
   const { session } = useAuth();
+  const { track } = useAnalytics();
 
 
   const [isLoadingComplete, setIsLoadingComplete] = useState(false);
@@ -131,6 +133,19 @@ export default function StepsScreen() {
   // Component mount/unmount logging
   useEffect(() => {
     console.log('[StepsScreen] 🎯 Component DID MOUNT');
+    
+    // Track steps started event
+    const trackStepsStarted = async () => {
+      const scaled = appliedChanges?.scalingFactor !== 1;
+      const substitutions = appliedChanges?.ingredientChanges?.length || 0;
+      await track('steps_started', { 
+        scaled, 
+        substitutions,
+        sessionType: 'single_recipe'
+      });
+    };
+    trackStepsStarted();
+    
     return () => {
       console.log('[StepsScreen] 🌀 Component WILL UNMOUNT');
     };

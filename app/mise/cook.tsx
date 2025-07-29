@@ -25,6 +25,7 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { useCooking } from '@/context/CookingContext';
 import { useAuth } from '@/context/AuthContext';
 import { useErrorModal } from '@/context/ErrorModalContext';
+import { useAnalytics } from '@/utils/analytics';
 import { COLORS, SPACING, RADIUS, OVERLAYS, SHADOWS, BORDER_WIDTH } from '@/constants/theme';
 import { sectionHeaderText, bodyText, bodyStrongText, bodyTextLoose, captionText } from '@/constants/typography';
 import { CombinedParsedRecipe, StructuredIngredient } from '@/common/types';
@@ -52,6 +53,7 @@ export default function CookScreen() {
   // Access the entire context objects
   const cookingContext = useCooking();
   const errorModalContext = useErrorModal();
+  const { track } = useAnalytics();
 
   // Removed temporary AsyncStorage clearing - no longer needed
 
@@ -172,6 +174,25 @@ export default function CookScreen() {
             
             console.log('[CookScreen] 📊 Populated local recipes from existing sessions:', existingRecipes.length, 'recipes');
             setRecipes(existingRecipes);
+            
+            // Track steps started event for existing multi-recipe cooking sessions
+            const trackExistingStepsStarted = async () => {
+              try {
+                // For existing sessions, we can't easily determine modifications from the context
+                // So we'll track with basic info
+                await track('steps_started', { 
+                  scaled: false, // Default assumption for existing sessions
+                  substitutions: 0, // Default assumption for existing sessions
+                  sessionType: 'multi_recipe',
+                  recipeCount: existingRecipes.length,
+                  existingSession: true
+                });
+              } catch (error) {
+                console.error('[CookScreen] Error tracking steps_started for existing sessions:', error);
+              }
+            };
+            
+            trackExistingStepsStarted();
             setIsLoading(false);
             return;
           }
@@ -233,6 +254,36 @@ export default function CookScreen() {
           }).filter(Boolean);
           
           setRecipes(recipeList); // Update local recipes state
+          
+          // Track steps started event for multi-recipe cooking
+          const trackStepsStarted = async () => {
+            try {
+              // Check if any recipes have modifications (scaling or substitutions)
+              const hasModifications = recipeList.some((recipe: any) => {
+                const miseRecipe = miseRecipes.find((mr: any) => mr.id === recipe.miseRecipeId);
+                return miseRecipe?.local_modifications?.scaling_factor !== 1 || 
+                       miseRecipe?.local_modifications?.ingredient_changes?.length > 0;
+              });
+              
+              const totalSubstitutions = miseRecipes.reduce((total: number, mr: any) => {
+                return total + (mr.local_modifications?.ingredient_changes?.length || 0);
+              }, 0);
+              
+              await track('steps_started', { 
+                scaled: hasModifications, 
+                substitutions: totalSubstitutions,
+                sessionType: 'multi_recipe',
+                recipeCount: recipeList.length
+              });
+            } catch (error) {
+              console.error('[CookScreen] Error tracking steps_started:', error);
+            }
+          };
+          
+          // Track if we have recipes loaded
+          if (recipeList && recipeList.length > 0) {
+            trackStepsStarted();
+          }
           
           // Initialize sessions in context with fresh data
           if (miseRecipes.length > 0) {

@@ -7,14 +7,12 @@ import {
   TouchableOpacity,
   Keyboard,
   KeyboardAvoidingView,
-  Platform,
   TouchableWithoutFeedback,
   Animated,
   Image,
   SafeAreaView,
   ActivityIndicator,
   InteractionManager,
-  Alert,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -37,22 +35,7 @@ import RecipeMatchSelectionModal from '@/components/RecipeMatchSelectionModal';
 import { CombinedParsedRecipe } from '@/common/types';
 import { useRecipeSubmission } from '@/hooks/useRecipeSubmission';
 import { detectInputType } from '../../server/utils/detectInputType';
-
-// Custom hook for interval management
-const useInterval = (callback: () => void, delay: number | null) => {
-  const savedCallback = useRef(callback);
-
-  useEffect(() => {
-    savedCallback.current = callback;
-  }, [callback]);
-
-  useEffect(() => {
-    if (delay !== null) {
-      const id = setInterval(() => savedCallback.current(), delay);
-      return () => clearInterval(id);
-    }
-  }, [delay]);
-};
+import { useAnalytics } from '@/utils/analytics';
 
 export default function HomeScreen() {
   const [recipeUrl, setRecipeUrl] = useState('');
@@ -63,6 +46,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { showError, hideError } = useErrorModal();
   const { session } = useAuth();
+  const { track } = useAnalytics();
   
   // Use the new submission hook
   const {
@@ -129,8 +113,6 @@ export default function HomeScreen() {
 
   // Component Mount/Unmount logging
   useEffect(() => {
-    console.log('[HomeScreen] Component DID MOUNT');
-    
     // Stage 1: Logo slides down and fades in (starts immediately)
     const logoTimer = setTimeout(() => {
       Animated.parallel([
@@ -157,7 +139,6 @@ export default function HomeScreen() {
     }, 750); // Logo animation (700ms) + small gap (50ms)
     
     return () => {
-      console.log('[HomeScreen] Component WILL UNMOUNT');
       clearTimeout(logoTimer);
       clearTimeout(contentTimer);
     };
@@ -166,12 +147,7 @@ export default function HomeScreen() {
   // Focus effect logging
   useFocusEffect(
     useCallback(() => {
-      console.log('[HomeScreen] 🎯 useFocusEffect triggered');
-      console.log('[HomeScreen] 👁️ Screen focused');
-
       return () => {
-        console.log('[HomeScreen] 🌀 useFocusEffect cleanup');
-        console.log('[HomeScreen] 🌀 Screen is blurring (not necessarily unmounting)');
         // Clear submission state when leaving screen
         clearState();
       };
@@ -184,7 +160,7 @@ export default function HomeScreen() {
     if (action === 'select' && selectedRecipeId) {
       // Find the selected recipe from potentialMatches using the selectedRecipeId
       const selectedMatch = potentialMatches.find(match => 
-        match.recipe.id?.toString() === selectedRecipeId
+        match.recipe.id === Number(selectedRecipeId)
       );
       
       if (selectedMatch) {
@@ -196,13 +172,20 @@ export default function HomeScreen() {
             from: '/tabs',
           },
         });
-        console.log('[HomeScreen] User selected from modal, routing to recipe:', selectedMatch.recipe.title);
+        track('recipe_selected_from_modal', {
+          recipeId: selectedMatch.recipe.id,
+          recipeTitle: selectedMatch.recipe.title,
+          userId: session?.user?.id,
+        });
       } else {
         console.error('[HomeScreen] Could not find selected recipe in potentialMatches:', selectedRecipeId);
         showError('Navigation Error', 'Could not load the selected recipe. Please try again.');
       }
     } else if (action === 'createNew') {
-      console.log('[Home] User chose to create new. Navigating to loading for new parse.');
+      track('recipe_create_new_selected', {
+        recipeUrl: recipeUrl,
+        userId: session?.user?.id,
+      });
       router.push({
         pathname: '/loading',
         params: {
@@ -213,9 +196,11 @@ export default function HomeScreen() {
     } else if (action === 'returnHome') {
       // Clear input and stay on home screen
       setRecipeUrl('');
-      console.log('[HomeScreen] User opted to return to home, clearing input.');
+      track('recipe_modal_return_home', {
+        userId: session?.user?.id,
+      });
     }
-  }, [potentialMatches, router, showError, recipeUrl]);
+  }, [potentialMatches, router, showError, recipeUrl, track, session?.user?.id]);
 
   // Replace isValidRecipeInput with a function that uses detectInputType
   function isValidRecipeInput(input: string) {
@@ -271,14 +256,34 @@ export default function HomeScreen() {
       return;
     }
 
+    // Generate submission ID for tracking
+    const submissionId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
     try {
-      console.log('[HomeScreen] Starting submission with:', {
+      // Track input mode selection
+      const inputType = detectInputType(recipeInput);
+      await track('input_mode_selected', { inputType });
+      
+      track('recipe_submission_started', {
         inputLength: recipeInput.length,
-        inputType: detectInputType(recipeInput),
+        inputType: inputType,
+        submissionId,
+        userId: session?.user?.id,
       });
 
       const result = await submitRecipe(recipeInput);
-      console.log('[HomeScreen] handleSubmit: Result from submitRecipe:', JSON.stringify(result)); // NEW LOG
+      
+      track('recipe_submission_result', {
+        success: result.success,
+        action: result.action,
+        error: result.error,
+        matches_count: result.matches?.length,
+        recipeId: result.recipe?.id,
+        normalizedUrl: result.normalizedUrl,
+        inputType: result.inputType,
+        submissionId,
+        userId: session?.user?.id,
+      });
       
       if (!result.success) {
         if (result.action === 'show_validation_error' && result.error) {
@@ -291,10 +296,19 @@ export default function HomeScreen() {
         // Show the match selection modal
         setPotentialMatches(result.matches);
         setShowMatchSelectionModal(true);
-        console.log('[HomeScreen] Multiple matches found, showing selection modal.');
+        track('recipe_matches_found', {
+          match_count: result.matches.length,
+          submissionId,
+          userId: session?.user?.id,
+        });
       } else if (result.action === 'navigate_to_summary' && result.recipe) {
         // Navigate to summary with cached recipe
-        console.log('[HomeScreen] Recipe submitted successfully - navigating to summary');
+        track('navigation_to_recipe_summary', {
+          recipeId: result.recipe.id,
+          entryPoint: 'new',
+          submissionId,
+          userId: session?.user?.id,
+        });
         InteractionManager.runAfterInteractions(() => {
           router.push({
             pathname: '/recipe/summary',
@@ -308,7 +322,12 @@ export default function HomeScreen() {
         setRecipeUrl(''); // Clear input after successful submission
       } else if (result.action === 'navigate_to_loading' && result.normalizedUrl) {
         // Navigate to loading with normalized URL
-        console.log('[HomeScreen] Recipe submitted successfully - navigating to loading with normalized URL');
+        track('navigation_to_loading_screen', {
+          normalizedUrl: result.normalizedUrl,
+          inputType: result.inputType,
+          submissionId,
+          userId: session?.user?.id,
+        });
         InteractionManager.runAfterInteractions(() => {
                   router.push({
           pathname: '/loading',
@@ -322,6 +341,17 @@ export default function HomeScreen() {
       }
     } catch (error) {
       console.error('[HomeScreen] Submission error:', error);
+      
+      // Log to Logtail for production error tracking
+      track('recipe_submission_failed', {
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+        submissionId: submissionId || 'unknown',
+        userId: session?.user?.id,
+        recipeInput: recipeInput,
+        inputType: detectInputType(recipeInput),
+      });
+      
       showError('Recipe Submission Failed', 'Something went wrong while submitting your recipe. Please try again, and if the problem continues, try pasting the recipe text instead of a URL.');
     }
   };

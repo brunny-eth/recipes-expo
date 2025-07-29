@@ -4,6 +4,7 @@ import { COLORS } from '@/constants/theme';
 import Animated, { FadeIn, FadeOut, SlideInRight, SlideOutLeft, useSharedValue, useAnimatedStyle, withSpring, runOnJS } from 'react-native-reanimated';
 import { useState, useEffect } from 'react';
 import { PanGestureHandler, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useAnalytics } from '@/utils/analytics';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -41,8 +42,10 @@ const onboardingSteps = [
 
 export default function OnboardingScreen({ onComplete, onBack }: OnboardingScreenProps) {
   const [currentStep, setCurrentStep] = useState(1);
+  const [isSwiping, setIsSwiping] = useState(false);
   const currentStepData = onboardingSteps[currentStep - 1];
   const translateX = useSharedValue(0);
+  const { track } = useAnalytics();
 
   // Preload all onboarding GIFs for smooth playback
   useEffect(() => {
@@ -63,20 +66,30 @@ export default function OnboardingScreen({ onComplete, onBack }: OnboardingScree
   }, []);
 
   const handleSwipe = (direction: 'left' | 'right') => {
+    if (isSwiping) return; // Prevent multiple swipes
+    
+    setIsSwiping(true);
     if (direction === 'right' && currentStep < 4) {
       setCurrentStep(currentStep + 1);
     } else if (direction === 'left' && currentStep > 1) {
       setCurrentStep(currentStep - 1);
     }
+    
+    // Reset swipe state after animation
+    setTimeout(() => setIsSwiping(false), 500);
   };
 
   const onSwipeGesture = (event: any) => {
     const { translationX, velocityX } = event.nativeEvent;
     
-    if (Math.abs(translationX) > 50 || Math.abs(velocityX) > 500) {
-      if (translationX > 0 && currentStep > 1) {
+    // Increased thresholds for less sensitivity
+    const translationThreshold = 100; // Increased from 50
+    const velocityThreshold = 800; // Increased from 500
+    
+    if (Math.abs(translationX) > translationThreshold || Math.abs(velocityX) > velocityThreshold) {
+      if (translationX > 0 && currentStep > 1 && !isSwiping) {
         runOnJS(handleSwipe)('left');
-      } else if (translationX < 0 && currentStep < 4) {
+      } else if (translationX < 0 && currentStep < 4 && !isSwiping) {
         runOnJS(handleSwipe)('right');
       }
     }
@@ -155,7 +168,16 @@ export default function OnboardingScreen({ onComplete, onBack }: OnboardingScree
                     >
                       <TouchableOpacity
                         style={styles.startButton}
-                        onPress={onComplete}
+                        onPress={async () => {
+                          try {
+                            // Track tutorial completion event
+                            await track('tutorial_completed', { method: 'onboarding' });
+                          } catch (error) {
+                            console.error('Failed to track tutorial completion:', error);
+                          }
+                          // Always call onComplete, even if tracking fails
+                          onComplete();
+                        }}
                       >
                         <Text style={styles.startButtonText}>Start Cooking</Text>
                       </TouchableOpacity>

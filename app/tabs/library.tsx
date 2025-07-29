@@ -26,6 +26,7 @@ import ScreenHeader from '@/components/ScreenHeader';
 import AddNewFolderModal from '@/components/AddNewFolderModal';
 import ConfirmationModal from '@/components/ConfirmationModal';
 import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
+import { useAnalytics } from '@/utils/analytics';
 
 // Types for folders
 type SavedFolder = {
@@ -42,6 +43,7 @@ export default function LibraryScreen() {
   const router = useRouter();
   const { session, isAuthenticated } = useAuth();
   const { showError } = useErrorModal();
+  const { track } = useAnalytics();
   
   // Tab state
   const [selectedTab, setSelectedTab] = useState<'explore' | 'saved'>('explore');
@@ -262,8 +264,17 @@ export default function LibraryScreen() {
   }, [selectedTab, fetchExploreRecipesFromAPI, fetchSavedFolders]);
 
   // Navigate to recipe
-  const navigateToRecipe = useCallback((recipe: ParsedRecipe) => {
+  const navigateToRecipe = useCallback(async (recipe: ParsedRecipe) => {
     console.log('[LibraryScreen] Navigating to recipe:', recipe.title);
+    
+    // Track input mode selection if user is on explore tab
+    if (selectedTab === 'explore') {
+      try {
+        await track('input_mode_selected', { inputType: 'explore' });
+      } catch (error) {
+        console.error('[LibraryScreen] Error tracking explore recipe selection:', error);
+      }
+    }
     
     router.push({
       pathname: '/recipe/summary',
@@ -272,7 +283,7 @@ export default function LibraryScreen() {
         entryPoint: 'library',
       },
     });
-  }, [router]);
+  }, [router, selectedTab, track]);
 
   // Navigate to folder
   const navigateToFolder = useCallback((folder: SavedFolder) => {

@@ -51,7 +51,6 @@ const createTabBarIcon = (iconName: string, label: string) => {
  * This is critical for maintaining individual tab screen state and preventing useFocusEffect remounts.
  */
 const MemoizedTabsNavigator = React.memo(() => {
-  console.log('[MemoizedTabsNavigator] Rendered - this should only happen once after initial load');
   
   return (
     <Tabs

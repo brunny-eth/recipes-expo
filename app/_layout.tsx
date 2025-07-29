@@ -8,6 +8,7 @@ import * as Font from 'expo-font';
 import { Asset } from 'expo-asset';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { FadeIn } from 'react-native-reanimated';
+import { PostHogProvider } from 'posthog-react-native';
 
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { ErrorModalProvider } from '@/context/ErrorModalContext';
@@ -112,7 +113,7 @@ function RootLayoutNav() {
         setAssetsLoaded(true);
         console.log('[RootLayoutNav][prepareApp] Assets loaded. assetsLoaded set to true.');
 
-        console.log('[RootLayoutNav][prepareApp] Checking AsyncStorage for \'hasLaunched\'...');
+        console.log('[RootLayoutNav][prepareApp] Checking AsyncStorage for "hasLaunched"...');
         const hasLaunchedBefore = await AsyncStorage.getItem('hasLaunched');
         
         if (!isMounted) return;
@@ -139,7 +140,7 @@ function RootLayoutNav() {
     console.log('[RootLayoutNav][handleWelcomeDismiss] Welcome screen dismissed by user.');
     try {
       await AsyncStorage.setItem('hasLaunched', 'true');
-      console.log('[RootLayoutNav][handleWelcomeDismiss] AsyncStorage \'hasLaunched\' set to true.');
+      console.log('[RootLayoutNav][handleWelcomeDismiss] AsyncStorage "hasLaunched" set to true.');
       setIsFirstLaunch(false); // Update state to prevent WelcomeScreen from showing again next time
       console.log('[RootLayoutNav][handleWelcomeDismiss] State updated, letting useEffect handle SplashScreen.hideAsync().');
       // Don't call SplashScreen.hideAsync() here - let the useEffect handle it
@@ -325,14 +326,23 @@ export default function RootLayout() {
   console.log('[RootLayout] Rendering stable context providers and RootLayoutNav');
   
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <ErrorModalProvider>
-        <AuthProvider>
-          <CookingProvider>
-            <RootLayoutNav />
-          </CookingProvider>
-        </AuthProvider>
-      </ErrorModalProvider>
-    </GestureHandlerRootView>
+    <PostHogProvider
+      apiKey="phc_LHzQ18078GlMjpjRz43tJHQ7HdiJ971AtSLK4wtdaSu"
+      options={{
+        host: 'https://us.i.posthog.com',
+        enableSessionReplay: true,
+      }}
+      autocapture
+    >
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <ErrorModalProvider>
+          <AuthProvider>
+            <CookingProvider>
+              <RootLayoutNav />
+            </CookingProvider>
+          </AuthProvider>
+        </ErrorModalProvider>
+      </GestureHandlerRootView>
+    </PostHogProvider>
   );
 }
