@@ -44,8 +44,9 @@ export async function findSimilarRecipe(
       return null;
     }
 
-    // Filter out unwanted recipe types (user_modified, raw_text) and keep only URL or video sources
+    // Filter out unwanted recipe types and keep only URL or video sources
     const allowedSourceTypes = ['url', 'video'];
+    const excludedSourceTypes = ['user_modified', 'raw_text'];
 
     const filteredMatches = data
       .filter((match: any) => {
@@ -54,6 +55,12 @@ export async function findSimilarRecipe(
 
         // If the RPC returned a source_type column, use it; otherwise, fall back to inspecting the JSON if available
         const sourceType = match.source_type || match.recipe_data?.source_type || null;
+
+        // Explicitly exclude user_modified and other unwanted source types
+        if (sourceType && excludedSourceTypes.includes(sourceType)) {
+          logger.debug({ function: 'findSimilarRecipe', matchId: match.id, sourceType }, 'Excluding recipe due to source type.');
+          return false;
+        }
 
         // If we can determine the source type, enforce the whitelist
         if (sourceType) {

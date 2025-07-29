@@ -633,6 +633,12 @@ export default function RecipeSummaryScreen() {
           setSelectedScaleFactor(1.0);
           setPersistedChanges([]);
           setCurrentUnsavedChanges([]);
+          console.log('[INGREDIENT_LOCKING] New recipe initialized:', {
+            entryPoint,
+            persistedChanges: [],
+            currentUnsavedChanges: [],
+            recipeTitle: parsed.title,
+          });
           // Set baseline for mise entry point
           if (entryPoint === 'mise') {
             setBaselineScaleFactor(1.0);

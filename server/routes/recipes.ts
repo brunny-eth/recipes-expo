@@ -304,20 +304,15 @@ router.post('/save-modified', async (req: Request<any, any, SaveModifiedRecipeRe
       hasImagePreserved: !!modifiedRecipeData?.image
     }, 'Modified recipe inserted into processed_recipes_cache.');
 
-    // --- 3. Generate and Save Embedding for the New Modified Recipe ---
-    // Prepare text inputs for embedding from the modifiedRecipeData
-    const ingredientsText = modifiedRecipeData.ingredientGroups
-      ?.flatMap(group => group.ingredients.map(ing => `${ing.amount || ''} ${ing.unit || ''} ${ing.name}`.trim()))
-      .join('\n');
-    const instructionsText = modifiedRecipeData.instructions?.join('\n');
-
-    await generateAndSaveEmbedding(newModifiedRecipeId, {
-      title: modifiedRecipeData.title,
-      ingredientsText: ingredientsText,
-      instructionsText: instructionsText,
-    });
-    // Note: The embedding is saved asynchronously, but we proceed with user_saved_recipes insert.
-    // You might want to add more robust error handling or retry logic for embedding if it's critical path.
+    // --- 3. Skip Embedding Generation for User-Modified Recipes ---
+    // User-modified recipes should not be embedded since they are filtered out during search
+    // This prevents unnecessary embedding generation and storage
+    logger.info({ 
+      requestId, 
+      newModifiedRecipeId,
+      sourceType: 'user_modified',
+      reason: 'Skipping embedding generation for user-modified recipe'
+    }, 'User-modified recipe - embedding generation skipped.');
 
     // --- 4. Insert into user_saved_recipes ---
     // This links the user to their newly saved modified recipe in the cache

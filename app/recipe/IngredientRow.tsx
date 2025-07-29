@@ -71,16 +71,42 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
   showCheckboxes = true,
   isViewingSavedRecipe = false, // Keep for backward compatibility
 }) => {
-  const { baseName, isRemoved, substitutedFor } = parseRecipeDisplayName(
-    ingredient.name,
+  // Only parse ingredient names if they contain UI-generated markers
+  const isUIGeneratedSubstitution = ingredient.name.includes('(substituted for ') || ingredient.name.includes('(removed)');
+  
+  // Check if ingredient contains natural language substitutions (disable modification for these)
+  const hasNaturalLanguageSubstitutions = !isUIGeneratedSubstitution && (
+    ingredient.name.includes(' or ') ||
+    ingredient.name.includes(' / ') ||
+    ingredient.name.includes('/') ||
+    ingredient.name.includes(' OR ') ||
+    ingredient.name.includes(' (or ')
   );
+  
+  let baseName: string;
+  let isRemoved: boolean;
+  let substitutedFor: string | null = null;
+  let ingredientToCheck: string;
+  
+  if (isUIGeneratedSubstitution) {
+    // This is a UI-generated change, parse it properly
+    const parsed = parseRecipeDisplayName(ingredient.name);
+    baseName = parsed.baseName;
+    isRemoved = parsed.isRemoved || false;
+    substitutedFor = parsed.substitutedFor || null;
+    ingredientToCheck = substitutedFor || baseName;
+  } else {
+    // This is original recipe text, treat the full name as the base name
+    baseName = ingredient.name;
+    isRemoved = false;
+    substitutedFor = null;
+    ingredientToCheck = baseName;
+  }
+
   const originalNameForSub = getOriginalIngredientNameFromAppliedChanges(
     [...persistedChanges, ...appliedChanges], // Use combined changes for parsing
     ingredient.name,
   );
-
-  // For substituted ingredients, we need to check the original ingredient name
-  const ingredientToCheck = substitutedFor || baseName;
 
   // Determine if this specific ingredient has a persisted change (locked)
   const hasPersistedChange = persistedChanges.some(
@@ -92,16 +118,18 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
     (change) => change.from === ingredientToCheck
   );
 
-  // If an ingredient has a persisted change, it should not be modifiable or revertible
-  const isLocked = hasPersistedChange;
+  // If an ingredient has a persisted change or natural language substitutions, it should not be modifiable
+  const isLocked = hasPersistedChange || hasNaturalLanguageSubstitutions;
 
-  // Show revert button only if there's an unsaved change and it's not locked
+  // Show revert button only if there's an actual unsaved change and it's not locked
   const showRevertButton = hasUnsavedChange && !isLocked;
 
   // Debug logging to help track the locking behavior - remove in production
-  if (substitutedFor || hasPersistedChange || hasUnsavedChange) {
+  if (substitutedFor || hasPersistedChange || hasUnsavedChange || showRevertButton || isUIGeneratedSubstitution || hasNaturalLanguageSubstitutions) {
     console.log('[INGREDIENT_LOCKING]', {
       ingredientName: ingredient.name,
+      isUIGeneratedSubstitution,
+      hasNaturalLanguageSubstitutions,
       baseName,
       substitutedFor,
       ingredientToCheck,
