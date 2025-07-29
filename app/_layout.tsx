@@ -12,6 +12,7 @@ import { PostHogProvider } from 'posthog-react-native';
 
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { ErrorModalProvider } from '@/context/ErrorModalContext';
+import { SuccessModalProvider } from '@/context/SuccessModalContext';
 import { CookingProvider } from '@/context/CookingContext';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -337,12 +338,14 @@ export default function RootLayout() {
     >
       <GestureHandlerRootView style={{ flex: 1 }}>
         <ErrorModalProvider>
-          <AuthProvider>
-            <CookingProvider>
-              <AuthNavigationHandler />
-              <RootLayoutNav />
-            </CookingProvider>
-          </AuthProvider>
+          <SuccessModalProvider>
+            <AuthProvider>
+              <CookingProvider>
+                <AuthNavigationHandler />
+                <RootLayoutNav />
+              </CookingProvider>
+            </AuthProvider>
+          </SuccessModalProvider>
         </ErrorModalProvider>
       </GestureHandlerRootView>
     </PostHogProvider>

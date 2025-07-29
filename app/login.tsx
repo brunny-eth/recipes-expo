@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
+import { useSuccessModal } from '@/context/SuccessModalContext';
 import { COLORS, SPACING, RADIUS, ICON_SIZE } from '@/constants/theme';
 import { FontAwesome } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -25,6 +26,7 @@ type AuthProvider = 'google' | 'apple';
 
 const LoginScreen = () => {
   const { signIn, isLoading: isAuthLoading } = useAuth();
+  const { showSuccess } = useSuccessModal();
   const [isSigningIn, setIsSigningIn] = useState<AuthProvider | null>(null);
 
   // Create the same animated logo as the index page
@@ -62,8 +64,12 @@ const LoginScreen = () => {
     try {
       const success = await signIn(provider); // Get the boolean result
       if (success) {
-        console.log(`[LoginScreen] Sign-in successful with ${provider}. Success modal will show on home screen.`);
-        // AuthContext will set justLoggedIn flag, and home screen will show success modal
+        console.log(`[LoginScreen] Sign-in successful with ${provider}.`);
+        showSuccess(
+          'Sign-in Successful!',
+          `You have successfully signed in with ${provider}. Redirecting to the main app...`,
+          2000 // Show for 2 seconds before navigation
+        );
       } else {
         console.log(`[LoginScreen] Sign-in flow cancelled or failed for ${provider}.`);
         // No specific action needed here as AuthContext's error modal already showed
@@ -92,7 +98,7 @@ const LoginScreen = () => {
         </View>
         <View style={styles.authSection}>
           <Text style={styles.subtitle}>
-            Link an account to use, save, and find new recipes.
+            Create an account with Google or Apple Login to use, save, and find new recipes.
           </Text>
 
           <TouchableOpacity
@@ -204,9 +210,10 @@ const styles = StyleSheet.create({
   } as TextStyle,
   subtitle: {
     ...bodyTextLoose,
+    fontSize: FONT.size.lg, // Make text bigger
     color: COLORS.secondary,
     textAlign: 'center',
-    marginBottom: SPACING.lg, // Reduced spacing to bring buttons closer
+    marginBottom: SPACING.xxxl, // Increased spacing to push buttons further away
   } as TextStyle,
   button: {
     flexDirection: 'row',

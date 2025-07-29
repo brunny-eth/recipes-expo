@@ -15,6 +15,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useErrorModal } from '@/context/ErrorModalContext';
+import { useSuccessModal } from '@/context/SuccessModalContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Updates from 'expo-updates';
@@ -30,6 +31,7 @@ import ScreenHeader from '@/components/ScreenHeader';
 export default function AccountScreen() {
   const { signOut, isAuthenticated, session } = useAuth();
   const { showError } = useErrorModal();
+  const { showSuccess } = useSuccessModal();
   const insets = useSafeAreaInsets();
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -70,7 +72,7 @@ export default function AccountScreen() {
 
       if (response.ok) {
         const responseData = await response.json();
-        showError('Success', 'Thank you for your feedback!');
+        showSuccess('Success', 'Thank you for your feedback!');
         setFeedbackMessage('');
       } else {
         const errorData = await response.json().catch(() => ({}));
@@ -91,7 +93,7 @@ export default function AccountScreen() {
     try {
       await signOut();
       // The success feedback will show briefly before navigation
-      showError('Success', 'You have been signed out successfully.');
+      showSuccess('Signed Out', 'You have been signed out successfully.');
     } catch (error) {
       console.error('[AccountScreen] Sign out error:', error);
       showError('Sign Out Error', 'Failed to sign out. Please try again.');
