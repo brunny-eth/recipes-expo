@@ -5,6 +5,8 @@ import { scraperClient, scraperApiKey } from '../lib/scraper';
 import { supabaseAdmin } from '../lib/supabaseAdmin';
 import { supabase } from '../lib/supabase';
 import { parseAndCacheRecipe } from '../services/parseRecipe';
+import { parseImageRecipe } from '../services/parseImageRecipe';
+import { upload } from '../lib/multer';
 import { modifyInstructions } from '../services/instructionModification';
 import { getAllRecipes, getRecipeById } from '../services/recipeDB';
 import { generateAndSaveEmbedding } from '../../utils/recipeEmbeddings';
@@ -113,6 +115,73 @@ router.post('/parse', async (req: Request, res: Response) => {
         method: req.method,
         body: req.body
     }, 'Unhandled exception in /parse route');
+    res.status(500).json({ error: 'Internal server error', details: error.message });
+  }
+});
+
+// --- Image Parsing Route ---
+// Test with: curl -X POST -F "image=@/path/to/recipe.jpg" http://localhost:3000/api/recipes/parse-image
+router.post('/parse-image', upload.single('image'), async (req: Request, res: Response) => {
+  const requestId = (req as any).id;
+  
+  try {
+    const file = (req as any).file;
+    if (!file) {
+      logger.warn({ requestId, route: req.originalUrl, method: req.method }, 'No image file uploaded for /parse-image');
+      return res.status(400).json({ error: 'Image file is required.' });
+    }
+
+    logger.info({ 
+      requestId, 
+      filename: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size,
+      route: req.originalUrl, 
+      method: req.method 
+    }, 'Received image for parsing');
+
+    const { recipe, error: parseError, fromCache, inputType, cacheKey, timings, usage, fetchMethodUsed, extractedText, imageProcessingTime } = await parseImageRecipe(
+      file.buffer, 
+      file.mimetype, 
+      requestId
+    );
+
+    if (parseError) {
+      switch (parseError.code) {
+        case ParseErrorCode.INVALID_INPUT:
+          return res.status(400).json({ error: parseError });
+        case ParseErrorCode.FINAL_VALIDATION_FAILED:
+        case ParseErrorCode.GENERATION_EMPTY:
+          return res.status(422).json({ error: parseError });
+        default:
+          return res.status(500).json({ error: parseError });
+      }
+    }
+
+    res.json({
+      message: `Image processing complete (${inputType}).`,
+      inputType,
+      fromCache,
+      cacheKey,
+      timings,
+      usage,
+      fetchMethodUsed,
+      recipe,
+      extractedText: extractedText ? extractedText.substring(0, 200) + '...' : null,
+      imageProcessingTime
+    });
+
+  } catch (err) {
+    const error = err as Error;
+    logger.error({
+        requestId: (req as any).id,
+        message: '💥 Error in /api/recipes/parse-image:', 
+        errorObject: error, 
+        errorMessage: error.message,
+        stack: error.stack,
+        route: req.originalUrl,
+        method: req.method
+    }, 'Unhandled exception in /parse-image route');
     res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 });

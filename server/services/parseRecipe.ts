@@ -7,6 +7,7 @@ import { createLogger } from '../lib/logger';
 import { parseUrlRecipe } from './parseUrlRecipe';
 import { parseTextRecipe } from './parseTextRecipe';
 import { parseVideoRecipe } from './parseVideoRecipe';
+import { parseImageRecipe } from './parseImageRecipe';
 import { StructuredError, ParseErrorCode } from '../../common/types/errors';
 
 const logger = createLogger('parseRecipe');
@@ -59,7 +60,7 @@ export async function parseAndCacheRecipe(
         const trimmedInput = input.trim();
         const inputType = detectInputType(trimmedInput);
 
-        const SUPPORTED_INPUT_TYPES: ReadonlyArray<InputType> = ['url', 'raw_text', 'video'];
+        const SUPPORTED_INPUT_TYPES: ReadonlyArray<InputType> = ['url', 'raw_text', 'video', 'image'];
         if (!SUPPORTED_INPUT_TYPES.includes(inputType)) {
             const errorMsg = `Unsupported input type detected: ${inputType}`;
             logger.error({ requestId, inputTypeRec: inputType }, errorMsg);

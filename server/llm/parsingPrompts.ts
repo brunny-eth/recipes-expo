@@ -131,3 +131,33 @@ ${caption}
     isJson: true,
   };
 }
+
+export function buildImageParsePrompt(): PromptPayload {
+  const userText = `
+The following image contains a recipe. Your task is to extract ALL visible text from the image and parse it into the standard recipe JSON format, following all rules from the system prompt.
+
+Look carefully at the image for:
+- Recipe title or dish name
+- Ingredient lists (may be formatted as lists, paragraphs, or embedded in text)
+- Cooking instructions or preparation steps
+- Timing information (prep time, cook time, total time)
+- Serving size or yield information
+- Any cooking tips, notes, or additional guidance
+
+The image may contain a recipe card, cookbook page, handwritten recipe, screenshot, or any other format. Extract ALL text content accurately, paying special attention to measurements, ingredient names, and cooking instructions.
+
+If ingredients are only mentioned within instruction steps, be sure to extract them into the ingredientGroups section. If an instruction step contains vague references like "all ingredients" or "all sauce ingredients," expand the instruction by including a comma-separated list of the relevant ingredients from the corresponding ingredientGroup's ingredients array.
+
+Ignore any non-recipe content like website headers, ads, social media elements, or unrelated text that may appear in the image.
+
+---
+EXTRACT TEXT FROM THE PROVIDED IMAGE AND PARSE AS RECIPE JSON:
+---
+`;
+
+  return {
+    system: COMMON_SYSTEM_PROMPT,
+    text: userText.trim(),
+    isJson: true,
+  };
+}

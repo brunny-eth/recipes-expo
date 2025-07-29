@@ -18,6 +18,11 @@ export type PromptPayload = {
         requestId: string;
         route?: string;
     };
+    // Support for vision models
+    imageData?: {
+        mimeType: string;
+        data: string; // base64 encoded image data
+    };
 };
 
 /**
@@ -57,16 +62,41 @@ export const geminiAdapter: ModelAdapter = async (
     const fullPrompt = withPromptDefaults(prompt);
     const requestId = fullPrompt.metadata?.requestId ?? 'no-id';
     const start = Date.now();
-    logger.info({ requestId, adapter: 'gemini', promptLength: fullPrompt.text.length }, 'Calling Gemini Adapter');
+    logger.info({ requestId, adapter: 'gemini', promptLength: fullPrompt.text.length, hasImage: !!fullPrompt.imageData }, 'Calling Gemini Adapter');
     
     try {
-        const combinedPrompt = `${fullPrompt.system}\n\n${fullPrompt.text}`;
+        let result;
+        
+        if (fullPrompt.imageData) {
+            // Vision model request with image
+            const combinedPrompt = `${fullPrompt.system}\n\n${fullPrompt.text}`;
+            
+            if (combinedPrompt.length > 250000) { 
+                throw new Error(`Gemini prompt is too large (${combinedPrompt.length} chars).`);
+            }
+            
+            const parts = [
+                { text: combinedPrompt },
+                {
+                    inlineData: {
+                        mimeType: fullPrompt.imageData.mimeType,
+                        data: fullPrompt.imageData.data
+                    }
+                }
+            ];
+            
+            result = await geminiModel.generateContent(parts);
+        } else {
+            // Text-only request (existing behavior)
+            const combinedPrompt = `${fullPrompt.system}\n\n${fullPrompt.text}`;
 
-        if (combinedPrompt.length > 250000) { 
-            throw new Error(`Gemini prompt is too large (${combinedPrompt.length} chars).`);
+            if (combinedPrompt.length > 250000) { 
+                throw new Error(`Gemini prompt is too large (${combinedPrompt.length} chars).`);
+            }
+            
+            result = await geminiModel.generateContent(combinedPrompt);
         }
         
-        const result = await geminiModel.generateContent(combinedPrompt);
         const response = result.response;
         const output = response.text();
         
@@ -84,7 +114,8 @@ export const geminiAdapter: ModelAdapter = async (
           inputTokenCount: usage.inputTokens,
           outputTokenCount: usage.outputTokens,
           totalCostUSD,
-          timeMs: Date.now() - start
+          timeMs: Date.now() - start,
+          hasImage: !!fullPrompt.imageData
         }, 'LLM call successful');
         
         return {
@@ -93,7 +124,7 @@ export const geminiAdapter: ModelAdapter = async (
             error: null
         };
     } catch (err: any) {
-        logger.error({ requestId, adapter: 'gemini', error: err }, 'Gemini Adapter call failed');
+        logger.error({ requestId, adapter: 'gemini', error: err, hasImage: !!fullPrompt.imageData }, 'Gemini Adapter call failed');
         return {
             output: null,
             usage: { inputTokens: 0, outputTokens: 0 },
@@ -112,7 +143,7 @@ export const openaiAdapter: ModelAdapter = async (
     const fullPrompt = withPromptDefaults(prompt);
     const requestId = fullPrompt.metadata?.requestId ?? 'no-id';
     const start = Date.now();
-    logger.info({ requestId, adapter: 'openai', promptLength: fullPrompt.text.length }, 'Calling OpenAI Adapter');
+    logger.info({ requestId, adapter: 'openai', promptLength: fullPrompt.text.length, hasImage: !!fullPrompt.imageData }, 'Calling OpenAI Adapter');
     if (!openaiClient) {
         return {
             output: null,
@@ -122,12 +153,38 @@ export const openaiAdapter: ModelAdapter = async (
     }
 
     try {
-        const completion = await openaiClient.chat.completions.create({
-            model: "gpt-4-turbo",
-            messages: [
+        let messages;
+        let model = "gpt-4-turbo";
+
+        if (fullPrompt.imageData) {
+            // Vision model request with image - use GPT-4o for vision
+            model = "gpt-4o";
+            messages = [
+                { role: "system", content: fullPrompt.system },
+                { 
+                    role: "user", 
+                    content: [
+                        { type: "text", text: fullPrompt.text },
+                        { 
+                            type: "image_url", 
+                            image_url: { 
+                                url: `data:${fullPrompt.imageData.mimeType};base64,${fullPrompt.imageData.data}` 
+                            } 
+                        }
+                    ]
+                }
+            ];
+        } else {
+            // Text-only request (existing behavior)
+            messages = [
                 { role: "system", content: fullPrompt.system },
                 { role: "user", content: fullPrompt.text }
-            ],
+            ];
+        }
+
+        const completion = await openaiClient.chat.completions.create({
+            model,
+            messages,
             temperature: fullPrompt.temperature,
             response_format: fullPrompt.isJson ? { type: "json_object" } : undefined
         });
@@ -146,7 +203,9 @@ export const openaiAdapter: ModelAdapter = async (
             inputTokenCount: usage.inputTokens,
             outputTokenCount: usage.outputTokens,
             totalCostUSD,
-            timeMs: Date.now() - start
+            timeMs: Date.now() - start,
+            hasImage: !!fullPrompt.imageData,
+            model: model
         }, 'LLM call successful');
 
         return {
@@ -158,7 +217,7 @@ export const openaiAdapter: ModelAdapter = async (
         
 
     } catch (err: any) {
-        logger.error({ requestId, adapter: 'openai', error: err }, 'OpenAI Adapter call failed');
+        logger.error({ requestId, adapter: 'openai', error: err, hasImage: !!fullPrompt.imageData }, 'OpenAI Adapter call failed');
         return {
             output: null,
             usage: { inputTokens: 0, outputTokens: 0 },
