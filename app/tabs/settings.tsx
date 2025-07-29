@@ -14,6 +14,7 @@ import {
 import { router, useFocusEffect } from 'expo-router';
 import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
+import { useErrorModal } from '@/context/ErrorModalContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Updates from 'expo-updates';
@@ -28,62 +29,33 @@ import ScreenHeader from '@/components/ScreenHeader';
 
 export default function AccountScreen() {
   const { signOut, isAuthenticated, session } = useAuth();
+  const { showError } = useErrorModal();
   const insets = useSafeAreaInsets();
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
-  // Component Mount/Unmount logging
-  useEffect(() => {
-    console.log('[AccountScreen] Component DID MOUNT');
-    console.log('[AccountScreen] Initial auth state:', { isAuthenticated, hasSession: !!session });
-    return () => {
-      console.log('[AccountScreen] Component WILL UNMOUNT');
-    };
-  }, []);
-
-  // Focus effect logging
-  useFocusEffect(
-    useCallback(() => {
-      console.log('[AccountScreen] 🎯 useFocusEffect triggered');
-      console.log('[AccountScreen] 👁️ Screen focused');
-      console.log('[AccountScreen] Auth state:', { isAuthenticated, hasSession: !!session });
-
-      return () => {
-        console.log('[AccountScreen] 🌀 useFocusEffect cleanup');
-        console.log('[AccountScreen] 🌀 Screen is blurring (not necessarily unmounting)');
-      };
-    }, [isAuthenticated, session])
-  );
-
-  // Log auth state changes
-  useEffect(() => {
-    console.log('[AccountScreen] Auth state changed:', { isAuthenticated, hasSession: !!session });
-  }, [isAuthenticated, session]);
-
   const handleSubmitFeedback = async () => {
     if (!feedbackMessage.trim()) {
-      Alert.alert('Error', 'Please enter a message before submitting feedback.');
+      showError('Input Required', 'Please enter a message before submitting feedback.');
       return;
     }
 
     if (!session?.user?.email) {
-      Alert.alert('Error', 'You must be logged in to submit feedback.');
+      showError('Login Required', 'You must be logged in to submit feedback.');
       return;
     }
 
     const backendUrl = process.env.EXPO_PUBLIC_API_URL;
     if (!backendUrl) {
       console.error('Missing EXPO_PUBLIC_API_URL environment variable');
-      Alert.alert('Error', 'Server configuration error. Please try again later.');
+      showError('Configuration Error', 'Server configuration error. Please try again later.');
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      console.log('[AccountScreen] Submitting feedback to:', `${backendUrl}/api/feedback`);
-      
       const response = await fetch(`${backendUrl}/api/feedback`, {
         method: 'POST',
         headers: {
@@ -96,12 +68,9 @@ export default function AccountScreen() {
         }),
       });
 
-      console.log('[AccountScreen] Feedback response status:', response.status);
-
       if (response.ok) {
         const responseData = await response.json();
-        console.log('[AccountScreen] Feedback submitted successfully:', responseData);
-        Alert.alert('Success', 'Thank you for your feedback!');
+        showError('Success', 'Thank you for your feedback!');
         setFeedbackMessage('');
       } else {
         const errorData = await response.json().catch(() => ({}));
@@ -110,7 +79,7 @@ export default function AccountScreen() {
       }
     } catch (error) {
       console.error('[AccountScreen] Error submitting feedback:', error);
-      Alert.alert('Error', 'Failed to submit feedback. Please try again.');
+      showError('Submission Error', 'Failed to submit feedback. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -118,23 +87,14 @@ export default function AccountScreen() {
 
   const handleSignOut = async () => {
     setIsSigningOut(true);
-    console.log('[AccountScreen] Starting sign out process...');
     
     try {
       await signOut();
-      console.log('[AccountScreen] Sign out completed successfully');
       // The success feedback will show briefly before navigation
-      Alert.alert('Success', 'You have been signed out successfully.', [
-        { 
-          text: 'OK', 
-          onPress: () => {
-            console.log('[AccountScreen] Sign out success alert dismissed');
-          }
-        }
-      ]);
+      showError('Success', 'You have been signed out successfully.');
     } catch (error) {
       console.error('[AccountScreen] Sign out error:', error);
-      Alert.alert('Error', 'Failed to sign out. Please try again.');
+      showError('Sign Out Error', 'Failed to sign out. Please try again.');
     } finally {
       setIsSigningOut(false);
     }
@@ -148,19 +108,9 @@ export default function AccountScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
         style={styles.scrollView}
-        onLayout={(event) => {
-          const { height } = event.nativeEvent.layout;
-          console.log('[AccountScreen] ScrollView layout height:', height);
-        }}
       >
         {/* User Info Section - Fixed height container */}
-        <View 
-          style={styles.userInfoContainer}
-          onLayout={(event) => {
-            const { height, y } = event.nativeEvent.layout;
-            console.log('[AccountScreen] UserInfoContainer layout:', { height, y, isAuthenticated });
-          }}
-        >
+        <View style={styles.userInfoContainer}>
           {isAuthenticated ? (
             <>
               <View style={styles.authStatusContainer}>
@@ -192,13 +142,7 @@ export default function AccountScreen() {
         </View>
 
         {/* Feedback Form Section - Always at consistent position */}
-        <View 
-          style={styles.feedbackSection}
-          onLayout={(event) => {
-            const { height, y } = event.nativeEvent.layout;
-            console.log('[AccountScreen] FeedbackSection layout:', { height, y, isAuthenticated });
-          }}
-        >
+        <View style={styles.feedbackSection}>
           <Text style={styles.sectionTitle}>Send Feedback</Text>
           <TextInput
             style={styles.feedbackInput}
@@ -295,9 +239,10 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xl,
   } as ViewStyle,
   userInfoContainer: {
-    height: 140, // Fixed height to ensure consistent positioning (use exact height instead of minHeight)
+    minHeight: 140, // Use minHeight for flexibility while maintaining consistent positioning
     marginBottom: SPACING.lg,
-    justifyContent: 'center', // Center content vertically within fixed height
+    justifyContent: 'center', // Center content vertically within container
+    paddingVertical: SPACING.md, // Add padding to ensure content doesn't touch edges
   } as ViewStyle,
   authStatusContainer: {
     flexDirection: 'row',
@@ -311,19 +256,6 @@ const styles = StyleSheet.create({
     ...bodyStrongText,
     color: COLORS.primary,
     marginLeft: SPACING.sm,
-  } as TextStyle,
-  userSection: {
-    marginBottom: SPACING.xl,
-    padding: SPACING.md,
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.md,
-    borderWidth: BORDER_WIDTH.default,
-    borderColor: COLORS.lightGray,
-  } as ViewStyle,
-  userEmail: {
-    ...bodyStrongText,
-    color: COLORS.textDark,
-    marginBottom: SPACING.sm,
   } as TextStyle,
   signOutButton: {
     marginTop: SPACING.sm,
@@ -339,7 +271,7 @@ const styles = StyleSheet.create({
     fontSize: FONT.size.smBody,
   } as TextStyle,
   feedbackSection: {
-    marginTop: SPACING.xxxl,
+    marginTop: SPACING.lg,
     marginBottom: SPACING.xl,
   } as ViewStyle,
   sectionTitle: {
@@ -422,12 +354,6 @@ const styles = StyleSheet.create({
   } as TextStyle,
   scrollContent: {
     paddingBottom: SPACING.xl,
-  } as ViewStyle,
-  bottomSection: {
-    paddingHorizontal: SPACING.pageHorizontal,
-    paddingTop: SPACING.lg,
-    borderTopWidth: BORDER_WIDTH.default,
-    borderTopColor: COLORS.lightGray,
   } as ViewStyle,
   bottomLegalSection: {
     paddingHorizontal: SPACING.pageHorizontal,

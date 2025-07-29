@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -32,12 +32,6 @@ import {
 } from '@/constants/typography';
 import { SubstitutionSuggestion } from '../../common/types';
 
-interface SubstitutionOption {
-  id: string;
-  name: string;
-  description: string;
-}
-
 interface IngredientSubstitutionModalProps {
   visible: boolean;
   onClose: () => void;
@@ -56,8 +50,7 @@ export default function IngredientSubstitutionModal({
   const [selectedOption, setSelectedOption] =
     useState<SubstitutionSuggestion | null>(null);
 
-  const handleCloseWithLog = () => {
-    console.log('[DEBUG] triggering onClose from modal');
+  const handleClose = () => {
     onClose();
   };
 
@@ -118,10 +111,10 @@ export default function IngredientSubstitutionModal({
       transparent
       animationType="none"
       presentationStyle="overFullScreen"
-      onRequestClose={handleCloseWithLog}
+      onRequestClose={handleClose}
     >
       <View style={styles.modalContainer}>
-        <Pressable style={styles.backdrop} onPress={handleCloseWithLog}>
+        <Pressable style={styles.backdrop} onPress={handleClose}>
           <Animated.View
             entering={FadeIn.duration(200)}
             exiting={FadeOut.duration(150)}

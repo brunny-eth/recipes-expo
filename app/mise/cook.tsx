@@ -26,6 +26,7 @@ import { useCooking } from '@/context/CookingContext';
 import { useAuth } from '@/context/AuthContext';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import { useAnalytics } from '@/utils/analytics';
+import { createLogger } from '@/utils/logger';
 import { COLORS, SPACING, RADIUS, OVERLAYS, SHADOWS, BORDER_WIDTH } from '@/constants/theme';
 import { sectionHeaderText, bodyText, bodyStrongText, bodyTextLoose, captionText } from '@/constants/typography';
 import { CombinedParsedRecipe, StructuredIngredient } from '@/common/types';
@@ -45,7 +46,6 @@ import {
 import { abbreviateUnit } from '@/utils/format';
 
 export default function CookScreen() {
-  console.error('[CookScreen] 🧨 FRESH BUILD MARKER vC9 - fixed infinite render loop in dependencies');
   
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -54,6 +54,7 @@ export default function CookScreen() {
   const cookingContext = useCooking();
   const errorModalContext = useErrorModal();
   const { track } = useAnalytics();
+  const logger = createLogger('CookScreen');
 
   // Removed temporary AsyncStorage clearing - no longer needed
 
@@ -125,8 +126,6 @@ export default function CookScreen() {
   // Timer and scroll cleanup - only on component unmount
   useEffect(() => {
     return () => {
-      console.error('[CookScreen] 🔍 Component unmounting (cleanup function).');
-      
       // Clean up timer
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
@@ -143,36 +142,20 @@ export default function CookScreen() {
   // Main data fetching and session initialization logic
   useFocusEffect(
     useCallback(() => {
-      console.error('[CookScreen] 🔍 useFocusEffect: Screen focused.');
-      const timestamp = new Date().toISOString();
-      console.log(`[CookScreen] 🎯 useFocusEffect triggered at ${timestamp}`);
-      
       const loadAndInitializeRecipes = async () => {
-        const loadTimestamp = new Date().toISOString();
-        console.log(`[CookScreen] 🚀 LOAD START at ${loadTimestamp}`);
-        
-        // Always fetch fresh data for simplicity and consistency
-        // No session resumption, no race conditions, no complexity
-        console.log('[CookScreen] 🔄 Always fetching fresh data for consistency');
-        
         setIsLoading(true);
         const initialRecipeIdFromParams = params.recipeId ? String(params.recipeId) : undefined;
-        console.log(`[CookScreen] 🔍 Initial recipe ID from params: ${initialRecipeIdFromParams}`);
 
         try {
           // Check if we already have active sessions - if so, don't clear them
           const hasActiveSessions = cookingContext.state.activeRecipes.length > 0;
-          console.log('[CookScreen] 🔍 Checking for existing sessions:', hasActiveSessions ? 'Found active sessions' : 'No active sessions');
           
           if (hasActiveSessions) {
-            console.log('[CookScreen] ✅ Using existing cooking sessions');
-            
             // Populate local recipes state from existing sessions
             const existingRecipes = cookingContext.state.activeRecipes
               .filter(session => session.recipe)
               .map(session => session.recipe!);
             
-            console.log('[CookScreen] 📊 Populated local recipes from existing sessions:', existingRecipes.length, 'recipes');
             setRecipes(existingRecipes);
             
             // Track steps started event for existing multi-recipe cooking sessions
@@ -188,7 +171,10 @@ export default function CookScreen() {
                   existingSession: true
                 });
               } catch (error) {
-                console.error('[CookScreen] Error tracking steps_started for existing sessions:', error);
+                logger.error('Error tracking steps_started for existing sessions', {
+                  errorMessage: error instanceof Error ? error.message : String(error),
+                  existingRecipesCount: existingRecipes.length
+                });
               }
             };
             
@@ -199,7 +185,10 @@ export default function CookScreen() {
           
           // Fetch fresh mise data from API
           if (!session?.user) {
-            console.log('[CookScreen] ❌ No user session found, cannot fetch mise recipes');
+            await track('mise_recipes_fetch_failed', { 
+              reason: 'no_user_session',
+              screen: 'cook'
+            });
             setRecipes([]);
             setIsLoading(false);
             return;
@@ -224,10 +213,7 @@ export default function CookScreen() {
           const recipesData = await response.json();
           const miseRecipes = recipesData?.recipes || [];
           
-          console.log('[CookScreen] 📊 Fetched mise recipes from API:', miseRecipes.length, 'recipes');
-          
           if (miseRecipes.length === 0) {
-            console.log('[CookScreen] ❌ No mise recipes found after fetch');
             setRecipes([]); // Clear local recipes if none fetched
             setIsLoading(false);
             return;
@@ -238,7 +224,11 @@ export default function CookScreen() {
             const recipeData = miseRecipe.prepared_recipe_data || miseRecipe.original_recipe_data;
             
             if (!recipeData) {
-              console.error('[CookScreen] ❌ No recipe data found for mise recipe:', miseRecipe.id);
+              logger.error('No recipe data found for mise recipe', { 
+                miseRecipeId: miseRecipe.id,
+                hasPreparedData: !!miseRecipe.prepared_recipe_data,
+                hasOriginalData: !!miseRecipe.original_recipe_data
+              });
               return null;
             }
             
@@ -276,7 +266,10 @@ export default function CookScreen() {
                 recipeCount: recipeList.length
               });
             } catch (error) {
-              console.error('[CookScreen] Error tracking steps_started:', error);
+              logger.error('Error tracking steps_started', {
+                errorMessage: error instanceof Error ? error.message : String(error),
+                recipeListLength: recipeList.length
+              });
             }
           };
           
@@ -287,29 +280,37 @@ export default function CookScreen() {
           
           // Initialize sessions in context with fresh data
           if (miseRecipes.length > 0) {
-            console.log('[CookScreen] 🚀 Initializing cooking sessions in context with fresh data');
-            
             try {
               // DEFENSIVE: Extract context function to local constant to prevent minification issues
               const initializeSessionsFn = cookingContext.initializeSessions;
               if (typeof initializeSessionsFn === 'function') {
                 initializeSessionsFn(miseRecipes, initialRecipeIdFromParams); // Pass initialActiveRecipeId
-                console.error('[CookScreen] ✅ Initialized cooking sessions in context successfully');
               } else {
-                console.error('[CookScreen] 🛑 initializeSessions function is undefined!');
+                logger.error('initializeSessions function is undefined', {
+                  contextFunctionType: typeof cookingContext.initializeSessions,
+                  hasCookingContext: !!cookingContext
+                });
               }
             } catch (error) {
-              console.error('[CookScreen] 💥 TypeError caught in initializeSessions call:', error);
-              console.error('[CookScreen] 💥 Error type:', typeof error);
-              console.error('[CookScreen] 💥 Error message:', error instanceof Error ? error.message : String(error));
-              console.error('[CookScreen] 💥 Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+              logger.error('TypeError caught in initializeSessions call', {
+                errorType: typeof error,
+                errorMessage: error instanceof Error ? error.message : String(error),
+                errorStack: error instanceof Error ? error.stack : 'No stack trace',
+                miseRecipesCount: miseRecipes.length,
+                initialRecipeId: initialRecipeIdFromParams
+              });
               
               // Continue without sessions rather than crashing the app
-              console.error('[CookScreen] ⚠️ Continuing without cooking sessions due to initialization error');
+              logger.warn('Continuing without cooking sessions due to initialization error');
             }
           }
         } catch (error) {
-          console.error('[CookScreen] 💥 Error fetching/initializing mise recipes:', error);
+          logger.error('Error fetching/initializing mise recipes', {
+            errorMessage: error instanceof Error ? error.message : String(error),
+            errorStack: error instanceof Error ? error.stack : 'No stack trace',
+            hasSession: !!session?.user,
+            hasAccessToken: !!session?.access_token
+          });
           // DEFENSIVE: Extract context function to local constant to prevent minification issues
           const showErrorFn = errorModalContext.showError;
           if (typeof showErrorFn === 'function') {
@@ -318,28 +319,22 @@ export default function CookScreen() {
           setRecipes([]); // Clear local recipes on error
         } finally {
           setIsLoading(false);
-          console.log('[CookScreen] 🏁 Finished fetching/initializing, isLoading set to false');
         }
       };
       
       loadAndInitializeRecipes();
         
       return () => {
-        console.error('[CookScreen] 🔍 useFocusEffect: Screen blurred/unfocused (cleanup function).');
+        // Cleanup function
       };
     }, [session?.user?.id, session?.access_token, params.recipeId, errorModalContext])
       ); // Always fetch fresh data - no context dependencies needed
 
   // Handle app state changes for timer management
   useEffect(() => {
-    console.error('[CookScreen] 🔍 Setting up AppState listener');
-    
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
-      console.error(`[CookScreen] 🔍 AppState changed from ${appState.current} to ${nextAppState}`);
-      
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
         // App has come to foreground - sync timers
-        console.log('App came to foreground, syncing timers');
         // Timer sync logic will be handled by individual timer components (if applicable)
       }
       appState.current = nextAppState;
@@ -348,14 +343,13 @@ export default function CookScreen() {
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     
     return () => {
-      console.error('[CookScreen] 🔍 Cleaning up AppState listener');
-      console.error('[CookScreen] 🔍 AppState subscription type:', typeof subscription);
-      console.error('[CookScreen] 🔍 AppState subscription remove type:', typeof subscription?.remove);
-      
       if (subscription && typeof subscription.remove === 'function') {
         subscription.remove();
       } else {
-        console.error('[CookScreen] ⚠️ AppState subscription remove is not a function!');
+        logger.error('AppState subscription remove is not a function', {
+          subscriptionType: typeof subscription,
+          hasRemove: typeof subscription?.remove
+        });
       }
     };
   }, []);
@@ -376,7 +370,13 @@ export default function CookScreen() {
           typeof switchRecipeFn !== 'function' || 
           typeof getCurrentScrollPositionFn !== 'function' || 
           typeof showErrorFn !== 'function') {
-        console.error('[CookScreen] Context functions are undefined, aborting recipe switch');
+        logger.error('Context functions are undefined, aborting recipe switch', {
+          setScrollPositionType: typeof setScrollPositionFn,
+          switchRecipeType: typeof switchRecipeFn,
+          getCurrentScrollPositionType: typeof getCurrentScrollPositionFn,
+          showErrorType: typeof showErrorFn,
+          targetRecipeId: recipeId
+        });
         return;
       }
 
@@ -402,7 +402,12 @@ export default function CookScreen() {
       }
 
     } catch (e: any) {
-      console.error('[CookScreen] Error in handleRecipeSwitch:', e.message);
+      logger.error('Error in handleRecipeSwitch', {
+        errorMessage: e.message,
+        errorStack: e.stack,
+        targetRecipeId: recipeId,
+        currentRecipeId: cookingContext.state.activeRecipeId
+      });
       const showErrorFn = errorModalContext.showError;
       if (typeof showErrorFn === 'function') {
         showErrorFn('Recipe Switch Error', 'Failed to switch recipe. Please try again.');
@@ -411,13 +416,18 @@ export default function CookScreen() {
   }, [cookingContext, errorModalContext, currentScrollY]);
 
 
-  const handleSwipeGesture = (event: any) => {
+  const handleSwipeGesture = async (event: any) => {
     if (event.nativeEvent.state === State.END) {
       const { translationX, velocityX } = event.nativeEvent;
       
       // Ensure state.activeRecipes is an array before accessing its properties
       if (!cookingContext.state.activeRecipes || !Array.isArray(cookingContext.state.activeRecipes) || cookingContext.state.activeRecipes.length === 0) {
-        console.warn('[CookScreen] ⚠️ Swipe gesture ignored: No active recipes in context state.');
+        await track('swipe_gesture_ignored', { 
+          reason: 'no_active_recipes',
+          activeRecipesCount: cookingContext.state.activeRecipes?.length || 0,
+          hasActiveRecipes: !!cookingContext.state.activeRecipes,
+          isArray: Array.isArray(cookingContext.state.activeRecipes)
+        });
         return;
       }
 
@@ -455,7 +465,13 @@ export default function CookScreen() {
             router.navigate('/tabs/mise' as any);
           }
         } catch (navError: any) {
-          console.error('[CookScreen] Error during swipe navigation:', navError);
+          logger.error('Error during swipe navigation', {
+            errorMessage: navError.message,
+            errorStack: navError.stack,
+            translationX,
+            velocityX,
+            currentIndex
+          });
           if (typeof errorModalContext.showError === 'function') {
             errorModalContext.showError('Navigation Error', 'Failed to navigate back. Please try again.');
           }
@@ -464,11 +480,17 @@ export default function CookScreen() {
     }
   };
 
-  const toggleStepCompleted = (recipeId: string, stepIndex: number) => {
+  const toggleStepCompleted = async (recipeId: string, stepIndex: number) => {
     // Find the current recipe and toggle the step
     const currentRecipeSession = cookingContext.state.activeRecipes.find(r => r.recipeId === recipeId);
     if (!currentRecipeSession || !currentRecipeSession.recipe) {
-      console.warn('[CookScreen] ⚠️ Cannot toggle step: current recipe session or recipe data not found.');
+      await track('step_toggle_failed', { 
+        reason: 'no_recipe_session',
+        recipeId,
+        stepIndex,
+        hasCurrentRecipeSession: !!currentRecipeSession,
+        hasRecipeData: !!currentRecipeSession?.recipe
+      });
       return;
     }
 
@@ -477,7 +499,12 @@ export default function CookScreen() {
     const uncompleteStepFn = cookingContext.uncompleteStep;
 
     if (typeof completeStepFn !== 'function' || typeof uncompleteStepFn !== 'function') {
-      console.error('[CookScreen] 🛑 Context step functions are undefined!');
+      logger.error('Context step functions are undefined', {
+        completeStepType: typeof completeStepFn,
+        uncompleteStepType: typeof uncompleteStepFn,
+        recipeId,
+        stepIndex
+      });
       return;
     }
 
@@ -492,11 +519,9 @@ export default function CookScreen() {
     
     if (isCompleted) {
       // Remove from completed steps
-      console.log('[CookScreen] Step uncompleted:', { recipeId, stepIndex });
       uncompleteStepFn(recipeId, stepId);
     } else {
       // Add to completed steps
-      console.log('[CookScreen] Step completed:', { recipeId, stepIndex });
       completeStepFn(recipeId, stepId);
       
       // Auto-scroll to next step if recipe has instructions
@@ -513,7 +538,6 @@ export default function CookScreen() {
 
   // --- Ingredient Tooltip Logic ---
   const handleIngredientPress = (ingredient: StructuredIngredient) => {
-    console.log('[CookScreen] Ingredient pressed:', ingredient.name);
     setSelectedIngredient(ingredient);
     setIsTooltipVisible(true);
   };
@@ -538,9 +562,6 @@ export default function CookScreen() {
   const handleTimerStartPause = () => {
     // DEFENSIVE: Extract context function to local constant to prevent minification issues
     const showErrorFn = errorModalContext.showError;
-    
-    console.error('[CookScreen] 🔍 handleTimerStartPause called, isTimerActive:', isTimerActive);
-    console.error('[CookScreen] 🔍 showError function type:', typeof showErrorFn);
     
     if (isTimerActive) {
       // Pause timer
@@ -572,18 +593,22 @@ export default function CookScreen() {
             setTimerTimeRemaining(0);
             
             // Show notification when timer finishes
-            console.error('[CookScreen] 🔍 About to call showError for timer completion');
             try {
               // DEFENSIVE: Extract showError again inside the interval closure
               const showErrorInternalFn = errorModalContext.showError;
               if (typeof showErrorInternalFn === 'function') {
                 showErrorInternalFn('Timer', "Time's up!");
               } else {
-                console.error('[CookScreen] ⚠️ showError is not a function!');
+                logger.error('showError is not a function in timer completion', {
+                  showErrorType: typeof showErrorInternalFn,
+                  hasErrorModalContext: !!errorModalContext
+                });
               }
             } catch (showErrorError: any) {
-              console.error('[CookScreen] 💥 Error calling showError:', showErrorError);
-              console.error('[CookScreen] 💥 showError error stack:', showErrorError.stack);
+              logger.error('Error calling showError for timer completion', {
+                errorMessage: showErrorError.message,
+                errorStack: showErrorError.stack
+              });
             }
           } else {
             setTimerTimeRemaining(newTimeRemaining);
@@ -616,8 +641,6 @@ export default function CookScreen() {
   };
 
   const handleEndCookingSessions = async () => {
-    console.log('[CookScreen] 🛑 User requested to end cooking sessions');
-    
     try {
       // End all cooking sessions
       await endAllSessions();
@@ -627,10 +650,12 @@ export default function CookScreen() {
       
       // Navigate back to the mise screen (prep station)
       router.back();
-      
-      console.log('[CookScreen] ✅ Successfully ended cooking sessions and navigated back');
     } catch (error) {
-      console.error('[CookScreen] 💥 Error ending cooking sessions:', error);
+      logger.error('Error ending cooking sessions', {
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : 'No stack trace',
+        activeRecipesCount: cookingContext.state.activeRecipes.length
+      });
       // Still try to navigate back even if there's an error
       closeToolsModal();
       router.back();

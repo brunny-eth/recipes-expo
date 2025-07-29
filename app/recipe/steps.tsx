@@ -11,8 +11,6 @@ import {
   Platform,
   Modal,
   Pressable,
-  Image,
-  Dimensions,
   ViewStyle,
   TextStyle,
   ImageStyle,
@@ -48,7 +46,6 @@ type AppliedRecipeChanges = {
   ingredientChanges: IngredientChange[];
   scalingFactor: number;
 };
-import { parseAmountString } from '@/utils/recipeUtils';
 import { useAuth } from '@/context/AuthContext';
 import RecipeStepsHeader from '@/components/recipe/RecipeStepsHeader';
 import StepsFooterButtons from '@/components/recipe/StepsFooterButtons';
@@ -63,11 +60,7 @@ import {
   FONT,
 } from '@/constants/typography';
 
-const screenWidth = Dimensions.get('window').width;
-
 export default function StepsScreen() {
-  // console.log('[StepsScreen] 🚀 Component rendering');
-  
   const params = useLocalSearchParams<{
     originalId?: string; // The ID of the original recipe from processed_recipes_cache
     recipeData?: string; // The original CombinedParsedRecipe (stringified)
@@ -107,7 +100,6 @@ export default function StepsScreen() {
   }>({});
   const [isToolsPanelVisible, setIsToolsPanelVisible] = useState(false);
   const [initialToolToShow, setInitialToolToShow] = useState<ActiveTool>(null);
-  const [isHeaderToolsVisible, setIsHeaderToolsVisible] = useState(false);
 
   // --- Tooltip State ---
   const [selectedIngredient, setSelectedIngredient] =
@@ -132,8 +124,6 @@ export default function StepsScreen() {
 
   // Component mount/unmount logging
   useEffect(() => {
-    console.log('[StepsScreen] 🎯 Component DID MOUNT');
-    
     // Track steps started event
     const trackStepsStarted = async () => {
       const scaled = appliedChanges?.scalingFactor !== 1;
@@ -145,16 +135,11 @@ export default function StepsScreen() {
       });
     };
     trackStepsStarted();
-    
-    return () => {
-      console.log('[StepsScreen] 🌀 Component WILL UNMOUNT');
-    };
   }, []);
 
   // Timer cleanup - only on component unmount
   useEffect(() => {
     return () => {
-      console.log('[StepsScreen] 🔍 Cleaning up timer interval on unmount');
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
       }
@@ -167,26 +152,10 @@ export default function StepsScreen() {
 
   // Effect to initialize recipe state from params
   useEffect(() => {
-    console.log('[StepsScreen] 🔄 Initializing recipe state from params:', {
-      hasRecipeData: !!params.recipeData,
-      hasEditedInstructions: !!params.editedInstructions,
-      hasEditedIngredients: !!params.editedIngredients,
-      hasNewTitle: !!params.newTitle,
-      hasOriginalId: !!params.originalId,
-      hasAppliedChanges: !!params.appliedChanges,
-      hasMiseRecipeId: !!params.miseRecipeId,
-      recipeDataLength: params.recipeData?.length || 0,
-    });
-    
     setIsLoading(true);
     try {
       if (params.recipeData) {
         const parsedOriginalRecipe: ParsedRecipe = JSON.parse(params.recipeData);
-        console.log('[StepsScreen] ✅ Successfully parsed recipe data:', {
-          title: parsedOriginalRecipe.title,
-          instructionsCount: parsedOriginalRecipe.instructions?.length || 0,
-          ingredientsCount: parsedOriginalRecipe.ingredientGroups?.length || 0,
-        });
         setOriginalRecipe(parsedOriginalRecipe); // Store original for reference
 
         // Start with a deep copy of the original recipe to preserve all fields
@@ -194,14 +163,11 @@ export default function StepsScreen() {
 
         // If we have a miseRecipeId, check for local modifications
         if (params.miseRecipeId) {
-          console.log('[StepsScreen] 📝 Checking for local modifications for mise recipe:', params.miseRecipeId);
-          
           // Access the global miseRecipes (we'll need to pass this properly later)
           const getMiseRecipe = (globalThis as any).getMiseRecipe;
           if (getMiseRecipe) {
             const miseRecipe = getMiseRecipe(params.miseRecipeId);
             if (miseRecipe?.local_modifications?.modified_recipe_data) {
-              console.log('[StepsScreen] 🔄 Using local modifications for mise recipe');
               currentModifiedRecipe = miseRecipe.local_modifications.modified_recipe_data;
             }
           }
@@ -230,28 +196,10 @@ export default function StepsScreen() {
           setAppliedChanges(JSON.parse(params.appliedChanges));
         }
 
-        // Debug logging to verify data flow
-        console.log('[StepsScreen] Recipe data initialized:', {
-          originalRecipeId: params.originalId,
-          hasOriginalRecipe: !!parsedOriginalRecipe,
-          hasModifiedRecipe: !!currentModifiedRecipe,
-          titleChanged: currentModifiedRecipe.title !== parsedOriginalRecipe.title,
-          hasImage: !!currentModifiedRecipe.image,
-          appliedChanges: params.appliedChanges ? JSON.parse(params.appliedChanges) : null,
-          usingMiseModifications: params.miseRecipeId && currentModifiedRecipe !== parsedOriginalRecipe,
-        });
-
         // Update legacy state for backward compatibility with existing UI components
         // Use titleOverride if available, otherwise use the modified recipe title
         const displayTitle = params.titleOverride || currentModifiedRecipe.title || 'Instructions';
         setRecipeTitle(displayTitle);
-        
-        console.log('[StepsScreen] Title selection:', {
-          titleOverride: params.titleOverride,
-          modifiedRecipeTitle: currentModifiedRecipe.title,
-          originalRecipeTitle: parsedOriginalRecipe.title,
-          displayTitle,
-        });
         setRecipeImageUrl(currentModifiedRecipe.image || currentModifiedRecipe.thumbnailUrl || null);
         
         if (currentModifiedRecipe.instructions && Array.isArray(currentModifiedRecipe.instructions)) {
@@ -292,14 +240,12 @@ export default function StepsScreen() {
       setIsLoading(false);
       return;
     }
-    console.log('[StepsScreen] ✅ Recipe initialization completed, setting isLoading to false');
     setIsLoading(false);
   }, [params.recipeData, params.editedInstructions, params.editedIngredients, params.newTitle, params.originalId, params.appliedChanges, showError]);
 
   useEffect(() => {
           return () => {
         // This cleanup function runs when the component unmounts
-        console.log('[StepsScreen] Component unmounting');
       };
     }, []);
 
@@ -537,9 +483,6 @@ export default function StepsScreen() {
   };
 
   const openToolsModal = (initialTool: ActiveTool = null) => {
-    console.log(
-      `Opening tools modal${initialTool ? ` to ${initialTool}` : ''}`,
-    );
     setInitialToolToShow(initialTool);
     setIsToolsPanelVisible(true);
   };
@@ -637,63 +580,6 @@ export default function StepsScreen() {
     <PanGestureHandler onHandlerStateChange={handleSwipeGesture}>
       <SafeAreaView style={styles.container}>
       <RecipeStepsHeader title={recipeTitle} imageUrl={recipeImageUrl} />
-
-      <Modal
-        transparent
-        visible={isHeaderToolsVisible}
-        animationType="fade"
-        onRequestClose={() => setIsHeaderToolsVisible(false)}
-      >
-        <Pressable
-          style={styles.headerToolsBackdrop}
-          onPress={() => setIsHeaderToolsVisible(false)}
-        >
-          <View style={styles.headerToolsContainer}>
-            <TouchableOpacity
-              style={styles.headerToolButton}
-              onPress={() => {
-                setIsHeaderToolsVisible(false);
-                openToolsModal('timer');
-              }}
-            >
-              <MaterialCommunityIcons
-                name="timer-outline"
-                size={24}
-                color={COLORS.textDark}
-              />
-              <Text style={styles.headerToolButtonText}>Timer</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.headerToolButton}
-              onPress={() => {
-                setIsHeaderToolsVisible(false);
-                openToolsModal('units');
-              }}
-            >
-              <MaterialCommunityIcons
-                name="ruler"
-                size={24}
-                color={COLORS.textDark}
-              />
-              <Text style={styles.headerToolButtonText}>Units</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.headerToolButton}
-              onPress={() => {
-                setIsHeaderToolsVisible(false);
-                openToolsModal('help');
-              }}
-            >
-              <MaterialCommunityIcons
-                name="help-circle-outline"
-                size={24}
-                color={COLORS.textDark}
-              />
-              <Text style={styles.headerToolButtonText}>Help</Text>
-            </TouchableOpacity>
-          </View>
-        </Pressable>
-      </Modal>
 
       {/* Progress Bar */}
       <View style={styles.progressBarContainer}>
@@ -1065,30 +951,6 @@ const styles = StyleSheet.create({
   exitButton: {
     padding: SPACING.sm,
   } as ViewStyle,
-  headerToolsBackdrop: {
-    flex: 1,
-    backgroundColor: OVERLAYS.light,
-  } as ViewStyle,
-  headerToolsContainer: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 82 : 48,
-    right: SPACING.md,
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.md,
-    padding: SPACING.sm,
-    ...SHADOWS.large,
-  } as ViewStyle,
-  headerToolButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: SPACING.smMd,
-    paddingHorizontal: SPACING.smLg,
-  } as ViewStyle,
-  headerToolButtonText: {
-    ...bodyStrongText,
-    color: COLORS.textDark,
-    marginLeft: SPACING.smMd,
-  } as TextStyle,
   // --- Tooltip Styles ---
   tooltipBackdrop: {
     flex: 1,

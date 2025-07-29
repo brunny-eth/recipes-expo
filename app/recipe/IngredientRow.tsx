@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -76,23 +76,6 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
     appliedChanges,
     ingredient.name,
   );
-
-  // Debug undo button logic for problematic ingredients
-  if (ingredient.name.includes('butter') || ingredient.name.includes('sugar') || 
-      ingredient.name.includes('flank') || ingredient.name.includes('paprika') ||
-      ingredient.name.includes('milk') || ingredient.name.includes('onion') ||
-      ingredient.name.includes('cherry tomatoes') || ingredient.name.includes('pickled') ||
-      ingredient.name.includes('thyme') || ingredient.name.includes('rosemary')) {
-    console.log(`[DEBUG] ${ingredient.name} undo logic:`, {
-      rawIngredientName: ingredient.name,
-      isRemoved,
-      substitutedFor,
-      isViewingSavedRecipe,
-      shouldShowRemovalUndo: isRemoved && !isViewingSavedRecipe,
-      shouldShowSubstitutionUndo: substitutedFor && !isRemoved && !isViewingSavedRecipe,
-      parsedIngredient: parseRecipeDisplayName(ingredient.name)
-    });
-  }
 
   return (
     <TouchableOpacity
@@ -186,12 +169,7 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
           ) && (
             <TouchableOpacity
               style={styles.infoButton}
-              onPress={() => {
-                /* removed verbose button press log */
-                requestAnimationFrame(() => {
-                  openSubstitutionModal(ingredient);
-                });
-              }}
+              onPress={() => openSubstitutionModal(ingredient)}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               testID={`substitution-button-${ingredient.name}`}
             >
