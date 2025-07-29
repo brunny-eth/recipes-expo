@@ -67,14 +67,18 @@ body, html {
 /* Header & Navigation */
 header {
     width: 100%;
-    background-color: transparent; /* Changed from white */
-    box-shadow: none; /* Remove shadow */
+    background-color: var(--white);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     padding: 0 20px;
     box-sizing: border-box;
     position: fixed;
     top: 0;
     left: 0;
     z-index: 1000;
+}
+
+.header-container {
+    display: none; /* Hide the duplicate header container */
 }
 
 nav {
@@ -143,12 +147,17 @@ main {
     to { opacity: 1; transform: translateY(0); }
 }
 
-/* Meez Logo */
+/* Header Logo */
+#meez-logo-header {
+    display: none; /* Hide the duplicate header logo */
+}
+
+/* Main Meez Logo */
 #meez-logo {
     display: block;
-    margin: 0 auto;
-    width: 250px; /* From index.tsx */
-    height: 250px; /* From index.tsx */
+    margin: 0 auto 30px auto;
+    width: 120px; /* Much smaller */
+    height: 120px; /* Much smaller */
 }
 
 /* Home Section Specifics */
@@ -428,7 +437,7 @@ main {
     }
 
     #meez-logo {
-        width: 120px;
-        height: 120px;
+        width: 80px;
+        height: 80px;
     }
 } 

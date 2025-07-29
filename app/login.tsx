@@ -97,29 +97,6 @@ const LoginScreen = () => {
             Create an account or login to your account to use Meez.
           </Text>
 
-          <TouchableOpacity
-            style={[styles.button, styles.googleButton]}
-            onPress={() => handleSignIn('google')}
-            disabled={!!isSigningIn}
-          >
-            {isSigningIn === 'google' ? (
-              <View style={styles.buttonContent}>
-                <ActivityIndicator color={COLORS.white} size="small" />
-                <Text style={styles.buttonText}>Signing in...</Text>
-              </View>
-            ) : (
-              <View style={styles.buttonContent}>
-                <FontAwesome
-                  name="google"
-                  size={ICON_SIZE.lg}
-                  color={COLORS.white}
-                  style={styles.icon}
-                />
-                <Text style={styles.buttonText}>Continue with Google</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-
           {Platform.OS === 'ios' && (
             <TouchableOpacity
               style={[styles.button, styles.appleButton]}
@@ -146,6 +123,29 @@ const LoginScreen = () => {
               )}
             </TouchableOpacity>
           )}
+
+          <TouchableOpacity
+            style={[styles.button, styles.googleButton]}
+            onPress={() => handleSignIn('google')}
+            disabled={!!isSigningIn}
+          >
+            {isSigningIn === 'google' ? (
+              <View style={styles.buttonContent}>
+                <ActivityIndicator color={COLORS.white} size="small" />
+                <Text style={styles.buttonText}>Signing in...</Text>
+              </View>
+            ) : (
+              <View style={styles.buttonContent}>
+                <FontAwesome
+                  name="google"
+                  size={ICON_SIZE.lg}
+                  color={COLORS.white}
+                  style={styles.icon}
+                />
+                <Text style={styles.buttonText}>Continue with Google</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
         {/* TOS/Privacy Policy agreement text */}
         <View style={styles.tosSection}>

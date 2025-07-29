@@ -282,6 +282,8 @@ PODS:
     - ExpoModulesCore
   - ExpoCrypto (14.1.5):
     - ExpoModulesCore
+  - ExpoDevice (7.1.4):
+    - ExpoModulesCore
   - ExpoFileSystem (18.1.11):
     - ExpoModulesCore
   - ExpoFont (13.3.2):
@@ -295,6 +297,8 @@ PODS:
   - ExpoLinearGradient (14.1.5):
     - ExpoModulesCore
   - ExpoLinking (7.1.7):
+    - ExpoModulesCore
+  - ExpoLocalization (16.1.6):
     - ExpoModulesCore
   - ExpoModulesCore (2.5.0):
     - DoubleConversion
@@ -396,6 +400,32 @@ PODS:
     - glog
     - hermes-engine
     - lottie-ios (= 4.5.0)
+    - RCT-Folly (= 2024.11.18.00)
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-hermes
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - Yoga
+  - PostHog (3.30.0)
+  - posthog-react-native-session-replay (1.1.1):
+    - DoubleConversion
+    - glog
+    - hermes-engine
+    - PostHog (~> 3.21)
     - RCT-Folly (= 2024.11.18.00)
     - RCTRequired
     - RCTTypeSafety
@@ -2616,6 +2646,7 @@ DEPENDENCIES:
   - ExpoBlur (from `../node_modules/expo-blur/ios`)
   - ExpoClipboard (from `../node_modules/expo-clipboard/ios`)
   - ExpoCrypto (from `../node_modules/expo-crypto/ios`)
+  - ExpoDevice (from `../node_modules/expo-device/ios`)
   - ExpoFileSystem (from `../node_modules/expo-file-system/ios`)
   - ExpoFont (from `../node_modules/expo-font/ios`)
   - ExpoHaptics (from `../node_modules/expo-haptics/ios`)
@@ -2623,6 +2654,7 @@ DEPENDENCIES:
   - ExpoKeepAwake (from `../node_modules/expo-keep-awake/ios`)
   - ExpoLinearGradient (from `../node_modules/expo-linear-gradient/ios`)
   - ExpoLinking (from `../node_modules/expo-linking/ios`)
+  - ExpoLocalization (from `../node_modules/expo-localization/ios`)
   - ExpoModulesCore (from `../node_modules/expo-modules-core`)
   - ExpoRandom (from `../node_modules/expo-random/ios`)
   - ExpoSecureStore (from `../node_modules/expo-secure-store/ios`)
@@ -2639,6 +2671,7 @@ DEPENDENCIES:
   - glog (from `../node_modules/react-native/third-party-podspecs/glog.podspec`)
   - hermes-engine (from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
   - lottie-react-native (from `../node_modules/lottie-react-native`)
+  - posthog-react-native-session-replay (from `../node_modules/posthog-react-native-session-replay`)
   - RCT-Folly (from `../node_modules/react-native/third-party-podspecs/RCT-Folly.podspec`)
   - RCT-Folly/Fabric (from `../node_modules/react-native/third-party-podspecs/RCT-Folly.podspec`)
   - RCTDeprecation (from `../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation`)
@@ -2724,6 +2757,7 @@ SPEC REPOS:
     - libdav1d
     - libwebp
     - lottie-ios
+    - PostHog
     - ReachabilitySwift
     - SDWebImage
     - SDWebImageAVIFCoder
@@ -2765,6 +2799,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-clipboard/ios"
   ExpoCrypto:
     :path: "../node_modules/expo-crypto/ios"
+  ExpoDevice:
+    :path: "../node_modules/expo-device/ios"
   ExpoFileSystem:
     :path: "../node_modules/expo-file-system/ios"
   ExpoFont:
@@ -2779,6 +2815,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-linear-gradient/ios"
   ExpoLinking:
     :path: "../node_modules/expo-linking/ios"
+  ExpoLocalization:
+    :path: "../node_modules/expo-localization/ios"
   ExpoModulesCore:
     :path: "../node_modules/expo-modules-core"
   ExpoRandom:
@@ -2812,6 +2850,8 @@ EXTERNAL SOURCES:
     :tag: hermes-2025-06-04-RNv0.79.3-7f9a871eefeb2c3852365ee80f0b6733ec12ac3b
   lottie-react-native:
     :path: "../node_modules/lottie-react-native"
+  posthog-react-native-session-replay:
+    :path: "../node_modules/posthog-react-native-session-replay"
   RCT-Folly:
     :podspec: "../node_modules/react-native/third-party-podspecs/RCT-Folly.podspec"
   RCTDeprecation:
@@ -2983,6 +3023,7 @@ SPEC CHECKSUMS:
   ExpoBlur: 846780b2c90f59e964b9a50385d4deb67174ebfb
   ExpoClipboard: 6b9aae54fd48a579473fb101051ad693435b9294
   ExpoCrypto: fcb6a8a08d1929f346cb95eb05a8f7818627177a
+  ExpoDevice: 7a961caede6638aa0d37d0d3aa884ab957a2e3d3
   ExpoFileSystem: 9681caebda23fa1b38a12a9c68b2bade7072ce20
   ExpoFont: 091a47eeaa1b30b0b760aa1d0a2e7814e8bf6fe6
   ExpoHaptics: 68c215e070f660e0a29c45dcda4f60eeff08aefb
@@ -2990,6 +3031,7 @@ SPEC CHECKSUMS:
   ExpoKeepAwake: e8dedc115d9f6f24b153ccd2d1d8efcdfd68a527
   ExpoLinearGradient: ce334cff9859da4635c1d8eff6e291b11b04ccbb
   ExpoLinking: 343a89ea864a851831fd4495e8aea01cf0f6a36f
+  ExpoLocalization: 677e45c2536bf918119962f78d7ffeeea317e07d
   ExpoModulesCore: 16f74d8df26d7e4b6bf7eb3d0effaf0f15df7b80
   ExpoRandom: 099ddce39b39ffb984b45118d031e8713e962a50
   ExpoSecureStore: 3148869ad24ab94f9e0c5777c7941d7a37d60399
@@ -3010,6 +3052,8 @@ SPEC CHECKSUMS:
   libwebp: 02b23773aedb6ff1fd38cec7a77b81414c6842a8
   lottie-ios: a881093fab623c467d3bce374367755c272bdd59
   lottie-react-native: 9076d7f8e9059606483795e535cef7a38d209f76
+  PostHog: 716bb0e65134459b7d3955b02be2a420c574b914
+  posthog-react-native-session-replay: 3cbd7dd2dc47194ae6a98464852de209c2c7e63f
   RCT-Folly: 36fe2295e44b10d831836cc0d1daec5f8abcf809
   RCTDeprecation: 0418ac97b9f53b2e37f473da1663ef3061e46beb
   RCTRequired: b9fde7f981b11aa898f03a70d3d4d36b80f1b16d
