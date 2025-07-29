@@ -859,16 +859,22 @@ export function formatIngredientsForGroceryList(
           parsedBaseName: parsedName.baseName,
           originalText,
           amount: ingredient.amount,
+          amountType: typeof ingredient.amount,
           unit: ingredient.unit,
+          unitType: typeof ingredient.unit,
           existingCategory: (ingredient as any).grocery_category
         });
         
-        // Standardize the unit immediately
-        // If ingredient.unit is null/empty, try to extract from the original text
-        let standardizedUnit = normalizeUnit(ingredient.unit);
-        if (standardizedUnit === null && ingredient.unit === null) {
-          // Fallback: try to extract unit from the original text
-          console.log('[groceryHelpers] 🔄 Unit is null, trying to extract from original text:', originalText);
+        // Handle unit - normalize it if it exists
+        let standardizedUnit: string | null = null;
+        if (ingredient.unit !== null && ingredient.unit !== undefined && ingredient.unit !== '') {
+          standardizedUnit = normalizeUnit(ingredient.unit);
+          console.log('[groceryHelpers] 📏 Normalized unit:', ingredient.unit, '→', standardizedUnit);
+        }
+        
+        // If no unit from structured ingredient, try to extract from original text as fallback
+        if (standardizedUnit === null) {
+          console.log('[groceryHelpers] 🔄 No unit found, trying to extract from original text:', originalText);
           
           // Simple unit extraction from original text
           const unitMatch = originalText.match(/\b(cup|cups|tbsp|tbs|tablespoon|tablespoons|tsp|teaspoon|teaspoons|oz|ounce|ounces|lb|pound|pounds|g|gram|grams|kg|kilogram|kilograms|ml|milliliter|milliliters|l|liter|liters|clove|cloves|head|heads|bunch|bunches|piece|pieces|stalk|stalks|sprig|sprigs|can|cans|bottle|bottles|box|boxes|bag|bags|package|packages|jar|jars|container|containers|pinch|pinches|dash|dashes|each|count)\b/i);
@@ -879,11 +885,22 @@ export function formatIngredientsForGroceryList(
           }
         }
         
-        // Parse amount first to use for display unit
-        // If ingredient.amount is null/empty, try to parse from the original text
-        let amount = parseAmountString(ingredient.amount);
-        if (amount === null && ingredient.amount === null) {
-          // Fallback: try to parse amount from the original text
+        // Handle amount - it might be a number, string, or null
+        let amount: number | null = null;
+        if (ingredient.amount !== null && ingredient.amount !== undefined) {
+          if (typeof ingredient.amount === 'number') {
+            // Amount is already a number (e.g., 6)
+            amount = ingredient.amount;
+            console.log('[groceryHelpers] 🔢 Using numeric amount directly:', amount);
+          } else if (typeof ingredient.amount === 'string') {
+            // Amount is a string (e.g., "6-8" or "1 1/2")
+            amount = parseAmountString(ingredient.amount);
+            console.log('[groceryHelpers] 🔢 Parsed string amount:', ingredient.amount, '→', amount);
+          }
+        }
+        
+        // If still no amount, try to parse from the original text as fallback
+        if (amount === null) {
           console.log('[groceryHelpers] 🔄 Amount is null, trying to parse from original text:', originalText);
           amount = parseAmountString(originalText);
           if (amount !== null) {
