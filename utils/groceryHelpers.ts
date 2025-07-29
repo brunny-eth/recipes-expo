@@ -854,38 +854,7 @@ export function formatIngredientsForGroceryList(
         const originalText = `${ingredient.amount || ''} ${ingredient.unit || ''} ${ingredient.name}`.trim();
         const parsedName = parseIngredientDisplayName(ingredient.name);
         
-        console.log(`[groceryHelpers] 🥬 Processing ingredient:`, {
-          originalName: ingredient.name,
-          parsedBaseName: parsedName.baseName,
-          originalText,
-          amount: ingredient.amount,
-          amountType: typeof ingredient.amount,
-          unit: ingredient.unit,
-          unitType: typeof ingredient.unit,
-          existingCategory: (ingredient as any).grocery_category
-        });
-        
-        // Handle unit - normalize it if it exists
-        let standardizedUnit: string | null = null;
-        if (ingredient.unit !== null && ingredient.unit !== undefined && ingredient.unit !== '') {
-          standardizedUnit = normalizeUnit(ingredient.unit);
-          console.log('[groceryHelpers] 📏 Normalized unit:', ingredient.unit, '→', standardizedUnit);
-        }
-        
-        // If no unit from structured ingredient, try to extract from original text as fallback
-        if (standardizedUnit === null) {
-          console.log('[groceryHelpers] 🔄 No unit found, trying to extract from original text:', originalText);
-          
-          // Simple unit extraction from original text
-          const unitMatch = originalText.match(/\b(cup|cups|tbsp|tbs|tablespoon|tablespoons|tsp|teaspoon|teaspoons|oz|ounce|ounces|lb|pound|pounds|g|gram|grams|kg|kilogram|kilograms|ml|milliliter|milliliters|l|liter|liters|clove|cloves|head|heads|bunch|bunches|piece|pieces|stalk|stalks|sprig|sprigs|can|cans|bottle|bottles|box|boxes|bag|bags|package|packages|jar|jars|container|containers|pinch|pinches|dash|dashes|each|count)\b/i);
-          if (unitMatch) {
-            const extractedUnit = unitMatch[1].toLowerCase();
-            standardizedUnit = normalizeUnit(extractedUnit);
-            console.log('[groceryHelpers] ✅ Successfully extracted unit from original text:', extractedUnit, '→', standardizedUnit);
-          }
-        }
-        
-        // Handle amount - it might be a number, string, or null
+        // Handle amount - it might be a number, string, or null (parse first)
         let amount: number | null = null;
         if (ingredient.amount !== null && ingredient.amount !== undefined) {
           if (typeof ingredient.amount === 'number') {
@@ -908,13 +877,94 @@ export function formatIngredientsForGroceryList(
           }
         }
         
+        console.log(`[groceryHelpers] 🥬 Processing ingredient:`, {
+          originalName: ingredient.name,
+          parsedBaseName: parsedName.baseName,
+          originalText,
+          amount: ingredient.amount,
+          amountType: typeof ingredient.amount,
+          parsedAmount: amount,
+          unit: ingredient.unit,
+          unitType: typeof ingredient.unit,
+          existingCategory: (ingredient as any).grocery_category
+        });
+        
+        // Handle unit - normalize it if it exists, but preserve original for display
+        let standardizedUnit: string | null = null;
+        let displayUnit: string | null = null;
+        
+        if (ingredient.unit !== null && ingredient.unit !== undefined && ingredient.unit !== '') {
+          const originalUnit = ingredient.unit.toLowerCase().trim();
+          standardizedUnit = normalizeUnit(ingredient.unit);
+          
+          // Preserve specific unit types for better display
+          if (originalUnit === 'cloves' || originalUnit === 'clove') {
+            displayUnit = 'cloves';
+          } else if (originalUnit === 'pinches' || originalUnit === 'pinch') {
+            displayUnit = 'pinch';
+          } else if (originalUnit === 'dashes' || originalUnit === 'dash') {
+            displayUnit = 'dash';
+          } else {
+            displayUnit = null; // Use standardized unit for display
+          }
+          
+          console.log('[groceryHelpers] 📏 Normalized unit:', ingredient.unit, '→', standardizedUnit, '(display:', displayUnit, ')');
+        }
+        
+        // If no unit from structured ingredient, try to extract from original text as fallback
+        if (standardizedUnit === null) {
+          console.log('[groceryHelpers] 🔄 No unit found, trying to extract from original text:', originalText);
+          
+          // Simple unit extraction from original text
+          const unitMatch = originalText.match(/\b(cup|cups|tbsp|tbs|tablespoon|tablespoons|tsp|teaspoon|teaspoons|oz|ounce|ounces|lb|pound|pounds|g|gram|grams|kg|kilogram|kilograms|ml|milliliter|milliliters|l|liter|liters|clove|cloves|head|heads|bunch|bunches|piece|pieces|stalk|stalks|sprig|sprigs|can|cans|bottle|bottles|box|boxes|bag|bags|package|packages|jar|jars|container|containers|pinch|pinches|dash|dashes|each|count)\b/i);
+          if (unitMatch) {
+            const extractedUnit = unitMatch[1].toLowerCase();
+            standardizedUnit = normalizeUnit(extractedUnit);
+            
+            // Preserve specific unit types for display
+            if (extractedUnit === 'cloves' || extractedUnit === 'clove') {
+              displayUnit = 'cloves';
+            } else if (extractedUnit === 'pinches' || extractedUnit === 'pinch') {
+              displayUnit = 'pinch';
+            } else if (extractedUnit === 'dashes' || extractedUnit === 'dash') {
+              displayUnit = 'dash';
+            }
+            
+            console.log('[groceryHelpers] ✅ Successfully extracted unit from original text:', extractedUnit, '→', standardizedUnit, '(display:', displayUnit, ')');
+          }
+        }
+        
+        // Special case: For spices without units, assign appropriate units based on ingredient name
+        if (standardizedUnit === null && amount !== null) {
+          const ingredientName = parsedName.baseName.toLowerCase();
+          
+          // Check if this is a spice/seasoning that should get a pinch unit
+          const spiceKeywords = [
+            'cumin', 'paprika', 'turmeric', 'cinnamon', 'nutmeg', 'cloves', 'allspice',
+            'cardamom', 'coriander', 'fennel', 'caraway', 'anise', 'saffron',
+            'cayenne', 'chili powder', 'curry powder', 'garam masala',
+            'oregano', 'thyme', 'rosemary', 'sage', 'basil', 'marjoram',
+            'bay leaves', 'dill', 'tarragon', 'herbs',
+            'black pepper', 'white pepper', 'pepper', 'peppercorn',
+            'garlic powder', 'onion powder', 'ginger powder'
+          ];
+          
+          const isSpice = spiceKeywords.some(spice => ingredientName.includes(spice));
+          
+          if (isSpice && amount <= 5) { // Small amounts of spices get pinch
+            standardizedUnit = 'each'; // For aggregation (pinch normalizes to each)
+            displayUnit = 'pinch';
+            console.log('[groceryHelpers] 🌶️ Assigned pinch unit to spice:', ingredientName);
+          }
+        }
+        
         // Create grocery list item from final ingredient
         const groceryItem = {
           item_name: parsedName.baseName, // Use base name without substitution text
           original_ingredient_text: originalText,
           quantity_amount: amount, // Use proper amount parsing
           quantity_unit: standardizedUnit, // Use standardized unit internally
-          display_unit: standardizedUnit ? getUnitDisplayName(standardizedUnit as Unit, amount || 1) : null,
+          display_unit: displayUnit || (standardizedUnit ? getUnitDisplayName(standardizedUnit as Unit, amount || 1) : null),
           grocery_category: (ingredient as any).grocery_category || null, // Use pre-categorized data if available
           is_checked: false,
           order_index: orderIndex++,

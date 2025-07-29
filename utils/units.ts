@@ -73,6 +73,11 @@ export function getUnitDisplayName(unit: Unit | string | null, amount: number = 
         // Count units - standardized to 'each'
         each: { singular: 'each', plural: 'each' },
         
+        // Preserved specific count units (for better display)
+        cloves: { singular: 'clove', plural: 'cloves' },
+        pinch: { singular: 'pinch', plural: 'pinches' },
+        dash: { singular: 'dash', plural: 'dashes' },
+        
         // Compound units (fallback for backend parsing failures)
         'oz can': { singular: 'oz can', plural: 'oz cans' },
         'ounce can': { singular: 'ounce can', plural: 'ounce cans' },
