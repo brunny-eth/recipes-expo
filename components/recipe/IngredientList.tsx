@@ -19,20 +19,22 @@ type AppliedChange = {
 type IngredientListProps = {
   ingredientGroups: IngredientGroup[];
   selectedScaleFactor: number;
-  appliedChanges: AppliedChange[];
+  appliedChanges: AppliedChange[]; // Keep for backward compatibility, represents currentUnsavedChanges
+  persistedChanges?: AppliedChange[]; // New prop for changes loaded from DB (locked)
   checkedIngredients?: { [key: number]: boolean };
   toggleCheckIngredient?: (index: number) => void;
   openSubstitutionModal: (ingredient: StructuredIngredient) => void;
   undoIngredientRemoval: (fullName: string) => void;
   undoSubstitution: (originalName: string) => void;
   showCheckboxes?: boolean; // New prop to control checkbox visibility
-  isViewingSavedRecipe?: boolean; // New prop to control revert buttons
+  isViewingSavedRecipe?: boolean; // Keep for backward compatibility
 };
 
 const IngredientList: React.FC<IngredientListProps> = ({
   ingredientGroups,
   selectedScaleFactor,
   appliedChanges,
+  persistedChanges = [], // Default to empty array if not provided
   checkedIngredients = {},
   toggleCheckIngredient = () => {},
   openSubstitutionModal,
@@ -74,6 +76,7 @@ const IngredientList: React.FC<IngredientListProps> = ({
             index={globalIndex}
             isChecked={!!checkedIngredients[globalIndex]}
             appliedChanges={appliedChanges}
+            persistedChanges={persistedChanges}
             toggleCheckIngredient={toggleCheckIngredient}
             openSubstitutionModal={openSubstitutionModal}
             undoIngredientRemoval={undoIngredientRemoval}

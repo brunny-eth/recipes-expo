@@ -35,13 +35,14 @@ type IngredientRowProps = {
   ingredient: StructuredIngredient;
   index: number;
   isChecked: boolean;
-  appliedChanges: AppliedChange[];
+  appliedChanges: AppliedChange[]; // Current unsaved changes (revertible)
+  persistedChanges?: AppliedChange[]; // Changes loaded from DB (locked)
   toggleCheckIngredient: (idx: number) => void;
   openSubstitutionModal: (ing: StructuredIngredient) => void;
   undoIngredientRemoval: (name: string) => void;
   undoSubstitution: (originalName: string) => void;
   showCheckboxes?: boolean;
-  isViewingSavedRecipe?: boolean;
+  isViewingSavedRecipe?: boolean; // Keep for backward compatibility
 };
 
 /**
@@ -61,21 +62,58 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
   ingredient,
   index,
   isChecked,
-  appliedChanges,
+  appliedChanges, // Current unsaved changes (revertible)
+  persistedChanges = [], // Changes loaded from DB (locked)
   toggleCheckIngredient,
   openSubstitutionModal,
   undoIngredientRemoval,
   undoSubstitution,
   showCheckboxes = true,
-  isViewingSavedRecipe = false,
+  isViewingSavedRecipe = false, // Keep for backward compatibility
 }) => {
   const { baseName, isRemoved, substitutedFor } = parseRecipeDisplayName(
     ingredient.name,
   );
   const originalNameForSub = getOriginalIngredientNameFromAppliedChanges(
-    appliedChanges,
+    [...persistedChanges, ...appliedChanges], // Use combined changes for parsing
     ingredient.name,
   );
+
+  // For substituted ingredients, we need to check the original ingredient name
+  const ingredientToCheck = substitutedFor || baseName;
+
+  // Determine if this specific ingredient has a persisted change (locked)
+  const hasPersistedChange = persistedChanges.some(
+    (change) => change.from === ingredientToCheck
+  );
+
+  // Determine if this specific ingredient has a current unsaved change (revertible)
+  const hasUnsavedChange = appliedChanges.some(
+    (change) => change.from === ingredientToCheck
+  );
+
+  // If an ingredient has a persisted change, it should not be modifiable or revertible
+  const isLocked = hasPersistedChange;
+
+  // Show revert button only if there's an unsaved change and it's not locked
+  const showRevertButton = hasUnsavedChange && !isLocked;
+
+  // Debug logging to help track the locking behavior - remove in production
+  if (substitutedFor || hasPersistedChange || hasUnsavedChange) {
+    console.log('[INGREDIENT_LOCKING]', {
+      ingredientName: ingredient.name,
+      baseName,
+      substitutedFor,
+      ingredientToCheck,
+      hasPersistedChange,
+      hasUnsavedChange,
+      isLocked,
+      showRevertButton,
+      persistedChangesCount: persistedChanges.length,
+      currentChangesCount: appliedChanges.length,
+      timestamp: new Date().toISOString(),
+    });
+  }
 
   return (
     <TouchableOpacity
@@ -131,7 +169,7 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
 
         {/* Button area - maintains consistent spacing whether buttons are present or not */}
         <View style={styles.buttonArea}>
-          {isRemoved && !isViewingSavedRecipe && (
+          {isRemoved && showRevertButton && (
           <TouchableOpacity
             style={styles.infoButton}
             onPress={() => undoIngredientRemoval(ingredient.name)}
@@ -145,7 +183,7 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
           </TouchableOpacity>
         )}
 
-          {substitutedFor && !isRemoved && !isViewingSavedRecipe && (
+          {substitutedFor && !isRemoved && !isLocked && (
           <TouchableOpacity
             style={styles.infoButton}
             onPress={() => undoSubstitution(originalNameForSub)}
@@ -162,6 +200,7 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
         {/* Substitution Button */}
         {!substitutedFor &&
           !isRemoved &&
+          !isLocked &&
           ingredient.suggested_substitutions &&
           ingredient.suggested_substitutions.length > 0 &&
           ingredient.suggested_substitutions.some(

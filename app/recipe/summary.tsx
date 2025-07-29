@@ -253,7 +253,9 @@ export default function RecipeSummaryScreen() {
     useState(false);
   const [selectedIngredient, setSelectedIngredient] =
     useState<StructuredIngredient | null>(null);
-  const [appliedChanges, setAppliedChanges] = useState<AppliedChange[]>([]);
+  // Separate persisted changes (loaded from DB, locked) from current unsaved changes (revertible)
+  const [persistedChanges, setPersistedChanges] = useState<AppliedChange[]>([]);
+  const [currentUnsavedChanges, setCurrentUnsavedChanges] = useState<AppliedChange[]>([]);
   const [isRewriting, setIsRewriting] = useState(false);
   const [isScalingInstructions, setIsScalingInstructions] = useState(false);
   // Track loading state specifically for the "Save for later" action so we don't disable the primary button.
@@ -283,7 +285,8 @@ export default function RecipeSummaryScreen() {
     isViewingSavedRecipe,
     selectedScaleFactor,
     miseRecipeId,
-    appliedChangesLength: appliedChanges.length,
+    persistedChangesLength: persistedChanges.length,
+    currentUnsavedChangesLength: currentUnsavedChanges.length,
     'Should show undo buttons?': !isViewingSavedRecipe,
   });
 
@@ -300,12 +303,17 @@ export default function RecipeSummaryScreen() {
   const scaledIngredientGroups = React.useMemo<IngredientGroup[]>(() => {
     if (!originalRecipe?.ingredientGroups) return [];
     
+    // Combine persisted and current changes for processing
+    const allAppliedChanges = [...persistedChanges, ...currentUnsavedChanges];
+    
     console.log('[DEBUG] ===== SCALING INGREDIENTS =====');
     console.log('[DEBUG] Scaling context:', {
       entryPoint,
       selectedScaleFactor,
-      appliedChangesCount: appliedChanges.length,
-      appliedChanges,
+      persistedChangesCount: persistedChanges.length,
+      currentUnsavedChangesCount: currentUnsavedChanges.length,
+      allAppliedChangesCount: allAppliedChanges.length,
+      allAppliedChanges,
       isViewingSavedRecipe,
       originalRecipeTitle: originalRecipe.title,
     });
@@ -341,7 +349,7 @@ export default function RecipeSummaryScreen() {
       });
 
       let finalIngredients = scaledIngredients;
-      if (appliedChanges.length > 0) {
+      if (allAppliedChanges.length > 0) {
         console.log('[DEBUG] Applying substitutions to scaled ingredients...');
         
         if (isViewingSavedRecipe) {
@@ -350,7 +358,7 @@ export default function RecipeSummaryScreen() {
             .map((baseIngredient) => {
               // Parse the display name to get the original name without "(removed)" or "(substituted for X)" text
               const { baseName: originalName } = parseRecipeDisplayName(baseIngredient.name);
-              const change = appliedChanges.find((c) => c.from === originalName);
+              const change = allAppliedChanges.find((c) => c.from === originalName);
               
               console.log('[DEBUG] Checking ingredient for substitution (clean display):', {
                 baseIngredientName: baseIngredient.name,
@@ -401,7 +409,7 @@ export default function RecipeSummaryScreen() {
         } else {
           // Active editing: show visual indicators for user feedback
           finalIngredients = scaledIngredients.map((baseIngredient) => {
-            const change = appliedChanges.find((c) => c.from === baseIngredient.name);
+            const change = allAppliedChanges.find((c) => c.from === baseIngredient.name);
             
             console.log('[DEBUG] Checking ingredient for substitution (with indicators):', {
               baseIngredientName: baseIngredient.name,
@@ -471,7 +479,7 @@ export default function RecipeSummaryScreen() {
     
     console.log('[DEBUG] ===== END SCALING INGREDIENTS =====');
     return result;
-  }, [originalRecipe, selectedScaleFactor, appliedChanges, isViewingSavedRecipe]);
+  }, [originalRecipe, selectedScaleFactor, persistedChanges, currentUnsavedChanges, isViewingSavedRecipe]);
 
   // Keep scaledIngredients as a flat array for backward compatibility with existing code
   const scaledIngredients = React.useMemo<StructuredIngredient[]>(() => {
@@ -569,7 +577,9 @@ export default function RecipeSummaryScreen() {
                 })),
               });
               
-              setAppliedChanges(convertedChanges);
+              // These are changes loaded from the database, so they are persisted
+              setPersistedChanges(convertedChanges);
+              setCurrentUnsavedChanges([]); // No unsaved changes initially
               // Set baseline for mise entry point
               if (entryPoint === 'mise') {
                 setBaselineAppliedChanges(convertedChanges);
@@ -614,13 +624,15 @@ export default function RecipeSummaryScreen() {
           } catch (appliedChangesError: any) {
             console.error('[DEBUG] Error parsing applied changes:', appliedChangesError);
             setSelectedScaleFactor(1.0);
-            setAppliedChanges([]);
+            setPersistedChanges([]);
+            setCurrentUnsavedChanges([]);
           }
         } else {
           console.log('[DEBUG] No appliedChanges URL param, defaulting to new recipe state');
           // New recipe, no existing changes
           setSelectedScaleFactor(1.0);
-          setAppliedChanges([]);
+          setPersistedChanges([]);
+          setCurrentUnsavedChanges([]);
           // Set baseline for mise entry point
           if (entryPoint === 'mise') {
             setBaselineScaleFactor(1.0);
@@ -643,8 +655,9 @@ export default function RecipeSummaryScreen() {
     if (entryPoint === 'mise') {
       // Compare current state against baseline to detect NEW modifications
       const hasScaleChanges = selectedScaleFactor !== baselineScaleFactor;
-      const hasIngredientChanges = appliedChanges.length !== baselineAppliedChanges.length || 
-        !appliedChanges.every((change, index) => {
+      const hasIngredientChanges = currentUnsavedChanges.length > 0 || 
+        persistedChanges.length !== baselineAppliedChanges.length || 
+        !persistedChanges.every((change, index) => {
           const baselineChange = baselineAppliedChanges[index];
           return baselineChange && 
             change.from === baselineChange.from && 
@@ -656,7 +669,8 @@ export default function RecipeSummaryScreen() {
         selectedScaleFactor,
         baselineScaleFactor,
         hasScaleChanges,
-        appliedChangesCount: appliedChanges.length,
+        currentUnsavedChangesCount: currentUnsavedChanges.length,
+        persistedChangesCount: persistedChanges.length,
         baselineAppliedChangesCount: baselineAppliedChanges.length,
         hasIngredientChanges,
         newHasModifications,
@@ -664,14 +678,14 @@ export default function RecipeSummaryScreen() {
       
       setHasModifications(newHasModifications);
     }
-  }, [selectedScaleFactor, appliedChanges, entryPoint, baselineScaleFactor, baselineAppliedChanges]);
+  }, [selectedScaleFactor, currentUnsavedChanges, persistedChanges, entryPoint, baselineScaleFactor, baselineAppliedChanges]);
 
   // Reset isAlreadyInMise when user makes modifications that would change the recipe
   useEffect(() => {
     if (isAlreadyInMise) {
       setIsAlreadyInMise(false);
     }
-  }, [selectedScaleFactor, appliedChanges]); // Reset when scaling or ingredient changes occur
+  }, [selectedScaleFactor, currentUnsavedChanges, persistedChanges]); // Reset when scaling or ingredient changes occur
 
   const detectedAllergens = React.useMemo(() => {
     if (!originalRecipe) return [];
@@ -684,17 +698,18 @@ export default function RecipeSummaryScreen() {
 
   const openSubstitutionModal = React.useCallback(
     (ingredient: StructuredIngredient) => {
-      console.log('[DEBUG] openSubstitutionModal called with:', {
-        ingredientName: ingredient.name,
-        ingredientAmount: ingredient.amount,
-        ingredientUnit: ingredient.unit,
-        selectedScaleFactor,
-        isViewingSavedRecipe,
-        appliedChanges,
-        hasSuggestedSubstitutions: !!ingredient.suggested_substitutions,
-        substitutionCount: ingredient.suggested_substitutions?.length || 0,
-        suggestedSubstitutions: ingredient.suggested_substitutions,
-      });
+          console.log('[DEBUG] openSubstitutionModal called with:', {
+      ingredientName: ingredient.name,
+      ingredientAmount: ingredient.amount,
+      ingredientUnit: ingredient.unit,
+      selectedScaleFactor,
+      isViewingSavedRecipe,
+      persistedChanges,
+      currentUnsavedChanges,
+      hasSuggestedSubstitutions: !!ingredient.suggested_substitutions,
+      substitutionCount: ingredient.suggested_substitutions?.length || 0,
+      suggestedSubstitutions: ingredient.suggested_substitutions,
+    });
 
       let scaledSuggestions: SubstitutionSuggestion[] | null = null;
       if (ingredient.suggested_substitutions && selectedScaleFactor !== 1) {
@@ -775,12 +790,12 @@ export default function RecipeSummaryScreen() {
       substitutionName: substitution.name,
       isRemoval: substitution.name === 'Remove ingredient',
       ingredientToSubstitute: ingredientToSubstitute.name,
-      currentAppliedChanges: appliedChanges,
+      currentUnsavedChanges: currentUnsavedChanges,
     });
 
     InteractionManager.runAfterInteractions(() => {
       if (substitution.name === 'Remove ingredient') {
-        const currentRemovals = appliedChanges.filter((c) => !c.to).length;
+        const currentRemovals = [...persistedChanges, ...currentUnsavedChanges].filter((c) => !c.to).length;
         console.log('[DEBUG] Removal limit check:', {
           currentRemovals,
           limit: 2,
@@ -862,7 +877,7 @@ export default function RecipeSummaryScreen() {
 
       if (isRemoval) setLastRemoved({ from: newChange.from, to: null });
 
-      setAppliedChanges((prev) => {
+      setCurrentUnsavedChanges((prev) => {
         const existingChangeIndex = prev.findIndex((c) => c.from === originalNameForSub);
         if (existingChangeIndex > -1) {
           const updated = [...prev];
@@ -874,17 +889,17 @@ export default function RecipeSummaryScreen() {
           });
           return updated;
         }
-        const newAppliedChanges = [...prev, newChange];
+        const newUnsavedChanges = [...prev, newChange];
         console.log('[DEBUG] Added new substitution/removal:', {
           isRemoval,
           ingredientName: originalNameForSub,
           previousChanges: prev,
           newChange,
-          allChanges: newAppliedChanges,
+          allChanges: newUnsavedChanges,
           previousCount: prev.length,
-          newCount: newAppliedChanges.length,
+          newCount: newUnsavedChanges.length,
         });
-        return newAppliedChanges;
+        return newUnsavedChanges;
       });
     });
   };
@@ -892,14 +907,14 @@ export default function RecipeSummaryScreen() {
   const undoIngredientRemoval = React.useCallback(
     (fullName: string) => {
       const { baseName: originalName } = parseRecipeDisplayName(fullName);
-      setAppliedChanges((prev) => prev.filter((change) => change.from !== originalName));
+      setCurrentUnsavedChanges((prev) => prev.filter((change) => change.from !== originalName));
       if (lastRemoved?.from === originalName) setLastRemoved(null);
     },
     [lastRemoved],
   );
 
   const undoSubstitution = React.useCallback((originalName: string) => {
-    setAppliedChanges((prev) => prev.filter((change) => change.from !== originalName));
+    setCurrentUnsavedChanges((prev) => prev.filter((change) => change.from !== originalName));
   }, []);
 
   // Use titleOverride if available (for mise recipes), otherwise use the recipe title
@@ -944,7 +959,7 @@ export default function RecipeSummaryScreen() {
       return;
     }
 
-      const needsSubstitution = appliedChanges.length > 0;
+      const needsSubstitution = currentUnsavedChanges.length > 0;
     const needsScaling = selectedScaleFactor !== 1;
 
       // Use the recipe data directly (local modifications removed)
@@ -977,7 +992,7 @@ export default function RecipeSummaryScreen() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
               originalInstructions: baseRecipe.instructions || [],
-            substitutions: appliedChanges.map((change) => ({
+            substitutions: currentUnsavedChanges.map((change) => ({
               from: change.from,
               to: change.to ? change.to.name : null,
             })),
@@ -1046,7 +1061,7 @@ export default function RecipeSummaryScreen() {
     }
 
     // Regular flow for new/saved recipes
-    const removalCount = appliedChanges.filter((c) => !c.to).length;
+    const removalCount = [...persistedChanges, ...currentUnsavedChanges].filter((c) => !c.to).length;
     if (removalCount > 2) {
       showError('Limit Reached', 'You can only remove up to 2 ingredients per recipe.');
       return;
@@ -1060,7 +1075,7 @@ export default function RecipeSummaryScreen() {
     let finalInstructions = recipe.instructions || [];
     let newTitle: string | null = null; // Capture new title from LLM if suggested
     const needsScaling = selectedScaleFactor !== 1;
-    const needsSubstitution = appliedChanges.length > 0;
+    const needsSubstitution = currentUnsavedChanges.length > 0;
 
     // --- Unified Instruction Modification (handles both substitutions and scaling) ---
     if (needsSubstitution || needsScaling) {
@@ -1083,7 +1098,7 @@ export default function RecipeSummaryScreen() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             originalInstructions: recipe.instructions || [],
-            substitutions: appliedChanges.map((change) => ({
+            substitutions: currentUnsavedChanges.map((change) => ({
               from: change.from,
               to: change.to ? change.to.name : null,
             })),
@@ -1125,8 +1140,10 @@ export default function RecipeSummaryScreen() {
       ingredientGroups: scaledIngredientGroups,
     };
 
+    // Combine all changes for saving to database
+    const allChangesToSave = [...persistedChanges, ...currentUnsavedChanges];
     const appliedChangesData = {
-      ingredientChanges: appliedChanges.map((change) => ({
+      ingredientChanges: allChangesToSave.map((change) => ({
         from: change.from,
         to: change.to ? {
           name: change.to.name,
@@ -1139,7 +1156,7 @@ export default function RecipeSummaryScreen() {
     };
 
     console.log('[DEBUG] ✅ FIXED: Preserving complete substitution data when saving:', {
-      originalAppliedChanges: appliedChanges.map(change => ({
+      originalAppliedChanges: allChangesToSave.map(change => ({
         from: change.from,
         to: change.to ? {
           name: change.to.name,
@@ -1149,7 +1166,7 @@ export default function RecipeSummaryScreen() {
         } : null,
       })),
       savedAppliedChangesData: appliedChangesData,
-      dataPreserved: appliedChanges.map(change => ({
+      dataPreserved: allChangesToSave.map(change => ({
         from: change.from,
         originalAmount: change.to?.amount || 'N/A',
         originalUnit: change.to?.unit || 'N/A',
@@ -1269,7 +1286,7 @@ export default function RecipeSummaryScreen() {
         recipeTitle: recipe.title,
         miseRecipeId: result.miseRecipe.id,
         hasModifications: needsSubstitution || needsScaling,
-        modificationsCount: appliedChanges.length,
+        modificationsCount: allChangesToSave.length,
         scalingFactor: selectedScaleFactor,
       });
       
@@ -1280,7 +1297,7 @@ export default function RecipeSummaryScreen() {
       showError('Save Failed', `Couldn't save recipe to mise: ${saveError.message}`);
       return; // Stop execution on failure
     }
-  }, [recipe, scaledIngredients, scaledIngredientGroups, appliedChanges, router, showError, selectedScaleFactor, session, entryPoint, miseRecipeId]);
+  }, [recipe, scaledIngredients, scaledIngredientGroups, persistedChanges, currentUnsavedChanges, router, showError, selectedScaleFactor, session, entryPoint, miseRecipeId]);
 
   const handleGoToSteps = () => InteractionManager.runAfterInteractions(navigateToNextScreen);
 
@@ -1296,7 +1313,7 @@ export default function RecipeSummaryScreen() {
         editedIngredients: JSON.stringify(preparedRecipeData.ingredientGroups || []),
         newTitle: 'null', // Title is already in preparedRecipeData
         appliedChanges: JSON.stringify({
-          ingredientChanges: appliedChanges.map((change) => ({
+          ingredientChanges: [...persistedChanges, ...currentUnsavedChanges].map((change) => ({
             from: change.from,
             to: change.to ? change.to.name : null,
           })),
@@ -1332,7 +1349,7 @@ export default function RecipeSummaryScreen() {
       return;
     }
 
-    const needsSubstitution = appliedChanges.length > 0;
+    const needsSubstitution = currentUnsavedChanges.length > 0;
     const needsScaling = selectedScaleFactor !== 1;
 
     // If we have modifications, we need to save a modified version
@@ -1361,7 +1378,7 @@ export default function RecipeSummaryScreen() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             originalInstructions: recipe.instructions || [],
-            substitutions: appliedChanges.map((change) => ({
+            substitutions: currentUnsavedChanges.map((change) => ({
               from: change.from,
               to: change.to ? change.to.name : null,
             })),
@@ -1394,8 +1411,10 @@ export default function RecipeSummaryScreen() {
           ingredientGroups: scaledIngredientGroups,
         };
 
+        // Combine all changes for saving
+        const allChangesToSaveForFolder = [...persistedChanges, ...currentUnsavedChanges];
         const appliedChangesData = {
-          ingredientChanges: appliedChanges.map((change) => ({
+          ingredientChanges: allChangesToSaveForFolder.map((change) => ({
             from: change.from,
             to: change.to ? {
               name: change.to.name,
@@ -1408,7 +1427,7 @@ export default function RecipeSummaryScreen() {
         };
 
         console.log('[DEBUG] ✅ FIXED: Preserving complete substitution data when saving (handleSaveForLater):', {
-          originalAppliedChanges: appliedChanges.map(change => ({
+          originalAppliedChanges: allChangesToSaveForFolder.map(change => ({
             from: change.from,
             to: change.to ? {
               name: change.to.name,
@@ -1418,7 +1437,7 @@ export default function RecipeSummaryScreen() {
             } : null,
           })),
           savedAppliedChangesData: appliedChangesData,
-          dataPreserved: appliedChanges.map(change => ({
+          dataPreserved: allChangesToSaveForFolder.map(change => ({
             from: change.from,
             originalAmount: change.to?.amount || 'N/A',
             originalUnit: change.to?.unit || 'N/A',
@@ -1543,7 +1562,7 @@ export default function RecipeSummaryScreen() {
     }
 
     const needsScaling = selectedScaleFactor !== 1;
-    const needsSubstitution = appliedChanges.length > 0;
+    const needsSubstitution = currentUnsavedChanges.length > 0;
     const hasModifications = needsScaling || needsSubstitution;
 
     console.log('[Summary] Cook now modifications check:', {
@@ -1551,7 +1570,7 @@ export default function RecipeSummaryScreen() {
       needsSubstitution,
       hasModifications,
       scaleFactor: selectedScaleFactor,
-      changesCount: appliedChanges.length,
+      changesCount: currentUnsavedChanges.length,
     });
 
     setIsCookingNow(true);
@@ -1564,7 +1583,7 @@ export default function RecipeSummaryScreen() {
         console.log('[Summary] Modifications detected, calling modify-instructions endpoint');
         
         // Check removal limit
-        const removalCount = appliedChanges.filter((c) => !c.to).length;
+        const removalCount = [...persistedChanges, ...currentUnsavedChanges].filter((c) => !c.to).length;
         if (removalCount > 2) {
           showError('Limit Reached', 'You can only remove up to 2 ingredients per recipe.');
           setIsCookingNow(false);
@@ -1592,7 +1611,7 @@ export default function RecipeSummaryScreen() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             originalInstructions: recipe.instructions || [],
-            substitutions: appliedChanges.map((change) => ({
+            substitutions: currentUnsavedChanges.map((change) => ({
               from: change.from,
               to: change.to ? change.to.name : null,
             })),
@@ -1665,7 +1684,7 @@ export default function RecipeSummaryScreen() {
 
     try {
       // Check if we have modifications that need LLM processing
-      const needsSubstitution = appliedChanges.length > 0;
+      const needsSubstitution = currentUnsavedChanges.length > 0;
       const needsScaling = selectedScaleFactor !== 1;
       
       let processedRecipeData = recipe;
@@ -1697,7 +1716,7 @@ export default function RecipeSummaryScreen() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             originalInstructions: baseRecipe.instructions || [],
-            substitutions: appliedChanges.map((change) => ({
+            substitutions: currentUnsavedChanges.map((change) => ({
               from: change.from,
               to: change.to ? change.to.name : null,
             })),
@@ -1737,14 +1756,16 @@ export default function RecipeSummaryScreen() {
           processedInstructionsCount: finalInstructions.length,
           newTitle: newTitle,
           scalingFactor: selectedScaleFactor,
-          substitutionsCount: appliedChanges.length,
+          substitutionsCount: currentUnsavedChanges.length,
         });
       } else {
         console.log('[Summary] No modifications requiring LLM processing');
       }
 
+      // Combine all changes for saving modifications
+      const allChangesToSaveForMise = [...persistedChanges, ...currentUnsavedChanges];
       const appliedChangesData = {
-        ingredientChanges: appliedChanges.map((change) => ({
+        ingredientChanges: allChangesToSaveForMise.map((change) => ({
           from: change.from,
           to: change.to ? {
             name: change.to.name,
@@ -1759,7 +1780,7 @@ export default function RecipeSummaryScreen() {
       console.log('[Summary] Saving processed modifications to database:', {
         miseRecipeId,
         selectedScaleFactor,
-        appliedChangesCount: appliedChanges.length,
+        appliedChangesCount: allChangesToSaveForMise.length,
         processedRecipeTitle: processedRecipeData.title,
         processedRecipeYield: processedRecipeData.recipeYield,
         instructionsCount: processedRecipeData.instructions?.length || 0,
@@ -1794,7 +1815,7 @@ export default function RecipeSummaryScreen() {
         miseRecipeId,
         recipeTitle: processedRecipeData.title,
         hasModifications: needsSubstitution || needsScaling,
-        modificationsCount: appliedChanges.length,
+        modificationsCount: allChangesToSaveForMise.length,
         scalingFactor: selectedScaleFactor,
       });
       
@@ -1996,7 +2017,8 @@ export default function RecipeSummaryScreen() {
             <IngredientList
               ingredientGroups={scaledIngredientGroups}
               selectedScaleFactor={selectedScaleFactor}
-              appliedChanges={appliedChanges}
+              appliedChanges={currentUnsavedChanges}
+              persistedChanges={persistedChanges}
               openSubstitutionModal={openSubstitutionModal}
               undoIngredientRemoval={undoIngredientRemoval}
               undoSubstitution={undoSubstitution}
