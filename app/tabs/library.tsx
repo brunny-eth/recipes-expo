@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
-import { supabase } from '@/lib/supabaseClient';
+
 import { bodyText, screenTitleText, FONT, bodyStrongText } from '@/constants/typography';
 import { useAuth } from '@/context/AuthContext';
 import { useErrorModal } from '@/context/ErrorModalContext';
@@ -188,31 +188,15 @@ export default function LibraryScreen() {
     setSavedError(null);
     
     try {
-      const { data: foldersData, error: foldersError } = await supabase
-        .from('user_saved_folders')
-        .select(`
-          id,
-          name,
-          color,
-          icon,
-          display_order,
-          user_saved_recipes!folder_id(count)
-        `)
-        .eq('user_id', session.user.id)
-        .order('display_order', { ascending: true });
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+      const response = await fetch(`${backendUrl}/api/saved/folders?userId=${session.user.id}`);
 
-      if (foldersError) throw foldersError;
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
 
-      const formattedFolders = foldersData?.map(folder => ({
-        id: folder.id,
-        name: folder.name,
-        color: folder.color,
-        icon: folder.icon,
-        display_order: folder.display_order,
-        recipe_count: (folder.user_saved_recipes as any)?.[0]?.count || 0,
-      })) || [];
-
-      setSavedFolders(formattedFolders);
+      const { folders } = await response.json();
+      setSavedFolders(folders || []);
       
     } catch (err) {
       track('fetch_saved_folders_error', { 
@@ -311,17 +295,20 @@ export default function LibraryScreen() {
     
     setIsSavedLoading(true);
     try {
-      const { error: deleteError } = await supabase
-        .from('user_saved_folders')
-        .delete()
-        .eq('user_id', session.user.id)
-        .eq('id', folderToDelete.id);
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+      const response = await fetch(`${backendUrl}/api/saved/folders/${folderToDelete.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: session.user.id }),
+      });
 
-      if (deleteError) {
+      if (!response.ok) {
         track('delete_folder_error', { 
           screen: 'LibraryScreen', 
           folderId: folderToDelete?.id, 
-          error: deleteError.message,
+          error: response.statusText,
           userId: session?.user?.id,
         });
         setSavedError('Failed to delete folder. Please try again.');

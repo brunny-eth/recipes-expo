@@ -8,6 +8,7 @@ import { recipeRouter } from './routes/recipes'
 import { aiRouter } from './routes/ai'
 import { miseRouter } from './routes/mise'
 import { feedbackRouter } from './routes/feedback'
+import savedRouter from './routes/saved'
 
 const app = express()
 
@@ -23,6 +24,7 @@ app.use('/api/recipes', recipeRouter)
 app.use('/api/ai', aiRouter)
 app.use('/api/mise', miseRouter)
 app.use('/api/feedback', feedbackRouter)
+app.use('/api/saved', savedRouter)
 
 // 👇 Only run this if executed directly (e.g., via `ts-node server/index.ts`)
 if (require.main === module) {

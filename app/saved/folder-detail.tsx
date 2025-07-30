@@ -22,7 +22,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/lib/supabaseClient';
+
 import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
 import { parseServingsValue } from '@/utils/recipeUtils';
 import { moveRecipesToFolder } from '@/lib/savedRecipes';
@@ -81,21 +81,18 @@ export default function SavedFolderDetailScreen() {
     if (!session?.user || !folderId) return;
 
     try {
-      const { data: folderData, error: folderError } = await supabase
-        .from('user_saved_folders')
-        .select('name')
-        .eq('id', folderId)
-        .eq('user_id', session.user.id)
-        .single();
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+      const response = await fetch(`${backendUrl}/api/saved/folders/${folderId}?userId=${session.user.id}`);
 
-      if (folderError) {
-        console.error('[SavedFolderDetailScreen] Error fetching folder name:', folderError);
+      if (!response.ok) {
+        console.error('[SavedFolderDetailScreen] Error fetching folder name:', response.statusText);
         return;
       }
 
-      if (folderData) {
-        console.log('[SavedFolderDetailScreen] Fetched folder name:', folderData.name);
-        setFolderName(folderData.name);
+      const { folder } = await response.json();
+      if (folder) {
+        console.log('[SavedFolderDetailScreen] Fetched folder name:', folder.name);
+        setFolderName(folder.name);
       }
     } catch (err) {
       console.error('[SavedFolderDetailScreen] Unexpected error fetching folder name:', err);
@@ -118,35 +115,17 @@ export default function SavedFolderDetailScreen() {
     setError(null);
     
     try {
-      const { data, error: fetchError } = await supabase
-        .from('user_saved_recipes')
-        .select(`
-          base_recipe_id,
-          title_override,
-          applied_changes,
-          original_recipe_data,
-          display_order,
-          processed_recipes_cache (
-            id,
-            recipe_data,
-            source_type,
-            parent_recipe_id
-          )
-        `)
-        .eq('user_id', session.user.id)
-        .eq('folder_id', folderId)
-        .order('display_order', { ascending: true })
-        .order('created_at', { ascending: false });
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+      const response = await fetch(`${backendUrl}/api/saved/folders/${folderId}/recipes?userId=${session.user.id}`);
 
-      if (fetchError) {
-        console.error('[SavedFolderDetailScreen] Error fetching folder recipes:', fetchError);
+      if (!response.ok) {
+        console.error('[SavedFolderDetailScreen] Error fetching folder recipes:', response.statusText);
         setError('Could not load recipes. Please try again.');
         return;
       }
 
-      const validRecipes = ((data as any[])?.filter(
-        (r) => r.processed_recipes_cache?.recipe_data,
-      ) as SavedRecipe[]) || [];
+      const { recipes } = await response.json();
+      const validRecipes = (recipes as SavedRecipe[]) || [];
 
       console.log(`[SavedFolderDetailScreen] Fetched ${validRecipes.length} recipes from folder ${folderId}.`);
       setSavedRecipes(validRecipes);
@@ -236,14 +215,17 @@ export default function SavedFolderDetailScreen() {
     
     setIsLoading(true);
     try {
-      const { error: deleteError } = await supabase
-        .from('user_saved_recipes')
-        .delete()
-        .eq('user_id', session.user.id)
-        .eq('base_recipe_id', recipeToDelete);
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+      const response = await fetch(`${backendUrl}/api/saved/recipes/${recipeToDelete}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: session.user.id }),
+      });
 
-      if (deleteError) {
-        console.error('[SavedFolderDetailScreen] Error deleting recipe:', deleteError);
+      if (!response.ok) {
+        console.error('[SavedFolderDetailScreen] Error deleting recipe:', response.statusText);
         setError('Failed to remove recipe. Please try again.');
       } else {
         console.log(`[SavedFolderDetailScreen] Recipe ${recipeToDelete} removed.`);
