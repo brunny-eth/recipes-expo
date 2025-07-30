@@ -18,11 +18,14 @@ export type PromptPayload = {
         requestId: string;
         route?: string;
     };
-    // Support for vision models
+    // Support for vision models - single image or array for multi-image
     imageData?: {
         mimeType: string;
         data: string; // base64 encoded image data
-    };
+    } | Array<{
+        mimeType: string;
+        data: string; // base64 encoded image data
+    }>;
 };
 
 /**
@@ -75,15 +78,22 @@ export const geminiAdapter: ModelAdapter = async (
                 throw new Error(`Gemini prompt is too large (${combinedPrompt.length} chars).`);
             }
             
-            const parts = [
-                { text: combinedPrompt },
-                {
+            const parts: any[] = [{ text: combinedPrompt }];
+            
+            // Handle both single image and array of images
+            const imageArray = Array.isArray(fullPrompt.imageData) 
+                ? fullPrompt.imageData 
+                : [fullPrompt.imageData];
+            
+            // Add each image to the parts array
+            for (const imageData of imageArray) {
+                parts.push({
                     inlineData: {
-                        mimeType: fullPrompt.imageData.mimeType,
-                        data: fullPrompt.imageData.data
+                        mimeType: imageData.mimeType,
+                        data: imageData.data
                     }
-                }
-            ];
+                });
+            }
             
             result = await geminiModel.generateContent(parts);
         } else {
@@ -159,19 +169,28 @@ export const openaiAdapter: ModelAdapter = async (
         if (fullPrompt.imageData) {
             // Vision model request with image - use GPT-4o for vision
             model = "gpt-4o";
+                        // Handle both single image and array of images
+            const imageArray = Array.isArray(fullPrompt.imageData) 
+                ? fullPrompt.imageData 
+                : [fullPrompt.imageData];
+            
+            const userContent: any[] = [{ type: "text", text: fullPrompt.text }];
+            
+            // Add each image to the content array
+            for (const imageData of imageArray) {
+                userContent.push({ 
+                    type: "image_url", 
+                    image_url: { 
+                        url: `data:${imageData.mimeType};base64,${imageData.data}` 
+                    } 
+                });
+            }
+            
             messages = [
                 { role: "system", content: fullPrompt.system },
-                { 
+                {
                     role: "user", 
-                    content: [
-                        { type: "text", text: fullPrompt.text },
-                        { 
-                            type: "image_url", 
-                            image_url: { 
-                                url: `data:${fullPrompt.imageData.mimeType};base64,${fullPrompt.imageData.data}` 
-                            } 
-                        }
-                    ]
+                    content: userContent
                 }
             ];
         } else {

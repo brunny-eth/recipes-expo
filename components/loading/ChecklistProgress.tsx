@@ -46,6 +46,29 @@ const VIDEO_STEPS = [
   },
 ];
 
+const IMAGE_STEPS = [
+  {
+    label: 'Analyzing your images',
+    subtext: 'Our AI is examining every detail',
+  },
+  {
+    label: 'Reading the text',
+    subtext: 'Extracting content from all pages',
+  },
+  {
+    label: 'Finding ingredients',
+    subtext: 'Identifying quantities and measurements',
+  },
+  {
+    label: 'Organizing steps',
+    subtext: 'Putting instructions in the right order',
+  },
+  {
+    label: 'Creating your recipe',
+    subtext: 'Making everything clear and beautiful',
+  },
+];
+
 interface ChecklistProgressProps {
   isFinished?: boolean;
   inputType?: string;
@@ -61,7 +84,9 @@ const ChecklistProgress: React.FC<ChecklistProgressProps> = ({
   const hasCompleted = useRef(false);
 
   // Select steps based on input type
-  const STEPS = inputType === 'video' ? VIDEO_STEPS : URL_STEPS;
+  const STEPS = inputType === 'video' ? VIDEO_STEPS : 
+               (inputType === 'image' || inputType === 'images') ? IMAGE_STEPS :
+               URL_STEPS;
 
   useEffect(() => {
     // First step loads after 2.5 seconds

@@ -39,12 +39,19 @@ function normalizeServings(servingRaw: string | null): string | null {
 export async function parseTextRecipe(
     input: string,
     requestId: string,
-    forceNewParse?: boolean | string
+    forceNewParse?: boolean | string,
+    options?: {
+        fromImageExtraction?: boolean; // Indicates text was extracted from image/PDF
+    }
 ): Promise<ParseResult> {
     // Coerce forceNewParse to boolean
     const forceNewParseBool = forceNewParse === true || forceNewParse === 'true';
+    const isFromImageExtraction = options?.fromImageExtraction === true;
+    
     console.log(`[parseTextRecipe] forceNewParse received as:`, forceNewParse, `| typeof:`, typeof forceNewParse, `| coerced:`, forceNewParseBool);
-    logger.info({ requestId }, "🚨🚨🚨 parseTextRecipe was called! 🚨🚨🚨");
+    console.log(`[parseTextRecipe] fromImageExtraction:`, isFromImageExtraction);
+    
+    logger.info({ requestId, fromImageExtraction: isFromImageExtraction }, "🚨🚨🚨 parseTextRecipe was called! 🚨🚨🚨");
     logger.info({ env: process.env.ENABLE_FUZZY_MATCH }, "Env variable ENABLE_FUZZY_MATCH value");
     const requestStartTime = Date.now();
     let overallTimings: ParseResult['timings'] = {
@@ -60,8 +67,14 @@ export async function parseTextRecipe(
     let isFallback = false;
 
     // --- Start Fuzzy Match Logic ---
-    logger.info({ requestId, enableFuzzyMatch: process.env.ENABLE_FUZZY_MATCH, forceNewParse: forceNewParseBool }, "Checking fuzzy match environment variable and forceNewParse");
-    if (!forceNewParseBool && process.env.ENABLE_FUZZY_MATCH === 'true') {
+    logger.info({ 
+        requestId, 
+        enableFuzzyMatch: process.env.ENABLE_FUZZY_MATCH, 
+        forceNewParse: forceNewParseBool,
+        fromImageExtraction: isFromImageExtraction 
+    }, "Checking fuzzy match environment variable, forceNewParse, and fromImageExtraction");
+    
+    if (!forceNewParseBool && !isFromImageExtraction && process.env.ENABLE_FUZZY_MATCH === 'true') {
         logger.info({ requestId }, "Fuzzy match enabled, attempting to find similar recipes.");
         const fuzzyMatchStartTime = Date.now();
         try {
@@ -218,8 +231,12 @@ export async function parseTextRecipe(
         } else {
             logger.info({ requestId, prepareMs: overallTimings.prepareText, textLength: preparedText?.length ?? 0 }, `Raw text prepared.`);
             
-            const prompt = buildTextParsePrompt(preparedText!);
+            const prompt = buildTextParsePrompt(preparedText!, isFromImageExtraction);
             prompt.metadata = { requestId };
+
+            if (isFromImageExtraction) {
+                logger.info({ requestId }, 'Using enhanced prompt for image-extracted JSON input');
+            }
 
             const modelStartTime = Date.now();
             const modelResponse = await runDefaultLLM(prompt);
@@ -342,7 +359,15 @@ export async function parseTextRecipe(
             
             parsedRecipe = {
                 ...finalRecipeData,
+                id: insertedId || undefined // Add the database ID to the recipe object, convert null to undefined
             };
+            
+            logger.info({ 
+                requestId, 
+                insertedId, 
+                recipeId: parsedRecipe.id,
+                hasId: !!parsedRecipe.id 
+            }, 'Recipe object created with database ID');
 
         } else {
             logger.warn({ requestId, inputType }, `Processing finished without error, but no final recipe data was produced.`);

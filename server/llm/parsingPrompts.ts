@@ -73,9 +73,28 @@ The response must be exactly one object with the following shape:
 16. **Tips Extraction**: Extract relevant cooking tips, tricks, or helpful advice mentioned in the text into the 'tips' field. This includes equipment recommendations (e.g., "use a cast iron skillet for best results" or "if you don't have galangal or kefir lime leaves, you can also swap ginger and fresh lime juice"), technique suggestions, timing advice, or any other helpful guidance that isn't explicitly an instruction. These may be in the form of a 'Recipe Notes' or 'Tips' section, or just plainly in text. BUT DO NOT include any promotional text ("sign up for our newsletter" or similar) in the tips field.
 `;
 
-export function buildTextParsePrompt(input: string): PromptPayload {
+export function buildTextParsePrompt(input: string, fromImageExtraction: boolean = false): PromptPayload {
+  const basePrompt = COMMON_SYSTEM_PROMPT;
+  
+  // If this is from image extraction, add guidance for handling potentially structured input
+  const enhancedPrompt = fromImageExtraction ? 
+    basePrompt + `
+
+**ADDITIONAL GUIDANCE FOR IMAGE-EXTRACTED TEXT:**
+This text was extracted from an image/PDF. It may be:
+- Well-structured JSON (preserve core data, add missing substitutions/fields)
+- Unstructured text (parse normally following all standard rules)
+
+If the input appears to be valid JSON with recipe data already structured:
+- PRESERVE the existing title, ingredient names, and instruction content
+- ENHANCE by adding missing suggested_substitutions and other fields
+- DO NOT reinterpret or change the core recipe information
+
+If the input is unstructured text, follow the standard parsing rules completely.` 
+    : basePrompt;
+
   return {
-    system: COMMON_SYSTEM_PROMPT,
+    system: enhancedPrompt,
     text: input,
     isJson: true
   };
@@ -132,32 +151,31 @@ ${caption}
   };
 }
 
-export function buildImageParsePrompt(): PromptPayload {
-  const userText = `
-The following image contains a recipe. Your task is to extract ALL visible text from the image and parse it into the standard recipe JSON format, following all rules from the system prompt.
+export function buildImageParsePrompt(imageDataArray?: Array<{ mimeType: string; data: string }>): PromptPayload {
+    const isMultiImage = imageDataArray && imageDataArray.length > 1;
+    
+    const instructions = isMultiImage 
+        ? `Extract the complete recipe text from these images. The recipe may be spread across multiple pages or images. Please:
 
-Look carefully at the image for:
-- Recipe title or dish name
-- Ingredient lists (may be formatted as lists, paragraphs, or embedded in text)
-- Cooking instructions or preparation steps
-- Timing information (prep time, cook time, total time)
-- Serving size or yield information
-- Any cooking tips, notes, or additional guidance
+1. **Combine information from all images** - ingredients from one image, instructions from another, etc.
+2. **Extract ALL visible text** including ingredients, instructions, cooking times, temperatures, and serving information
+3. **Ignore non-recipe content** like ads, other recipes, or unrelated text
+4. **Return as plain text** - do not format as JSON, just extract the raw recipe text
 
-The image may contain a recipe card, cookbook page, handwritten recipe, screenshot, or any other format. Extract ALL text content accurately, paying special attention to measurements, ingredient names, and cooking instructions.
+Return the extracted text exactly as it appears, preserving the original formatting and structure.`
+        
+        : `Extract the complete recipe text from this image. Please:
 
-If ingredients are only mentioned within instruction steps, be sure to extract them into the ingredientGroups section. If an instruction step contains vague references like "all ingredients" or "all sauce ingredients," expand the instruction by including a comma-separated list of the relevant ingredients from the corresponding ingredientGroup's ingredients array.
+1. **Extract ALL visible text** including ingredients, instructions, cooking times, temperatures, and serving information  
+2. **Ignore non-recipe content** like ads, other recipes, or unrelated text
+3. **Return as plain text** - do not format as JSON, just extract the raw recipe text
 
-Ignore any non-recipe content like website headers, ads, social media elements, or unrelated text that may appear in the image.
+Return the extracted text exactly as it appears, preserving the original formatting and structure.`;
 
----
-EXTRACT TEXT FROM THE PROVIDED IMAGE AND PARSE AS RECIPE JSON:
----
-`;
-
-  return {
-    system: COMMON_SYSTEM_PROMPT,
-    text: userText.trim(),
-    isJson: true,
-  };
+    return {
+        system: COMMON_SYSTEM_PROMPT,
+        text: instructions,
+        isJson: false, // We want plain text output, not JSON
+        imageData: imageDataArray
+    };
 }

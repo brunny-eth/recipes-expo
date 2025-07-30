@@ -7,7 +7,8 @@ const ALLOWED_MIME_TYPES = [
   'image/jpeg',
   'image/png', 
   'image/webp',
-  'image/gif'
+  'image/gif',
+  'application/pdf'
 ];
 
 // Configure multer for in-memory storage
@@ -23,16 +24,26 @@ const fileFilter = (req: any, file: any, cb: (error: Error | null, acceptFile?: 
       originalname: file.originalname,
       allowedTypes: ALLOWED_MIME_TYPES 
     }, 'Rejected file upload: unsupported mime type');
-    cb(new Error('Only JPEG, PNG, WebP, and GIF images are allowed'));
+    cb(new Error('Only JPEG, PNG, WebP, GIF images and PDF files are allowed'));
   }
 };
 
-// Configure multer with storage, file filter, and size limits
+// Configure multer for single file upload
 export const upload = multer({
   storage,
   fileFilter,
   limits: {
     fileSize: MAX_FILE_SIZE,
     files: 1 // Only allow single file upload
+  }
+});
+
+// Configure multer for multiple file uploads
+export const uploadMultiple = multer({
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: MAX_FILE_SIZE,
+    files: 10 // Allow up to 10 files
   }
 }); 

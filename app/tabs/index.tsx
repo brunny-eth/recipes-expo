@@ -32,6 +32,8 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import LogoHeader from '@/components/LogoHeader';
 import RecipeMatchSelectionModal from '@/components/RecipeMatchSelectionModal';
+import RecipePDFImageUploader, { UploadResult } from '@/components/RecipePDFImageUploader';
+import UploadRecipeModal from '@/components/UploadRecipeModal';
 import { CombinedParsedRecipe } from '@/common/types';
 import { useRecipeSubmission } from '@/hooks/useRecipeSubmission';
 import { detectInputType } from '../../server/utils/detectInputType';
@@ -43,6 +45,8 @@ export default function HomeScreen() {
   const [potentialMatches, setPotentialMatches] = useState<{ recipe: CombinedParsedRecipe; similarity: number; }[]>([]);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const uploaderRef = useRef<any>(null);
   const router = useRouter();
   const { showError, hideError } = useErrorModal();
   const { session } = useAuth();
@@ -356,6 +360,106 @@ export default function HomeScreen() {
     }
   };
 
+  const handleUploadComplete = async (result: UploadResult) => {
+    if (result.success && result.navigateToLoading) {
+      // Navigate to loading screen for image processing
+      if (result.imageUri) {
+        // Single image processing
+        router.push({
+          pathname: '/loading',
+          params: {
+            recipeUrl: result.imageUri,
+            inputType: 'image',
+            forceNewParse: 'true'
+          }
+        });
+      } else if (result.imageUris && result.imageUris.length > 0) {
+        // Multiple images processing - we'll need to modify the loading screen to handle this
+        // For now, let's serialize the array
+        router.push({
+          pathname: '/loading',
+          params: {
+            recipeUrl: JSON.stringify(result.imageUris),
+            inputType: 'images',
+            forceNewParse: 'true'
+          }
+        });
+      }
+    } else if (result.success && result.recipe) {
+      // Track successful upload
+      track('recipe_upload_success', {
+        hasExtractedText: !!result.extractedText,
+        hasCoverImage: !!result.coverImageUrl,
+        imageProcessingTime: result.imageProcessingTime,
+        userId: session?.user?.id,
+      });
+
+      // Navigate to recipe summary
+      router.push({
+        pathname: '/recipe/summary',
+        params: {
+          recipeData: JSON.stringify(result.recipe),
+          entryPoint: 'upload',
+          from: '/tabs',
+        },
+      });
+    } else if (result.success && result.cachedMatches && result.cachedMatches.length > 0) {
+      // Handle case where multiple similar recipes were found
+      track('recipe_matches_found', {
+        match_count: result.cachedMatches.length,
+        hasExtractedText: !!result.extractedText,
+        hasCoverImage: !!result.coverImageUrl,
+        imageProcessingTime: result.imageProcessingTime,
+        userId: session?.user?.id,
+      });
+
+      // Show the match selection modal
+      setPotentialMatches(result.cachedMatches);
+      setShowMatchSelectionModal(true);
+    } else {
+      // Track upload failure
+      track('recipe_upload_failed', {
+        error: result.error,
+        userId: session?.user?.id,
+      });
+
+      showError('Upload Failed', result.error || 'Failed to process the uploaded image. Please try again.');
+    }
+  };
+
+  // Upload modal handlers
+  const handleShowUploadModal = () => {
+    setShowUploadModal(true);
+  };
+
+  const handleCloseUploadModal = () => {
+    setShowUploadModal(false);
+  };
+
+  const handleTakePhoto = () => {
+    setShowUploadModal(false);
+    // Small delay to ensure modal is fully closed before opening picker
+    setTimeout(() => {
+      uploaderRef.current?.handleCamera();
+    }, 100);
+  };
+
+  const handleChooseImage = () => {
+    setShowUploadModal(false);
+    // Small delay to ensure modal is fully closed before opening picker
+    setTimeout(() => {
+      uploaderRef.current?.handleImagePicker();
+    }, 100);
+  };
+
+  const handleBrowseFiles = () => {
+    setShowUploadModal(false);
+    // Small delay to ensure modal is fully closed before opening picker
+    setTimeout(() => {
+      uploaderRef.current?.handleDocumentPicker();
+    }, 100);
+  };
+
   const [hasUserTyped, setHasUserTyped] = useState(false);
 
   const handleInputFocus = useCallback(() => {
@@ -449,18 +553,13 @@ export default function HomeScreen() {
             <View style={styles.inputSection}>
               <View style={styles.inputContainer}>
                 <View style={styles.textInputWrapper}>
-                  <TouchableOpacity
+                  <RecipePDFImageUploader
+                    ref={uploaderRef}
+                    onUploadComplete={handleUploadComplete}
+                    isLoading={isSubmitting}
                     style={styles.uploadButton}
-                    onPress={() => {
-                      /* TODO */
-                    }}
-                  >
-                    <MaterialCommunityIcons
-                      name="plus"
-                      size={ICON_SIZE.md}
-                      color={COLORS.primary}
-                    />
-                  </TouchableOpacity>
+                    onShowUploadModal={handleShowUploadModal}
+                  />
                   <View style={styles.divider} />
                   <TextInput
                     style={styles.input}
@@ -497,6 +596,15 @@ export default function HomeScreen() {
           onAction={handleMatchSelectionAction}
         />
       )}
+
+      {/* Upload Recipe Modal */}
+      <UploadRecipeModal
+        visible={showUploadModal}
+        onClose={handleCloseUploadModal}
+        onTakePhoto={handleTakePhoto}
+        onChooseImage={handleChooseImage}
+        onBrowseFiles={handleBrowseFiles}
+      />
     </SafeAreaView>
   );
 }

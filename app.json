@@ -39,7 +39,9 @@
             ]
           }
         ],
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "Allow Meez to access your photo library to select recipe images and PDFs.",
+        "NSCameraUsageDescription": "Allow Meez to access your camera to take photos of recipes."
       },
       "jsEngine": "hermes"
     },
@@ -61,7 +63,10 @@
       "expo-router",
       "expo-web-browser",
       "expo-secure-store",
-      "expo-localization"
+      "expo-localization",
+      "expo-image-picker",
+      "expo-document-picker",
+      "expo-file-system"
     ],
     "experiments": {
       "typedRoutes": true

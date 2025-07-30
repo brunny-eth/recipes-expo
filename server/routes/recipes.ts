@@ -6,7 +6,7 @@ import { supabaseAdmin } from '../lib/supabaseAdmin';
 import { supabase } from '../lib/supabase';
 import { parseAndCacheRecipe } from '../services/parseRecipe';
 import { parseImageRecipe } from '../services/parseImageRecipe';
-import { upload } from '../lib/multer';
+import { upload, uploadMultiple } from '../lib/multer';
 import { modifyInstructions } from '../services/instructionModification';
 import { getAllRecipes, getRecipeById } from '../services/recipeDB';
 import { generateAndSaveEmbedding } from '../../utils/recipeEmbeddings';
@@ -14,6 +14,7 @@ import { CombinedParsedRecipe } from '../../common/types';
 import { IngredientChange } from '../llm/modificationPrompts';
 import logger from '../lib/logger'; 
 import { ParseErrorCode } from '../../common/types/errors';
+import { ImageData } from '../services/parseImageRecipe';
 
 interface SaveModifiedRecipeRequestBody {
   originalRecipeId: number;
@@ -124,10 +125,25 @@ router.post('/parse', async (req: Request, res: Response) => {
 router.post('/parse-image', upload.single('image'), async (req: Request, res: Response) => {
   const requestId = (req as any).id;
   
+  logger.info({ 
+    requestId,
+    headers: req.headers,
+    bodySize: req.body ? Object.keys(req.body).length : 0,
+    fileExists: !!(req as any).file,
+    route: req.originalUrl,
+    method: req.method
+  }, 'Starting /parse-image request processing');
+  
   try {
     const file = (req as any).file;
     if (!file) {
-      logger.warn({ requestId, route: req.originalUrl, method: req.method }, 'No image file uploaded for /parse-image');
+      logger.warn({ 
+        requestId, 
+        route: req.originalUrl, 
+        method: req.method,
+        multerError: 'No file received by multer',
+        headers: req.headers 
+      }, 'No image file uploaded for /parse-image');
       return res.status(400).json({ error: 'Image file is required.' });
     }
 
@@ -140,10 +156,11 @@ router.post('/parse-image', upload.single('image'), async (req: Request, res: Re
       method: req.method 
     }, 'Received image for parsing');
 
-    const { recipe, error: parseError, fromCache, inputType, cacheKey, timings, usage, fetchMethodUsed, extractedText, imageProcessingTime } = await parseImageRecipe(
+    const { recipe, error: parseError, fromCache, inputType, cacheKey, timings, usage, fetchMethodUsed, extractedText, imageProcessingTime, coverImageUrl, cachedMatches } = await parseImageRecipe(
       file.buffer, 
       file.mimetype, 
-      requestId
+      requestId,
+      { uploadCoverImage: true } // Enable cover image upload
     );
 
     if (parseError) {
@@ -168,11 +185,25 @@ router.post('/parse-image', upload.single('image'), async (req: Request, res: Re
       fetchMethodUsed,
       recipe,
       extractedText: extractedText ? extractedText.substring(0, 200) + '...' : null,
-      imageProcessingTime
+      imageProcessingTime,
+      coverImageUrl,
+      cachedMatches
     });
 
   } catch (err) {
     const error = err as Error;
+    
+    // Check for multer-specific errors
+    if (error.message?.includes('File too large')) {
+      logger.warn({ requestId: (req as any).id, error: error.message }, 'File size exceeded limit');
+      return res.status(400).json({ error: 'File too large. Maximum size is 10MB.' });
+    }
+    
+    if (error.message?.includes('Only JPEG, PNG, WebP, and GIF')) {
+      logger.warn({ requestId: (req as any).id, error: error.message }, 'Invalid file type uploaded');
+      return res.status(400).json({ error: error.message });
+    }
+    
     logger.error({
         requestId: (req as any).id,
         message: '💥 Error in /api/recipes/parse-image:', 
@@ -180,9 +211,124 @@ router.post('/parse-image', upload.single('image'), async (req: Request, res: Re
         errorMessage: error.message,
         stack: error.stack,
         route: req.originalUrl,
-        method: req.method
+        method: req.method,
+        errorName: error.name,
+        errorCode: (error as any).code
     }, 'Unhandled exception in /parse-image route');
-    res.status(500).json({ error: 'Internal server error', details: error.message });
+    res.status(500).json({ error: 'Failed to process the uploaded image. Please try again.', details: error.message });
+  }
+});
+
+// --- Multi-Page Image Parsing Route ---
+// Test with: curl -X POST -F "images=@page1.jpg" -F "images=@page2.jpg" http://localhost:3000/api/recipes/parse-images
+router.post('/parse-images', (req: Request, res: Response, next: Function) => {
+  // Custom multer error handling
+  uploadMultiple.array('images', 10)(req, res, (err: any) => {
+    if (err) {
+      const requestId = (req as any).id;
+      
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        logger.warn({ requestId, error: err.message }, 'File size limit exceeded in multi-image upload');
+        return res.status(400).json({ error: 'One or more files exceed the 10MB size limit.' });
+      }
+      
+      if (err.code === 'LIMIT_FILE_COUNT') {
+        logger.warn({ requestId, error: err.message }, 'Too many files in multi-image upload');
+        return res.status(400).json({ error: 'Too many files. Maximum is 10 images.' });
+      }
+      
+      if (err.message?.includes('Only JPEG, PNG, WebP, and GIF')) {
+        logger.warn({ requestId, error: err.message }, 'Invalid file type in multi-image upload');
+        return res.status(400).json({ error: err.message });
+      }
+      
+      logger.error({ requestId, error: err }, 'Multer error in multi-image upload');
+      return res.status(400).json({ error: 'File upload error. Please try again.' });
+    }
+    
+    next();
+  });
+}, async (req: Request, res: Response) => {
+  const requestId = (req as any).id;
+  
+  logger.info({ 
+    requestId,
+    headers: req.headers,
+    filesCount: (req as any).files?.length || 0,
+    route: req.originalUrl,
+    method: req.method
+  }, 'Starting /parse-images request processing');
+  
+  try {
+    const files = (req as any).files;
+    if (!files || files.length === 0) {
+      logger.warn({ requestId, route: req.originalUrl, method: req.method }, 'No image files uploaded for /parse-images');
+      return res.status(400).json({ error: 'At least one image file is required.' });
+    }
+
+    logger.info({ 
+      requestId, 
+      filesCount: files.length,
+      fileSizes: files.map((f: any) => ({ name: f.originalname, size: f.size })),
+      route: req.originalUrl, 
+      method: req.method 
+    }, 'Received multiple images for parsing');
+
+    // Prepare image data for vision model
+    const imageData = files.map((file: any) => ({
+      mimeType: file.mimetype,
+      data: file.buffer.toString('base64')
+    }));
+
+    const { recipe, error: parseError, fromCache, inputType, cacheKey, timings, usage, fetchMethodUsed, extractedText, imageProcessingTime, coverImageUrl, cachedMatches } = await parseImageRecipe(
+      imageData,
+      requestId,
+      { uploadCoverImage: true } // Enable cover image upload for multi-page
+    );
+
+    if (parseError) {
+      switch (parseError.code) {
+        case ParseErrorCode.INVALID_INPUT:
+          return res.status(400).json({ error: parseError });
+        case ParseErrorCode.FINAL_VALIDATION_FAILED:
+        case ParseErrorCode.GENERATION_EMPTY:
+          return res.status(422).json({ error: parseError });
+        default:
+          return res.status(500).json({ error: parseError });
+      }
+    }
+
+    res.json({
+      message: `Multi-page recipe processing complete.`,
+      inputType,
+      fromCache,
+      cacheKey,
+      timings,
+      usage,
+      fetchMethodUsed,
+      recipe,
+      extractedText,
+      imageProcessingTime,
+      coverImageUrl,
+      cachedMatches,
+      pagesProcessed: files.length
+    });
+    
+  } catch (err) {
+    const error = err as Error;
+    
+    logger.error({
+        requestId: (req as any).id,
+        message: '💥 Error in /api/recipes/parse-images:', 
+        errorObject: error, 
+        errorMessage: error.message,
+        stack: error.stack,
+        route: req.originalUrl,
+        method: req.method,
+        errorName: error.name,
+        errorCode: (error as any).code
+    }, 'Unhandled exception in /parse-images route');
+    res.status(500).json({ error: 'Failed to process the uploaded images. Please try again.', details: error.message });
   }
 });
 

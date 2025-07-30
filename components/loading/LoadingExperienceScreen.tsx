@@ -62,12 +62,23 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
   // Animation values
   const rotation = useSharedValue(0);
   
-  // Video-specific timing and messaging
+  // Input type-specific timing and messaging
   const isVideo = inputType === 'video';
+  const isImage = inputType === 'image';
+  const isImages = inputType === 'images';
   
-  const getSpinnerDuration = () => 700; // Consistent timing for both video and URL
-  const getTagline = () => isVideo ? "Processing video recipe..." : "Working on our mise en place...";
-  const getReadyText = () => isVideo ? "Video Recipe Ready!" : "Recipe Ready!";
+  const getSpinnerDuration = () => 700; // Consistent timing for all input types
+  const getTagline = () => {
+    if (isVideo) return "Processing video recipe...";
+    if (isImage) return "Extracting recipe from image...";
+    if (isImages) return "Processing recipe pages...";
+    return "Working on our mise en place...";
+  };
+  const getReadyText = () => {
+    if (isVideo) return "Video Recipe Ready!";
+    if (isImage || isImages) return "Recipe Extracted!";
+    return "Recipe Ready!";
+  };
   
   // Animated styles
   const spinnerStyle = useAnimatedStyle(() => {
@@ -169,16 +180,59 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
 
   const parseRecipe = async (): Promise<ParsedRecipe | null> => {
     const baseBackendUrl = process.env.EXPO_PUBLIC_API_URL!;
-    const endpoint = '/api/recipes/parse';
+    
+    // Choose endpoint based on input type
+    let endpoint: string;
+    let requestBody: any;
+    let headers: any = {};
+    
+    if (isImage) {
+      // Single image processing
+      endpoint = '/api/recipes/parse-image';
+      
+      // Convert data URL to FormData
+      const formData = new FormData();
+      
+      // Detect if this is a PDF based on the URI
+      const isPDFFile = recipeInput.toLowerCase().includes('.pdf');
+      
+      const imageFile = {
+        uri: recipeInput,
+        type: isPDFFile ? 'application/pdf' : 'image/jpeg',
+        name: isPDFFile ? 'recipe.pdf' : 'recipe-image.jpg',
+      } as any;
+      formData.append('image', imageFile);
+      requestBody = formData;
+    } else if (isImages) {
+      // Multiple images processing
+      endpoint = '/api/recipes/parse-images';
+      
+      // Parse the JSON array of image URIs
+      const imageUris = JSON.parse(recipeInput);
+      const formData = new FormData();
+      
+      imageUris.forEach((uri: string, index: number) => {
+        const imageFile = {
+          uri: uri,
+          type: 'image/jpeg',
+          name: `recipe-image-${index}.jpg`,
+        } as any;
+        formData.append('images', imageFile);
+      });
+      
+      requestBody = formData;
+    } else {
+      // URL/text processing (existing logic)
+      endpoint = '/api/recipes/parse';
+      headers['Content-Type'] = 'application/json';
+      requestBody = JSON.stringify({ input: recipeInput, forceNewParse });
+    }
+    
     const backendUrl = `${baseBackendUrl}${endpoint}`;
 
     try {
       console.log(`[parseRecipe] Preparing to send request to: ${backendUrl}`);
-      const requestBody = { input: recipeInput, forceNewParse };
-      console.log(
-        '[parseRecipe] Request Body:',
-        JSON.stringify(requestBody, null, 2),
-      );
+      console.log('[parseRecipe] Input type:', inputType);
 
       // Temporarily log env vars to verify them at runtime
       console.log('EXPO_PUBLIC_API_URL:', process.env.EXPO_PUBLIC_API_URL);
@@ -186,10 +240,8 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
 
       const response = await fetch(backendUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
+        headers,
+        body: requestBody,
       });
 
       console.log(`[parseRecipe] Response Status: ${response.status}`);
@@ -309,7 +361,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
       <View style={{ flex: 1 }}>
         <View style={styles.logoContainer}>
           <Image
-            source={require('@/assets/images/meezblue_underline.webp')}
+            source={require('@/assets/images/meezblue_underline.png')}
             style={styles.logo}
             resizeMode="contain"
           />
@@ -362,7 +414,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
   return (
     <View style={styles.logoContainer}>
       <Image
-        source={require('@/assets/images/meezblue_underline.webp')}
+        source={require('@/assets/images/meezblue_underline.png')}
         style={styles.logo}
         resizeMode="contain"
       />
