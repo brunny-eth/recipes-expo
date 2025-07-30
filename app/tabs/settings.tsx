@@ -110,27 +110,16 @@ export default function AccountScreen() {
         contentContainerStyle={styles.scrollContent}
         style={styles.scrollView}
       >
-        {/* User Info Section - Fixed height container */}
+        {/* User Info Section - Just the login status at top */}
         <View style={styles.userInfoContainer}>
           {isAuthenticated ? (
             <>
-              <View style={styles.authStatusContainer}>
-                <Text style={styles.authStatusText}>
-                  {`Logged in as ${session?.user?.email}`}
-                </Text>
-              </View>
-              <TouchableOpacity 
-                style={[
-                  styles.signOutButton,
-                  isSigningOut && styles.signOutButtonDisabled
-                ]} 
-                onPress={handleSignOut}
-                disabled={isSigningOut}
-              >
-                <Text style={styles.signOutButtonText}>
-                  {isSigningOut ? 'Signing Out...' : 'Sign Out'}
-                </Text>
-              </TouchableOpacity>
+              <Text style={styles.authStatusText}>
+                {`Logged in as ${session?.user?.email}`}
+              </Text>
+              <Text style={styles.authStatusText}>
+                Account status: Subscribed
+              </Text>
             </>
           ) : (
             <TouchableOpacity
@@ -152,7 +141,7 @@ export default function AccountScreen() {
             value={feedbackMessage}
             onChangeText={setFeedbackMessage}
             multiline
-            numberOfLines={4}
+            numberOfLines={6}
             textAlignVertical="top"
             maxLength={400}
           />
@@ -169,6 +158,24 @@ export default function AccountScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* Sign Out Section - After feedback */}
+        {isAuthenticated && (
+          <View style={styles.signOutSection}>
+            <TouchableOpacity 
+              style={[
+                styles.signOutButton,
+                isSigningOut && styles.signOutButtonDisabled
+              ]} 
+              onPress={handleSignOut}
+              disabled={isSigningOut}
+            >
+              <Text style={styles.signOutButtonText}>
+                {isSigningOut ? 'Signing Out...' : 'Sign Out'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {__DEV__ && (
           <View style={styles.devSection}>
@@ -209,7 +216,7 @@ export default function AccountScreen() {
       </ScrollView>
 
       {/* Legal Links and Version - Fixed to bottom */}
-      <View style={[styles.bottomLegalSection, { paddingBottom: insets.bottom + SPACING.md }]}>
+      <View style={[styles.bottomLegalSection, { paddingBottom: insets.bottom }]}>
         <View style={styles.legalSection}>
           <TouchableOpacity 
             style={styles.legalLink} 
@@ -237,26 +244,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.pageHorizontal,
   } as ViewStyle,
   scrollView: {
-    marginTop: SPACING.xl,
   } as ViewStyle,
   userInfoContainer: {
-    minHeight: 140, // Use minHeight for flexibility while maintaining consistent positioning
     marginBottom: SPACING.lg,
-    justifyContent: 'center', // Center content vertically within container
-    paddingVertical: SPACING.md, // Add padding to ensure content doesn't touch edges
-  } as ViewStyle,
-  authStatusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SPACING.base,
-    borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.primaryLight,
-    marginBottom: SPACING.sm,
+    paddingTop: SPACING.sm, // Minimal top padding
   } as ViewStyle,
   authStatusText: {
-    ...bodyStrongText,
-    color: COLORS.primary,
-    marginLeft: SPACING.sm,
+    ...bodyText,
+    color: COLORS.textSubtle,
+    textAlign: 'center',
   } as TextStyle,
   signOutButton: {
     marginTop: SPACING.sm,
@@ -273,10 +269,14 @@ const styles = StyleSheet.create({
   } as TextStyle,
   feedbackSection: {
     marginTop: SPACING.lg,
-    marginBottom: SPACING.xl,
+    marginBottom: SPACING.xs,
+  } as ViewStyle,
+  signOutSection: {
+    marginBottom: SPACING.md,
   } as ViewStyle,
   sectionTitle: {
     ...sectionHeaderText,
+    marginTop: SPACING.xxl,
     marginBottom: SPACING.md,
     color: COLORS.textDark,
     textAlign: 'center',
@@ -287,7 +287,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.lightGray,
     borderRadius: RADIUS.sm,
     padding: SPACING.md,
-    minHeight: 100,
+    minHeight: 140,
     marginBottom: SPACING.sm,
     ...bodyText,
     color: COLORS.textDark,
@@ -333,7 +333,6 @@ const styles = StyleSheet.create({
     ...bodyText,
     fontSize: FONT.size.caption,
     color: COLORS.textSubtle,
-    textDecorationLine: 'underline',
   } as TextStyle,
   versionText: {
     ...bodyText,
@@ -358,9 +357,7 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   bottomLegalSection: {
     paddingHorizontal: SPACING.pageHorizontal,
-    paddingTop: SPACING.lg,
-    borderTopWidth: BORDER_WIDTH.default,
-    borderTopColor: COLORS.lightGray,
+    paddingTop: SPACING.sm,
   } as ViewStyle,
   signOutButtonDisabled: {
     backgroundColor: COLORS.disabled,

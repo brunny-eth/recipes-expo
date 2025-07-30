@@ -218,10 +218,10 @@ export default function HomeScreen() {
     if (!recipeUrl || recipeUrl.trim() === '') {
       showError(
         'Input Required',
-        'Add a recipe link or dish name.\n\nLooking for ideas? Head to the Explore tab to see what others are cooking.',
+        'Add a recipe to get started.\n\nLooking for ideas? Head to the Explore tab.',
         undefined,
         undefined,
-        'Go to Library',
+        'Go to Explore',
         () => {
           hideError();
           router.push('/tabs/library');
@@ -237,7 +237,7 @@ export default function HomeScreen() {
         'Please enter a real dish name (like "chicken soup" or "tomato pasta") or a recipe link',
         undefined,
         undefined,
-        'Go to Library',
+        'Go to Explore',
         () => {
           hideError();
           router.push('/tabs/library');

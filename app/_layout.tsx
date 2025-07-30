@@ -22,6 +22,8 @@ import LoginScreen from '@/app/login';
 import { COLORS } from '@/constants/theme';
 import SplashScreenMeez from './SplashScreen';
 import { AuthNavigationHandler } from '@/components/AuthNavigationHandler';
+import OfflineBanner from '@/components/OfflineBanner';
+import { getNetworkStatus } from '@/utils/networkUtils';
 
 SplashScreen.preventAutoHideAsync();
 console.log('[GLOBAL] SplashScreen.preventAutoHideAsync called.');
@@ -47,6 +49,9 @@ function RootLayoutNav() {
   // Add timeout mechanism to prevent getting stuck in loading states after inactivity
   const [forceReady, setForceReady] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Offline detection
+  const [isOffline, setIsOffline] = useState(false);
   
   // Remove navigation ref since we're no longer using navigation for initial routing
 
@@ -86,6 +91,21 @@ function RootLayoutNav() {
       }
     };
   }, []); // Run once on mount
+
+  // Check network status
+  useEffect(() => {
+    const checkNetwork = async () => {
+      const isConnected = await getNetworkStatus();
+      setIsOffline(!isConnected);
+    };
+    
+    checkNetwork();
+    
+    // Check every 5 seconds
+    const interval = setInterval(checkNetwork, 5000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   // === PREPARE APP RESOURCES ===
   useEffect(() => {
@@ -193,6 +213,7 @@ function RootLayoutNav() {
       if (session) {
         return (
           <Animated.View style={{ flex: 1, backgroundColor: COLORS.background }} entering={FadeIn.duration(400)}>
+            <OfflineBanner visible={isOffline} />
             <AppNavigators />
             <StatusBar style="dark" />
           </Animated.View>
@@ -200,6 +221,7 @@ function RootLayoutNav() {
       } else {
         return (
           <Animated.View style={{ flex: 1, backgroundColor: COLORS.background }} entering={FadeIn.duration(400)}>
+            <OfflineBanner visible={isOffline} />
             <LoginScreen />
             <StatusBar style="dark" />
           </Animated.View>
@@ -221,6 +243,7 @@ function RootLayoutNav() {
     if (session) {
       return (
         <Animated.View style={{ flex: 1, backgroundColor: COLORS.background }} entering={FadeIn.duration(400)}>
+          <OfflineBanner visible={isOffline} />
           <AppNavigators />
           <StatusBar style="dark" />
         </Animated.View>
@@ -228,6 +251,7 @@ function RootLayoutNav() {
     } else {
       return (
         <Animated.View style={{ flex: 1, backgroundColor: COLORS.background }} entering={FadeIn.duration(400)}>
+          <OfflineBanner visible={isOffline} />
           <LoginScreen />
           <StatusBar style="dark" />
         </Animated.View>
@@ -245,6 +269,7 @@ function RootLayoutNav() {
     handleWelcomeDismiss,
     session, // Now critical for conditional rendering
     segments, // Add segments to dependencies for initial routing
+    isOffline, // Add offline state to dependencies
   ]);
 
   return renderContent;

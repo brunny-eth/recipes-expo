@@ -129,9 +129,9 @@ const styles = StyleSheet.create({
   button: {
     backgroundColor: COLORS.primary,
     paddingVertical: SPACING.smMd,
-    paddingHorizontal: 24, // Shorter button width
+    paddingHorizontal: 24,
     borderRadius: RADIUS.sm,
-    width: 160, // Fixed width for both buttons
+    width: 200, // Increased width for longer buttons
     alignItems: 'center',
   } as ViewStyle,
   buttonText: {

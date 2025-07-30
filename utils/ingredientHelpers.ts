@@ -29,7 +29,7 @@ const UNIT_MAPPINGS: Record<string, string> = {
   'stalk': 'each', 'stalks': 'each', 'stem': 'each', 'stems': 'each',
   'sprig': 'each', 'sprigs': 'each', 'branch': 'each', 'branches': 'each',
   'leaf': 'each', 'leaves': 'each', 'sheet': 'each', 'sheets': 'each',
-  'slice': 'each', 'slices': 'each', 'strip': 'each', 'strips': 'each',
+  'slice': 'slices', 'slices': 'slices', 'strip': 'each', 'strips': 'each',
   'wedge': 'each', 'wedges': 'each', 'segment': 'each', 'segments': 'each',
 
   // Container units - mapped to 'each' but preserve original for display
@@ -69,7 +69,7 @@ const UNIT_DISPLAY_NAMES: Record<string, { singular: string, plural: string }> =
   // Volume units
   'ml': { singular: 'ml', plural: 'ml' },
   'tsp': { singular: 'tsp', plural: 'tsp' },
-  'tbsp': { singular: 'Tbsp', plural: 'Tbsp' },
+  'tbsp': { singular: 'tbsp', plural: 'tbsp' },
   'fl_oz': { singular: 'fl oz', plural: 'fl oz' },
   'cup': { singular: 'cup', plural: 'cups' },
   'pint': { singular: 'pint', plural: 'pints' },
@@ -79,6 +79,7 @@ const UNIT_DISPLAY_NAMES: Record<string, { singular: string, plural: string }> =
   
   // Count and weight units
   'each': { singular: '', plural: '' }, // Empty for count units
+  'slices': { singular: 'slice', plural: 'slices' }, // Preserve slice display
   'g': { singular: 'g', plural: 'g' },
   'kg': { singular: 'kg', plural: 'kg' },
   'oz': { singular: 'oz', plural: 'oz' },

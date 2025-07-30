@@ -8,7 +8,8 @@ const URL_STEPS = [
     label: 'Skipping the slop',
     subtext: 'Sifting through 3,000 words of fluff',
   },
-  { label: 'Deleting the ads', subtext: 'Why are there so many of them?' },
+  { label: 'Deleting the ads', 
+    subtext: 'Why are there so many of them?' },
   {
     label: 'Finding backup ingredients',
     subtext: "Just in case you don't have cardamom",
@@ -48,23 +49,23 @@ const VIDEO_STEPS = [
 
 const IMAGE_STEPS = [
   {
-    label: 'Analyzing your images',
-    subtext: 'Our AI is examining every detail',
+    label: 'Analyzing the attached images',
+    subtext: 'Trying to find the recipe in here...',
   },
   {
-    label: 'Reading the text',
-    subtext: 'Extracting content from all pages',
+    label: 'Transcribing the chaos',
+    subtext: 'Extracting content from the pages',
   },
   {
-    label: 'Finding ingredients',
-    subtext: 'Identifying quantities and measurements',
+    label: 'Finding the correct ingredients',
+    subtext: 'Changing "cimanon" back to "cinnamon"',
   },
   {
-    label: 'Organizing steps',
+    label: 'Organizing the steps',
     subtext: 'Putting instructions in the right order',
   },
   {
-    label: 'Creating your recipe',
+    label: 'Formatting the recipe for you',
     subtext: 'Making everything clear and beautiful',
   },
 ];

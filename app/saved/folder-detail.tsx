@@ -6,6 +6,7 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
 
@@ -334,11 +335,19 @@ export default function SavedFolderDetailScreen() {
           </View>
         )}
         
-        {imageUrl && (
+        {imageUrl ? (
           <FastImage
             source={{ uri: imageUrl }}
             style={styles.recipeImage}
           />
+        ) : (
+          <View style={styles.fallbackImageContainer}>
+            <Image
+              source={require('@/assets/images/meezblue_underline.webp')}
+              style={styles.fallbackImage}
+              resizeMode="contain"
+            />
+          </View>
         )}
         
         <View style={styles.recipeInfo}>
@@ -440,7 +449,7 @@ export default function SavedFolderDetailScreen() {
                   <ActivityIndicator size="small" color={COLORS.white} />
                 ) : (
                   <Text style={styles.moveButtonText}>
-                    Move to folder
+                    Move folders
                   </Text>
                 )}
               </TouchableOpacity>
@@ -597,6 +606,19 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     marginRight: SPACING.md,
   },
+  fallbackImageContainer: {
+    width: SPACING.xxl + 8,
+    height: SPACING.xxl + 8,
+    borderRadius: 6,
+    marginRight: SPACING.md,
+    backgroundColor: COLORS.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fallbackImage: {
+    width: '80%',
+    height: '80%',
+  },
   recipeInfo: {
     flex: 1,
   },
@@ -680,11 +702,6 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: COLORS.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
     minHeight: 48,
   },
   moveButtonDisabled: {

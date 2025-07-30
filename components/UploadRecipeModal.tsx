@@ -49,9 +49,30 @@ export default function UploadRecipeModal({
           onPress={(e) => e.stopPropagation()} // Prevent closing when tapping inside modal
         >
           <Text style={styles.title}>Upload Recipe</Text>
-          <Text style={styles.subtitle}>Choose how you'd like to add your recipe</Text>
 
           <View style={styles.optionsContainer}>
+            <TouchableOpacity
+              style={styles.optionButton}
+              onPress={onBrowseFiles}
+            >
+              <View style={styles.optionIcon}>
+                <MaterialCommunityIcons
+                  name="file-document"
+                  size={24}
+                  color={COLORS.primary}
+                />
+              </View>
+              <View style={styles.optionContent}>
+                <Text style={styles.optionTitle}>Browse Files</Text>
+                <Text style={styles.optionSubtitle}>Add a recipe PDF from your files</Text>
+              </View>
+              <MaterialCommunityIcons
+                name="chevron-right"
+                size={20}
+                color={COLORS.textMuted}
+              />
+            </TouchableOpacity>
+
             <TouchableOpacity
               style={styles.optionButton}
               onPress={onTakePhoto}
@@ -65,7 +86,7 @@ export default function UploadRecipeModal({
               </View>
               <View style={styles.optionContent}>
                 <Text style={styles.optionTitle}>Take Photo</Text>
-                <Text style={styles.optionSubtitle}>Use your camera to capture a recipe</Text>
+                <Text style={styles.optionSubtitle}>Add a recipe using your camera</Text>
               </View>
               <MaterialCommunityIcons
                 name="chevron-right"
@@ -87,29 +108,7 @@ export default function UploadRecipeModal({
               </View>
               <View style={styles.optionContent}>
                 <Text style={styles.optionTitle}>Choose Image</Text>
-                <Text style={styles.optionSubtitle}>Select from your photo library</Text>
-              </View>
-              <MaterialCommunityIcons
-                name="chevron-right"
-                size={20}
-                color={COLORS.textMuted}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.optionButton}
-              onPress={onBrowseFiles}
-            >
-              <View style={styles.optionIcon}>
-                <MaterialCommunityIcons
-                  name="file-document"
-                  size={24}
-                  color={COLORS.primary}
-                />
-              </View>
-              <View style={styles.optionContent}>
-                <Text style={styles.optionTitle}>Browse Files</Text>
-                <Text style={styles.optionSubtitle}>Select PDF or image files</Text>
+                <Text style={styles.optionSubtitle}>Add a recipe from your pics</Text>
               </View>
               <MaterialCommunityIcons
                 name="chevron-right"
@@ -155,7 +154,7 @@ const styles = StyleSheet.create({
     ...screenTitleText,
     color: COLORS.textDark,
     textAlign: 'center',
-    marginBottom: SPACING.xs,
+    marginBottom: SPACING.xl,
   } as TextStyle,
   subtitle: {
     ...bodyText,

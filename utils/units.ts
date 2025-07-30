@@ -62,7 +62,7 @@ export function getUnitDisplayName(unit: Unit | string | null, amount: number = 
         // Volume units
         ml: { singular: 'ml', plural: 'ml' },
         tsp: { singular: 'tsp', plural: 'tsp' },
-        tbsp: { singular: 'Tbsp', plural: 'Tbsp' },
+        tbsp: { singular: 'tbsp', plural: 'tbsp' },
         fl_oz: { singular: 'fl oz', plural: 'fl oz' },
         cup: { singular: 'cup', plural: 'cups' },
         pint: { singular: 'pint', plural: 'pints' },

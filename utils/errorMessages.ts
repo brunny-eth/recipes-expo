@@ -1,4 +1,5 @@
 import { ParseErrorCode } from '../common/types/errors';
+import { isOfflineError } from './networkUtils';
 
 /**
  * Maps technical ParseErrorCode values to user-friendly, actionable error messages
@@ -6,10 +7,10 @@ import { ParseErrorCode } from '../common/types/errors';
 export function getErrorMessage(errorCode: ParseErrorCode, context?: string): string {
   switch (errorCode) {
     case ParseErrorCode.INVALID_INPUT:
-      return "That doesn't look like a valid recipe. Please try a URL with an actual recipe on it, or just paste the recipe text directly. You can also just say what you want and we'll suggest a recipe for you.";
+      return "That doesn't look like a valid recipe. \n\n Please try a URL with an actual recipe in it, or just paste the recipe text directly.";
       
     case ParseErrorCode.GENERATION_FAILED:
-      return "We couldn't process that recipe. Please try a URL with an actual recipe on it, or just paste the recipe text directly. You can also just say what you want and we'll suggest a recipe for you.";
+      return "We couldn't process that recipe. \n\n Please try a URL with an actual recipe on it, or just paste the recipe text directly.";
       
     case ParseErrorCode.GENERATION_EMPTY:
       if (context === 'url') {
@@ -24,7 +25,7 @@ export function getErrorMessage(errorCode: ParseErrorCode, context?: string): st
       return "The recipe details seem incomplete. Please add more ingredients or cooking steps and try again.";
       
     case ParseErrorCode.UNSUPPORTED_INPUT_TYPE:
-      return "We can only process recipe URLs or recipe text right now. Please try pasting a link or typing out the recipe.";
+      return "Please try pasting a link with a recipe in it,or just search for a similar recipe.";
       
     default:
       return "Something went wrong while processing your recipe. Please try again.";
@@ -38,9 +39,7 @@ export function getNetworkErrorMessage(error: Error | string, statusCode?: numbe
   const errorMessage = typeof error === 'string' ? error : error.message;
   
   // Network connectivity issues
-  if (errorMessage.includes('Network request failed') || 
-      errorMessage.includes('Failed to fetch') ||
-      errorMessage.includes('network error')) {
+  if (isOfflineError(error)) {
     return "Please check your internet connection and try again.";
   }
   

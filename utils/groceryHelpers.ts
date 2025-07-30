@@ -65,6 +65,8 @@ const INGREDIENT_ALIASES: Record<string, string> = {
   'flour': 'all purpose flour',
   'plain flour': 'all purpose flour',
   'white flour': 'all purpose flour',
+  'all-purpose flour': 'all purpose flour', // Handle hyphenated version
+  'all purpose flour': 'all purpose flour', // Keep canonical form
   
   // Tomato variations
   'roma tomato': 'tomato',
@@ -77,6 +79,12 @@ const INGREDIENT_ALIASES: Record<string, string> = {
   'bell peppers': 'bell pepper',
   'sweet pepper': 'bell pepper',
   'sweet peppers': 'bell pepper',
+  'black pepper': 'black pepper',
+  'freshly ground black pepper': 'black pepper',
+  'ground black pepper': 'black pepper',
+  'white pepper': 'white pepper',
+  'freshly ground white pepper': 'white pepper',
+  'ground white pepper': 'white pepper',
   
   // Herb variations
   'fresh herbs': 'herbs',
@@ -117,6 +125,19 @@ const INGREDIENT_ALIASES: Record<string, string> = {
   'ground pork': 'ground pork',
   'ground lamb': 'ground lamb',
   
+  // Salt variations - normalize all to base "salt"
+  'kosher salt': 'salt',
+  'sea salt': 'salt', 
+  'fine salt': 'salt',
+  'coarse salt': 'salt',
+  'table salt': 'salt',
+  'iodized salt': 'salt',
+  'himalayan salt': 'salt',
+  'pink salt': 'salt',
+  'rock salt': 'salt',
+  'celtic salt': 'salt',
+  'flaky salt': 'salt',
+
   // Unit-based cleanup (remove unit words from ingredient names)
   'fluid ounces': '', // Remove when it appears in ingredient name
   'ounces': '', // Remove when it appears in ingredient name
@@ -138,7 +159,6 @@ const PRESERVED_COMBINATIONS = new Set([
   'active dry yeast', 'active dry',
   'brown sugar', 'white sugar', 'powdered sugar', 'confectioners sugar',
   'hot paprika', 'sweet paprika',
-  'fine salt', 'coarse salt', 'kosher salt', 'sea salt',
   'heavy cream', 'light cream', 'sour cream', 'whipped cream',
   'cottage cheese', 'cream cheese', 'goat cheese', 'blue cheese',
   'green beans', 'black beans', 'kidney beans', 'navy beans',
@@ -154,7 +174,7 @@ const PRESERVED_COMBINATIONS = new Set([
  * Adjectives that should typically be removed unless part of a preserved combination
  */
 const REMOVABLE_ADJECTIVES = new Set([
-  'fresh', 'dried', 'chopped', 'diced', 'minced', 'crushed', 'sliced',
+  'fresh', 'dried', 'chopped', 'diced', 'minced', 'crushed', 'sliced', 'ground',
   'peeled', 'seeded', 'pitted', 'canned', 'frozen', 'defrosted',
   'cooked', 'raw', 'boiled', 'fried', 'baked', 'grilled', 'steamed', 'roasted',
   'large', 'medium', 'small', 'jumbo', 'extra', 'super', 'mini', 'baby',
