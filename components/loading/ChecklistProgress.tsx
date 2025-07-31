@@ -90,12 +90,12 @@ const ChecklistProgress: React.FC<ChecklistProgressProps> = ({
                URL_STEPS;
 
   useEffect(() => {
-    // First step loads after 2.5 seconds
+    // First step loads after 3.125 seconds (25% slower)
     const firstStepTimer = setTimeout(() => {
       setCurrentStepIndex(1);
-    }, 2500);
+    }, 3125);
 
-    // Then start the regular interval for subsequent steps (3.5 seconds each)
+    // Then start the regular interval for subsequent steps (4.375 seconds each, 25% slower)
     const regularIntervalTimer = setTimeout(() => {
       intervalRef.current = setInterval(() => {
         setCurrentStepIndex((prevIndex) => {
@@ -105,8 +105,8 @@ const ChecklistProgress: React.FC<ChecklistProgressProps> = ({
           clearInterval(intervalRef.current!);
           return prevIndex;
         });
-      }, 3500) as any;
-    }, 2500);
+      }, 4375) as any;
+    }, 3125);
 
     return () => {
       clearTimeout(firstStepTimer);
@@ -130,7 +130,7 @@ const ChecklistProgress: React.FC<ChecklistProgressProps> = ({
           clearInterval(fastForwardInterval);
           return prevIndex;
         });
-      }, 200) as any;
+      }, 250) as any; // 25% slower fast-forward
 
       return () => {
         clearInterval(fastForwardInterval);

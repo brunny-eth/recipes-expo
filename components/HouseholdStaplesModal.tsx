@@ -142,7 +142,7 @@ export default function HouseholdStaplesModal({
                 </TouchableOpacity>
                 <TouchableOpacity onPress={handleSave} style={styles.saveButton}>
                   <Text style={styles.saveButtonText}>
-                    Filter Out
+                    Save Staples
                   </Text>
                 </TouchableOpacity>
               </View>

@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
+import Animated, { FadeInUp } from 'react-native-reanimated';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import { useKeepAwake } from 'expo-keep-awake';
@@ -128,9 +128,17 @@ export default function StepsScreen() {
     const trackStepsStarted = async () => {
       const scaled = appliedChanges?.scalingFactor !== 1;
       const substitutions = appliedChanges?.ingredientChanges?.length || 0;
+      const modified = substitutions > 0 || scaled;
+      console.log('[POSTHOG] Tracking event: steps_started', { 
+        scaled, 
+        substitutions,
+        modified,
+        sessionType: 'single_recipe'
+      });
       await track('steps_started', { 
         scaled, 
         substitutions,
+        modified,
         sessionType: 'single_recipe'
       });
     };
@@ -506,40 +514,49 @@ export default function StepsScreen() {
   const completedStepsCount = Object.values(completedSteps).filter(Boolean).length;
   const progressPercentage = instructions.length > 0 ? (completedStepsCount / instructions.length) * 100 : 0;
 
-  // Handle marking mise recipe as complete
-  const handleMarkMiseComplete = async () => {
-    if (!params.miseRecipeId || !session?.access_token) return;
+  // Handle ending cooking session
+  const handleEndCookingSession = async () => {
+    if (!session?.access_token) {
+      router.back();
+      return;
+    }
 
-    setIsLoadingComplete(true);
-    try {
-      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
-      if (!backendUrl) {
-        throw new Error('API configuration error');
+    // If this is a mise recipe, mark it as complete
+    if (params.miseRecipeId) {
+      setIsLoadingComplete(true);
+      try {
+        const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+        if (!backendUrl) {
+          throw new Error('API configuration error');
+        }
+
+        const response = await fetch(`${backendUrl}/api/mise/recipes/${params.miseRecipeId}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            userId: session.user?.id,
+            isCompleted: true 
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to mark recipe as complete');
+        }
+
+        // Navigate back to mise tab
+        router.replace('/tabs/mise' as any);
+      } catch (err) {
+        console.error('Error marking recipe complete:', err);
+        showError('Error', 'Failed to mark recipe as complete. Please try again.');
+      } finally {
+        setIsLoadingComplete(false);
       }
-
-      const response = await fetch(`${backendUrl}/api/mise/recipes/${params.miseRecipeId}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          userId: session.user?.id,
-          isCompleted: true 
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to mark recipe as complete');
-      }
-
-      // Navigate back to mise tab
-      router.replace('/tabs/mise' as any);
-    } catch (err) {
-      console.error('Error marking recipe complete:', err);
-      showError('Error', 'Failed to mark recipe as complete. Please try again.');
-    } finally {
-      setIsLoadingComplete(false);
+    } else {
+      // For non-mise recipes, just navigate back
+      router.back();
     }
   };
 
@@ -650,50 +667,14 @@ export default function StepsScreen() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {instructions.length > 0 &&
-        Object.values(completedSteps).filter(Boolean).length ===
-          instructions.length && (
-          <Animated.View
-            entering={FadeIn.duration(500)}
-            style={styles.completionContainer}
-          >
-            <View style={styles.completionContent}>
-              <Text style={styles.completionTitle}>Recipe Completed</Text>
-              <Text style={styles.completionText}>Enjoy!</Text>
-              
-              {/* Mark as Complete button for mise recipes */}
-              {params.miseRecipeId && (
-                <TouchableOpacity
-                  style={[
-                    styles.completeButton,
-                    isLoadingComplete && styles.completeButtonDisabled
-                  ]}
-                  onPress={handleMarkMiseComplete}
-                  disabled={isLoadingComplete}
-                >
-                  {isLoadingComplete ? (
-                    <ActivityIndicator color={COLORS.white} />
-                  ) : (
-                    <>
-                      <MaterialCommunityIcons
-                        name="check-circle"
-                        size={20}
-                        color={COLORS.white}
-                      />
-                      <Text style={styles.completeButtonText}>Mark as Complete</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              )}
-            </View>
-          </Animated.View>
-        )}
+
 
       {/* Footer Buttons */}
       <StepsFooterButtons
         onTimersPress={handleTimersPress}
         onRecipeTipsPress={handleRecipeTipsPress}
         hasRecipeTips={!!modifiedRecipe?.tips}
+        onEndCookingSessions={handleEndCookingSession}
       />
 
 
@@ -903,31 +884,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 22,
   } as TextStyle,
-  completionContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: OVERLAYS.whiteOpaque,
-    padding: SPACING.pageHorizontal,
-    paddingBottom: SPACING.xxlAlt,
-    borderTopLeftRadius: RADIUS.xxxl,
-    borderTopRightRadius: RADIUS.xxxl,
-    ...SHADOWS.mediumUp,
-  } as ViewStyle,
-  completionContent: {
-    alignItems: 'center',
-  } as ViewStyle,
-  completionTitle: {
-    ...sectionHeaderText,
-    color: COLORS.primary,
-    marginBottom: SPACING.xs,
-  } as TextStyle,
-  completionText: {
-    ...bodyTextLoose,
-    color: COLORS.textDark,
-    marginBottom: SPACING.smLg,
-  } as TextStyle,
+
   centeredStatusContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -1091,23 +1048,7 @@ const styles = StyleSheet.create({
     color: COLORS.white,
   } as TextStyle,
 
-  completeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.success,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    borderRadius: RADIUS.sm,
-    marginTop: SPACING.md,
-    gap: SPACING.sm,
-  } as ViewStyle,
-  completeButtonDisabled: {
-    backgroundColor: COLORS.lightGray,
-  } as ViewStyle,
-  completeButtonText: {
-    color: COLORS.white,
-    fontWeight: 'bold',
-  } as TextStyle,
+
   // --- Progress Bar Styles ---
   progressBarContainer: {
     paddingHorizontal: SPACING.pageHorizontal,

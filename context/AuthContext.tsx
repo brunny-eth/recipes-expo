@@ -18,6 +18,7 @@ import { useSegments } from 'expo-router';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as SecureStore from 'expo-secure-store';
 import { createLogger } from '@/utils/logger';
+import { useAnalytics } from '@/utils/analytics';
 
 const logger = createLogger('auth');
 
@@ -69,6 +70,17 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   const [isLoading, setIsLoading] = useState(true);
   const [justLoggedIn, setJustLoggedIn] = useState(false);
   const { showError } = useErrorModal();
+  const { maybeIdentifyUser, resetUser } = useAnalytics();
+
+  // Use refs to access PostHog functions to avoid stale closures
+  const maybeIdentifyUserRef = useRef(maybeIdentifyUser);
+  const resetUserRef = useRef(resetUser);
+
+  // Update refs when functions change
+  useEffect(() => {
+    maybeIdentifyUserRef.current = maybeIdentifyUser;
+    resetUserRef.current = resetUser;
+  }, [maybeIdentifyUser, resetUser]);
 
   // Navigation event listeners
   const navigationListeners = useRef<Set<(event: AuthNavigationEvent) => void>>(new Set());
@@ -170,6 +182,9 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
             setSession(newSession);
             setJustLoggedIn(true);
             
+            // Identify user in PostHog
+            maybeIdentifyUserRef.current(newSession.user);
+            
             // Check if user is new and update metadata accordingly
             const isNew = await isNewUser(newSession.user.id);
             if (isNew) {
@@ -207,7 +222,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         logger.warn('No access/refresh tokens found in URL fragment', { url });
       }
     },
-    [emitNavigationEvent], // Add emitNavigationEvent to dependencies
+    [emitNavigationEvent], // Add emitNavigationEvent back to dependencies
   );
 
   // Effect to set up auth state change listener and deep link listener
@@ -228,6 +243,10 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           setSession(session);
           setJustLoggedIn(true);
           setIsLoading(false);
+          
+          // Identify user in PostHog
+          maybeIdentifyUserRef.current(session.user);
+          
           // Emit navigation event
           emitNavigationEvent({ type: 'SIGNED_IN', userId: session.user.id });
         } else if (event === 'SIGNED_OUT') {
@@ -235,6 +254,10 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           setSession(null);
           setJustLoggedIn(false);
           setIsLoading(false);
+          
+          // Reset user in PostHog
+          resetUserRef.current();
+          
           // Emit navigation event
           emitNavigationEvent({ type: 'SIGNED_OUT' });
         } else if (event === 'TOKEN_REFRESHED' && session) {
@@ -248,6 +271,8 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           });
           if (session) {
             setSession(session);
+            // Identify user in PostHog for initial session
+            maybeIdentifyUserRef.current(session.user);
           } else {
             setSession(null);
           }
@@ -277,7 +302,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       authListener?.subscription?.unsubscribe();
       urlSubscription?.remove();
     };
-  }, [handleUrl, emitNavigationEvent]); // Add emitNavigationEvent to dependencies
+  }, [handleUrl, emitNavigationEvent]); // Add emitNavigationEvent back to dependencies
 
   const signIn = useCallback(async (provider: AuthProvider): Promise<boolean> => {
     logger.info('Sign-in process started', { provider });

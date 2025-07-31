@@ -82,6 +82,8 @@ const INGREDIENT_ALIASES: Record<string, string> = {
   'black pepper': 'black pepper',
   'freshly ground black pepper': 'black pepper',
   'ground black pepper': 'black pepper',
+  'freshly ground pepper': 'black pepper', // Add this for generic "freshly ground pepper"
+  'ground pepper': 'black pepper', // Add this for generic "ground pepper"
   'white pepper': 'white pepper',
   'freshly ground white pepper': 'white pepper',
   'ground white pepper': 'white pepper',
@@ -568,6 +570,12 @@ function areUnitsCompatible(unit1: string | null, unit2: string | null): boolean
     return true;
   }
   
+  // Special case: teaspoons and null are compatible for seeds/spices aggregation
+  if ((normalizedUnit1 === 'tsp' && normalizedUnit2 === null) || 
+      (normalizedUnit1 === null && normalizedUnit2 === 'tsp')) {
+    return true;
+  }
+  
   if (normalizedUnit1 === null || normalizedUnit2 === null) {
     console.log(`[groceryHelpers] ❌ Units are not compatible (one is null): ${normalizedUnit1}, ${normalizedUnit2}`);
     return false;
@@ -647,10 +655,11 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
   const groupedByName = new Map<string, GroceryListItem[]>();
   for (const item of items) {
     const normalizedName = normalizeName(item.item_name);
-    // Create a normalized copy of the item
+    
+    // Create a normalized copy of the item with normalized name as the display name
     const normalizedItem = {
       ...item,
-      item_name: normalizedName // Use normalized name for grouping
+      item_name: normalizedName // Use normalized name as the final display name
     };
     if (!groupedByName.has(normalizedName)) {
       groupedByName.set(normalizedName, []);
@@ -707,7 +716,19 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
           const baseAmount = parseQuantity(baseItem.quantity_amount);
           const compareAmount = parseQuantity(compareItem.quantity_amount);
 
-          if (baseAmount !== null && compareAmount !== null) {
+          // Handle case where both amounts are null (as needed items)
+          if (baseAmount === null && compareAmount === null) {
+            // Combine items with null amounts - they're both "as needed"
+            
+            // Combine the original ingredient texts to show what recipes they came from
+            const combinedText = baseItem.original_ingredient_text === compareItem.original_ingredient_text 
+              ? baseItem.original_ingredient_text
+              : `${baseItem.original_ingredient_text}; ${compareItem.original_ingredient_text}`;
+            
+            baseItem.original_ingredient_text = combinedText;
+            processedIndices.add(j);
+          }
+          else if (baseAmount !== null && compareAmount !== null) {
             let convertedAmount = compareAmount;
             let finalUnit = baseItem.quantity_unit;
             let finalAmount = baseAmount;

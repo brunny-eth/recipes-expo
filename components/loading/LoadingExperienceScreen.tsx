@@ -172,6 +172,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
           recipeData: JSON.stringify(finalRecipeData),
           entryPoint: 'new',
           from: '/',
+          inputType: inputType, // Pass the input type to determine if we should show "Visit Source"
         },
       });
       onComplete();
@@ -269,6 +270,10 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
           setRecipeData(result.recipe);
           
           // Track successful recipe parsing
+          console.log('[POSTHOG] Tracking event: recipe_parsed', { 
+            inputType, 
+            ingredientsCount: result.recipe.ingredients?.length || 0 
+          });
           await track('recipe_parsed', { 
             inputType, 
             ingredientsCount: result.recipe.ingredients?.length || 0 

@@ -54,10 +54,7 @@ export default function StepItem({
     const searchTermsWithIng = generateIngredientSearchTerms(ingredients);
     const uniqueSearchTermItems = getUniqueSearchTermItems(searchTermsWithIng);
 
-    if (__DEV__) {
-      console.log(`[StepItem] 📝 Step: "${step}"`);
-      console.log(`[StepItem] 🎯 Unique search terms: [${uniqueSearchTermItems.map(item => `"${item.searchTerm}"`).join(', ')}]`);
-    }
+
 
     if (uniqueSearchTermItems.length === 0) {
       return (
@@ -77,9 +74,7 @@ export default function StepItem({
     );
     const parts = step.split(regex);
 
-    if (__DEV__) {
-      console.log(`[StepItem] ✂️ Split parts: [${parts.map(part => `"${part}"`).join(', ')}]`);
-    }
+
 
     return (
       <Text style={[
@@ -94,9 +89,6 @@ export default function StepItem({
               (item) => new RegExp(item.searchTerm, 'i').test(part),
             );
             if (matchedItem && onIngredientPress) {
-              if (__DEV__) {
-                console.log(`[StepItem] ✅ Matched: "${part}" → "${matchedItem.ingredient.name}"`);
-              }
               return (
                 <Text
                   key={index}

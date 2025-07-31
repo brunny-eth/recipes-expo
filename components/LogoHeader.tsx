@@ -9,11 +9,6 @@ interface LogoHeaderProps {
 }
 
 const LogoHeader: React.FC<LogoHeaderProps> = React.memo(({ animatedLogo }) => {
-  console.log(`[${new Date().toISOString()}] [LogoHeader] 🎨 RENDER TRIGGERED`);
-  console.log('[LogoHeader] Props analysis:', {
-    hasAnimatedLogo: !!animatedLogo,
-    animatedLogoReference: animatedLogo,
-  });
 
   return (
     <View style={styles.logoContainer}>

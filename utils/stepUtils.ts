@@ -77,29 +77,20 @@ export const testIngredientHighlighting = () => {
     'Mix in garlic powder and salt',
   ];
 
-  console.log('[stepUtils] 🧪 Testing improved ingredient highlighting:');
-  
   const searchTerms = generateIngredientSearchTerms(testIngredients);
   const uniqueTerms = getUniqueSearchTermItems(searchTerms);
   
-  console.log('Generated search terms:', uniqueTerms.map(t => t.searchTerm));
-  
   testSteps.forEach((step, index) => {
-    console.log(`\nStep ${index + 1}: "${step}"`);
     const regex = new RegExp(`(${uniqueTerms.map(item => item.searchTerm).join('|')})`, 'gi');
     const parts = step.split(regex);
-    console.log('Split parts:', parts.filter(part => part));
+    // Console logs removed for cleaner output
   });
 };
 
 // Debug function to help visualize generated search terms
 export const debugIngredientSearchTerms = (ingredients: StructuredIngredient[]) => {
   const searchTerms = generateIngredientSearchTerms(ingredients);
-  console.log('[stepUtils] 🔍 Generated search terms:');
-  ingredients.forEach((ing, index) => {
-    const termsForIngredient = searchTerms.filter(item => item.ingredient === ing);
-    console.log(`  ${index + 1}. "${ing.name}" → [${termsForIngredient.map(t => `"${t.searchTerm}"`).join(', ')}]`);
-  });
+  // Console logs removed for cleaner output
   return searchTerms;
 };
 

@@ -221,7 +221,7 @@ const buttonWidth = (availableWidth - buttonTotalGap) / numButtons;
 // --- End Types ---
 
 export default function RecipeSummaryScreen() {
-  const params = useLocalSearchParams<{ recipeData?: string; from?: string; appliedChanges?: string; isModified?: string; entryPoint?: string; miseRecipeId?: string; finalYield?: string; originalRecipeData?: string; titleOverride?: string }>();
+  const params = useLocalSearchParams<{ recipeData?: string; from?: string; appliedChanges?: string; isModified?: string; entryPoint?: string; miseRecipeId?: string; finalYield?: string; originalRecipeData?: string; titleOverride?: string; inputType?: string }>();
   const router = useRouter();
   const { showError, hideError } = useErrorModal();
   const { session } = useAuth();
@@ -1491,6 +1491,10 @@ export default function RecipeSummaryScreen() {
         if (!saveResponse.ok) throw new Error(saveResult.error || 'Failed to save modified recipe');
 
         // Track recipe saved event
+        console.log('[POSTHOG] Tracking event: recipe_saved', { 
+          recipeId: recipe.id.toString(), 
+          inputType: entryPoint 
+        });
         await track('recipe_saved', { 
           recipeId: recipe.id.toString(), 
           inputType: entryPoint 
@@ -1511,6 +1515,10 @@ export default function RecipeSummaryScreen() {
         const result = await saveRecipe(recipe.id, folderId);
         if (result.success) {
           // Track recipe saved event
+          console.log('[POSTHOG] Tracking event: recipe_saved', { 
+            recipeId: recipe.id.toString(), 
+            inputType: entryPoint 
+          });
           await track('recipe_saved', { 
             recipeId: recipe.id.toString(), 
             inputType: entryPoint 
@@ -2034,8 +2042,8 @@ export default function RecipeSummaryScreen() {
           </View>
         </View>
 
-        {/* Visit Source link inside ScrollView with proper spacing */}
-        {recipe?.sourceUrl && (
+        {/* Visit Source link inside ScrollView with proper spacing - only show for URL-based recipes or saved recipes */}
+        {recipe?.sourceUrl && (params.inputType === 'url' || !params.inputType) && (
           <View style={[styles.visitSourceContainer, { marginBottom: 60 }]}>
             <Text
               style={styles.visitSourceLink}

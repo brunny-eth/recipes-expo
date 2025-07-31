@@ -250,6 +250,23 @@ export async function parseTextRecipe(
             } else {
                 try {
                     finalRecipeData = JSON.parse(modelResponse.output);
+                    
+                    // Debug logging for PDF/image parsing issues
+                    logger.info({ 
+                        requestId, 
+                        finalRecipeDataType: Array.isArray(finalRecipeData) ? 'array' : typeof finalRecipeData,
+                        hasTitle: !!finalRecipeData?.title,
+                        isArray: Array.isArray(finalRecipeData),
+                        arrayLength: Array.isArray(finalRecipeData) ? finalRecipeData.length : 'N/A',
+                        firstItemTitle: Array.isArray(finalRecipeData) && finalRecipeData[0] ? finalRecipeData[0].title : 'N/A'
+                    }, 'Debug: LLM response structure');
+                    
+                    // Handle case where LLM returns an array of recipes (common with PDF extraction)
+                    if (Array.isArray(finalRecipeData) && finalRecipeData.length > 0 && finalRecipeData[0]) {
+                        logger.info({ requestId }, 'LLM returned array of recipes, extracting first recipe');
+                        finalRecipeData = finalRecipeData[0];
+                    }
+                    
                      logger.info({ requestId, timeMs: overallTimings.geminiParse, usage: handlerUsage, action: `llm_parse_raw_text` }, `LLM parse completed for Raw Text.`);
                 } catch (parseErr: any) {
                     processingError = `Failed to parse model response: ${parseErr.message}`;

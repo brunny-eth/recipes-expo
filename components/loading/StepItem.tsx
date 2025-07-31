@@ -68,7 +68,7 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.lg, // Increased spacing between checklist items
     paddingHorizontal: SPACING.pageHorizontal,
   } as ViewStyle,
   textContainer: {

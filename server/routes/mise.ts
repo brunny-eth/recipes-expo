@@ -683,39 +683,9 @@ router.get('/grocery-list', async (req: Request, res: Response) => {
       }))
     }, 'All grocery items before aggregation');
 
-    // Filter out common household staples that users unlikely need to buy
-    const EXCLUDED_ITEMS = new Set([
-      'salt', 'pepper', 'black pepper', 'white pepper',
-      'water', 'tap water', 'cold water', 'warm water', 'hot water',
-      'cooking spray', 'non-stick spray', 'oil spray',
-      'ice', 'ice cube', 'ice cubes'
-    ]);
-    
-    const filteredGroceryItems = allGroceryItems.filter(item => {
-      // Use the same normalization as aggregation for consistency
-      const normalizedItem = normalizeName(item.item_name);
-      const shouldExclude = EXCLUDED_ITEMS.has(normalizedItem);
-      
-      if (shouldExclude) {
-        logger.info({ 
-          requestId, 
-          item_name: item.item_name,
-          normalized_name: normalizedItem
-        }, 'Excluding common household item from grocery list');
-      }
-      
-      return !shouldExclude;
-    });
-    
-    logger.info({ 
-      requestId, 
-      originalCount: allGroceryItems.length,
-      filteredCount: filteredGroceryItems.length,
-      excludedCount: allGroceryItems.length - filteredGroceryItems.length
-    }, 'Applied exclusion filter for household staples');
-
-    // Aggregate the filtered grocery list
-    const aggregatedItems = aggregateGroceryList(filteredGroceryItems);
+    // No server-side filtering - let client handle household staples filtering
+    // Aggregate the grocery list directly
+    const aggregatedItems = aggregateGroceryList(allGroceryItems);
 
     // Debug specific problematic cases
     const problematicItems = ['garlic', 'tamari', 'avocado'];

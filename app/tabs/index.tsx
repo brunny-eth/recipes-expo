@@ -41,6 +41,11 @@ import { useAnalytics } from '@/utils/analytics';
 
 export default function HomeScreen() {
   const [recipeUrl, setRecipeUrl] = useState('');
+  
+  // Debug: Log recipeUrl state changes
+  useEffect(() => {
+    console.log('[UI] 🔍 recipeUrl state changed:', { value: recipeUrl, type: typeof recipeUrl, length: recipeUrl?.length });
+  }, [recipeUrl]);
   const [showMatchSelectionModal, setShowMatchSelectionModal] = useState(false);
   const [potentialMatches, setPotentialMatches] = useState<{ recipe: CombinedParsedRecipe; similarity: number; }[]>([]);
   const [isInputFocused, setIsInputFocused] = useState(false);
@@ -174,6 +179,7 @@ export default function HomeScreen() {
             recipeData: JSON.stringify(selectedMatch.recipe),
             entryPoint: 'new',
             from: '/tabs',
+            inputType: 'raw_text', // Recipe matches are from text input
           },
         });
         track('recipe_selected_from_modal', {
@@ -215,7 +221,23 @@ export default function HomeScreen() {
   }
 
   const handleSubmit = async () => {
+    console.log('[DEBUG] handleSubmit – START');
+    console.log('[UI] 🚀 Submit button pressed with value:', recipeUrl);
+    console.log('[UI] 🚀 Submit button pressed - recipeUrl type:', typeof recipeUrl);
+    console.log('[UI] 🚀 Submit button pressed - recipeUrl length:', recipeUrl?.length);
+    
+    try {
+      // Temporary debug: Test PostHog directly
+      console.log('[DEBUG] Testing PostHog directly...');
+      try {
+        await track('debug_test', { test: true, timestamp: Date.now() });
+        console.log('[DEBUG] PostHog test call succeeded');
+      } catch (err) {
+        console.error('[POSTHOG] Test call failed:', err);
+      }
+    console.log('[UI] 🔍 Checking if recipeUrl is empty...');
     if (!recipeUrl || recipeUrl.trim() === '') {
+      console.log('[UI] ❌ recipeUrl is empty, showing error');
       showError(
         'Input Required',
         'Add a recipe to get started.\n\nLooking for ideas? Head to the Explore tab.',
@@ -230,8 +252,11 @@ export default function HomeScreen() {
       setRecipeUrl(''); // Clear the input bar on error
       return;
     }
+    console.log('[UI] ✅ recipeUrl is not empty, continuing...');
     // --- New client-side validation ---
+    console.log('[UI] 🔍 Running input validation...');
     if (!isValidRecipeInput(recipeUrl)) {
+      console.log('[UI] ❌ Input validation failed');
       showError(
         'Input Not Recognized',
         'Please enter a real dish name (like "chicken soup" or "tomato pasta") or a recipe link',
@@ -246,11 +271,14 @@ export default function HomeScreen() {
       setRecipeUrl('');
       return;
     }
+    console.log('[UI] ✅ Input validation passed');
 
     const recipeInput = recipeUrl.trim();
 
     // Users must be authenticated to use the app
+    console.log('[UI] 🔍 Checking authentication...');
     if (!session) {
+      console.log('[UI] ❌ No session found, showing login error');
       showError(
         'Login Required',
         'Please log in to continue using the app.',
@@ -259,25 +287,47 @@ export default function HomeScreen() {
       setRecipeUrl('');
       return;
     }
+    console.log('[UI] ✅ User is authenticated');
 
     // Generate submission ID for tracking
     const submissionId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
     try {
+      console.log('[UI] 🚀 Starting recipe submission process...');
       // Track input mode selection
       const inputType = detectInputType(recipeInput);
-      await track('input_mode_selected', { inputType });
+      console.log('[UI] 🔍 Detected input type:', inputType);
+      console.log('[POSTHOG] Tracking event: input_mode_selected', { inputType });
+      try {
+        await track('input_mode_selected', { inputType });
+        console.log('[POSTHOG] input_mode_selected tracking succeeded');
+      } catch (err) {
+        console.error('[POSTHOG] input_mode_selected tracking failed:', err);
+      }
       
-      track('recipe_submission_started', {
+      console.log('[POSTHOG] Tracking event: recipe_submission_started', {
         inputLength: recipeInput.length,
         inputType: inputType,
         submissionId,
         userId: session?.user?.id,
       });
+      try {
+        await track('recipe_submission_started', {
+          inputLength: recipeInput.length,
+          inputType: inputType,
+          submissionId,
+          userId: session?.user?.id,
+        });
+        console.log('[POSTHOG] recipe_submission_started tracking succeeded');
+      } catch (err) {
+        console.error('[POSTHOG] recipe_submission_started tracking failed:', err);
+      }
 
+      console.log('[UI] 🚀 Calling submitRecipe with:', recipeInput);
       const result = await submitRecipe(recipeInput);
+      console.log('[UI] ✅ submitRecipe completed with result:', result);
       
-      track('recipe_submission_result', {
+      console.log('[POSTHOG] Tracking event: recipe_submission_result', {
         success: result.success,
         action: result.action,
         error: result.error,
@@ -288,6 +338,22 @@ export default function HomeScreen() {
         submissionId,
         userId: session?.user?.id,
       });
+      try {
+        await track('recipe_submission_result', {
+          success: result.success,
+          action: result.action,
+          error: result.error,
+          matches_count: result.matches?.length,
+          recipeId: result.recipe?.id,
+          normalizedUrl: result.normalizedUrl,
+          inputType: result.inputType,
+          submissionId,
+          userId: session?.user?.id,
+        });
+        console.log('[POSTHOG] recipe_submission_result tracking succeeded');
+      } catch (err) {
+        console.error('[POSTHOG] recipe_submission_result tracking failed:', err);
+      }
       
       if (!result.success) {
         if (result.action === 'show_validation_error' && result.error) {
@@ -320,6 +386,7 @@ export default function HomeScreen() {
               recipeData: JSON.stringify(result.recipe),
               entryPoint: 'new',
               from: '/tabs',
+              inputType: result.inputType || detectInputType(recipeInput), // Use the result inputType or detect it
             },
           });
         });
@@ -358,6 +425,9 @@ export default function HomeScreen() {
       
       showError('Recipe Submission Failed', 'Something went wrong while submitting your recipe. Please try again, and if the problem continues, try pasting the recipe text instead of a URL.');
     }
+  } catch (err) {
+    console.error('[🔥 ERROR] Exception in handleSubmit:', err);
+  }
   };
 
   const handleUploadComplete = async (result: UploadResult) => {
@@ -401,6 +471,7 @@ export default function HomeScreen() {
           recipeData: JSON.stringify(result.recipe),
           entryPoint: 'upload',
           from: '/tabs',
+          inputType: 'image', // This is from image upload
         },
       });
     } else if (result.success && result.cachedMatches && result.cachedMatches.length > 0) {
@@ -472,6 +543,7 @@ export default function HomeScreen() {
 
   // Track if user has typed
   const handleChangeText = (text: string) => {
+    console.log('[UI] 📝 TextInput onChangeText called with:', { text, type: typeof text, length: text?.length });
     setRecipeUrl(text);
     if (text.length > 0 && !hasUserTyped) {
       setHasUserTyped(true);
@@ -573,12 +645,18 @@ export default function HomeScreen() {
                     editable={!isSubmitting}
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
+                    returnKeyType="go"
+                    blurOnSubmit={false}
+                    enablesReturnKeyAutomatically={true}
+                    keyboardType="default"
+                    textContentType="none"
                   />
                 </View>
                 <TouchableOpacity
                   style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
                   onPress={handleSubmit}
                   disabled={isSubmitting}
+                  onPressIn={() => console.log('[UI] 🎯 Submit button pressed in - isSubmitting:', isSubmitting)}
                 >
                   {getSubmitButtonContent()}
                 </TouchableOpacity>

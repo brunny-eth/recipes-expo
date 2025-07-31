@@ -251,32 +251,29 @@ const filterHouseholdStaples = (
         
         const stapleName = staple.toLowerCase().trim();
         
-        // Exact matches or very close matches
-        if (itemName === stapleName || itemName.includes(stapleName)) {
-                  // Special handling for pepper types - don't match vegetable peppers
-        if (stapleName.includes('pepper') && !stapleName.includes('bell')) {
+        // Special handling for pepper types - match pepper variations but not vegetable peppers
+        if (stapleName === 'black pepper' || stapleName === 'ground pepper') {
           const vegetablePeppers = ['bell pepper', 'jalapeño', 'jalapeno', 'poblano', 'serrano', 'habanero', 'chili pepper', 'hot pepper', 'sweet pepper'];
           const isVegetablePepper = vegetablePeppers.some(vegPepper => itemName.includes(vegPepper));
           
-          // Also check for "freshly ground pepper" and similar variations
-          if (stapleName === 'black pepper' || stapleName === 'ground pepper') {
-            const pepperVariations = ['freshly ground pepper', 'ground black pepper', 'black pepper', 'ground pepper', 'pepper'];
-            const isPepperVariation = pepperVariations.some(pepper => itemName.includes(pepper));
-            return isPepperVariation; // Filter out all pepper variations
+          if (isVegetablePepper) {
+            return false; // Don't filter out vegetable peppers
           }
           
-          return !isVegetablePepper; // Only filter if it's NOT a vegetable pepper
+          // Check for pepper variations that should be filtered
+          const pepperVariations = ['freshly ground pepper', 'ground black pepper', 'black pepper', 'ground pepper'];
+          const isPepperVariation = pepperVariations.some(pepper => itemName.includes(pepper));
+          return isPepperVariation;
         }
           
-          // Special handling for "salt" - don't match specialized salts
-          if (stapleName === 'salt') {
-            const specializedSalts = ['sea salt', 'himalayan', 'kosher salt', 'table salt', 'iodized salt'];
-            // If it's a basic salt, filter it out
-            return itemName === 'salt' || specializedSalts.some(salt => itemName.includes(salt));
-          }
-          
-          return true;
+        // Special handling for salt - match all salt types
+        if (stapleName === 'salt') {
+          const saltVariations = ['salt', 'kosher salt', 'sea salt', 'table salt', 'iodized salt'];
+          return saltVariations.some(salt => itemName.includes(salt));
         }
+        
+        // For other staples, do exact or substring matching
+        return itemName === stapleName || itemName.includes(stapleName);
         
         return false;
       });
@@ -841,7 +838,8 @@ export default function MiseScreen() {
           const amount = item.amount ? `${formatAmountForGroceryDisplay(item.amount)}` : '';
           const unitDisplay = getUnitDisplayName(item.unit as any, item.amount || 1);
           const unit = unitDisplay ? ` ${unitDisplay}` : '';
-          const displayText = `${amount}${unit} ${item.name}`.trim();
+          const asNeededText = (!item.amount && !amount) ? ' (as needed)' : '';
+          const displayText = `${amount}${unit} ${item.name}${asNeededText}`.trim();
           
           plainText += `${checkbox} ${displayText}\n`;
         });
@@ -1112,7 +1110,11 @@ export default function MiseScreen() {
                 const unitDisplay = getUnitDisplayName(groceryItem.unit as any, groceryItem.amount || 1);
                 const unitText = unitDisplay ? ` ${unitDisplay}` : '';
                 const spaceBeforeName = (amountText || unitText) ? ' ' : '';
-                return `${amountText}${unitText}${spaceBeforeName}${groceryItem.name}`;
+                
+                // Add "(as needed)" for items with no amount
+                const asNeededText = (!groceryItem.amount && !amountText) ? ' (as needed)' : '';
+                
+                return `${amountText}${unitText}${spaceBeforeName}${groceryItem.name}${asNeededText}`;
               })()}
             </Text>
             {groceryItem.isManual && (

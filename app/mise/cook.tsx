@@ -166,6 +166,7 @@ export default function CookScreen() {
                 await track('steps_started', { 
                   scaled: false, // Default assumption for existing sessions
                   substitutions: 0, // Default assumption for existing sessions
+                  modified: false, // Default assumption for existing sessions
                   sessionType: 'multi_recipe',
                   recipeCount: existingRecipes.length,
                   existingSession: true
@@ -259,9 +260,11 @@ export default function CookScreen() {
                 return total + (mr.local_modifications?.ingredient_changes?.length || 0);
               }, 0);
               
+              const modified = totalSubstitutions > 0 || hasModifications;
               await track('steps_started', { 
                 scaled: hasModifications, 
                 substitutions: totalSubstitutions,
+                modified,
                 sessionType: 'multi_recipe',
                 recipeCount: recipeList.length
               });
