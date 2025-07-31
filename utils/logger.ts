@@ -1,5 +1,5 @@
 // Simple structured logger for client-side
-const isDevelopment = __DEV__;
+const isDevelopment = process.env.NODE_ENV === 'development';
 
 class ClientLogger {
   private scope: string;

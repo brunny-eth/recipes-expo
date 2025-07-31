@@ -8,12 +8,12 @@ import { convertUnits, availableUnits, Unit, getUnitDisplayName } from './units'
  * Converts decimal amounts to readable fractions for grocery list display
  */
 export function formatAmountForGroceryDisplay(amount: number | null): string | null {
-  if (__DEV__) {
+  if (process.env.NODE_ENV === 'development') {
     console.log('[groceryHelpers] 📊 formatAmountForGroceryDisplay called with:', amount);
   }
   
   if (amount === null || amount === 0) {
-    if (__DEV__) {
+    if (process.env.NODE_ENV === 'development') {
     console.log('[groceryHelpers] 📊 formatAmountForGroceryDisplay returning null - amount is null or 0');
   }
     return null;
@@ -21,7 +21,7 @@ export function formatAmountForGroceryDisplay(amount: number | null): string | n
 
   // Use the existing formatMeasurement function which already handles fractions properly
   const result = formatMeasurement(amount);
-  if (__DEV__) {
+  if (process.env.NODE_ENV === 'development') {
     console.log('[groceryHelpers] 📊 formatAmountForGroceryDisplay returning:', result);
   }
   return result;
@@ -247,7 +247,7 @@ function applyIngredientAliases(name: string): string {
   
   // Check for exact matches first
   if (INGREDIENT_ALIASES[normalized]) {
-    if (__DEV__) {
+    if (process.env.NODE_ENV === 'development') {
       console.log('[groceryHelpers] 🔄 Applied alias:', normalized, '→', INGREDIENT_ALIASES[normalized]);
     }
     return INGREDIENT_ALIASES[normalized];
@@ -257,7 +257,7 @@ function applyIngredientAliases(name: string): string {
   for (const [alias, canonical] of Object.entries(INGREDIENT_ALIASES)) {
     if (normalized.includes(alias)) {
       const result = normalized.replace(alias, canonical);
-      if (__DEV__) {
+      if (process.env.NODE_ENV === 'development') {
         console.log('[groceryHelpers] 🔄 Applied partial alias:', normalized, '→', result);
       }
       return result;
@@ -271,7 +271,9 @@ function applyIngredientAliases(name: string): string {
  * Removes non-essential adjectives while preserving important combinations
  */
 function removeAdjectives(name: string): string {
-  console.log('[groceryHelpers] ✂️ removeAdjectives called with:', name);
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[groceryHelpers] ✂️ removeAdjectives called with:', name);
+  }
   
   // Convert hyphens to spaces for consistent processing
   let processed = name.replace(/-/g, ' ');
@@ -280,7 +282,9 @@ function removeAdjectives(name: string): string {
   // Check if the entire phrase should be preserved
   const fullPhrase = words.join(' ');
   if (PRESERVED_COMBINATIONS.has(fullPhrase)) {
-    console.log('[groceryHelpers] 🛡️ Preserving entire phrase:', fullPhrase);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[groceryHelpers] 🛡️ Preserving entire phrase:', fullPhrase);
+    }
     return fullPhrase;
   }
   
@@ -291,7 +295,9 @@ function removeAdjectives(name: string): string {
     
     if (PRESERVED_COMBINATIONS.has(twoWordPhrase) || 
         (threeWordPhrase && PRESERVED_COMBINATIONS.has(threeWordPhrase))) {
-      console.log('[groceryHelpers] 🛡️ Found preserved combination:', twoWordPhrase || threeWordPhrase);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[groceryHelpers] 🛡️ Found preserved combination:', twoWordPhrase || threeWordPhrase);
+      }
       // Don't remove adjectives from preserved combinations
       return fullPhrase;
     }
@@ -312,12 +318,16 @@ function removeAdjectives(name: string): string {
       }
     }
     
-    console.log('[groceryHelpers] ✂️ Removing adjective:', word);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[groceryHelpers] ✂️ Removing adjective:', word);
+    }
     return false; // Remove standalone adjective
   });
   
   const result = filteredWords.join(' ').trim();
-  console.log('[groceryHelpers] ✂️ removeAdjectives result:', name, '→', result);
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[groceryHelpers] ✂️ removeAdjectives result:', name, '→', result);
+  }
   return result || name; // Fallback to original if everything was removed
 }
 
@@ -325,14 +335,18 @@ function removeAdjectives(name: string): string {
  * Converts plural forms to singular while respecting exceptions
  */
 function singularize(name: string): string {
-  console.log('[groceryHelpers] 📝 singularize called with:', name);
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[groceryHelpers] 📝 singularize called with:', name);
+  }
   
   const words = name.split(/\s+/);
   const lastWord = words[words.length - 1];
   
   // Check if the full phrase or last word should remain plural
   if (PLURAL_EXCEPTIONS.has(name) || PLURAL_EXCEPTIONS.has(lastWord)) {
-    console.log('[groceryHelpers] 🚫 Skipping singularization (exception):', name);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[groceryHelpers] 🚫 Skipping singularization (exception):', name);
+    }
     return name;
   }
   
@@ -340,7 +354,9 @@ function singularize(name: string): string {
   if (IRREGULAR_PLURALS[lastWord]) {
     words[words.length - 1] = IRREGULAR_PLURALS[lastWord];
     const result = words.join(' ');
-    console.log('[groceryHelpers] 🔄 Applied irregular plural:', name, '→', result);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[groceryHelpers] 🔄 Applied irregular plural:', name, '→', result);
+    }
     return result;
   }
   
@@ -371,7 +387,9 @@ function singularize(name: string): string {
   }
   
   const result = words.join(' ');
-  console.log('[groceryHelpers] 📝 singularize result:', name, '→', result);
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[groceryHelpers] 📝 singularize result:', name, '→', result);
+  }
   return result;
 }
 
@@ -379,18 +397,26 @@ function singularize(name: string): string {
  * Handles special ingredient-specific normalizations
  */
 function applySpecialCases(name: string): string {
-  console.log('[groceryHelpers] 🎯 applySpecialCases called with:', name);
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[groceryHelpers] 🎯 applySpecialCases called with:', name);
+  }
   
   // Handle complex herb patterns like "fresh chopped herbs scallions" → "scallions"
   if (name.includes('herbs') && (name.includes('scallion') || name.includes('cilantro') || name.includes('parsley'))) {
     if (name.includes('scallion')) {
-      console.log('[groceryHelpers] 🌿 HERB EXTRACTION: scallions');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[groceryHelpers] 🌿 HERB EXTRACTION: scallions');
+      }
       return 'scallions';
     } else if (name.includes('cilantro')) {
-      console.log('[groceryHelpers] 🌿 HERB EXTRACTION: cilantro');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[groceryHelpers] 🌿 HERB EXTRACTION: cilantro');
+      }
       return 'cilantro';
     } else if (name.includes('parsley')) {
-      console.log('[groceryHelpers] 🌿 HERB EXTRACTION: parsley');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[groceryHelpers] 🌿 HERB EXTRACTION: parsley');
+      }
       return 'parsley';
     }
   }
@@ -417,7 +443,9 @@ function applySpecialCases(name: string): string {
   name = name.replace(/\s*\(\s*\)/g, '');
   name = name.trim();
   
-  console.log('[groceryHelpers] 🎯 applySpecialCases result:', name);
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[groceryHelpers] 🎯 applySpecialCases result:', name);
+  }
   return name;
 }
 
@@ -426,10 +454,14 @@ function applySpecialCases(name: string): string {
  * This is the main entry point for ingredient name normalization.
  */
 export function normalizeName(name: string): string {
-  console.log('[groceryHelpers] 🔄 normalizeName called with:', name);
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[groceryHelpers] 🔄 normalizeName called with:', name);
+  }
   
   if (!name || typeof name !== 'string') {
-    console.log('[groceryHelpers] ⚠️ Invalid input to normalizeName:', name);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[groceryHelpers] ⚠️ Invalid input to normalizeName:', name);
+    }
     return '';
   }
   
@@ -456,7 +488,9 @@ export function normalizeName(name: string): string {
   // Step 6: Final cleanup
   normalized = normalized.replace(/\s+/g, ' ').trim();
   
-  console.log('[groceryHelpers] ✅ normalizeName final result:', name, '→', normalized);
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[groceryHelpers] ✅ normalizeName final result:', name, '→', normalized);
+  }
   return normalized || name; // Fallback to original if somehow empty
 }
 
@@ -514,11 +548,15 @@ const unitDictionary: { [key: string]: string | null } = {
  * Returns null if the unit is not found or is empty.
  */
 function normalizeUnit(unit: string | null): string | null {
-  console.log('[groceryHelpers] 📏 Normalizing unit:', unit);
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[groceryHelpers] 📏 Normalizing unit:', unit);
+  }
   if (!unit) return null;
   const lowerUnit = unit.toLowerCase().trim();
   const result = unitDictionary[lowerUnit] || null;
-  console.log('[groceryHelpers] 📏 Normalized unit result:', result);
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[groceryHelpers] 📏 Normalized unit result:', result);
+  }
   return result;
 }
 
@@ -527,14 +565,18 @@ function normalizeUnit(unit: string | null): string | null {
  * Returns null if parsing fails.
  */
 function parseQuantity(amount: number | string | null): number | null {
-  console.log('[groceryHelpers] 🔢 Parsing quantity:', amount);
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[groceryHelpers] 🔢 Parsing quantity:', amount);
+  }
   if (typeof amount === 'number') {
     return amount;
   }
   if (typeof amount === 'string' && amount.trim() !== '') {
     // Use parseAmountString to handle mixed numbers like "1 1/2", fractions, etc.
     const result = parseAmountString(amount.trim());
-    console.log('[groceryHelpers] 🔢 Parsed quantity result:', result);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[groceryHelpers] 🔢 Parsed quantity result:', result);
+    }
     return result;
   }
   return null;
@@ -562,21 +604,27 @@ function areUnitsCompatible(unit1: string | null, unit2: string | null): boolean
   const normalizedUnit2 = normalizeUnit(unit2);
 
   if (normalizedUnit1 === null && normalizedUnit2 === null) {
-    console.log('[groceryHelpers] ✅ Units are compatible (both null)');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[groceryHelpers] ✅ Units are compatible (both null)');
+    }
     return true;
   }
   
   // Special case: each units and null are compatible for count-based aggregation
   if ((normalizedUnit1 === 'each' && normalizedUnit2 === null) || 
       (normalizedUnit1 === null && normalizedUnit2 === 'each')) {
-    console.log(`[groceryHelpers] ✅ Special case: each and null are compatible for count-based aggregation`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[groceryHelpers] ✅ Special case: each and null are compatible for count-based aggregation`);
+    }
     return true;
   }
   
   // Special case: tablespoons and null are compatible for seeds/spices aggregation
   if ((normalizedUnit1 === 'tbsp' && normalizedUnit2 === null) || 
       (normalizedUnit1 === null && normalizedUnit2 === 'tbsp')) {
-    console.log(`[groceryHelpers] ✅ Special case: tbsp and null are compatible for seeds/spices`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[groceryHelpers] ✅ Special case: tbsp and null are compatible for seeds/spices`);
+    }
     return true;
   }
   
@@ -587,7 +635,9 @@ function areUnitsCompatible(unit1: string | null, unit2: string | null): boolean
   }
   
   if (normalizedUnit1 === null || normalizedUnit2 === null) {
-    console.log(`[groceryHelpers] ❌ Units are not compatible (one is null): ${normalizedUnit1}, ${normalizedUnit2}`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[groceryHelpers] ❌ Units are not compatible (one is null): ${normalizedUnit1}, ${normalizedUnit2}`);
+    }
     return false;
   }
 
@@ -602,11 +652,15 @@ function areUnitsCompatible(unit1: string | null, unit2: string | null): boolean
   const isUnit2Convertible = availableUnits.includes(normalizedUnit2 as any);
 
   if (isUnit1Convertible && isUnit2Convertible) {
-    console.log(`[groceryHelpers] ✅ Both units (${normalizedUnit1}, ${normalizedUnit2}) are convertible volume units`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[groceryHelpers] ✅ Both units (${normalizedUnit1}, ${normalizedUnit2}) are convertible volume units`);
+    }
     return true;
   }
   
-  console.log(`[groceryHelpers] ❌ Units are not convertible: ${normalizedUnit1}, ${normalizedUnit2}`);
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[groceryHelpers] ❌ Units are not convertible: ${normalizedUnit1}, ${normalizedUnit2}`);
+  }
 
   // Define unit groups for non-convertible but similar types
   // Weight units can only be compatible with the SAME weight unit (no conversion available)
@@ -622,33 +676,43 @@ function areUnitsCompatible(unit1: string | null, unit2: string | null): boolean
 
   // Check if both units are volume units (these can be converted)
   if (volumeUnits.has(normalizedUnit1) && volumeUnits.has(normalizedUnit2)) {
-    console.log('[groceryHelpers] ✅ Both are volume units - can convert:', {
-      unit1: normalizedUnit1,
-      unit2: normalizedUnit2,
-      unit1_in_set: volumeUnits.has(normalizedUnit1),
-      unit2_in_set: volumeUnits.has(normalizedUnit2),
-      volume_units: Array.from(volumeUnits)
-    });
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[groceryHelpers] ✅ Both are volume units - can convert:', {
+        unit1: normalizedUnit1,
+        unit2: normalizedUnit2,
+        unit1_in_set: volumeUnits.has(normalizedUnit1),
+        unit2_in_set: volumeUnits.has(normalizedUnit2),
+        volume_units: Array.from(volumeUnits)
+      });
+    }
     return true;
   }
 
   // Check if both units are weight units - only compatible if they're identical
   if (weightUnits.has(normalizedUnit1) && weightUnits.has(normalizedUnit2)) {
     if (normalizedUnit1 === normalizedUnit2) {
-      console.log('[groceryHelpers] ✅ Both are identical weight units');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[groceryHelpers] ✅ Both are identical weight units');
+      }
       return true;
     } else {
-      console.log('[groceryHelpers] ❌ Different weight units - no conversion available');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[groceryHelpers] ❌ Different weight units - no conversion available');
+      }
       return false; // Different weight units cannot be converted
     }
   }
   
   if (countUnits.has(normalizedUnit1) && countUnits.has(normalizedUnit2)) {
-    console.log('[groceryHelpers] ✅ Both are count units');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[groceryHelpers] ✅ Both are count units');
+    }
     return true; // Both are count units
   }
 
-  console.log('[groceryHelpers] ❌ Units are not compatible');
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[groceryHelpers] ❌ Units are not compatible');
+  }
   return false; // Units are not compatible
 }
 
@@ -714,10 +778,12 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
           
           if ((volumeUnits.has(baseUnit as any) && countUnits.has(compareUnit as any)) ||
               (countUnits.has(baseUnit as any) && volumeUnits.has(compareUnit as any))) {
-            console.log('[groceryHelpers] 🥄 Special volume/count aggregation for:', baseItem.item_name, {
-              baseUnit,
-              compareUnit
-            });
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[groceryHelpers] 🥄 Special volume/count aggregation for:', baseItem.item_name, {
+                baseUnit,
+                compareUnit
+              });
+            }
             canAggregate = true;
           }
         }
@@ -769,7 +835,9 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
               if ((volumeUnits.has(baseUnit as any) && countUnits.has(compareUnit as any)) ||
                   (countUnits.has(baseUnit as any) && volumeUnits.has(compareUnit as any))) {
                 // Create a combined entry showing both measurements
-                console.log('[groceryHelpers] 🥄 Creating combined volume/count entry for:', baseItem.item_name);
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('[groceryHelpers] 🥄 Creating combined volume/count entry for:', baseItem.item_name);
+                }
                 
                 // Keep the base item's measurements for display, but note it's a combined entry
                 finalUnit = baseItem.quantity_unit; // Keep base unit
@@ -793,11 +861,13 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
                 
                 if (baseInMl !== null && compareInMl !== null) {
                   const totalInMl = baseInMl + compareInMl;
-                  console.log('[groceryHelpers] 📊 Converting amounts:', {
-                    base: { amount: baseAmount, unit: normalizedBaseUnit, inMl: baseInMl },
-                    compare: { amount: compareAmount, unit: normalizedCompareUnit, inMl: compareInMl },
-                    total: { inMl: totalInMl }
-                  });
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log('[groceryHelpers] 📊 Converting amounts:', {
+                      base: { amount: baseAmount, unit: normalizedBaseUnit, inMl: baseInMl },
+                      compare: { amount: compareAmount, unit: normalizedCompareUnit, inMl: compareInMl },
+                      total: { inMl: totalInMl }
+                    });
+                  }
                   
                   // Try converting to each unit in order of preference
                   const preferredUnits: [Unit, number, number][] = [
@@ -814,12 +884,14 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
                   for (const [unit, min, max] of preferredUnits) {
                     const amount = convertUnits(totalInMl, 'ml', unit);
                     if (amount !== null && amount >= min && amount <= max) {
-                      console.log('[groceryHelpers] 📊 Found suitable unit:', {
-                        unit,
-                        amount,
-                        min,
-                        max
-                      });
+                      if (process.env.NODE_ENV === 'development') {
+                        console.log('[groceryHelpers] 📊 Found suitable unit:', {
+                          unit,
+                          amount,
+                          min,
+                          max
+                        });
+                      }
                       bestUnit = unit;
                       bestAmount = amount;
                       break;
@@ -829,27 +901,33 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
                   finalUnit = bestUnit.toString();
                   finalAmount = bestAmount;
                   
-                  console.log('[groceryHelpers] 📊 Final conversion:', {
-                    totalInMl,
-                    finalUnit,
-                    finalAmount,
-                    displayUnit: getUnitDisplayName(finalUnit as Unit, finalAmount)
-                  });
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log('[groceryHelpers] 📊 Final conversion:', {
+                      totalInMl,
+                      finalUnit,
+                      finalAmount,
+                      displayUnit: getUnitDisplayName(finalUnit as Unit, finalAmount)
+                    });
+                  }
                 } else {
-                  console.warn('[groceryHelpers] ⚠️ Unit conversion failed:', {
-                    baseUnit: normalizedBaseUnit,
-                    compareUnit: normalizedCompareUnit,
-                    baseAmount,
-                    compareAmount
-                  });
+                  if (process.env.NODE_ENV === 'development') {
+                    console.warn('[groceryHelpers] ⚠️ Unit conversion failed:', {
+                      baseUnit: normalizedBaseUnit,
+                      compareUnit: normalizedCompareUnit,
+                      baseAmount,
+                      compareAmount
+                    });
+                  }
                   // No fallback - if conversion fails, don't aggregate
                   continue;
                 }
               } else {
-                console.warn('[groceryHelpers] ⚠️ Unit normalization failed:', {
-                  baseUnit: baseItem.quantity_unit,
-                  compareUnit: compareItem.quantity_unit
-                });
+                if (process.env.NODE_ENV === 'development') {
+                  console.warn('[groceryHelpers] ⚠️ Unit normalization failed:', {
+                    baseUnit: baseItem.quantity_unit,
+                    compareUnit: compareItem.quantity_unit
+                  });
+                }
                 // No fallback - if normalization fails, don't aggregate
                 continue;
               }
@@ -871,18 +949,22 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
     finalAggregatedList.push(...aggregatedItemsForGroup);
   }
 
-  console.log('[groceryHelpers] ✅ Aggregation complete:', {
-    input_items: items.length,
-    output_items: finalAggregatedList.length,
-    items_combined: items.length - finalAggregatedList.length
-  });
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[groceryHelpers] ✅ Aggregation complete:', {
+      input_items: items.length,
+      output_items: finalAggregatedList.length,
+      items_combined: items.length - finalAggregatedList.length
+    });
+  }
 
-  console.log('[groceryHelpers] 🚨 FINAL AGGREGATION RESULT:', {
-    input_count: items.length,
-    output_count: finalAggregatedList.length,
-    garlic_items: finalAggregatedList.filter(item => item.item_name.toLowerCase().includes('garlic')),
-    sesame_items: finalAggregatedList.filter(item => item.item_name.toLowerCase().includes('sesame'))
-  });
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[groceryHelpers] 🚨 FINAL AGGREGATION RESULT:', {
+      input_count: items.length,
+      output_count: finalAggregatedList.length,
+      garlic_items: finalAggregatedList.filter(item => item.item_name.toLowerCase().includes('garlic')),
+      sesame_items: finalAggregatedList.filter(item => item.item_name.toLowerCase().includes('sesame'))
+    });
+  }
 
   return finalAggregatedList;
 }
@@ -898,14 +980,18 @@ export function formatIngredientsForGroceryList(
   shoppingListId: string,
   userSavedRecipeId?: string
 ): GroceryListItem[] {
-  console.log('[groceryHelpers] 🛒 Starting grocery list formatting for recipe:', recipe.title);
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[groceryHelpers] 🛒 Starting grocery list formatting for recipe:', recipe.title);
+  }
   const groceryItems: GroceryListItem[] = [];
   let orderIndex = 0;
 
   // Process each ingredient group from the final recipe
   if (recipe.ingredientGroups) {
     for (const group of recipe.ingredientGroups) {
-      console.log(`[groceryHelpers] 📦 Processing ingredient group: "${group.name}"`);
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[groceryHelpers] 📦 Processing ingredient group: "${group.name}"`);
+      }
       
       for (const ingredient of group.ingredients) {
         const originalText = `${ingredient.amount || ''} ${ingredient.unit || ''} ${ingredient.name}`.trim();
@@ -917,34 +1003,44 @@ export function formatIngredientsForGroceryList(
           if (typeof ingredient.amount === 'number') {
             // Amount is already a number (e.g., 6)
             amount = ingredient.amount;
-            console.log('[groceryHelpers] 🔢 Using numeric amount directly:', amount);
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[groceryHelpers] 🔢 Using numeric amount directly:', amount);
+            }
           } else if (typeof ingredient.amount === 'string') {
             // Amount is a string (e.g., "6-8" or "1 1/2")
             amount = parseAmountString(ingredient.amount);
-            console.log('[groceryHelpers] 🔢 Parsed string amount:', ingredient.amount, '→', amount);
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[groceryHelpers] 🔢 Parsed string amount:', ingredient.amount, '→', amount);
+            }
           }
         }
         
         // If still no amount, try to parse from the original text as fallback
         if (amount === null) {
-          console.log('[groceryHelpers] 🔄 Amount is null, trying to parse from original text:', originalText);
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[groceryHelpers] 🔄 Amount is null, trying to parse from original text:', originalText);
+          }
           amount = parseAmountString(originalText);
           if (amount !== null) {
-            console.log('[groceryHelpers] ✅ Successfully parsed amount from original text:', amount);
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[groceryHelpers] ✅ Successfully parsed amount from original text:', amount);
+            }
           }
         }
         
-        console.log(`[groceryHelpers] 🥬 Processing ingredient:`, {
-          originalName: ingredient.name,
-          parsedBaseName: parsedName.baseName,
-          originalText,
-          amount: ingredient.amount,
-          amountType: typeof ingredient.amount,
-          parsedAmount: amount,
-          unit: ingredient.unit,
-          unitType: typeof ingredient.unit,
-          existingCategory: (ingredient as any).grocery_category
-        });
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[groceryHelpers] 🥬 Processing ingredient:`, {
+            originalName: ingredient.name,
+            parsedBaseName: parsedName.baseName,
+            originalText,
+            amount: ingredient.amount,
+            amountType: typeof ingredient.amount,
+            parsedAmount: amount,
+            unit: ingredient.unit,
+            unitType: typeof ingredient.unit,
+            existingCategory: (ingredient as any).grocery_category
+          });
+        }
         
         // Handle unit - normalize it if it exists, but preserve original for display
         let standardizedUnit: string | null = null;
@@ -960,7 +1056,9 @@ export function formatIngredientsForGroceryList(
             const descriptiveSizes = ['small', 'medium', 'large', 'extra large', 'small-size', 'medium-size', 'large-size'];
             if (descriptiveSizes.some(size => originalUnit.includes(size.toLowerCase()))) {
               descriptiveSize = ingredient.unit; // Preserve original capitalization
-              console.log('[groceryHelpers] 📏 Descriptive size detected, will add to name:', descriptiveSize);
+              if (process.env.NODE_ENV === 'development') {
+                console.log('[groceryHelpers] 📏 Descriptive size detected, will add to name:', descriptiveSize);
+              }
             }
           }
           // Preserve specific unit types for better display
@@ -976,12 +1074,16 @@ export function formatIngredientsForGroceryList(
             displayUnit = null; // Use standardized unit for display
           }
           
-          console.log('[groceryHelpers] 📏 Normalized unit:', ingredient.unit, '→', standardizedUnit, '(display:', displayUnit, ', descriptive:', descriptiveSize, ')');
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[groceryHelpers] 📏 Normalized unit:', ingredient.unit, '→', standardizedUnit, '(display:', displayUnit, ', descriptive:', descriptiveSize, ')');
+          }
         }
         
         // If no unit from structured ingredient, try to extract from original text as fallback
         if (standardizedUnit === null) {
-          console.log('[groceryHelpers] 🔄 No unit found, trying to extract from original text:', originalText);
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[groceryHelpers] 🔄 No unit found, trying to extract from original text:', originalText);
+          }
           
           // Simple unit extraction from original text
           const unitMatch = originalText.match(/\b(cup|cups|tbsp|tbs|tablespoon|tablespoons|tsp|teaspoon|teaspoons|oz|ounce|ounces|lb|pound|pounds|g|gram|grams|kg|kilogram|kilograms|ml|milliliter|milliliters|l|liter|liters|clove|cloves|head|heads|bunch|bunches|piece|pieces|stalk|stalks|sprig|sprigs|can|cans|bottle|bottles|box|boxes|bag|bags|package|packages|jar|jars|container|containers|pinch|pinches|dash|dashes|each|count)\b/i);
@@ -998,7 +1100,9 @@ export function formatIngredientsForGroceryList(
               displayUnit = 'dash';
             }
             
-            console.log('[groceryHelpers] ✅ Successfully extracted unit from original text:', extractedUnit, '→', standardizedUnit, '(display:', displayUnit, ')');
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[groceryHelpers] ✅ Successfully extracted unit from original text:', extractedUnit, '→', standardizedUnit, '(display:', displayUnit, ')');
+            }
           }
         }
         
@@ -1041,7 +1145,9 @@ export function formatIngredientsForGroceryList(
           if (isSpice && amount <= 5) { // Small amounts of spices get pinch
             standardizedUnit = 'each'; // For aggregation (pinch normalizes to each)
             displayUnit = 'pinch';
-            console.log('[groceryHelpers] 🌶️ Assigned pinch unit to spice:', ingredientName);
+            if (process.env.NODE_ENV === 'development') {
+              console.log('[groceryHelpers] 🌶️ Assigned pinch unit to spice:', ingredientName);
+            }
           }
         }
         
@@ -1066,38 +1172,44 @@ export function formatIngredientsForGroceryList(
           source_recipe_title: recipe.title || 'Unknown Recipe'
         };
         
-        console.log(`[groceryHelpers] 🔍 Detailed grocery item creation:`, {
-          originalName: ingredient.name,
-          parsedBaseName: parsedName.baseName,
-          originalAmount: ingredient.amount,
-          parsedAmount: amount,
-          originalUnit: ingredient.unit,
-          standardizedUnit: standardizedUnit,
-          displayUnit: groceryItem.display_unit,
-          originalText: originalText,
-          finalGroceryItem: {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[groceryHelpers] 🔍 Detailed grocery item creation:`, {
+            originalName: ingredient.name,
+            parsedBaseName: parsedName.baseName,
+            originalAmount: ingredient.amount,
+            parsedAmount: amount,
+            originalUnit: ingredient.unit,
+            standardizedUnit: standardizedUnit,
+            displayUnit: groceryItem.display_unit,
+            originalText: originalText,
+            finalGroceryItem: {
+              item_name: groceryItem.item_name,
+              quantity_amount: groceryItem.quantity_amount,
+              quantity_unit: groceryItem.quantity_unit,
+              display_unit: groceryItem.display_unit
+            }
+          });
+        }
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[groceryHelpers] ✅ Created grocery item:`, {
             item_name: groceryItem.item_name,
+            original_ingredient_text: groceryItem.original_ingredient_text,
             quantity_amount: groceryItem.quantity_amount,
             quantity_unit: groceryItem.quantity_unit,
-            display_unit: groceryItem.display_unit
-          }
-        });
-        
-        console.log(`[groceryHelpers] ✅ Created grocery item:`, {
-          item_name: groceryItem.item_name,
-          original_ingredient_text: groceryItem.original_ingredient_text,
-          quantity_amount: groceryItem.quantity_amount,
-          quantity_unit: groceryItem.quantity_unit,
-          grocery_category: groceryItem.grocery_category,
-          basicCategory: getBasicGroceryCategory(groceryItem.item_name)
-        });
+            grocery_category: groceryItem.grocery_category,
+            basicCategory: getBasicGroceryCategory(groceryItem.item_name)
+          });
+        }
         
         groceryItems.push(groceryItem);
       }
     }
   }
 
-  console.log(`[groceryHelpers] 🎯 Finished formatting ${groceryItems.length} grocery items`);
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[groceryHelpers] 🎯 Finished formatting ${groceryItems.length} grocery items`);
+  }
   
   // Post-process: Convert large cheese amounts from oz to cups for better grocery shopping
   const processedItems = groceryItems.map(item => {
@@ -1111,13 +1223,15 @@ export function formatIngredientsForGroceryList(
       // Convert large oz amounts to cups (4 oz = 1 cup for shredded cheese)
       if (item.quantity_amount >= 8) { // Convert amounts 8 oz and above
         const cupsAmount = item.quantity_amount / 4;
-        console.log('[groceryHelpers] 🧀 Converting cheese from oz to cups:', {
-          item: item.item_name,
-          originalAmount: item.quantity_amount,
-          originalUnit: 'oz',
-          newAmount: cupsAmount,
-          newUnit: 'cup'
-        });
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[groceryHelpers] 🧀 Converting cheese from oz to cups:', {
+            item: item.item_name,
+            originalAmount: item.quantity_amount,
+            originalUnit: 'oz',
+            newAmount: cupsAmount,
+            newUnit: 'cup'
+          });
+        }
         
         return {
           ...item,
@@ -1305,16 +1419,22 @@ export function getBasicGroceryCategory(ingredientName: string): string {
  * Applies basic categorization to grocery items using simple pattern matching
  */
 export function categorizeIngredients(items: GroceryListItem[]): GroceryListItem[] {
-  console.log('[groceryHelpers] 🏷️ Starting basic categorization for', items.length, 'items');
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[groceryHelpers] 🏷️ Starting basic categorization for', items.length, 'items');
+  }
   const result = items.map(item => {
     const category = getBasicGroceryCategory(item.item_name);
-    console.log(`[groceryHelpers] 📝 Categorized "${item.item_name}" as "${category}"`);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[groceryHelpers] 📝 Categorized "${item.item_name}" as "${category}"`);
+    }
     return {
       ...item,
       grocery_category: category
     };
   });
-  console.log('[groceryHelpers] ✅ Completed basic categorization');
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[groceryHelpers] ✅ Completed basic categorization');
+  }
   return result;
 }
 
@@ -1345,7 +1465,9 @@ export function prepareForSupabaseInsert(
   user_saved_recipe_id: string | null;
   source_recipe_title: string;
 }> {
-  console.log('[groceryHelpers] 💾 Preparing', items.length, 'items for database insertion');
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[groceryHelpers] 💾 Preparing', items.length, 'items for database insertion');
+  }
   const result = items.map(item => ({
     shopping_list_id: shoppingListId,
     item_name: item.item_name,
@@ -1360,6 +1482,8 @@ export function prepareForSupabaseInsert(
     user_saved_recipe_id: item.user_saved_recipe_id,
     source_recipe_title: item.source_recipe_title
   }));
-  console.log('[groceryHelpers] ✅ Items prepared for database');
-  return result;
-} 
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[groceryHelpers] ✅ Items prepared for database');
+  }
+  return result; 
+}

@@ -1,5 +1,3 @@
-declare const __DEV__: boolean;
-
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const FREE_USAGE_KEY = 'hasUsedFreeRecipe';
@@ -11,7 +9,7 @@ const FREE_USAGE_KEY = 'hasUsedFreeRecipe';
 export const getHasUsedFreeRecipe = async (): Promise<boolean> => {
   try {
     const value = await AsyncStorage.getItem(FREE_USAGE_KEY);
-    if (__DEV__) {
+    if (process.env.NODE_ENV === 'development') {
       console.log('[FreeUsage] getHasUsedFreeRecipe:', value);
     }
     return value === 'true';
@@ -26,7 +24,7 @@ export const getHasUsedFreeRecipe = async (): Promise<boolean> => {
  */
 export const setHasUsedFreeRecipe = async (): Promise<void> => {
   try {
-    if (__DEV__) {
+    if (process.env.NODE_ENV === 'development') {
       console.log('[FreeUsage] setHasUsedFreeRecipe: true');
     }
     await AsyncStorage.setItem(FREE_USAGE_KEY, 'true');

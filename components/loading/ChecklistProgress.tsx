@@ -49,7 +49,7 @@ const VIDEO_STEPS = [
 
 const IMAGE_STEPS = [
   {
-    label: 'Analyzing the attached images',
+    label: 'Analyzing attached images',
     subtext: 'Trying to find the recipe in here...',
   },
   {
@@ -57,7 +57,7 @@ const IMAGE_STEPS = [
     subtext: 'Extracting content from the pages',
   },
   {
-    label: 'Finding the correct ingredients',
+    label: 'Fixing the ingredients',
     subtext: 'Changing "cimanon" back to "cinnamon"',
   },
   {
