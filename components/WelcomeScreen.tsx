@@ -71,7 +71,7 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
               entering={FadeIn.duration(1000).delay(3500)}
               style={{ width: '100%' }}
             >
-              <Text style={styles.bullet}>• Instantly swap or remove any ingredient</Text>
+              <Text style={styles.bullet}>• Easily swap or remove ingredients</Text>
             </Animated.View>
 
             <Animated.View

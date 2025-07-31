@@ -252,6 +252,7 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     ...bodyStrongText,
     color: COLORS.textDark,
+    textAlign: 'center',
   } as TextStyle,
 });
 

@@ -66,7 +66,7 @@ export default function AccountScreen() {
         body: JSON.stringify({
           email: session.user.email,
           message: feedbackMessage.trim(),
-          app_version: '1.0.0', // Hardcoded version
+          app_version: '1.0.1', // Hardcoded version
         }),
       });
 

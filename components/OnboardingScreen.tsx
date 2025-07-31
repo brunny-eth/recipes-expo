@@ -29,7 +29,7 @@ const onboardingSteps = [
   {
     id: 3,
     title: "Make multiple meals",
-    description: "Multi-recipe cooking \n with step by step guidance",
+    description: "Multi-recipe cooking \n made easy",
     gifSource: require('@/assets/gifs/ThirdScreen.gif'),
   },
   {

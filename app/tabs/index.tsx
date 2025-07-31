@@ -737,7 +737,7 @@ const styles = StyleSheet.create({
   },
   headerContainer: {
     alignItems: 'center',
-    marginBottom: SPACING.xxxl,
+    marginBottom: SPACING.xl,
     maxWidth: 365,
     alignSelf: 'center',
     paddingHorizontal: SPACING.md,
