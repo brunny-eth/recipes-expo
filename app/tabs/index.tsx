@@ -44,7 +44,9 @@ export default function HomeScreen() {
   
   // Debug: Log recipeUrl state changes
   useEffect(() => {
-    console.log('[UI] 🔍 recipeUrl state changed:', { value: recipeUrl, type: typeof recipeUrl, length: recipeUrl?.length });
+    if (__DEV__) {
+      console.log('[UI] 🔍 recipeUrl state changed:', { value: recipeUrl, type: typeof recipeUrl, length: recipeUrl?.length });
+    }
   }, [recipeUrl]);
   const [showMatchSelectionModal, setShowMatchSelectionModal] = useState(false);
   const [potentialMatches, setPotentialMatches] = useState<{ recipe: CombinedParsedRecipe; similarity: number; }[]>([]);
@@ -221,23 +223,31 @@ export default function HomeScreen() {
   }
 
   const handleSubmit = async () => {
-    console.log('[DEBUG] handleSubmit – START');
-    console.log('[UI] 🚀 Submit button pressed with value:', recipeUrl);
-    console.log('[UI] 🚀 Submit button pressed - recipeUrl type:', typeof recipeUrl);
-    console.log('[UI] 🚀 Submit button pressed - recipeUrl length:', recipeUrl?.length);
+    if (__DEV__) {
+      console.log('[DEBUG] handleSubmit – START');
+      console.log('[UI] 🚀 Submit button pressed with value:', recipeUrl);
+      console.log('[UI] 🚀 Submit button pressed - recipeUrl type:', typeof recipeUrl);
+      console.log('[UI] 🚀 Submit button pressed - recipeUrl length:', recipeUrl?.length);
+    }
     
     try {
       // Temporary debug: Test PostHog directly
-      console.log('[DEBUG] Testing PostHog directly...');
-      try {
-        await track('debug_test', { test: true, timestamp: Date.now() });
-        console.log('[DEBUG] PostHog test call succeeded');
-      } catch (err) {
-        console.error('[POSTHOG] Test call failed:', err);
+      if (__DEV__) {
+        console.log('[DEBUG] Testing PostHog directly...');
+        try {
+          await track('debug_test', { test: true, timestamp: Date.now() });
+          console.log('[DEBUG] PostHog test call succeeded');
+        } catch (err) {
+          console.error('[POSTHOG] Test call failed:', err);
+        }
       }
-    console.log('[UI] 🔍 Checking if recipeUrl is empty...');
+    if (__DEV__) {
+      console.log('[UI] 🔍 Checking if recipeUrl is empty...');
+    }
     if (!recipeUrl || recipeUrl.trim() === '') {
-      console.log('[UI] ❌ recipeUrl is empty, showing error');
+      if (__DEV__) {
+        console.log('[UI] ❌ recipeUrl is empty, showing error');
+      }
       showError(
         'Input Required',
         'Add a recipe to get started.\n\nLooking for ideas? Head to the Explore tab.',
@@ -252,11 +262,17 @@ export default function HomeScreen() {
       setRecipeUrl(''); // Clear the input bar on error
       return;
     }
-    console.log('[UI] ✅ recipeUrl is not empty, continuing...');
+    if (__DEV__) {
+      console.log('[UI] ✅ recipeUrl is not empty, continuing...');
+    }
     // --- New client-side validation ---
-    console.log('[UI] 🔍 Running input validation...');
+    if (__DEV__) {
+      console.log('[UI] 🔍 Running input validation...');
+    }
     if (!isValidRecipeInput(recipeUrl)) {
-      console.log('[UI] ❌ Input validation failed');
+      if (__DEV__) {
+        console.log('[UI] ❌ Input validation failed');
+      }
       showError(
         'Input Not Recognized',
         'Please enter a real dish name (like "chicken soup" or "tomato pasta") or a recipe link',
@@ -271,14 +287,20 @@ export default function HomeScreen() {
       setRecipeUrl('');
       return;
     }
-    console.log('[UI] ✅ Input validation passed');
+    if (__DEV__) {
+      console.log('[UI] ✅ Input validation passed');
+    }
 
     const recipeInput = recipeUrl.trim();
 
     // Users must be authenticated to use the app
-    console.log('[UI] 🔍 Checking authentication...');
+    if (__DEV__) {
+      console.log('[UI] 🔍 Checking authentication...');
+    }
     if (!session) {
-      console.log('[UI] ❌ No session found, showing login error');
+      if (__DEV__) {
+        console.log('[UI] ❌ No session found, showing login error');
+      }
       showError(
         'Login Required',
         'Please log in to continue using the app.',
@@ -287,22 +309,34 @@ export default function HomeScreen() {
       setRecipeUrl('');
       return;
     }
-    console.log('[UI] ✅ User is authenticated');
+    if (__DEV__) {
+      console.log('[UI] ✅ User is authenticated');
+    }
 
     // Generate submission ID for tracking
     const submissionId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
     try {
-      console.log('[UI] 🚀 Starting recipe submission process...');
+      if (__DEV__) {
+        console.log('[UI] 🚀 Starting recipe submission process...');
+      }
       // Track input mode selection
       const inputType = detectInputType(recipeInput);
-      console.log('[UI] 🔍 Detected input type:', inputType);
-      console.log('[POSTHOG] Tracking event: input_mode_selected', { inputType });
+      if (__DEV__) {
+        console.log('[UI] 🔍 Detected input type:', inputType);
+      }
+      if (__DEV__) {
+        console.log('[POSTHOG] Tracking event: input_mode_selected', { inputType });
+      }
       try {
         await track('input_mode_selected', { inputType });
-        console.log('[POSTHOG] input_mode_selected tracking succeeded');
+        if (__DEV__) {
+          console.log('[POSTHOG] input_mode_selected tracking succeeded');
+        }
       } catch (err) {
-        console.error('[POSTHOG] input_mode_selected tracking failed:', err);
+        if (__DEV__) {
+          console.error('[POSTHOG] input_mode_selected tracking failed:', err);
+        }
       }
       
       console.log('[POSTHOG] Tracking event: recipe_submission_started', {

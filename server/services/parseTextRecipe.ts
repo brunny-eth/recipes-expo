@@ -48,8 +48,10 @@ export async function parseTextRecipe(
     const forceNewParseBool = forceNewParse === true || forceNewParse === 'true';
     const isFromImageExtraction = options?.fromImageExtraction === true;
     
-    console.log(`[parseTextRecipe] forceNewParse received as:`, forceNewParse, `| typeof:`, typeof forceNewParse, `| coerced:`, forceNewParseBool);
-    console.log(`[parseTextRecipe] fromImageExtraction:`, isFromImageExtraction);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[parseTextRecipe] forceNewParse received as:`, forceNewParse, `| typeof:`, typeof forceNewParse, `| coerced:`, forceNewParseBool);
+      console.log(`[parseTextRecipe] fromImageExtraction:`, isFromImageExtraction);
+    }
     
     logger.info({ requestId, fromImageExtraction: isFromImageExtraction }, "🚨🚨🚨 parseTextRecipe was called! 🚨🚨🚨");
     logger.info({ env: process.env.ENABLE_FUZZY_MATCH }, "Env variable ENABLE_FUZZY_MATCH value");
@@ -413,7 +415,9 @@ export async function parseTextRecipe(
           servings: parsedRecipe?.recipeYield
         }, "Final structured recipe returned to client");
 
-        console.log('[parseTextRecipe] Returning parsedRecipe with ID:', parsedRecipe?.id);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[parseTextRecipe] Returning parsedRecipe with ID:', parsedRecipe?.id);
+        }
 
         const finalResult: ParseResult = {
             recipe: parsedRecipe,

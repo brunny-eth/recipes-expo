@@ -86,13 +86,15 @@ const RecipePDFImageUploader = React.forwardRef<any, Props>(({ onUploadComplete,
         name: 'recipe-image.jpg',
       } as any;
 
-      console.log('Uploading to:', `${process.env.EXPO_PUBLIC_API_URL}/api/recipes/parse-image`);
-      console.log('Image file info:', {
-        uri: finalImageUri,
-        type: imageFile.type,
-        name: imageFile.name,
-        isFromPDF
-      });
+      if (__DEV__) {
+        console.log('Uploading to:', `${process.env.EXPO_PUBLIC_API_URL}/api/recipes/parse-image`);
+        console.log('Image file info:', {
+          uri: finalImageUri,
+          type: imageFile.type,
+          name: imageFile.name,
+          isFromPDF
+        });
+      }
 
       formData.append('image', imageFile);
 
@@ -102,7 +104,9 @@ const RecipePDFImageUploader = React.forwardRef<any, Props>(({ onUploadComplete,
         // Don't set Content-Type header - let the browser set it with proper boundary
       });
 
-      console.log('Response status:', response.status);
+      if (__DEV__) {
+        console.log('Response status:', response.status);
+      }
 
       if (!response.ok) {
         const errorData = await response.text();
@@ -164,7 +168,9 @@ const RecipePDFImageUploader = React.forwardRef<any, Props>(({ onUploadComplete,
         formData.append('images', imageFile);
       }
 
-      console.log('Uploading', imageUris.length, 'images to:', `${process.env.EXPO_PUBLIC_API_URL}/api/recipes/parse-images`);
+      if (__DEV__) {
+        console.log('Uploading', imageUris.length, 'images to:', `${process.env.EXPO_PUBLIC_API_URL}/api/recipes/parse-images`);
+      }
 
       const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/recipes/parse-images`, {
         method: 'POST',
@@ -172,7 +178,9 @@ const RecipePDFImageUploader = React.forwardRef<any, Props>(({ onUploadComplete,
         // Don't set Content-Type header - let the browser set it with proper boundary
       });
 
-      console.log('Multi-image response status:', response.status);
+      if (__DEV__) {
+        console.log('Multi-image response status:', response.status);
+      }
 
       if (!response.ok) {
         const errorData = await response.text();
@@ -204,7 +212,9 @@ const RecipePDFImageUploader = React.forwardRef<any, Props>(({ onUploadComplete,
 
   const handleImagePicker = async () => {
     if (isPickerActive) {
+      if (__DEV__) {
       console.log('Image picker already active, ignoring request');
+    }
       return;
     }
 

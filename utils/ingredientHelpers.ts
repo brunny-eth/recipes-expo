@@ -126,17 +126,23 @@ const APPROXIMATION_PREFIXES = [
  * Normalized unit lookup - converts any unit variation to standardized form
  */
 function normalizeUnit(rawUnit: string | null): string | null {
-  console.log('[ingredientHelpers] 📏 normalizeUnit called with:', rawUnit);
+  if (__DEV__) {
+    console.log('[ingredientHelpers] 📏 normalizeUnit called with:', rawUnit);
+  }
   
   if (!rawUnit) {
-    console.log('[ingredientHelpers] 📏 normalizeUnit returning null - no input');
+    if (__DEV__) {
+      console.log('[ingredientHelpers] 📏 normalizeUnit returning null - no input');
+    }
     return null;
   }
   
   const cleaned = rawUnit.toLowerCase().trim();
   const normalized = UNIT_MAPPINGS[cleaned] || null;
   
-  console.log('[ingredientHelpers] 📏 normalizeUnit result:', { input: rawUnit, cleaned, normalized });
+  if (__DEV__) {
+    console.log('[ingredientHelpers] 📏 normalizeUnit result:', { input: rawUnit, cleaned, normalized });
+  }
   return normalized;
 }
 
@@ -144,16 +150,22 @@ function normalizeUnit(rawUnit: string | null): string | null {
  * Gets appropriate display name for a unit based on quantity
  */
 function getDisplayUnit(unit: string | null, amount: number | null): string | null {
-  console.log('[ingredientHelpers] 🎨 getDisplayUnit called with:', { unit, amount });
+  if (__DEV__) {
+    console.log('[ingredientHelpers] 🎨 getDisplayUnit called with:', { unit, amount });
+  }
   
   if (!unit) {
-    console.log('[ingredientHelpers] 🎨 getDisplayUnit returning null - no unit');
+    if (__DEV__) {
+      console.log('[ingredientHelpers] 🎨 getDisplayUnit returning null - no unit');
+    }
     return null;
   }
   
   const displayInfo = UNIT_DISPLAY_NAMES[unit];
   if (!displayInfo) {
-    console.log('[ingredientHelpers] 🎨 getDisplayUnit returning original unit - no display info');
+    if (__DEV__) {
+      console.log('[ingredientHelpers] 🎨 getDisplayUnit returning original unit - no display info');
+    }
     return unit;
   }
   
@@ -161,12 +173,14 @@ function getDisplayUnit(unit: string | null, amount: number | null): string | nu
   const shouldUsePlural = amount === null || amount === 0 || amount > 1 || (amount > 0 && amount < 1);
   const result = shouldUsePlural ? displayInfo.plural : displayInfo.singular;
   
-  console.log('[ingredientHelpers] 🎨 getDisplayUnit result:', { 
-    unit, 
-    amount, 
-    shouldUsePlural, 
-    result 
-  });
+  if (__DEV__) {
+    console.log('[ingredientHelpers] 🎨 getDisplayUnit result:', { 
+      unit, 
+      amount, 
+      shouldUsePlural, 
+      result 
+    });
+  }
   
   return result || unit;
 }
@@ -183,11 +197,15 @@ function parseIngredientString(ingredientString: string): {
   displayUnit: string | null;
   parsedAmount: number | null;
 } {
-  console.log('[ingredientHelpers] 🔍 parseIngredientString called with:', ingredientString);
+  if (__DEV__) {
+    console.log('[ingredientHelpers] 🔍 parseIngredientString called with:', ingredientString);
+  }
   
   const original = ingredientString.trim();
   if (!original) {
-    console.log('[ingredientHelpers] ⚠️ Empty ingredient string');
+    if (__DEV__) {
+      console.log('[ingredientHelpers] ⚠️ Empty ingredient string');
+    }
     return {
       amount: null,
       unit: null, 
@@ -207,7 +225,9 @@ function parseIngredientString(ingredientString: string): {
   if (commaIndex !== -1) {
     preparation = workingString.substring(commaIndex + 1).trim();
     workingString = workingString.substring(0, commaIndex).trim();
-    console.log('[ingredientHelpers] 📝 Found comma-separated preparation:', preparation);
+    if (__DEV__) {
+      console.log('[ingredientHelpers] 📝 Found comma-separated preparation:', preparation);
+    }
   }
   
   // Handle parenthetical preparation (but not substitutions)
@@ -219,7 +239,9 @@ function parseIngredientString(ingredientString: string): {
       preparation += ', ' + parenMatch[2].trim();
     }
     workingString = parenMatch[1].trim();
-    console.log('[ingredientHelpers] 📝 Found parenthetical preparation:', preparation);
+    if (__DEV__) {
+      console.log('[ingredientHelpers] 📝 Found parenthetical preparation:', preparation);
+    }
   }
   
   // Step 2: Handle special non-numeric amount patterns first
@@ -238,11 +260,13 @@ function parseIngredientString(ingredientString: string): {
     if (match) {
       amount = defaultAmount;
       remainingText = match[2].trim();
-      console.log('[ingredientHelpers] 🎯 Matched special amount pattern:', {
-        pattern: pattern.source,
-        amount,
-        remaining: remainingText
-      });
+      if (__DEV__) {
+        console.log('[ingredientHelpers] 🎯 Matched special amount pattern:', {
+          pattern: pattern.source,
+          amount,
+          remaining: remainingText
+        });
+      }
       break;
     }
   }
@@ -280,18 +304,22 @@ function parseIngredientString(ingredientString: string): {
           amount = match[1].trim(); // Just the count (1)
           // Reconstruct the remaining text with the size and unit preserved
           remainingText = `${match[2]} ${match[3]} ${workingString.substring(match[0].length)}`.trim();
-          console.log('[ingredientHelpers] 📦 Extracted compound measurement:', {
-            count: amount,
-            remaining: remainingText
-          });
+          if (__DEV__) {
+            console.log('[ingredientHelpers] 📦 Extracted compound measurement:', {
+              count: amount,
+              remaining: remainingText
+            });
+          }
         } else {
           amount = match[1].trim();
           remainingText = workingString.substring(match[0].length).trim();
-          console.log('[ingredientHelpers] 🔢 Extracted amount:', {
-            pattern: pattern.source,
-            amount,
-            remaining: remainingText
-          });
+          if (__DEV__) {
+            console.log('[ingredientHelpers] 🔢 Extracted amount:', {
+              pattern: pattern.source,
+              amount,
+              remaining: remainingText
+            });
+          }
         }
         break;
       }
@@ -341,15 +369,19 @@ function parseIngredientString(ingredientString: string): {
         
         finalName = remainingText.substring(unitMatch[0].length).trim();
         
-        console.log('[ingredientHelpers] 📏 Extracted unit:', {
-          rawUnit,
-          normalizedUnit: unit,
-          remaining: finalName
-        });
+        if (__DEV__) {
+          console.log('[ingredientHelpers] 📏 Extracted unit:', {
+            rawUnit,
+            normalizedUnit: unit,
+            remaining: finalName
+          });
+        }
         
         // Check if this is actually a descriptive word that should stay with the name
         if (DESCRIPTIVE_WORDS.has(rawUnit.toLowerCase())) {
-          console.log('[ingredientHelpers] 🔄 Unit is descriptive, moving back to name:', rawUnit);
+          if (__DEV__) {
+            console.log('[ingredientHelpers] 🔄 Unit is descriptive, moving back to name:', rawUnit);
+          }
           finalName = `${rawUnit} ${finalName}`.trim();
           unit = null;
           continue; // Try next pattern
@@ -372,7 +404,9 @@ function parseIngredientString(ingredientString: string): {
       if (UNIT_MAPPINGS[compoundUnit]) {
         unit = compoundUnit;
         finalName = finalName.substring(compoundMatch[0].length).trim();
-        console.log('[ingredientHelpers] 📦 Found compound unit:', compoundUnit);
+        if (__DEV__) {
+          console.log('[ingredientHelpers] 📦 Found compound unit:', compoundUnit);
+        }
       }
     }
   }
@@ -381,7 +415,9 @@ function parseIngredientString(ingredientString: string): {
   let parsedAmount: number | null = null;
   if (amount) {
     parsedAmount = parseAmountString(amount);
-    console.log('[ingredientHelpers] 🧮 Parsed amount:', { amount, parsedAmount });
+    if (__DEV__) {
+      console.log('[ingredientHelpers] 🧮 Parsed amount:', { amount, parsedAmount });
+    }
   }
   
   // Step 7: Generate display unit
@@ -403,7 +439,9 @@ function parseIngredientString(ingredientString: string): {
     parsedAmount
   };
   
-  console.log('[ingredientHelpers] ✅ parseIngredientString result:', result);
+  if (__DEV__) {
+    console.log('[ingredientHelpers] ✅ parseIngredientString result:', result);
+  }
   return result;
 }
 
@@ -417,10 +455,14 @@ function parseIngredientString(ingredientString: string): {
 export const coerceToStructuredIngredients = (
   ingredients: (StructuredIngredient | string | null | undefined)[] | null | undefined
 ): StructuredIngredient[] => {
-  console.log('[ingredientHelpers] 🔄 coerceToStructuredIngredients called with:', ingredients?.length, 'items');
+  if (__DEV__) {
+    console.log('[ingredientHelpers] 🔄 coerceToStructuredIngredients called with:', ingredients?.length, 'items');
+  }
   
   if (!ingredients || !Array.isArray(ingredients)) {
-    console.log('[ingredientHelpers] ⚠️ Invalid ingredients input, returning empty array');
+    if (__DEV__) {
+      console.log('[ingredientHelpers] ⚠️ Invalid ingredients input, returning empty array');
+    }
     return [];
   }
 
@@ -433,7 +475,9 @@ export const coerceToStructuredIngredients = (
 
     if (typeof ing === 'string') {
       if (ing.trim()) { // Ensure string is not empty or just whitespace
-        console.log('[ingredientHelpers] 📝 Processing string ingredient:', ing);
+        if (__DEV__) {
+          console.log('[ingredientHelpers] 📝 Processing string ingredient:', ing);
+        }
         const parsed = parseIngredientString(ing.trim());
         
         processedIngredients.push({
@@ -445,7 +489,9 @@ export const coerceToStructuredIngredients = (
         });
       }
     } else if (typeof ing === 'object' && ing.name) { 
-      console.log('[ingredientHelpers] 📦 Processing object ingredient:', ing.name);
+      if (__DEV__) {
+        console.log('[ingredientHelpers] 📦 Processing object ingredient:', ing.name);
+      }
       processedIngredients.push({
         name: ing.name,
         amount: ing.amount !== undefined ? ing.amount : null,
@@ -460,7 +506,9 @@ export const coerceToStructuredIngredients = (
     }
   }
 
-  console.log('[ingredientHelpers] ✅ coerceToStructuredIngredients processed:', processedIngredients.length, 'items');
+  if (__DEV__) {
+    console.log('[ingredientHelpers] ✅ coerceToStructuredIngredients processed:', processedIngredients.length, 'items');
+  }
   return processedIngredients;
 };
 
@@ -508,11 +556,15 @@ export function parseRecipeDisplayName(name: string): {
   isRemoved?: boolean;
   substitutedFor?: string | null;
 } {
-  console.log('[ingredientHelpers] 🔄 Parsing RECIPE display name:', name);
+  if (__DEV__) {
+    console.log('[ingredientHelpers] 🔄 Parsing RECIPE display name:', name);
+  }
   
   // Handle null/undefined input
   if (!name) {
-    console.log('[ingredientHelpers] ⚠️ Empty ingredient name');
+    if (__DEV__) {
+      console.log('[ingredientHelpers] ⚠️ Empty ingredient name');
+    }
     return { baseName: '', substitutionText: null };
   }
 
@@ -524,21 +576,25 @@ export function parseRecipeDisplayName(name: string): {
   if (name.includes('(removed)')) {
     isRemoved = true;
     originalName = name.replace(/\s*\(removed\)\s*/i, '').trim();
-    console.log('[ingredientHelpers] 🗑️ Found removal marker:', {
-      originalName: name,
-      cleanedName: originalName,
-      isRemoved
-    });
+    if (__DEV__) {
+      console.log('[ingredientHelpers] 🗑️ Found removal marker:', {
+        originalName: name,
+        cleanedName: originalName,
+        isRemoved
+      });
+    }
   }
   
   // Check for "removed:" prefix marker
   if (originalName.toLowerCase().includes('removed:')) {
     isRemoved = true;
     originalName = originalName.replace(/^removed:\s*/i, '').trim();
-    console.log('[ingredientHelpers] 🗑️ Found removal prefix:', {
-      cleanedName: originalName,
-      isRemoved
-    });
+    if (__DEV__) {
+      console.log('[ingredientHelpers] 🗑️ Found removal prefix:', {
+        cleanedName: originalName,
+        isRemoved
+      });
+    }
   }
 
   // Check for "(substituted for X)" pattern first
@@ -549,11 +605,13 @@ export function parseRecipeDisplayName(name: string): {
   if (substitutedForMatch) {
     baseName = substitutedForMatch[1].trim();
     substitutionText = substitutedForMatch[2].trim();
-    console.log('[ingredientHelpers] 🔄 Found "substituted for" pattern:', {
-      originalName,
-      baseName,
-      substitutionText: substitutionText
-    });
+    if (__DEV__) {
+      console.log('[ingredientHelpers] 🔄 Found "substituted for" pattern:', {
+        originalName,
+        baseName,
+        substitutionText: substitutionText
+      });
+    }
   } else {
     // Split on other substitution markers
     const substitutionMarkers = [' or ', ' (or ', ' / ', ' OR ', ' / ', '/'];
@@ -567,21 +625,25 @@ export function parseRecipeDisplayName(name: string): {
         if (substitutionText.endsWith(')')) {
           substitutionText = substitutionText.slice(0, -1).trim();
         }
-        console.log('[ingredientHelpers] 🔍 Found substitution marker:', {
-          marker,
-          baseName,
-          substitutionText
-        });
+        if (__DEV__) {
+          console.log('[ingredientHelpers] 🔍 Found substitution marker:', {
+            marker,
+            baseName,
+            substitutionText
+          });
+        }
         break;
       }
     }
   }
 
-  console.log('[ingredientHelpers] ✅ RECIPE parsed result:', {
-    baseName,
-    substitutionText,
-    isRemoved
-  });
+  if (__DEV__) {
+    console.log('[ingredientHelpers] ✅ RECIPE parsed result:', {
+      baseName,
+      substitutionText,
+      isRemoved
+    });
+  }
   
   // Check if this is a substituted ingredient
   const substitutedFor = substitutionText;
@@ -604,11 +666,15 @@ export function parseIngredientDisplayName(name: string): {
   isRemoved?: boolean;
   substitutedFor?: string | null;
 } {
-  console.log('[ingredientHelpers] 🔄 Parsing GROCERY ingredient name:', name);
+  if (__DEV__) {
+    console.log('[ingredientHelpers] 🔄 Parsing GROCERY ingredient name:', name);
+  }
   
   // Handle null/undefined input
   if (!name) {
-    console.log('[ingredientHelpers] ⚠️ Empty ingredient name');
+    if (__DEV__) {
+      console.log('[ingredientHelpers] ⚠️ Empty ingredient name');
+    }
     return { baseName: '', substitutionText: null };
   }
 
@@ -626,11 +692,13 @@ export function parseIngredientDisplayName(name: string): {
       if (substitutionText.endsWith(')')) {
         substitutionText = substitutionText.slice(0, -1).trim();
       }
-      console.log('[ingredientHelpers] 🔍 Found substitution:', {
-        marker,
-        baseName,
-        substitutionText
-      });
+      if (__DEV__) {
+        console.log('[ingredientHelpers] 🔍 Found substitution:', {
+          marker,
+          baseName,
+          substitutionText
+        });
+      }
       break;
     }
   }
@@ -639,13 +707,17 @@ export function parseIngredientDisplayName(name: string): {
   const parenMatch = baseName.match(/^(.*?)\s*\(.*\)\s*$/);
   if (parenMatch) {
     baseName = parenMatch[1].trim();
-    console.log('[ingredientHelpers] 🧹 Cleaned parenthetical for grocery:', baseName);
+    if (__DEV__) {
+      console.log('[ingredientHelpers] 🧹 Cleaned parenthetical for grocery:', baseName);
+    }
   }
 
-  console.log('[ingredientHelpers] ✅ GROCERY parsed result:', {
-    baseName,
-    substitutionText
-  });
+  if (__DEV__) {
+    console.log('[ingredientHelpers] ✅ GROCERY parsed result:', {
+      baseName,
+      substitutionText
+    });
+  }
   
   // For grocery context, we don't need removal/substitution detection
   const substitutedFor = substitutionText;

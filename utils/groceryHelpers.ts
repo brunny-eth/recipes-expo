@@ -8,16 +8,22 @@ import { convertUnits, availableUnits, Unit, getUnitDisplayName } from './units'
  * Converts decimal amounts to readable fractions for grocery list display
  */
 export function formatAmountForGroceryDisplay(amount: number | null): string | null {
-  console.log('[groceryHelpers] 📊 formatAmountForGroceryDisplay called with:', amount);
+  if (__DEV__) {
+    console.log('[groceryHelpers] 📊 formatAmountForGroceryDisplay called with:', amount);
+  }
   
   if (amount === null || amount === 0) {
+    if (__DEV__) {
     console.log('[groceryHelpers] 📊 formatAmountForGroceryDisplay returning null - amount is null or 0');
+  }
     return null;
   }
 
   // Use the existing formatMeasurement function which already handles fractions properly
   const result = formatMeasurement(amount);
-  console.log('[groceryHelpers] 📊 formatAmountForGroceryDisplay returning:', result);
+  if (__DEV__) {
+    console.log('[groceryHelpers] 📊 formatAmountForGroceryDisplay returning:', result);
+  }
   return result;
 }
 
@@ -241,7 +247,9 @@ function applyIngredientAliases(name: string): string {
   
   // Check for exact matches first
   if (INGREDIENT_ALIASES[normalized]) {
-    console.log('[groceryHelpers] 🔄 Applied alias:', normalized, '→', INGREDIENT_ALIASES[normalized]);
+    if (__DEV__) {
+      console.log('[groceryHelpers] 🔄 Applied alias:', normalized, '→', INGREDIENT_ALIASES[normalized]);
+    }
     return INGREDIENT_ALIASES[normalized];
   }
   
@@ -249,7 +257,9 @@ function applyIngredientAliases(name: string): string {
   for (const [alias, canonical] of Object.entries(INGREDIENT_ALIASES)) {
     if (normalized.includes(alias)) {
       const result = normalized.replace(alias, canonical);
-      console.log('[groceryHelpers] 🔄 Applied partial alias:', normalized, '→', result);
+      if (__DEV__) {
+        console.log('[groceryHelpers] 🔄 Applied partial alias:', normalized, '→', result);
+      }
       return result;
     }
   }

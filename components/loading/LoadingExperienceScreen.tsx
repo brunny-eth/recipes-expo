@@ -45,7 +45,9 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
   inputType = 'url',
   forceNewParse,
 }) => {
-  console.log(`[${new Date().toISOString()}] [LoadingExperienceScreen] render/mount with input: ${recipeInput}`);
+      if (__DEV__) {
+      console.log(`[${new Date().toISOString()}] [LoadingExperienceScreen] render/mount with input: ${recipeInput}`);
+    }
   const router = useRouter();
   const alreadyNavigated = useRef(false);
   const [isParsingFinished, setIsParsingFinished] = useState(false);
@@ -96,15 +98,21 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
 
   // Debug: Track state changes
   useEffect(() => {
-    console.log(`[${new Date().toISOString()}] [STATE] showSpinner changed to: ${showSpinner}`);
+    if (__DEV__) {
+      console.log(`[${new Date().toISOString()}] [STATE] showSpinner changed to: ${showSpinner}`);
+    }
   }, [showSpinner]);
 
   useEffect(() => {
-    console.log(`[${new Date().toISOString()}] [STATE] checkmarkShown changed to: ${checkmarkShown}`);
+    if (__DEV__) {
+      console.log(`[${new Date().toISOString()}] [STATE] checkmarkShown changed to: ${checkmarkShown}`);
+    }
   }, [checkmarkShown]);
 
   useEffect(() => {
-    console.log(`[${new Date().toISOString()}] [STATE] hideChecklist changed to: ${hideChecklist}`);
+    if (__DEV__) {
+      console.log(`[${new Date().toISOString()}] [STATE] hideChecklist changed to: ${hideChecklist}`);
+    }
   }, [hideChecklist]);
 
   // Helper function to process backend error responses
@@ -153,19 +161,27 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
   const handleSpinComplete = (finalRecipeData: ParsedRecipe) => {
     if (!isMountedRef.current) return;
     
-    console.log(`[${new Date().toISOString()}] [handleSpinComplete] Starting state changes...`);
+    if (__DEV__) {
+      console.log(`[${new Date().toISOString()}] [handleSpinComplete] Starting state changes...`);
+    }
     
-    console.log(`[${new Date().toISOString()}] [handleSpinComplete] setShowSpinner(false) - HIDING SPINNER`);
+    if (__DEV__) {
+      console.log(`[${new Date().toISOString()}] [handleSpinComplete] setShowSpinner(false) - HIDING SPINNER`);
+    }
     setShowSpinner(false);
     
-    console.log(`[${new Date().toISOString()}] [handleSpinComplete] setCheckmarkShown(true) - SHOWING CHECKMARK`);
+    if (__DEV__) {
+      console.log(`[${new Date().toISOString()}] [handleSpinComplete] setCheckmarkShown(true) - SHOWING CHECKMARK`);
+    }
     setCheckmarkShown(true);
     
     // Navigate after 1 second
     setTimeout(() => {
       if (!isMountedRef.current || !finalRecipeData) return;
       
-      console.log(`[${new Date().toISOString()}] [handleSpinComplete] Navigating to recipe summary...`);
+      if (__DEV__) {
+        console.log(`[${new Date().toISOString()}] [handleSpinComplete] Navigating to recipe summary...`);
+      }
       router.replace({
         pathname: '/recipe/summary',
         params: {
@@ -232,12 +248,14 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
     const backendUrl = `${baseBackendUrl}${endpoint}`;
 
     try {
-      console.log(`[parseRecipe] Preparing to send request to: ${backendUrl}`);
-      console.log('[parseRecipe] Input type:', inputType);
+      if (__DEV__) {
+        console.log(`[parseRecipe] Preparing to send request to: ${backendUrl}`);
+        console.log('[parseRecipe] Input type:', inputType);
 
-      // Temporarily log env vars to verify them at runtime
-      console.log('EXPO_PUBLIC_API_URL:', process.env.EXPO_PUBLIC_API_URL);
-      console.log('EXPO_PUBLIC_AUTH_URL:', process.env.EXPO_PUBLIC_AUTH_URL);
+        // Temporarily log env vars to verify them at runtime
+        console.log('EXPO_PUBLIC_API_URL:', process.env.EXPO_PUBLIC_API_URL);
+        console.log('EXPO_PUBLIC_AUTH_URL:', process.env.EXPO_PUBLIC_AUTH_URL);
+      }
 
       const response = await fetch(backendUrl, {
         method: 'POST',
@@ -245,11 +263,15 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
         body: requestBody,
       });
 
-      console.log(`[parseRecipe] Response Status: ${response.status}`);
+      if (__DEV__) {
+        console.log(`[parseRecipe] Response Status: ${response.status}`);
+      }
 
       if (response.ok) {
         const result = await response.json();
-        console.log('[parseRecipe] Response JSON:', result);
+        if (__DEV__) {
+          console.log('[parseRecipe] Response JSON:', result);
+        }
 
         // Handle video recipe source
         if (result.source === 'link') {
@@ -270,10 +292,12 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
           setRecipeData(result.recipe);
           
           // Track successful recipe parsing
-          console.log('[POSTHOG] Tracking event: recipe_parsed', { 
-            inputType, 
-            ingredientsCount: result.recipe.ingredients?.length || 0 
-          });
+          if (__DEV__) {
+            console.log('[POSTHOG] Tracking event: recipe_parsed', { 
+              inputType, 
+              ingredientsCount: result.recipe.ingredients?.length || 0 
+            });
+          }
           await track('recipe_parsed', { 
             inputType, 
             ingredientsCount: result.recipe.ingredients?.length || 0 
@@ -332,8 +356,10 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
         
         // Use the recipe data from the state, which should have been updated
         finalRecipeData = recipeData;
-        console.log('[LoadingExperienceScreen] Parsing complete. Starting spinner...');
-        console.log('[LoadingExperienceScreen] recipeData with ID:', finalRecipeData?.id);
+        if (__DEV__) {
+          console.log('[LoadingExperienceScreen] Parsing complete. Starting spinner...');
+          console.log('[LoadingExperienceScreen] recipeData with ID:', finalRecipeData?.id);
+        }
         
         if (finalRecipeData) {
           // Hide checklist and start spinner animation
@@ -382,18 +408,30 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
         {(showSpinner || checkmarkShown) && (
           <View 
             style={styles.overlayContainer}
-            onLayout={() => console.log(`[${new Date().toISOString()}] [OVERLAY_CONTAINER] Persistent overlay mounted/rendered`)}
+            onLayout={() => {
+              if (__DEV__) {
+                console.log(`[${new Date().toISOString()}] [OVERLAY_CONTAINER] Persistent overlay mounted/rendered`);
+              }
+            }}
           >
             {showSpinner && (
               <Animated.View 
                 entering={FadeIn.duration(300).withCallback((finished) => {
-                  console.log(`[${new Date().toISOString()}] [SPINNER] FadeIn animation finished: ${finished}`);
+                  if (__DEV__) {
+                    console.log(`[${new Date().toISOString()}] [SPINNER] FadeIn animation finished: ${finished}`);
+                  }
                 })}
                 exiting={FadeOut.duration(0).withCallback((finished) => {
-                  console.log(`[${new Date().toISOString()}] [SPINNER] FadeOut animation finished: ${finished}`);
+                  if (__DEV__) {
+                    console.log(`[${new Date().toISOString()}] [SPINNER] FadeOut animation finished: ${finished}`);
+                  }
                 })}
                 style={styles.spinnerContent}
-                onLayout={() => console.log(`[${new Date().toISOString()}] [SPINNER] Component mounted/rendered`)}
+                onLayout={() => {
+                  if (__DEV__) {
+                    console.log(`[${new Date().toISOString()}] [SPINNER] Component mounted/rendered`);
+                  }
+                }}
               >
                 <Animated.View style={[styles.spinner, spinnerStyle]} />
               </Animated.View>
@@ -401,10 +439,16 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
             {checkmarkShown && (
               <Animated.View 
                 entering={FadeIn.duration(400).withCallback((finished) => {
-                  console.log(`[${new Date().toISOString()}] [CHECKMARK] FadeIn animation finished: ${finished}`);
+                  if (__DEV__) {
+                    console.log(`[${new Date().toISOString()}] [CHECKMARK] FadeIn animation finished: ${finished}`);
+                  }
                 })}
                 style={styles.checkmarkContent}
-                onLayout={() => console.log(`[${new Date().toISOString()}] [CHECKMARK] Component mounted/rendered`)}
+                onLayout={() => {
+                  if (__DEV__) {
+                    console.log(`[${new Date().toISOString()}] [CHECKMARK] Component mounted/rendered`);
+                  }
+                }}
               >
                 <Text style={styles.bigCheckmark}>✓</Text>
                 <Text style={styles.readyText}>{getReadyText()}</Text>
