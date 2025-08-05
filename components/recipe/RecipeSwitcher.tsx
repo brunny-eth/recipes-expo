@@ -1,5 +1,5 @@
-import React, { useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import React, { useRef, useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Modal, Pressable } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, SHADOWS, BORDER_WIDTH } from '@/constants/theme';
 import { bodyStrongText, bodyText, FONT } from '@/constants/typography';
@@ -23,6 +23,9 @@ export default function RecipeSwitcher({
   onRecipeSwitch
 }: RecipeSwitcherProps) {
   const scrollViewRef = useRef<ScrollView>(null);
+  const popupTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [isPopupVisible, setIsPopupVisible] = useState(false);
+  const [popupText, setPopupText] = useState('');
 
   // Auto-scroll to active tab when activeRecipeId changes
   useEffect(() => {
@@ -43,13 +46,54 @@ export default function RecipeSwitcher({
     }
   }, [activeRecipeId, recipes.length]);
 
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (popupTimeoutRef.current) {
+        clearTimeout(popupTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const showRecipeNamePopup = (fullTitle: string) => {
+    // Clear any existing timeout
+    if (popupTimeoutRef.current) {
+      clearTimeout(popupTimeoutRef.current);
+    }
+
+    // Set popup visible with text
+    setPopupText(fullTitle);
+    setIsPopupVisible(true);
+
+    // Auto-dismiss after 2.5 seconds
+    popupTimeoutRef.current = setTimeout(() => {
+      setIsPopupVisible(false);
+    }, 2500);
+  };
+
+  const hidePopup = () => {
+    if (popupTimeoutRef.current) {
+      clearTimeout(popupTimeoutRef.current);
+      popupTimeoutRef.current = null;
+    }
+    setIsPopupVisible(false);
+  };
+
   if (recipes.length === 0) {
     return null;
   }
 
   const handleRecipePress = (recipe: RecipeSession) => {
-    // Only switch to the recipe - let the parent handle data loading
-    onRecipeSwitch(recipe.recipeId);
+    const isAlreadyActive = recipe.recipeId === activeRecipeId;
+    
+    if (isAlreadyActive) {
+      // Show popup for full recipe name
+      const fullTitle = recipe.recipe?.title || 'Unknown Recipe';
+      showRecipeNamePopup(fullTitle);
+    } else {
+      // Switch to the recipe (existing behavior)
+      onRecipeSwitch(recipe.recipeId);
+    }
   };
 
   // Single recipe case - show with underline
@@ -61,11 +105,30 @@ export default function RecipeSwitcher({
     return (
       <View style={styles.container}>
         <View style={styles.singleRecipeContainer}>
-          <Text style={styles.singleRecipeTitle}>
-            {truncatedTitle}
-          </Text>
+          <TouchableOpacity
+            onPress={() => showRecipeNamePopup(recipeTitle)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.singleRecipeTitle}>
+              {truncatedTitle}
+            </Text>
+          </TouchableOpacity>
           <View style={styles.singleRecipeUnderline} />
         </View>
+        
+        {/* Popup for single recipe */}
+        <Modal
+          transparent
+          visible={isPopupVisible}
+          animationType="fade"
+          onRequestClose={hidePopup}
+        >
+          <Pressable style={styles.popupBackdrop} onPress={hidePopup}>
+            <View style={styles.popupContainer}>
+              <Text style={styles.popupText}>{popupText}</Text>
+            </View>
+          </Pressable>
+        </Modal>
       </View>
     );
   }
@@ -106,6 +169,20 @@ export default function RecipeSwitcher({
           })}
         </ScrollView>
       </View>
+
+      {/* Popup for multiple recipes */}
+      <Modal
+        transparent
+        visible={isPopupVisible}
+        animationType="fade"
+        onRequestClose={hidePopup}
+      >
+        <Pressable style={styles.popupBackdrop} onPress={hidePopup}>
+          <View style={styles.popupContainer}>
+            <Text style={styles.popupText}>{popupText}</Text>
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -174,5 +251,31 @@ const styles = StyleSheet.create({
   },
   tabButtonTextActive: {
     color: COLORS.textDark,
+  },
+
+  // Popup styles
+  popupBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingTop: 80, // Position below the status bar and recipe switcher
+  },
+  popupContainer: {
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    marginHorizontal: SPACING.pageHorizontal,
+    maxWidth: '90%',
+    ...SHADOWS.large,
+    position: 'relative',
+  },
+  popupText: {
+    ...bodyStrongText,
+    color: COLORS.textDark,
+    fontSize: 16,
+    textAlign: 'center',
+    lineHeight: 22,
   },
 }); 

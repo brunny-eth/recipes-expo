@@ -25,7 +25,7 @@ export async function findSimilarRecipe(
     const { data, error } = await supabaseAdmin.rpc('match_recipes_by_embedding', {
       query_embedding: vectorString,
       match_threshold: threshold,
-      match_count: 5,
+      match_count: 15, // Increased from 10 to get more potential matches for filtering
     });
 
     if (error) {
@@ -50,9 +50,6 @@ export async function findSimilarRecipe(
 
     const filteredMatches = data
       .filter((match: any) => {
-        // Ensure similarity meets threshold first
-        if (match.similarity < threshold) return false;
-
         // If the RPC returned a source_type column, use it; otherwise, fall back to inspecting the JSON if available
         const sourceType = match.source_type || match.recipe_data?.source_type || null;
 
@@ -72,10 +69,10 @@ export async function findSimilarRecipe(
         return true;
       })
       .sort((a: any, b: any) => b.similarity - a.similarity)
-      .slice(0, 3);
+      .slice(0, 8); // Increased from 3 to show more recipe options
 
     if (filteredMatches.length === 0) {
-      logger.info({ function: 'findSimilarRecipe', threshold }, "No matches found above threshold.");
+      logger.info({ function: 'findSimilarRecipe', threshold }, "No matches found after filtering.");
       return null;
     }
 
@@ -94,6 +91,7 @@ export async function findSimilarRecipe(
     logger.info({ 
       function: 'findSimilarRecipe', 
       foundMatchesCount: finalMatches.length, 
+      topSimilarity: finalMatches[0]?.similarity,
       thresholdUsed: threshold 
     }, "Returning final similar recipes array.");
 

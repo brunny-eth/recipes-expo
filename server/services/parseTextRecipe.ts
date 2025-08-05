@@ -17,7 +17,7 @@ import { findSimilarRecipe } from '../../utils/findSimilarRecipe';
 import { generateAndSaveEmbedding } from '../../utils/recipeEmbeddings';
 
 const MAX_PREVIEW_LENGTH = 100;
-const SIMILARITY_THRESHOLD = 0.50;
+const SIMILARITY_THRESHOLD = 0.45;
 
 function normalizeServings(servingRaw: string | null): string | null {
     if (!servingRaw) return null;
@@ -90,7 +90,16 @@ export async function parseTextRecipe(
             // Step 2: Use the embedding to find similar recipes in the database
             const searchStartTime = Date.now();
             logger.info({ requestId }, "[FuzzyMatch] Searching for similar recipes...");
-            const matches = await findSimilarRecipe(embedding, SIMILARITY_THRESHOLD);
+            
+            // First try with the standard threshold
+            let matches = await findSimilarRecipe(embedding, SIMILARITY_THRESHOLD);
+            
+            // If no matches found with standard threshold, try with a lower threshold
+            if (!matches || matches.length === 0) {
+                logger.info({ requestId, originalThreshold: SIMILARITY_THRESHOLD, newThreshold: 0.25 }, "[FuzzyMatch] No matches with standard threshold, trying lower threshold.");
+                matches = await findSimilarRecipe(embedding, 0.25);
+            }
+            
             logger.info({ requestId, event: 'findSimilarRecipe_result', matchesIsNull: matches === null, matchesLength: matches?.length || 0 }, "[FuzzyMatch] Raw matches result");
             const searchTime = Date.now() - searchStartTime;
             logger.info({ requestId, timeMs: searchTime, matchesFound: matches?.length || 0 }, "[FuzzyMatch] Search complete.");
@@ -103,11 +112,11 @@ export async function parseTextRecipe(
                     threshold: SIMILARITY_THRESHOLD,
                     totalFuzzyMatchTime: Date.now() - fuzzyMatchStartTime,
                     timings: { embeddingTime, searchTime }
-                }, "Fuzzy matches found above threshold.");
+                }, "Fuzzy matches found.");
 
                 // If exactly one match, return it directly (existing behavior)
                 if (matches.length === 1) {
-                    logger.info({ requestId, matchedRecipeId: matches[0].recipe.id, event: 'single_match_return' }, "Single match found, returning directly.");
+                    logger.info({ requestId, matchedRecipeId: matches[0].recipe.id, similarity: matches[0].similarity, event: 'single_match_return' }, "Single match found, returning directly.");
                     return {
                         recipe: matches[0].recipe,
                         error: null,
@@ -120,7 +129,7 @@ export async function parseTextRecipe(
                     };
                 } else {
                     // Multiple matches - pass them to frontend for user selection
-                    logger.info({ requestId, matchesCount: matches.length, event: 'multiple_matches_return' }, "Multiple matches found, passing to frontend for selection.");
+                    logger.info({ requestId, matchesCount: matches.length, topSimilarity: matches[0].similarity, event: 'multiple_matches_return' }, "Multiple matches found, passing to frontend for selection.");
                     return {
                         recipe: null, // No single recipe
                         error: null,
@@ -142,7 +151,7 @@ export async function parseTextRecipe(
                         totalFuzzyMatchTime: Date.now() - fuzzyMatchStartTime,
                         event: 'no_matches_found'
                     }, 
-                    "No suitable fuzzy matches found above threshold. Proceeding with LLM."
+                    "No fuzzy matches found even with lower threshold. Proceeding with LLM."
                 );
             }
 

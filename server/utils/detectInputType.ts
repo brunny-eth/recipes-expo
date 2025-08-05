@@ -15,16 +15,17 @@ export function detectInputType(input: string): InputType {
     return 'invalid';
   }
 
-  // Handle inputs that are too short to be meaningful (e.g., single characters, or "a.b")
-  // You might adjust the length based on your minimum meaningful text input.
-  if (trimmed.length < 5) {
+  // Loosen minimum length requirement - allow shorter inputs like "lasagna", "pasta"
+  if (trimmed.length < 3) {
     console.log(`[detectInputType] Classification result: 'invalid' for input: '${input}' (too short: ${trimmed.length} chars)`);
     return 'invalid';
   }
 
-  // Handle inputs that are only special characters or non-alphanumeric
-  if (!/[a-zA-Z0-9]/.test(trimmed)) {
-    console.log(`[detectInputType] Classification result: 'invalid' for input: '${input}' (no alphanumeric chars)`);
+  // More permissive alphanumeric check - require mostly letters for recipe searches
+  // This allows inputs like "lasagna", "pasta", "curry", "7-layer dip" while rejecting pure numbers
+  const letterRatio = (trimmed.match(/[a-zA-Z]/g) || []).length / trimmed.length;
+  if (letterRatio < 0.65) {
+    console.log(`[detectInputType] Classification result: 'invalid' for input: '${input}' (insufficient letters: ${letterRatio})`);
     return 'invalid';
   }
 
@@ -61,10 +62,10 @@ export function detectInputType(input: string): InputType {
           }
       } else {
           // If it has a protocol but the hostname doesn't look like a valid FQDN
-          // (e.g., "https://invalid", "http://mylocalhost"), treat it as invalid for parsing.
-          console.log(`[detectInputType] URL hostname "${urlObj.hostname}" does not look like a valid domain. Classifying as 'invalid'.`);
-          console.log(`[detectInputType] Classification result: 'invalid' for input: '${input}' (invalid domain)`);
-          return 'invalid';
+          // (e.g., "https://invalid", "http://mylocalhost"), treat it as raw_text since it's likely a recipe name
+          console.log(`[detectInputType] URL hostname "${urlObj.hostname}" does not look like a valid domain. Classifying as 'raw_text'.`);
+          console.log(`[detectInputType] Classification result: 'raw_text' for input: '${input}' (invalid domain, likely recipe name)`);
+          return 'raw_text';
       }
   } catch (e) {
       // If the URL constructor throws an error, the string is not a valid URL.

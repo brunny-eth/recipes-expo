@@ -113,9 +113,9 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
           </View>
 
           <FlatList
-            data={matches.slice(0, 5)}
-            initialNumToRender={5}
-            maxToRenderPerBatch={5}
+            data={matches}
+            initialNumToRender={8}
+            maxToRenderPerBatch={8}
             renderItem={renderRecipeItem}
             keyExtractor={(item) => item.recipe.id?.toString() || Math.random().toString()}
             style={styles.recipeList}
