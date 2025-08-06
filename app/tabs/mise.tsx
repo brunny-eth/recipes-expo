@@ -753,13 +753,28 @@ export default function MiseScreen() {
   }, [session, showError, refreshGroceryListOnly, track]);
 
   // Handle grocery item toggle
-  const handleGroceryToggle = useCallback((categoryName: string, itemIndex: number) => {
+  const handleGroceryToggle = useCallback((itemId: string) => {
     // Optimistically update local state for instant feedback
     const updatedList = [...groceryList];
-    const categoryIndex = updatedList.findIndex(cat => cat.name === categoryName);
-    if (categoryIndex === -1) return;
+    
+    // Find item by ID instead of index for stable identification
+    let itemToUpdate: GroceryItem | null = null;
+    let categoryIndex = -1;
+    let itemIndex = -1;
+    
+    for (let i = 0; i < updatedList.length; i++) {
+      const category = updatedList[i];
+      const foundIndex = category.items.findIndex(item => item.id === itemId);
+      if (foundIndex !== -1) {
+        itemToUpdate = category.items[foundIndex];
+        categoryIndex = i;
+        itemIndex = foundIndex;
+        break;
+      }
+    }
+    
+    if (!itemToUpdate) return;
 
-    const itemToUpdate = updatedList[categoryIndex].items[itemIndex];
     const newCheckedState = !itemToUpdate.checked;
     itemToUpdate.checked = newCheckedState;
     setGroceryList(updatedList);
@@ -779,12 +794,12 @@ export default function MiseScreen() {
         },
         body: JSON.stringify({
           userId: session.user.id,
-          itemName: itemToUpdate.name,
+          itemName: itemToUpdate!.name,
           isChecked: newCheckedState,
         }),
       }).catch(err => {
         track('mise_grocery_item_toggle_error', {
-          itemName: itemToUpdate.name,
+          itemName: itemToUpdate!.name,
           isChecked: newCheckedState,
           errorMessage: err instanceof Error ? err.message : String(err),
           errorStack: err instanceof Error ? err.stack : undefined,
@@ -792,7 +807,7 @@ export default function MiseScreen() {
         });
         // Optionally, revert the optimistic update and show an error
         showError('Sync Error', 'Could not save check state. Please try again.');
-        itemToUpdate.checked = !newCheckedState;
+        itemToUpdate!.checked = !newCheckedState;
         setGroceryList([...groceryList]);
       });
     }, 500); // 500ms debounce
@@ -1090,7 +1105,7 @@ export default function MiseScreen() {
           <View key={groceryItem.id} style={styles.groceryItem}>
             <TouchableOpacity
               style={styles.groceryItemCheckbox}
-              onPress={() => handleGroceryToggle(item.name, index)}
+              onPress={() => handleGroceryToggle(groceryItem.id)}
             >
               <MaterialCommunityIcons
                 name={groceryItem.checked ? "checkbox-marked" : "checkbox-blank-outline"}
@@ -1247,7 +1262,7 @@ export default function MiseScreen() {
           <FlatList
             data={displayGroceryList}
             renderItem={renderGroceryCategory}
-            keyExtractor={(item) => item.name}
+            keyExtractor={(item) => `category-${item.name}-${item.items.length}`}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
           />

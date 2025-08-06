@@ -32,7 +32,7 @@ type AuthProvider = 'google' | 'apple';
 
 // Navigation events that auth context can emit
 export type AuthNavigationEvent = 
-  | { type: 'SIGNED_IN'; userId: string }
+  | { type: 'SIGNED_IN'; userId: string; userMetadata: UserMetadata | null }
   | { type: 'SIGNED_OUT' }
   | { type: 'AUTH_ERROR'; error: string };
 
@@ -205,7 +205,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
             }
 
             // Emit navigation event instead of direct navigation
-            emitNavigationEvent({ type: 'SIGNED_IN', userId: newSession.user.id });
+            emitNavigationEvent({ type: 'SIGNED_IN', userId: newSession.user.id, userMetadata: newSession.user.user_metadata as UserMetadata });
           }
         } catch (e: any) {
           logger.error('Authentication Error: Unexpected error setting session via deeplink', { 
@@ -247,8 +247,27 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           // Identify user in PostHog
           maybeIdentifyUserRef.current(session.user);
           
+          // Check if user is new and update metadata accordingly
+          const isNew = !session.user.user_metadata?.first_login_at;
+          if (isNew) {
+            logger.info('New user detected, updating metadata', { userId: session.user.id });
+            const { error: metadataError } = await supabase.auth.updateUser({
+              data: { 
+                first_login_at: new Date().toISOString(),
+                role: 'beta_user',
+              },
+            });
+            
+            if (metadataError) {
+              logger.error('Error updating new user metadata', { 
+                userId: session.user.id, 
+                error: metadataError.message 
+              });
+            }
+          }
+          
           // Emit navigation event
-          emitNavigationEvent({ type: 'SIGNED_IN', userId: session.user.id });
+          emitNavigationEvent({ type: 'SIGNED_IN', userId: session.user.id, userMetadata: session.user.user_metadata as UserMetadata });
         } else if (event === 'SIGNED_OUT') {
           logger.info('User signed out', { userId: session?.user?.id || 'unknown' });
           setSession(null);

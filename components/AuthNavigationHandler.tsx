@@ -23,11 +23,24 @@ export function AuthNavigationHandler() {
       switch (event.type) {
         case 'SIGNED_IN':
           logger.info('Navigating to main app after sign in', { userId: event.userId });
-          showSuccess(
-            'Welcome to Meez!',
-            'You have successfully signed in. Start exploring recipes!',
-            4000 // Show for 4 seconds
-          );
+          
+          // Check if user is new based on first_login_at metadata
+          const isNewUser = !event.userMetadata?.first_login_at;
+          
+          if (isNewUser) {
+            showSuccess(
+              'Welcome to Meez!',
+              'This is your first time here. Start exploring recipes and save your favorites!',
+              4000 // Show for 4 seconds
+            );
+          } else {
+            showSuccess(
+              'Welcome back to Meez!',
+              'Great to see you again. Your saved recipes are ready for you!',
+              4000 // Show for 4 seconds
+            );
+          }
+          
           // Delay navigation to allow modal to show
           setTimeout(() => {
             router.replace('/tabs');

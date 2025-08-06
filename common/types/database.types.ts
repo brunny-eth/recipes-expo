@@ -159,7 +159,13 @@ export interface Database {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_random_recipes: {
+        Args: Record<string, never>;
+        Returns: Array<{
+          id: number;
+          recipe_data: Json;
+        }>;
+      };
     }
     Enums: {
       [_ in never]: never
