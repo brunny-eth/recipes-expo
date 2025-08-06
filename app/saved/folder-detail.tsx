@@ -350,7 +350,7 @@ export default function SavedFolderDetailScreen() {
             onPress={() => handleDeleteRecipe(item.base_recipe_id)}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <MaterialCommunityIcons name="delete-outline" size={20} color={COLORS.error} />
+            <MaterialCommunityIcons name="trash-can" size={16} color={COLORS.textMuted} />
           </TouchableOpacity>
         )}
       </TouchableOpacity>

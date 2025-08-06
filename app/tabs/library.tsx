@@ -11,6 +11,7 @@ import {
   TextStyle,
   TextInput,
   Alert,
+  Modal,
 } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -37,6 +38,18 @@ type SavedFolder = {
   display_order: number;
   recipe_count: number;
 };
+
+// Predefined folder colors (8 choices in 4x2 grid)
+const FOLDER_COLORS = [
+  '#109DF0', // Primary blue
+  '#9253E0', // Purple
+  '#2E7D32', // Green
+  '#FFA000', // Orange
+  '#D32F2F', // Red
+  '#7a8c99', // Gray
+  '#FF6B6B', // Coral
+  '#DDA0DD', // Plum
+];
 
 export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
@@ -67,6 +80,60 @@ export default function LibraryScreen() {
   const [showDeleteFolderModal, setShowDeleteFolderModal] = useState(false);
   const [folderToDelete, setFolderToDelete] = useState<SavedFolder | null>(null);
 
+  // Color picker modal state
+  const [showColorPickerModal, setShowColorPickerModal] = useState(false);
+  const [folderToEdit, setFolderToEdit] = useState<SavedFolder | null>(null);
+  const [isUpdatingColor, setIsUpdatingColor] = useState(false);
+
+  // Update folder color
+  const updateFolderColor = useCallback(async (folderId: number, newColor: string) => {
+    if (!session?.user) return;
+    
+    setIsUpdatingColor(true);
+    try {
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+      const response = await fetch(`${backendUrl}/api/saved/folders/${folderId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          userId: session.user.id,
+          color: newColor 
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update folder color');
+      }
+
+      // Update local state
+      setSavedFolders(prev => 
+        prev.map(folder => 
+          folder.id === folderId 
+            ? { ...folder, color: newColor }
+            : folder
+        )
+      );
+
+      track('folder_color_updated', {
+        folderId,
+        newColor,
+        userId: session?.user?.id,
+      });
+    } catch (error) {
+      track('folder_color_update_error', {
+        folderId,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        userId: session?.user?.id,
+      });
+      showError('Error', 'Failed to update folder color. Please try again.');
+    } finally {
+      setIsUpdatingColor(false);
+      setFolderToEdit(null);
+    }
+  }, [session, showError, track]);
 
 
   // Load cached explore recipes (keeping existing explore logic)
@@ -381,13 +448,20 @@ export default function LibraryScreen() {
       style={styles.folderCard}
       onPress={() => navigateToFolder(item)}
     >
-      <View style={styles.folderIcon}>
+      <TouchableOpacity 
+        style={styles.folderIcon}
+        onPress={() => {
+          setFolderToEdit(item);
+          setShowColorPickerModal(true);
+        }}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      >
         <MaterialCommunityIcons
           name="folder"
           size={28}
-          color={COLORS.primary}
+          color={item.color || COLORS.primary}
         />
-      </View>
+      </TouchableOpacity>
       <View style={styles.folderInfo}>
         <Text style={styles.folderName} numberOfLines={1} ellipsizeMode="tail">
           {item.name}
@@ -396,16 +470,16 @@ export default function LibraryScreen() {
           {item.recipe_count} recipe{item.recipe_count !== 1 ? 's' : ''}
         </Text>
       </View>
-      <View style={styles.folderActions}>
-        <TouchableOpacity 
-          style={styles.deleteButton} 
-          onPress={() => handleDeleteFolder(item)}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <MaterialCommunityIcons name="delete-outline" size={20} color={COLORS.textMuted} />
-        </TouchableOpacity>
-        <MaterialCommunityIcons name="chevron-right" size={20} color={COLORS.textMuted} />
-      </View>
+              <View style={styles.folderActions}>
+          <TouchableOpacity 
+            style={styles.deleteButton} 
+            onPress={() => handleDeleteFolder(item)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <MaterialCommunityIcons name="trash-can" size={16} color={COLORS.textMuted} />
+          </TouchableOpacity>
+          <MaterialCommunityIcons name="chevron-right" size={20} color={COLORS.textMuted} />
+        </View>
     </TouchableOpacity>
   ), [navigateToFolder, handleDeleteFolder]);
 
@@ -649,6 +723,67 @@ export default function LibraryScreen() {
           destructive={false}
         />
       )}
+
+             {/* Color Picker Modal */}
+       {folderToEdit && (
+         <Modal
+           visible={showColorPickerModal}
+           transparent={true}
+           animationType="fade"
+           onRequestClose={() => setShowColorPickerModal(false)}
+         >
+           <TouchableOpacity 
+             style={styles.modalOverlay} 
+             activeOpacity={1}
+             onPress={() => setShowColorPickerModal(false)}
+           >
+             <TouchableOpacity 
+               style={styles.colorPickerContainer}
+               activeOpacity={1}
+               onPress={(e) => e.stopPropagation()}
+             >
+               <Text style={styles.colorPickerTitle}>
+                 Choose a color for "{folderToEdit.name}"
+               </Text>
+               
+               <View style={styles.colorGrid}>
+                 <View style={styles.colorRow}>
+                   {FOLDER_COLORS.slice(0, 4).map((color, index) => (
+                     <TouchableOpacity
+                       key={index}
+                       style={[
+                         styles.colorSquare,
+                         { backgroundColor: color },
+                         folderToEdit.color === color && styles.selectedColorSquare
+                       ]}
+                       onPress={() => {
+                         updateFolderColor(folderToEdit.id, color);
+                         setShowColorPickerModal(false);
+                       }}
+                     />
+                   ))}
+                 </View>
+                 <View style={styles.colorRow}>
+                   {FOLDER_COLORS.slice(4, 8).map((color, index) => (
+                     <TouchableOpacity
+                       key={index + 4}
+                       style={[
+                         styles.colorSquare,
+                         { backgroundColor: color },
+                         folderToEdit.color === color && styles.selectedColorSquare
+                       ]}
+                       onPress={() => {
+                         updateFolderColor(folderToEdit.id, color);
+                         setShowColorPickerModal(false);
+                       }}
+                     />
+                   ))}
+                 </View>
+               </View>
+             </TouchableOpacity>
+           </TouchableOpacity>
+         </Modal>
+       )}
     </View>
   );
 }
@@ -873,4 +1008,71 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
     marginTop: SPACING.xs,
   } as TextStyle,
+
+  // Modal styles
+     modalOverlay: {
+     flex: 1,
+     justifyContent: 'center',
+     alignItems: 'center',
+     backgroundColor: 'rgba(0,0,0,0.6)',
+   },
+   colorPickerContainer: {
+     backgroundColor: COLORS.white,
+     borderRadius: RADIUS.lg,
+     padding: SPACING.xl,
+     width: '85%',
+     maxWidth: 320,
+     shadowColor: COLORS.black,
+     shadowOffset: { width: 0, height: 10 },
+     shadowOpacity: 0.25,
+     shadowRadius: 20,
+     elevation: 10,
+   },
+   colorPickerTitle: {
+     ...bodyStrongText,
+     fontSize: FONT.size.lg,
+     color: COLORS.textDark,
+     marginBottom: SPACING.lg,
+     textAlign: 'center',
+   },
+   colorGrid: {
+     width: '100%',
+     marginBottom: SPACING.lg,
+   },
+   colorRow: {
+     flexDirection: 'row',
+     justifyContent: 'space-between',
+     marginBottom: SPACING.md,
+   },
+   colorSquare: {
+     width: 50,
+     height: 50,
+     borderRadius: RADIUS.md,
+     borderWidth: 2,
+     borderColor: COLORS.surface,
+     shadowColor: COLORS.black,
+     shadowOffset: { width: 0, height: 2 },
+     shadowOpacity: 0.1,
+     shadowRadius: 4,
+     elevation: 2,
+   },
+   selectedColorSquare: {
+     borderColor: COLORS.primary,
+     borderWidth: 3,
+     shadowColor: COLORS.primary,
+     shadowOffset: { width: 0, height: 4 },
+     shadowOpacity: 0.3,
+     shadowRadius: 8,
+     elevation: 4,
+   },
+  doneButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: RADIUS.sm,
+  },
+     doneButtonText: {
+     ...bodyStrongText,
+     color: COLORS.white,
+   },
 }); 

@@ -62,6 +62,7 @@ export default function AddNewFolderModal({
         user_id: session.user.id,
         name: folderName.trim(),
         display_order: displayOrder,
+        color: '#109DF0', // Default to primary blue
       };
 
       console.log('AddNewFolderModal: Attempting to insert folder data:', insertData);

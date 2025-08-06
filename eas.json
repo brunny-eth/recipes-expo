@@ -22,7 +22,8 @@
       "channel": "production",
       "autoIncrement": true,
       "env": {
-        "BUNDLE_ID": "com.meez.recipes",
+        "BUNDLE_ID": "com.meez.dev",
+        "APP_ENV": "dev",
         "EXPO_DEBUG": "1"
       },
       "ios": {

@@ -133,6 +133,7 @@ export default function FolderPickerModal({
           user_id: session.user.id,
           name: newFolderName.trim(),
           display_order: displayOrder,
+          color: '#109DF0', // Default to primary blue
         })
         .select()
         .single();
@@ -202,7 +203,7 @@ export default function FolderPickerModal({
         <MaterialCommunityIcons
           name="folder"
           size={20}
-          color={COLORS.primary}
+          color={item.color || COLORS.primary}
         />
       </View>
       <View style={styles.folderInfo}>

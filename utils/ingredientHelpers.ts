@@ -43,6 +43,7 @@ const UNIT_MAPPINGS: Record<string, string> = {
   // Special measurement units
   'pinch': 'each', 'pinches': 'each', 'dash': 'each', 'dashes': 'each',
   'splash': 'each', 'splashes': 'each', 'handful': 'each', 'handfuls': 'each',
+  'large handful': 'each', 'large handfuls': 'each', 'small handful': 'each', 'small handfuls': 'each',
   'drop': 'each', 'drops': 'each', 'squeeze': 'each', 'squeezes': 'each',
 
   // Weight units (note: not convertible with volume in units.ts)
@@ -80,6 +81,8 @@ const UNIT_DISPLAY_NAMES: Record<string, { singular: string, plural: string }> =
   // Count and weight units
   'each': { singular: '', plural: '' }, // Empty for count units
   'slices': { singular: 'slice', plural: 'slices' }, // Preserve slice display
+  'large handfuls': { singular: 'large handful', plural: 'large handfuls' },
+  'small handfuls': { singular: 'small handful', plural: 'small handfuls' },
   'g': { singular: 'g', plural: 'g' },
   'kg': { singular: 'kg', plural: 'kg' },
   'oz': { singular: 'oz', plural: 'oz' },
@@ -230,17 +233,30 @@ function parseIngredientString(ingredientString: string): {
     }
   }
   
-  // Handle parenthetical preparation (but not substitutions)
+  // Handle parenthetical preparation (but not substitutions or units)
   const parenMatch = workingString.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
   if (parenMatch && !parenMatch[2].includes(' or ') && !parenMatch[2].includes('/')) {
-    if (!preparation) {
-      preparation = parenMatch[2].trim();
+    const parenContent = parenMatch[2].trim();
+    
+    // Check if parentheses contain unit information (like "2 cloves", "3 tbsp")
+    const unitPattern = /^\d+(?:\s+\d+\/\d+)?\s+(cloves?|heads?|bunches?|pieces?|stalks?|sprigs?|cans?|bottles?|jars?|bags?|boxes?|packages?|containers?|tbsp|tbsps?|tsp|tsps?|cups?|ounces?|oz|pounds?|lb|grams?|g|kilograms?|kg|milliliters?|ml|liters?|l|pinches?|dashes?|drops?|splashes?|handfuls?|large\s+handfuls?|small\s+handfuls?|squeezes?)$/i;
+    
+    if (unitPattern.test(parenContent)) {
+      // This is unit information, not preparation - leave it for unit extraction
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[ingredientHelpers] 📏 Found parenthetical unit info, leaving for unit extraction:', parenContent);
+      }
     } else {
-      preparation += ', ' + parenMatch[2].trim();
-    }
-    workingString = parenMatch[1].trim();
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[ingredientHelpers] 📝 Found parenthetical preparation:', preparation);
+      // This is preparation text
+      if (!preparation) {
+        preparation = parenContent;
+      } else {
+        preparation += ', ' + parenContent;
+      }
+      workingString = parenMatch[1].trim();
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[ingredientHelpers] 📝 Found parenthetical preparation:', preparation);
+      }
     }
   }
   
@@ -619,8 +635,22 @@ export function parseRecipeDisplayName(name: string): {
     for (const marker of substitutionMarkers) {
       if (originalName.includes(marker)) {
         const parts = originalName.split(marker);
-        baseName = parts[0].trim();
-        substitutionText = parts.slice(1).join(marker).trim();
+        const firstPart = parts[0].trim();
+        const secondPart = parts.slice(1).join(marker).trim();
+        
+        // Special case: If first part is just "champagne" and second part contains "vinegar",
+        // treat this as a compound ingredient name, not a substitution
+        if (firstPart.toLowerCase() === 'champagne' && secondPart.toLowerCase().includes('vinegar')) {
+          baseName = originalName; // Keep the full name as-is
+          substitutionText = null;
+          if (process.env.NODE_ENV === 'development') {
+            console.log('[ingredientHelpers] 🍾 Preserving compound vinegar name in recipe:', originalName);
+          }
+          break;
+        }
+        
+        baseName = firstPart;
+        substitutionText = secondPart;
         // Remove trailing parenthesis if present
         if (substitutionText.endsWith(')')) {
           substitutionText = substitutionText.slice(0, -1).trim();
@@ -678,7 +708,7 @@ export function parseIngredientDisplayName(name: string): {
     return { baseName: '', substitutionText: null };
   }
 
-  // Split on substitution markers
+  // Split on substitution markers, but be smarter about compound ingredient names
   const substitutionMarkers = [' or ', ' (or ', ' / ', ' OR ', ' / ', '/'];
   let baseName = name;
   let substitutionText = null;
@@ -686,8 +716,32 @@ export function parseIngredientDisplayName(name: string): {
   for (const marker of substitutionMarkers) {
     if (name.includes(marker)) {
       const parts = name.split(marker);
-      baseName = parts[0].trim();
-      substitutionText = parts.slice(1).join(marker).trim();
+      const firstPart = parts[0].trim();
+      const secondPart = parts.slice(1).join(marker).trim();
+      
+      // Special case: If first part is just "champagne" and second part contains "vinegar",
+      // treat this as a compound ingredient name, not a substitution
+      if (firstPart.toLowerCase() === 'champagne' && secondPart.toLowerCase().includes('vinegar')) {
+        baseName = name; // Keep the full name as-is
+        substitutionText = null;
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[ingredientHelpers] 🍾 Preserving compound vinegar name:', name);
+        }
+        break;
+      }
+      
+      // Special case: If both parts contain "paprika", treat this as a compound ingredient name
+      if (firstPart.toLowerCase().includes('paprika') || secondPart.toLowerCase().includes('paprika')) {
+        baseName = name; // Keep the full name as-is
+        substitutionText = null;
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[ingredientHelpers] 🌶️ Preserving compound paprika name:', name);
+        }
+        break;
+      }
+      
+      baseName = firstPart;
+      substitutionText = secondPart;
       // Remove trailing parenthesis if present
       if (substitutionText.endsWith(')')) {
         substitutionText = substitutionText.slice(0, -1).trim();
@@ -709,6 +763,29 @@ export function parseIngredientDisplayName(name: string): {
     baseName = parenMatch[1].trim();
     if (process.env.NODE_ENV === 'development') {
       console.log('[ingredientHelpers] 🧹 Cleaned parenthetical for grocery:', baseName);
+    }
+  }
+  
+  // Preserve important combinations that should not be modified
+  // This is a simplified version of the PRESERVED_COMBINATIONS logic
+  const preservedCombinations = [
+    'golden potatoes', 'red potatoes', 'small potatoes', 'baby potatoes', 'fingerling potatoes',
+    'russet potatoes', 'yukon gold potatoes', 'sweet potatoes', 'purple potatoes', 'white potatoes',
+    'all purpose flour', 'all-purpose flour', 'unbleached all purpose flour', 'unbleached all-purpose flour'
+  ];
+  
+  const lowerBaseName = baseName.toLowerCase();
+  for (const combination of preservedCombinations) {
+    if (lowerBaseName.includes(combination)) {
+      // Keep the original case from the input
+      const originalCase = baseName.match(new RegExp(combination, 'i'))?.[0];
+      if (originalCase) {
+        baseName = originalCase;
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[ingredientHelpers] 🛡️ Preserved combination:', combination);
+        }
+        break;
+      }
     }
   }
 

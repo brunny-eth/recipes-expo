@@ -83,7 +83,7 @@ export default function PDFToImageConverter({
         body {
           margin: 0;
           padding: 0;
-          font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+          font-family: 'Inter-Regular', -apple-system, BlinkMacSystemFont, sans-serif;
           background: #eeece5;
           color: #27241F;
           line-height: 1.5;
@@ -107,14 +107,14 @@ export default function PDFToImageConverter({
           font-weight: 600;
           color: #27241F;
           margin: 0 0 4px 0;
-          font-family: 'Ubuntu', sans-serif;
+          font-family: 'Ubuntu-Regular', sans-serif;
         }
         
         .header-subtitle {
           font-size: 14px;
           color: #5C6B73;
           margin: 0;
-          font-family: 'Inter', sans-serif;
+          font-family: 'Inter-Regular', sans-serif;
         }
         
         .content {
@@ -157,7 +157,7 @@ export default function PDFToImageConverter({
           font-size: 14px;
           font-weight: 600;
           cursor: pointer;
-          font-family: 'Inter', sans-serif;
+          font-family: 'Inter-Regular', sans-serif;
           transition: all 0.2s ease;
           min-width: 60px;
         }
@@ -177,7 +177,7 @@ export default function PDFToImageConverter({
           font-size: 14px;
           color: #5C6B73;
           font-weight: 500;
-          font-family: 'Inter', sans-serif;
+          font-family: 'Inter-Regular', sans-serif;
           white-space: nowrap;
         }
         
@@ -194,7 +194,7 @@ export default function PDFToImageConverter({
           font-size: 14px;
           font-weight: 600;
           cursor: pointer;
-          font-family: 'Inter', sans-serif;
+          font-family: 'Inter-Regular', sans-serif;
           transition: all 0.2s ease;
           flex: 1;
           min-width: 100px;
@@ -257,7 +257,7 @@ export default function PDFToImageConverter({
           text-align: center;
           padding: 40px;
           color: #5C6B73;
-          font-family: 'Inter', sans-serif;
+          font-family: 'Inter-Regular', sans-serif;
         }
         
         .loading-spinner {
@@ -304,7 +304,7 @@ export default function PDFToImageConverter({
           font-size: 14px;
           color: #5C6B73;
           text-align: center;
-          font-family: 'Inter', sans-serif;
+          font-family: 'Inter-Regular', sans-serif;
         }
         
         @media (max-width: 480px) {

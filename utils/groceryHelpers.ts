@@ -39,6 +39,7 @@ export interface GroceryListItem {
   recipe_id: number | null;
   user_saved_recipe_id: string | null;
   source_recipe_title: string;
+  preparation: string | null;  // Preparation method (e.g., "grated", "chopped", "diced")
 }
 
 // === INGREDIENT NORMALIZATION DATA ===
@@ -146,6 +147,24 @@ const INGREDIENT_ALIASES: Record<string, string> = {
   'celtic salt': 'salt',
   'flaky salt': 'salt',
 
+  // Mustard variations - normalize grainy types to "grainy mustard"
+  'grain mustard': 'grainy mustard',
+  'grainy dijon mustard': 'grainy mustard',
+  'whole grain mustard': 'grainy mustard',
+  'whole grain dijon mustard': 'grainy mustard',
+  // Keep specific mustard types separate
+  'dijon mustard': 'dijon mustard',
+  'yellow mustard': 'yellow mustard', 
+  'brown mustard': 'brown mustard',
+
+  // Vinegar variations - normalize to base types
+  'champagne vinegar': 'champagne vinegar',
+  'apple cider vinegar': 'apple cider vinegar',
+  'red wine vinegar': 'red wine vinegar',
+  'white wine vinegar': 'white wine vinegar',
+  'balsamic vinegar': 'balsamic vinegar',
+  'rice vinegar': 'rice vinegar',
+
   // Unit-based cleanup (remove unit words from ingredient names)
   'fluid ounces': '', // Remove when it appears in ingredient name
   'ounces': '', // Remove when it appears in ingredient name
@@ -175,14 +194,16 @@ const PRESERVED_COMBINATIONS = new Set([
   'red wine vinegar', 'white wine vinegar', 'apple cider vinegar', 'balsamic vinegar',
   'soy sauce', 'hot sauce', 'barbecue sauce', 'tomato sauce',
   'chicken broth', 'beef broth', 'vegetable broth',
-  'greek yogurt', 'plain yogurt'
+  'greek yogurt', 'plain yogurt',
+  'golden potatoes', 'red potatoes', 'small potatoes', 'baby potatoes', 'fingerling potatoes',
+  'russet potatoes', 'yukon gold potatoes', 'sweet potatoes', 'purple potatoes', 'white potatoes'
 ]);
 
 /**
  * Adjectives that should typically be removed unless part of a preserved combination
  */
 const REMOVABLE_ADJECTIVES = new Set([
-  'fresh', 'dried', 'chopped', 'diced', 'minced', 'crushed', 'sliced', 'ground',
+  'chopped', 'diced', 'minced', 'crushed', 'sliced', 'ground',
   'peeled', 'seeded', 'pitted', 'canned', 'frozen', 'defrosted',
   'cooked', 'raw', 'boiled', 'fried', 'baked', 'grilled', 'steamed', 'roasted',
   'large', 'medium', 'small', 'jumbo', 'extra', 'super', 'mini', 'baby',
@@ -401,6 +422,51 @@ function applySpecialCases(name: string): string {
     console.log('[groceryHelpers] 🎯 applySpecialCases called with:', name);
   }
   
+  // Handle fresh herb logic
+  const commonHerbs = [
+    'basil', 'cilantro', 'dill', 'mint', 'oregano', 'parsley', 'rosemary', 
+    'sage', 'thyme', 'chives', 'tarragon', 'marjoram', 'bay leaves', 'chervil'
+  ];
+  
+  const lowerName = name.toLowerCase();
+  const isHerb = commonHerbs.some(herb => {
+    // Use word boundaries to avoid partial matches
+    const herbRegex = new RegExp(`\\b${herb}\\b`, 'i');
+    return herbRegex.test(lowerName);
+  });
+  
+  if (isHerb) {
+    // If it explicitly says "fresh [herb]", keep it as "fresh [herb]"
+    if (lowerName.startsWith('fresh ')) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[groceryHelpers] 🌿 Keeping explicit fresh herb:', name);
+      }
+      return name;
+    }
+    
+    // If it explicitly says "dried [herb]", keep it as "dried [herb]"
+    if (lowerName.startsWith('dried ')) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[groceryHelpers] 🌿 Keeping explicit dried herb:', name);
+      }
+      return name;
+    }
+    
+    // If it's just "[herb]" without fresh/dried, assume it's fresh
+    const herbName = commonHerbs.find(herb => {
+      // Use word boundaries to avoid partial matches
+      const herbRegex = new RegExp(`\\b${herb}\\b`, 'i');
+      return herbRegex.test(lowerName);
+    });
+    if (herbName) {
+      const freshHerbName = `fresh ${herbName}`;
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[groceryHelpers] 🌿 Assuming fresh herb:', name, '→', freshHerbName);
+      }
+      return freshHerbName;
+    }
+  }
+  
   // Handle complex herb patterns like "fresh chopped herbs scallions" → "scallions"
   if (name.includes('herbs') && (name.includes('scallion') || name.includes('cilantro') || name.includes('parsley'))) {
     if (name.includes('scallion')) {
@@ -490,6 +556,20 @@ export function normalizeName(name: string): string {
   
   if (process.env.NODE_ENV === 'development') {
     console.log('[groceryHelpers] ✅ normalizeName final result:', name, '→', normalized);
+    // Special logging for mustard items to verify grouping
+    if (name.toLowerCase().includes('mustard')) {
+      console.log('[groceryHelpers] 🧪 Mustard normalization:', name, '→', normalized);
+    }
+    // Special logging for vinegar items to verify grouping
+    if (name.toLowerCase().includes('vinegar')) {
+      console.log('[groceryHelpers] 🍾 Vinegar normalization:', name, '→', normalized);
+    }
+    // Special logging for herb items to verify fresh/dried logic
+    if (name.toLowerCase().includes('basil') || name.toLowerCase().includes('cilantro') || 
+        name.toLowerCase().includes('dill') || name.toLowerCase().includes('thyme') ||
+        name.toLowerCase().includes('rosemary') || name.toLowerCase().includes('parsley')) {
+      console.log('[groceryHelpers] 🌿 Herb normalization:', name, '→', normalized);
+    }
   }
   return normalized || name; // Fallback to original if somehow empty
 }
@@ -728,7 +808,30 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
   // Step 1: Group all items by their normalized name.
   const groupedByName = new Map<string, GroceryListItem[]>();
   for (const item of items) {
-    const normalizedName = normalizeName(item.item_name);
+    // Special case: Don't normalize potato varieties - keep them separate
+    const isPotatoVariant = item.item_name.toLowerCase().includes('potato') && 
+      (item.item_name.toLowerCase().includes('small') || 
+       item.item_name.toLowerCase().includes('red') || 
+       item.item_name.toLowerCase().includes('golden') || 
+       item.item_name.toLowerCase().includes('baby') || 
+       item.item_name.toLowerCase().includes('fingerling') || 
+       item.item_name.toLowerCase().includes('russet') || 
+       item.item_name.toLowerCase().includes('yukon') || 
+       item.item_name.toLowerCase().includes('sweet') || 
+       item.item_name.toLowerCase().includes('purple') || 
+       item.item_name.toLowerCase().includes('white'));
+    
+    // Special case: Don't normalize flour varieties - keep them separate
+    const isFlourVariant = item.item_name.toLowerCase().includes('flour') && 
+      (item.item_name.toLowerCase().includes('all purpose') || 
+       item.item_name.toLowerCase().includes('all-purpose') || 
+       item.item_name.toLowerCase().includes('unbleached') || 
+       item.item_name.toLowerCase().includes('whole wheat') || 
+       item.item_name.toLowerCase().includes('bread') || 
+       item.item_name.toLowerCase().includes('cake') || 
+       item.item_name.toLowerCase().includes('pastry'));
+    
+    const normalizedName = (isPotatoVariant || isFlourVariant) ? item.item_name : normalizeName(item.item_name);
     
     // Create a normalized copy of the item with normalized name as the display name
     const normalizedItem = {
@@ -813,7 +916,10 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
             if ((baseItem.quantity_unit === 'cloves' && compareItem.quantity_unit === null) ||
                 (baseItem.quantity_unit === null && compareItem.quantity_unit === 'cloves') ||
                 (normalizeUnit(baseItem.quantity_unit) === 'clove' && compareItem.quantity_unit === null) ||
-                (baseItem.quantity_unit === null && normalizeUnit(compareItem.quantity_unit) === 'clove')) {
+                (baseItem.quantity_unit === null && normalizeUnit(compareItem.quantity_unit) === 'clove') ||
+                // Handle case where both are normalized to 'each' but originally were 'cloves'
+                (normalizeUnit(baseItem.quantity_unit) === 'each' && normalizeUnit(compareItem.quantity_unit) === 'each' &&
+                 (baseItem.display_unit === 'cloves' || compareItem.display_unit === 'cloves'))) {
               // Use the cloves unit and add the amounts
               finalUnit = baseItem.quantity_unit || compareItem.quantity_unit;
               finalAmount = baseAmount + compareAmount;
@@ -870,11 +976,12 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
                   }
                   
                   // Try converting to each unit in order of preference
+                  // Prefer tbsp/tsp over fl_oz for better readability
                   const preferredUnits: [Unit, number, number][] = [
                     ['cup', 0.25, 4],      // 1/4 cup to 4 cups
-                    ['fl_oz', 1, 16],      // 1 fl oz to 16 fl oz
-                    ['tbsp', 1, 16],       // 1 tbsp to 16 tbsp
-                    ['tsp', 1, 16],        // 1 tsp to 16 tsp
+                    ['tbsp', 1, 16],       // 1 tbsp to 16 tbsp (preferred over fl_oz)
+                    ['tsp', 1, 16],        // 1 tsp to 16 tsp (preferred over fl_oz)
+                    ['fl_oz', 1, 16],      // 1 fl oz to 16 fl oz (fallback)
                     ['ml', 1, 1000]        // fallback to ml
                   ];
                   
@@ -906,7 +1013,8 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
                       totalInMl,
                       finalUnit,
                       finalAmount,
-                      displayUnit: getUnitDisplayName(finalUnit as Unit, finalAmount)
+                      displayUnit: getUnitDisplayName(finalUnit as Unit, finalAmount),
+                      originalUnits: `${baseAmount} ${normalizedBaseUnit} + ${compareAmount} ${normalizedCompareUnit}`
                     });
                   }
                 } else {
@@ -937,8 +1045,17 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
             
             baseItem.quantity_amount = finalAmount;
             baseItem.quantity_unit = finalUnit;
-            // Always use standardized display unit based on final amount
-            baseItem.display_unit = getUnitDisplayName(finalUnit as Unit, finalAmount);
+            
+            // Preserve display unit for specific cases where we want to keep the original unit name
+            if (baseItem.item_name.toLowerCase().includes('garlic') && 
+                (baseItem.display_unit === 'cloves' || compareItem.display_unit === 'cloves')) {
+              // Keep "cloves" as display unit for garlic
+              baseItem.display_unit = 'cloves';
+            } else {
+              // Always use standardized display unit based on final amount
+              baseItem.display_unit = getUnitDisplayName(finalUnit as Unit, finalAmount);
+            }
+            
             baseItem.original_ingredient_text += ` | ${compareItem.original_ingredient_text}`;
             processedIndices.add(j);
           }
@@ -1042,6 +1159,46 @@ export function formatIngredientsForGroceryList(
           });
         }
         
+        // Special debugging for broccoli
+        if (ingredient.name.toLowerCase().includes('broccoli')) {
+          console.log('[groceryHelpers] 🥦 BROCCOLI DEBUG:', {
+            originalName: ingredient.name,
+            parsedBaseName: parsedName.baseName,
+            originalUnit: ingredient.unit,
+            originalText
+          });
+        }
+        
+        // Special debugging for garlic
+        if (ingredient.name.toLowerCase().includes('garlic')) {
+          console.log('[groceryHelpers] 🧄 GARLIC DEBUG:', {
+            originalName: ingredient.name,
+            parsedBaseName: parsedName.baseName,
+            originalUnit: ingredient.unit,
+            originalText
+          });
+        }
+        
+        // Special debugging for potatoes
+        if (ingredient.name.toLowerCase().includes('potato')) {
+          console.log('[groceryHelpers] 🥔 POTATO DEBUG:', {
+            originalName: ingredient.name,
+            parsedBaseName: parsedName.baseName,
+            originalUnit: ingredient.unit,
+            originalText
+          });
+        }
+        
+        // Special debugging for flour
+        if (ingredient.name.toLowerCase().includes('flour')) {
+          console.log('[groceryHelpers] 🌾 FLOUR DEBUG:', {
+            originalName: ingredient.name,
+            parsedBaseName: parsedName.baseName,
+            originalUnit: ingredient.unit,
+            originalText
+          });
+        }
+        
         // Handle unit - normalize it if it exists, but preserve original for display
         let standardizedUnit: string | null = null;
         let displayUnit: string | null = null;
@@ -1064,10 +1221,18 @@ export function formatIngredientsForGroceryList(
           // Preserve specific unit types for better display
           else if (originalUnit === 'cloves' || originalUnit === 'clove') {
             displayUnit = 'cloves';
+          } else if (originalUnit === 'heads' || originalUnit === 'head') {
+            displayUnit = 'heads';
           } else if (originalUnit === 'pinches' || originalUnit === 'pinch') {
             displayUnit = 'pinch';
           } else if (originalUnit === 'dashes' || originalUnit === 'dash') {
             displayUnit = 'dash';
+          } else if (originalUnit === 'slices' || originalUnit === 'slice') {
+            displayUnit = 'slices';
+          } else if (originalUnit === 'large handfuls' || originalUnit === 'large handful') {
+            displayUnit = 'large handfuls';
+          } else if (originalUnit === 'small handfuls' || originalUnit === 'small handful') {
+            displayUnit = 'small handfuls';
           } else if (originalUnit === 'small pinch' || originalUnit === 'medium pinch' || originalUnit === 'large pinch') {
             displayUnit = originalUnit; // Keep the full descriptive pinch
           } else {
@@ -1086,7 +1251,7 @@ export function formatIngredientsForGroceryList(
           }
           
           // Simple unit extraction from original text
-          const unitMatch = originalText.match(/\b(cup|cups|tbsp|tbs|tablespoon|tablespoons|tsp|teaspoon|teaspoons|oz|ounce|ounces|lb|pound|pounds|g|gram|grams|kg|kilogram|kilograms|ml|milliliter|milliliters|l|liter|liters|clove|cloves|head|heads|bunch|bunches|piece|pieces|stalk|stalks|sprig|sprigs|can|cans|bottle|bottles|box|boxes|bag|bags|package|packages|jar|jars|container|containers|pinch|pinches|dash|dashes|each|count)\b/i);
+          const unitMatch = originalText.match(/\b(cup|cups|tbsp|tbs|tablespoon|tablespoons|tsp|teaspoon|teaspoons|oz|ounce|ounces|lb|pound|pounds|g|gram|grams|kg|kilogram|kilograms|ml|milliliter|milliliters|l|liter|liters|clove|cloves|head|heads|bunch|bunches|piece|pieces|slice|slices|stalk|stalks|sprig|sprigs|can|cans|bottle|bottles|box|boxes|bag|bags|package|packages|jar|jars|container|containers|pinch|pinches|dash|dashes|large\s+handful|large\s+handfuls|small\s+handful|small\s+handfuls|handful|handfuls|each|count)\b/i);
           if (unitMatch) {
             const extractedUnit = unitMatch[1].toLowerCase();
             standardizedUnit = normalizeUnit(extractedUnit);
@@ -1094,11 +1259,19 @@ export function formatIngredientsForGroceryList(
             // Preserve specific unit types for display
             if (extractedUnit === 'cloves' || extractedUnit === 'clove') {
               displayUnit = 'cloves';
+            } else if (extractedUnit === 'heads' || extractedUnit === 'head') {
+              displayUnit = 'heads';
             } else if (extractedUnit === 'pinches' || extractedUnit === 'pinch') {
               displayUnit = 'pinch';
             } else if (extractedUnit === 'dashes' || extractedUnit === 'dash') {
               displayUnit = 'dash';
-            }
+                      } else if (extractedUnit === 'slices' || extractedUnit === 'slice') {
+            displayUnit = 'slices';
+          } else if (extractedUnit === 'large handfuls' || extractedUnit === 'large handful') {
+            displayUnit = 'large handfuls';
+          } else if (extractedUnit === 'small handfuls' || extractedUnit === 'small handful') {
+            displayUnit = 'small handfuls';
+          }
             
             if (process.env.NODE_ENV === 'development') {
               console.log('[groceryHelpers] ✅ Successfully extracted unit from original text:', extractedUnit, '→', standardizedUnit, '(display:', displayUnit, ')');
@@ -1114,7 +1287,7 @@ export function formatIngredientsForGroceryList(
           // Be more specific to avoid catching vegetable peppers
           const spiceKeywords = [
             'cumin', 'paprika', 'turmeric', 'cinnamon', 'nutmeg', 'allspice',
-            'cardamom', 'coriander', 'fennel', 'caraway', 'anise', 'saffron',
+            'cardamom', 'coriander', 'caraway', 'anise', 'saffron',
             'cayenne', 'chili powder', 'curry powder', 'garam masala',
             'oregano', 'thyme', 'rosemary', 'sage', 'basil', 'marjoram',
             'bay leaves', 'dill', 'tarragon', 'herbs',
@@ -1139,8 +1312,11 @@ export function formatIngredientsForGroceryList(
             ingredientName.includes('peppercorn')
           );
           
+          // Exclude fennel bulb from being treated as a spice (fennel seeds are the spice)
+          const isFennelBulb = ingredientName.includes('fennel') && !ingredientName.includes('seed');
+          
           const isRegularSpice = spiceKeywords.some(spice => ingredientName.includes(spice));
-          const isSpice = isRegularSpice || isPepperSpice;
+          const isSpice = (isRegularSpice || isPepperSpice) && !isFennelBulb;
           
           if (isSpice && amount <= 5) { // Small amounts of spices get pinch
             standardizedUnit = 'each'; // For aggregation (pinch normalizes to each)
@@ -1152,9 +1328,11 @@ export function formatIngredientsForGroceryList(
         }
         
         // Create grocery list item from final ingredient
-        // Include descriptive size in the item name if present
+        // Include descriptive size in the item name if present, but not if it's a unit
         let finalItemName = parsedName.baseName;
-        if (descriptiveSize) {
+        if (descriptiveSize && !displayUnit) {
+          // Only add descriptive size if we don't have a display unit
+          // This prevents "small heads broccoli" when we have display_unit: "heads"
           finalItemName = `${descriptiveSize} ${parsedName.baseName}`;
         }
         
@@ -1163,13 +1341,14 @@ export function formatIngredientsForGroceryList(
           original_ingredient_text: originalText,
           quantity_amount: amount, // Use proper amount parsing
           quantity_unit: standardizedUnit, // Use standardized unit internally
-          display_unit: displayUnit || (standardizedUnit ? getUnitDisplayName(standardizedUnit as Unit, amount || 1) : null),
+          display_unit: displayUnit || (standardizedUnit && standardizedUnit !== 'each' ? getUnitDisplayName(standardizedUnit as Unit, amount || 1) : null),
           grocery_category: (ingredient as any).grocery_category || null, // Use pre-categorized data if available
           is_checked: false,
           order_index: orderIndex++,
           recipe_id: recipe.id || null,
           user_saved_recipe_id: userSavedRecipeId || null,
-          source_recipe_title: recipe.title || 'Unknown Recipe'
+          source_recipe_title: recipe.title || 'Unknown Recipe',
+          preparation: ingredient.preparation || null // Include preparation method
         };
         
         if (process.env.NODE_ENV === 'development') {
@@ -1191,6 +1370,58 @@ export function formatIngredientsForGroceryList(
           });
         }
         
+        // Special debugging for broccoli final item
+        if (ingredient.name.toLowerCase().includes('broccoli')) {
+          console.log('[groceryHelpers] 🥦 BROCCOLI FINAL ITEM:', {
+            item_name: groceryItem.item_name,
+            quantity_amount: groceryItem.quantity_amount,
+            quantity_unit: groceryItem.quantity_unit,
+            display_unit: groceryItem.display_unit,
+            finalItemName: finalItemName,
+            descriptiveSize,
+            displayUnit
+          });
+        }
+        
+        // Special debugging for garlic final item
+        if (ingredient.name.toLowerCase().includes('garlic')) {
+          console.log('[groceryHelpers] 🧄 GARLIC FINAL ITEM:', {
+            item_name: groceryItem.item_name,
+            quantity_amount: groceryItem.quantity_amount,
+            quantity_unit: groceryItem.quantity_unit,
+            display_unit: groceryItem.display_unit,
+            finalItemName: finalItemName,
+            descriptiveSize,
+            displayUnit
+          });
+        }
+        
+        // Special debugging for potato final item
+        if (ingredient.name.toLowerCase().includes('potato')) {
+          console.log('[groceryHelpers] 🥔 POTATO FINAL ITEM:', {
+            item_name: groceryItem.item_name,
+            quantity_amount: groceryItem.quantity_amount,
+            quantity_unit: groceryItem.quantity_unit,
+            display_unit: groceryItem.display_unit,
+            finalItemName: finalItemName,
+            descriptiveSize,
+            displayUnit
+          });
+        }
+        
+        // Special debugging for flour final item
+        if (ingredient.name.toLowerCase().includes('flour')) {
+          console.log('[groceryHelpers] 🌾 FLOUR FINAL ITEM:', {
+            item_name: groceryItem.item_name,
+            quantity_amount: groceryItem.quantity_amount,
+            quantity_unit: groceryItem.quantity_unit,
+            display_unit: groceryItem.display_unit,
+            finalItemName: finalItemName,
+            descriptiveSize,
+            displayUnit
+          });
+        }
+        
         if (process.env.NODE_ENV === 'development') {
           console.log(`[groceryHelpers] ✅ Created grocery item:`, {
             item_name: groceryItem.item_name,
@@ -1198,7 +1429,8 @@ export function formatIngredientsForGroceryList(
             quantity_amount: groceryItem.quantity_amount,
             quantity_unit: groceryItem.quantity_unit,
             grocery_category: groceryItem.grocery_category,
-            basicCategory: getBasicGroceryCategory(groceryItem.item_name)
+            basicCategory: getBasicGroceryCategory(groceryItem.item_name),
+            preparation: groceryItem.preparation
           });
         }
         
@@ -1464,6 +1696,7 @@ export function prepareForSupabaseInsert(
   recipe_id: number | null;
   user_saved_recipe_id: string | null;
   source_recipe_title: string;
+  preparation: string | null;
 }> {
   if (process.env.NODE_ENV === 'development') {
     console.log('[groceryHelpers] 💾 Preparing', items.length, 'items for database insertion');
@@ -1480,7 +1713,8 @@ export function prepareForSupabaseInsert(
     order_index: item.order_index,
     recipe_id: item.recipe_id,
     user_saved_recipe_id: item.user_saved_recipe_id,
-    source_recipe_title: item.source_recipe_title
+    source_recipe_title: item.source_recipe_title,
+    preparation: item.preparation
   }));
   if (process.env.NODE_ENV === 'development') {
     console.log('[groceryHelpers] ✅ Items prepared for database');

@@ -30,13 +30,13 @@ export function AuthNavigationHandler() {
           if (isNewUser) {
             showSuccess(
               'Welcome to Meez!',
-              'This is your first time here. Start exploring recipes and save your favorites!',
+              'You can start importing recipes here or save recipes from the Explore page.',
               4000 // Show for 4 seconds
             );
           } else {
             showSuccess(
               'Welcome back to Meez!',
-              'Great to see you again. Your saved recipes are ready for you!',
+              'Great to see you again. Your recipes are ready for you.',
               4000 // Show for 4 seconds
             );
           }

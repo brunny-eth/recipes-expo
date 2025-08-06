@@ -23,7 +23,6 @@ import { useAnalytics } from '@/utils/analytics';
 const logger = createLogger('auth');
 
 interface UserMetadata {
-  role?: 'beta_user' | 'control' | 'variant';
   first_login_at?: string;
   [key: string]: any;
 }
@@ -192,7 +191,6 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
               const { error: metadataError } = await supabase.auth.updateUser({
                 data: { 
                   first_login_at: new Date().toISOString(),
-                  role: 'beta_user',
                 },
               });
               
@@ -254,7 +252,6 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
             const { error: metadataError } = await supabase.auth.updateUser({
               data: { 
                 first_login_at: new Date().toISOString(),
-                role: 'beta_user',
               },
             });
             

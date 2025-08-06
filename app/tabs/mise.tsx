@@ -82,6 +82,7 @@ type GroceryItem = {
   checked: boolean;
   id: string;
   isManual?: boolean; // Flag to identify manually added items
+  preparation?: string | null; // Preparation method (e.g., "grated", "chopped", "diced")
 };
 
 type GroceryCategory = {
@@ -127,13 +128,17 @@ const convertToGroceryCategories = (items: any[]): GroceryCategory[] => {
       }
     }
     
+    // Generate a stable ID based on item content, not array index
+    const stableId = item.id || `${item.item_name || item.name}-${item.quantity_amount || '0'}-${finalUnit || 'unit'}-${categoryName}`;
+    
     const groceryItem = {
-      id: item.id || `item_${index}`,
+      id: stableId,
       name: item.item_name || item.name,
       amount: item.quantity_amount,
       unit: finalUnit, // Use fallback unit if available
       category: categoryName,
       checked: item.is_checked || false,
+      preparation: item.preparation || null, // Include preparation method
     };
     
     categories[categoryName].push(groceryItem);
@@ -186,6 +191,7 @@ const mergeManualItemsIntoCategories = (
       category: categoryName,
       checked: false,
       isManual: true,
+      preparation: null, // Manual items don't have preparation info
     };
     
     mergedCategories[categoryName].push(groceryItem);
@@ -263,13 +269,24 @@ const filterHouseholdStaples = (
           // Check for pepper variations that should be filtered
           const pepperVariations = ['freshly ground pepper', 'ground black pepper', 'black pepper', 'ground pepper'];
           const isPepperVariation = pepperVariations.some(pepper => itemName.includes(pepper));
-          return isPepperVariation;
+          
+          // Special case for standalone "pepper" - only match if it's exactly "pepper" or ends with " pepper"
+          // This prevents matching "bell pepper", "jalapeño pepper", etc.
+          const isStandalonePepper = itemName === 'pepper' || itemName.endsWith(' pepper');
+          
+          return isPepperVariation || isStandalonePepper;
         }
           
         // Special handling for salt - match all salt types
         if (stapleName === 'salt') {
           const saltVariations = ['salt', 'kosher salt', 'sea salt', 'table salt', 'iodized salt'];
           return saltVariations.some(salt => itemName.includes(salt));
+        }
+        
+        // Special handling for flour - match flour variations
+        if (stapleName === 'all purpose flour' || stapleName === 'all-purpose flour') {
+          const flourVariations = ['all purpose flour', 'all-purpose flour', 'unbleached all purpose flour', 'unbleached all-purpose flour'];
+          return flourVariations.some(flour => itemName.includes(flour));
         }
         
         // For other staples, do exact or substring matching
@@ -853,14 +870,34 @@ export default function MiseScreen() {
           const amount = item.amount ? `${formatAmountForGroceryDisplay(item.amount)}` : '';
           const unitDisplay = getUnitDisplayName(item.unit as any, item.amount || 1);
           const unit = unitDisplay ? ` ${unitDisplay}` : '';
-          const asNeededText = (!item.amount && !amount) ? ' (as needed)' : '';
-          const displayText = `${amount}${unit} ${item.name}${asNeededText}`.trim();
+          
+          // Add "(as needed)" for items with no amount
+          const asNeededText = (!item.amount && !amount) ? '(as needed)' : '';
+          
+          // Build display text with preparation
+          const amountPart = `${amount}${unit}`;
+          const preparationPart = item.preparation || '';
+          
+          // Combine with proper comma handling
+          let displayText = item.name;
+          if (amountPart && preparationPart) {
+            displayText = `${item.name} - ${amountPart}, ${preparationPart}`;
+          } else if (amountPart) {
+            displayText = `${item.name} - ${amountPart}`;
+          } else if (preparationPart) {
+            displayText = `${item.name} - ${preparationPart}`;
+          } else if (asNeededText) {
+            displayText = `${item.name} - ${asNeededText}`;
+          }
           
           plainText += `${checkbox} ${displayText}\n`;
         });
         
         plainText += '\n'; // Add spacing between categories
       });
+
+      // Add footer
+      plainText += '\nMade with help from Meez';
 
       await Share.share({
         message: plainText,
@@ -892,7 +929,8 @@ export default function MiseScreen() {
           quantity_amount: item.amount,
           display_unit: item.unit,
           grocery_category: item.category,
-          is_checked: item.checked
+          is_checked: item.checked,
+          preparation: item.preparation // Preserve preparation information
         }))
       ));
       const updatedManualItems = [...manualItems, newItem];
@@ -926,7 +964,8 @@ export default function MiseScreen() {
           quantity_amount: item.amount,
           display_unit: item.unit,
           grocery_category: item.category,
-          is_checked: item.checked
+          is_checked: item.checked,
+          preparation: item.preparation // Preserve preparation information
         }))
       ));
       const mergedGroceryList = mergeManualItemsIntoCategories(recipeCategorizedList, updatedManualItems);
@@ -957,7 +996,8 @@ export default function MiseScreen() {
           quantity_amount: item.amount,
           display_unit: item.unit,
           grocery_category: item.category,
-          is_checked: item.checked
+          is_checked: item.checked,
+          preparation: item.preparation // Preserve preparation information
         }))
       ));
       const mergedGroceryList = mergeManualItemsIntoCategories(recipeCategorizedList, []);
@@ -1101,37 +1141,79 @@ export default function MiseScreen() {
         )}
       </View>
       {item.items.map((groceryItem, index) => {
+        const isLastItem = index === item.items.length - 1;
         return (
-          <View key={groceryItem.id} style={styles.groceryItem}>
+          <View
+            key={groceryItem.id}
+            style={[
+              styles.groceryItem,
+              isLastItem && styles.groceryItemLast
+            ]}
+          >
             <TouchableOpacity
               style={styles.groceryItemCheckbox}
               onPress={() => handleGroceryToggle(groceryItem.id)}
             >
               <MaterialCommunityIcons
                 name={groceryItem.checked ? "checkbox-marked" : "checkbox-blank-outline"}
-                size={24}
-                color={groceryItem.checked ? COLORS.success : COLORS.secondary}
+                size={28}
+                color={groceryItem.checked ? COLORS.primary : COLORS.textMuted}
               />
             </TouchableOpacity>
-            <Text 
-              style={[
-                styles.groceryItemText,
-                groceryItem.checked && styles.groceryItemChecked
-              ]}
-              numberOfLines={2}
-            >
-              {(() => {
-                const amountText = groceryItem.amount ? formatAmountForGroceryDisplay(groceryItem.amount) : '';
-                const unitDisplay = getUnitDisplayName(groceryItem.unit as any, groceryItem.amount || 1);
-                const unitText = unitDisplay ? ` ${unitDisplay}` : '';
-                const spaceBeforeName = (amountText || unitText) ? ' ' : '';
-                
-                // Add "(as needed)" for items with no amount
-                const asNeededText = (!groceryItem.amount && !amountText) ? ' (as needed)' : '';
-                
-                return `${amountText}${unitText}${spaceBeforeName}${groceryItem.name}${asNeededText}`;
-              })()}
-            </Text>
+            
+            <View style={styles.groceryItemTextContainer}>
+              <Text 
+                style={[
+                  styles.groceryItemText,
+                  groceryItem.checked && styles.groceryItemChecked
+                ]}
+              >
+                {groceryItem.name}
+              </Text>
+              <Text 
+                style={[
+                  styles.groceryItemSubtext,
+                  groceryItem.checked && styles.groceryItemChecked
+                ]}
+              >
+                {(() => {
+                  const amountText = groceryItem.amount ? formatAmountForGroceryDisplay(groceryItem.amount) : '';
+                  const unitText = groceryItem.unit ? ` ${groceryItem.unit}` : '';
+                  
+                  // Add "(as needed)" for items with no amount
+                  const asNeededText = (!groceryItem.amount && !amountText) ? '(as needed)' : '';
+                  
+                  // Build subtext parts
+                  const amountPart = `${amountText}${unitText}`;
+                  const preparationPart = groceryItem.preparation || '';
+                  
+                  // Combine with proper comma handling
+                  let subtext = '';
+                  if (amountPart && preparationPart) {
+                    subtext = `${amountPart}, ${preparationPart}`;
+                  } else if (amountPart) {
+                    subtext = amountPart;
+                  } else if (preparationPart) {
+                    subtext = preparationPart;
+                  } else if (asNeededText) {
+                    subtext = asNeededText;
+                  }
+                  
+                  // Debug broccoli display
+                  if (groceryItem.name.toLowerCase().includes('broccoli')) {
+                    console.log('[mise.tsx] 🥦 BROCCOLI DISPLAY:', {
+                      amountText,
+                      unitText,
+                      groceryItemName: groceryItem.name,
+                      subtext
+                    });
+                  }
+                  
+                  return subtext;
+                })()}
+              </Text>
+            </View>
+            
             {groceryItem.isManual && (
               <TouchableOpacity
                 onPress={() => handleDeleteManualItem(groceryItem.id)}
@@ -1531,7 +1613,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm,
     paddingVertical: SPACING.lg, // Consistent vertical padding
     paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.lg, // Increased spacing between categories
     borderWidth: BORDER_WIDTH.hairline,
     borderColor: COLORS.primaryLight,
     ...SHADOWS.small,
@@ -1546,6 +1628,7 @@ const styles = StyleSheet.create({
     ...bodyStrongText,
     color: COLORS.textDark,
     fontSize: FONT.size.lg,
+    fontWeight: 'bold',
   } as TextStyle,
   addButton: {
     padding: SPACING.xs,
@@ -1554,18 +1637,43 @@ const styles = StyleSheet.create({
   groceryItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: SPACING.sm,
-    marginBottom: SPACING.xs, // Add 6-8px gap between items
+    paddingVertical: SPACING.md, // Increased padding for even spacing
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.surface,
   } as ViewStyle,
+
   groceryItemCheckbox: {
-    marginRight: SPACING.md,
+    marginRight: SPACING.sm,
+    alignSelf: 'center',
+  } as ViewStyle,
+
+  groceryItemTextContainer: {
+    flex: 1,
+    flexDirection: 'column',
   } as ViewStyle,
   groceryItemText: {
     ...bodyText,
     fontSize: FONT.size.bodyMedium,
     color: COLORS.textDark,
-    flex: 1,
   } as TextStyle,
+  groceryItemSubtext: {
+    ...bodyText,
+    fontSize: FONT.size.caption,
+    color: COLORS.textMuted,
+    fontStyle: 'italic',
+    marginTop: 2,
+  } as TextStyle,
+  groceryItemPreparation: {
+    ...bodyText,
+    fontSize: FONT.size.caption - 1,
+    color: COLORS.textMuted,
+    fontStyle: 'italic',
+    marginTop: 2,
+  } as TextStyle,
+  groceryItemLast: {
+    borderBottomWidth: 0, // Remove border for last item
+    marginBottom: 0, // Remove bottom margin for last item
+  } as ViewStyle,
   groceryItemChecked: {
     textDecorationLine: 'line-through',
     color: COLORS.darkGray,

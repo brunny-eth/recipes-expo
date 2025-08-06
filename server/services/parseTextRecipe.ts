@@ -17,7 +17,7 @@ import { findSimilarRecipe } from '../../utils/findSimilarRecipe';
 import { generateAndSaveEmbedding } from '../../utils/recipeEmbeddings';
 
 const MAX_PREVIEW_LENGTH = 100;
-const SIMILARITY_THRESHOLD = 0.45;
+const SIMILARITY_THRESHOLD = 0.5;
 
 function normalizeServings(servingRaw: string | null): string | null {
     if (!servingRaw) return null;
@@ -96,8 +96,8 @@ export async function parseTextRecipe(
             
             // If no matches found with standard threshold, try with a lower threshold
             if (!matches || matches.length === 0) {
-                logger.info({ requestId, originalThreshold: SIMILARITY_THRESHOLD, newThreshold: 0.25 }, "[FuzzyMatch] No matches with standard threshold, trying lower threshold.");
-                matches = await findSimilarRecipe(embedding, 0.25);
+                logger.info({ requestId, originalThreshold: SIMILARITY_THRESHOLD, newThreshold: 0.35 }, "[FuzzyMatch] No matches with standard threshold, trying lower threshold.");
+                matches = await findSimilarRecipe(embedding, 0.35);
             }
             
             logger.info({ requestId, event: 'findSimilarRecipe_result', matchesIsNull: matches === null, matchesLength: matches?.length || 0 }, "[FuzzyMatch] Raw matches result");

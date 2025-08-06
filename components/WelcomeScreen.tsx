@@ -1,5 +1,6 @@
 import { View, Text, TouchableOpacity, SafeAreaView, TextStyle, StyleSheet } from 'react-native';
 import { COLORS } from '@/constants/theme';
+import { FONT } from '@/constants/typography';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useState } from 'react';
 import OnboardingScreen from './OnboardingScreen';
@@ -52,7 +53,7 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
                 color: COLORS.textDark,
                 lineHeight: 28,
                 paddingTop: 30,
-                fontFamily: 'Inter-SemiBold'
+                fontFamily: FONT.family.interSemiBold
               }}>
                 Meez helps you prep and cook without clutter
               </Text>
@@ -97,7 +98,7 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
                 textAlign: 'center',
                 color: COLORS.textDark,
                 lineHeight: 26,
-                fontFamily: 'Ubuntu-Regular'
+                fontFamily: FONT.family.ubuntu
               }}>
                 Designed by home cooks, for home cooks
               </Text>
@@ -133,7 +134,7 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
                 <Text style={{ 
                   color: COLORS.white, 
                   fontSize: 18, 
-                  fontFamily: 'Inter-SemiBold' 
+                  fontFamily: FONT.family.interSemiBold 
                 }}>
                   Get Started
                 </Text>

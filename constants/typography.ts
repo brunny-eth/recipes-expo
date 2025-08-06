@@ -2,9 +2,6 @@ import { TextStyle } from 'react-native';
 import { RFValue } from 'react-native-responsive-fontsize';
 
 const ubuntu = 'Ubuntu-Regular';
-const ubuntuBold = 'Ubuntu-Bold';
-const ubuntuMedium = 'Ubuntu-Medium';
-const ubuntuLight = 'Ubuntu-Light';
 const inter = 'Inter-Regular';
 const interSemiBold = 'Inter-SemiBold';
 
@@ -16,9 +13,6 @@ export function responsiveFont(base: number, min: number, max: number) {
 export const FONT = {
   family: {
     ubuntu,
-    ubuntuBold,
-    ubuntuMedium,
-    ubuntuLight,
     inter,
     interSemiBold,
   },

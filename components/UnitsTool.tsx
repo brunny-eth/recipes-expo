@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
   },
   resultText: {
     ...sectionHeaderText,
-    fontFamily: 'Inter-SemiBold, sans-serif',
+    fontFamily: FONT.family.interSemiBold,
     color: COLORS.primary,
     textAlign: 'center',
   },

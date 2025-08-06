@@ -209,6 +209,52 @@ router.delete('/folders/:id', async (req: Request, res: Response) => {
   }
 });
 
+// PUT /api/saved/folders/:id - Update folder properties
+router.put('/folders/:id', async (req: Request, res: Response) => {
+  const requestId = (req as any).id;
+  
+  try {
+    const { id } = req.params;
+    const { userId, color, name } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'Missing userId' });
+    }
+
+    logger.info({ requestId, folderId: id, userId, color, name }, 'Updating folder');
+
+    const updateData: any = {};
+    if (color !== undefined) updateData.color = color;
+    if (name !== undefined) updateData.name = name;
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ error: 'No valid fields to update' });
+    }
+
+    const { error: updateError } = await supabaseAdmin
+      .from('user_saved_folders')
+      .update(updateData)
+      .eq('user_id', userId)
+      .eq('id', id);
+
+    if (updateError) {
+      logger.error({ requestId, err: updateError }, 'Failed to update folder');
+      return res.status(500).json({ error: 'Failed to update folder' });
+    }
+
+    logger.info({ requestId, folderId: id }, 'Successfully updated folder');
+
+    res.json({
+      message: 'Folder updated successfully'
+    });
+
+  } catch (err) {
+    const error = err as Error;
+    logger.error({ requestId, err: error }, 'Error in /folders/:id PUT route');
+    res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+});
+
 // DELETE /api/saved/recipes/:id - Delete a saved recipe
 router.delete('/recipes/:id', async (req: Request, res: Response) => {
   const requestId = (req as any).id;

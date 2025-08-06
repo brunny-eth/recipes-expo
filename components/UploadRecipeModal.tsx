@@ -64,7 +64,6 @@ export default function UploadRecipeModal({
               </View>
               <View style={styles.optionContent}>
                 <Text style={styles.optionTitle}>Browse Files</Text>
-                <Text style={styles.optionSubtitle}>Add a recipe PDF from your files</Text>
               </View>
               <MaterialCommunityIcons
                 name="chevron-right"
@@ -86,7 +85,6 @@ export default function UploadRecipeModal({
               </View>
               <View style={styles.optionContent}>
                 <Text style={styles.optionTitle}>Take Photo</Text>
-                <Text style={styles.optionSubtitle}>Add a recipe using your camera</Text>
               </View>
               <MaterialCommunityIcons
                 name="chevron-right"
@@ -108,7 +106,6 @@ export default function UploadRecipeModal({
               </View>
               <View style={styles.optionContent}>
                 <Text style={styles.optionTitle}>Choose Image</Text>
-                <Text style={styles.optionSubtitle}>Add a recipe from your pics</Text>
               </View>
               <MaterialCommunityIcons
                 name="chevron-right"
@@ -190,12 +187,6 @@ const styles = StyleSheet.create({
     ...bodyStrongText,
     color: COLORS.textDark,
     fontSize: FONT.size.body,
-    marginBottom: 2,
-  } as TextStyle,
-  optionSubtitle: {
-    ...bodyText,
-    color: COLORS.textMuted,
-    fontSize: FONT.size.caption,
   } as TextStyle,
   cancelButton: {
     paddingVertical: SPACING.md,

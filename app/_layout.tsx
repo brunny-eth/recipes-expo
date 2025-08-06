@@ -57,9 +57,6 @@ function RootLayoutNav() {
 
   const [fontsLoaded] = useFonts({
     'Ubuntu-Regular': require('../assets/fonts/Ubuntu-Regular.ttf'),
-    'Ubuntu-Bold': require('../assets/fonts/Ubuntu-Bold.ttf'),
-    'Ubuntu-Medium': require('../assets/fonts/Ubuntu-Medium.ttf'),
-    'Ubuntu-Light': require('../assets/fonts/Ubuntu-Light.ttf'),
     'Inter-Regular': require('../assets/fonts/Inter-Regular.ttf'),
     'Inter-SemiBold': require('../assets/fonts/Inter-SemiBold.ttf'),
   });

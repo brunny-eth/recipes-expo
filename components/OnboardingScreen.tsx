@@ -1,6 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, SafeAreaView } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
 import { COLORS } from '@/constants/theme';
+import { FONT } from '@/constants/typography';
 import Animated, { FadeIn, FadeOut, SlideInRight, SlideOutLeft, useSharedValue, useAnimatedStyle, withSpring, runOnJS } from 'react-native-reanimated';
 import { useState, useEffect } from 'react';
 import { PanGestureHandler, GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -242,7 +243,7 @@ const styles = StyleSheet.create({
   placeholderText: {
     color: '#999',
     fontSize: 16,
-    fontFamily: 'Inter-Regular',
+    fontFamily: FONT.family.inter,
     textAlign: 'center',
     lineHeight: 22,
   },
@@ -273,14 +274,14 @@ const styles = StyleSheet.create({
   },
   stepTitle: {
     fontSize: 24,
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: FONT.family.interSemiBold,
     color: COLORS.textDark,
     textAlign: 'center',
     marginBottom: 12,
   },
   stepDescription: {
     fontSize: 16,
-    fontFamily: 'Ubuntu-Regular',
+    fontFamily: FONT.family.ubuntu,
     color: COLORS.textDark,
     textAlign: 'center',
     lineHeight: 22,
@@ -313,6 +314,6 @@ const styles = StyleSheet.create({
   startButtonText: {
     color: COLORS.white,
     fontSize: 18,
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: FONT.family.interSemiBold,
   },
 });

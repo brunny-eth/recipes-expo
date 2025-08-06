@@ -75,6 +75,7 @@ export function getUnitDisplayName(unit: Unit | string | null, amount: number = 
         
         // Preserved specific count units (for better display)
         cloves: { singular: 'clove', plural: 'cloves' },
+        heads: { singular: 'head', plural: 'heads' },
         pinch: { singular: 'pinch', plural: 'pinches' },
         dash: { singular: 'dash', plural: 'dashes' },
         
