@@ -54,6 +54,7 @@ import {
   bodyStrongText,
   captionText,
   FONT,
+  metaText,
 } from '@/constants/typography';
 import { useAuth } from '@/context/AuthContext';
 import IngredientSubstitutionModal from '@/app/recipe/IngredientSubstitutionModal';
@@ -2145,7 +2146,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   infoRowLabel: {
-            fontFamily: FONT.family.ubuntu,
+            fontFamily: FONT.family.heading,
     fontSize: FONT.size.body,
   },
   infoRowContent: {
@@ -2171,7 +2172,7 @@ const styles = StyleSheet.create({
   } as TextStyle,
   sectionTitle: {
     ...sectionHeaderText,
-    fontFamily: FONT.family.interSemiBold,
+    fontFamily: FONT.family.bold,
     color: COLORS.textDark,
     textAlign: 'left',
     marginBottom: SPACING.xs,
@@ -2252,7 +2253,7 @@ const styles = StyleSheet.create({
   readMoreText: {
     ...bodyStrongText,
     color: COLORS.primary,
-    fontSize: FONT.size.smBody,
+    fontSize: FONT.size.caption,
   },
   saveButtonContainer: {
     paddingHorizontal: SPACING.pageHorizontal,
@@ -2282,7 +2283,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 0,
   },
   ingredientsSubtext: {
-    fontFamily: FONT.family.inter,
+    fontFamily: FONT.family.body,
     fontSize: FONT.size.caption,
     color: COLORS.textMuted,
     marginBottom: SPACING.sm, // Use small spacing for consistency
@@ -2297,28 +2298,28 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   shortDescriptionHeader: {
-    fontFamily: FONT.family.inter,
+    fontFamily: FONT.family.body,
     fontSize: FONT.size.body,
     color: COLORS.darkGray,
     textAlign: 'center',
     marginTop: SPACING.xs,
     marginHorizontal: SPACING.xs,
     paddingHorizontal: SPACING.sm,
-    lineHeight: FONT.lineHeight.compact,
+    lineHeight: FONT.lineHeight.tight,
   },
   shortDescriptionHeaderLeft: {
-    fontFamily: FONT.family.inter,
-    fontSize: FONT.size.smBody+1,
+    fontFamily: FONT.family.body,
+    fontSize: FONT.size.caption + 1,
     color: COLORS.textMuted,
     textAlign: 'center',
     marginTop: SPACING.xxs,
     marginBottom: SPACING.sm,
     marginHorizontal: SPACING.xs, // Reduced for wider text area
     paddingHorizontal: SPACING.xs, // Reduced for wider text area
-    lineHeight: FONT.lineHeight.compact,
+    lineHeight: FONT.lineHeight.tight,
   },
   metaInfoCondensed: {
-    fontFamily: FONT.family.inter,
+    fontFamily: FONT.family.body,
     alignItems: 'center',
     marginBottom: SPACING.sm
   },
@@ -2336,7 +2337,7 @@ const styles = StyleSheet.create({
     elevation: 1, // For Android
   },
   visitSourceLink: {
-    fontFamily: FONT.family.inter,
+    fontFamily: FONT.family.body,
     fontSize: FONT.size.caption,
     color: COLORS.textDark,
     textDecorationLine: 'underline',

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, BORDER_WIDTH, SHADOWS } from '@/constants/theme';
-import { titleText, captionStrongText, bodyStrongText } from '@/constants/typography';
+import { screenTitleText, captionStrongText, bodyStrongText, FONT, metaText } from '@/constants/typography';
 
 // Props expected from the parent (StepsScreen)
 interface TimerToolProps {
@@ -231,14 +231,14 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xl,
   },
   timerDisplay: {
-    ...titleText,
+    ...screenTitleText,
     fontSize: 64,
     color: COLORS.textDark,
     fontVariant: ['tabular-nums'],
     textAlign: 'center',
   },
   timerDisplayInput: {
-    ...titleText,
+    ...screenTitleText,
     fontSize: 64,
     color: COLORS.textDark,
     fontVariant: ['tabular-nums'],
@@ -250,8 +250,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
   },
   tapToEdit: {
-    ...captionStrongText,
-    fontSize: 12,
+    ...metaText,
     color: COLORS.textMuted,
     marginTop: SPACING.xs,
     textAlign: 'center',
@@ -276,7 +275,7 @@ const styles = StyleSheet.create({
   },
   quickAddButtonText: {
     ...captionStrongText,
-    fontSize: 14,
+    fontSize: FONT.size.caption,
     color: COLORS.textDark,
   },
   controlsContainer: {

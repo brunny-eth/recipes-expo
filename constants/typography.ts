@@ -1,10 +1,6 @@
 import { TextStyle } from 'react-native';
 import { RFValue } from 'react-native-responsive-fontsize';
 
-const ubuntu = 'Ubuntu-Regular';
-const inter = 'Inter-Regular';
-const interSemiBold = 'Inter-SemiBold';
-
 export function responsiveFont(base: number, min: number, max: number) {
   const scaled = RFValue(base);
   return Math.min(Math.max(scaled, min), max);
@@ -12,22 +8,28 @@ export function responsiveFont(base: number, min: number, max: number) {
 
 export const FONT = {
   family: {
-    ubuntu,
-    inter,
-    interSemiBold,
+    logo: 'Ubuntu-Regular',
+    heading: 'Ubuntu-Regular',
+    body: 'Inter-Regular',
+    bold: 'Inter-SemiBold',
+    // Legacy aliases (to be removed after full migration)
+    ubuntu: 'Ubuntu-Regular',
+    inter: 'Inter-Regular',
+    interSemiBold: 'Inter-SemiBold',
   },
   size: {
-    xs: responsiveFont(12, 10, 12),
-    caption: responsiveFont(13, 11, 13),
-    smBody: responsiveFont(14, 12, 14),
-    bodyMedium: responsiveFont(15, 13, 15),
+    meta: responsiveFont(12, 11, 12),
+    caption: responsiveFont(14, 13, 14),
     body: responsiveFont(16, 14, 16),
+    sectionHeader: responsiveFont(18, 16, 18),
+    screenTitle: responsiveFont(24, 20, 24),
+    logo: responsiveFont(32, 28, 32),
+    // Legacy aliases (to be removed after full migration)
+    xs: responsiveFont(12, 11, 12),
+    smBody: responsiveFont(14, 13, 14),
+    bodyMedium: responsiveFont(16, 14, 16),
     lg: responsiveFont(18, 16, 18),
-    sectionHeader: responsiveFont(20, 18, 20),
     xl: responsiveFont(24, 20, 24),
-    title: responsiveFont(28, 24, 28),
-    screenTitle: responsiveFont(28, 24, 28),
-    h1: responsiveFont(30, 26, 30),
     xxl: responsiveFont(32, 28, 32),
   },
   weight: {
@@ -36,60 +38,68 @@ export const FONT = {
     bold: '700',
   },
   lineHeight: {
-    none: 1,
-    compact: 22,
-    snug: 1.3,
-    normal: 1.5,
-    relaxed: 1.625,
-    loose: 1.75,
-    spacious: 34,
+    tight: 20,
+    normal: 24,
+    relaxed: 28,
+    spacious: 32,
+    // Legacy alias (to be removed after full migration)
+    compact: 20,
   },
-};
+} as const;
 
+// Predefined text styles for common use cases
 export const screenTitleText: TextStyle = {
-  fontFamily: FONT.family.ubuntu,
+  fontFamily: FONT.family.heading,
   fontSize: FONT.size.screenTitle,
-};
-
-export const titleText: TextStyle = {
-  fontFamily: FONT.family.ubuntu,
-  fontSize: FONT.size.title,
+  fontWeight: '600',
 };
 
 export const sectionHeaderText: TextStyle = {
-  fontFamily: FONT.family.ubuntu,
+  fontFamily: FONT.family.body,
   fontSize: FONT.size.sectionHeader,
+  fontWeight: '600',
 };
 
-// Use `bodyText` for settings, buttons, and dense UI
-export const bodyText = {
-  fontFamily: FONT.family.inter,
-  fontSize: FONT.size.smBody,
-  lineHeight: 20, // UI-safe baseline
-};
-
-// Use `bodyTextLoose` only where font clipping was observed (e.g. Libre Baskerville on iOS)
-export const bodyTextLoose = {
-  ...bodyText,
-  lineHeight: 24, // for custom font rendering quirks
+export const bodyText: TextStyle = {
+  fontFamily: FONT.family.body,
+  fontSize: FONT.size.body,
+  lineHeight: FONT.lineHeight.normal,
 };
 
 export const bodyStrongText: TextStyle = {
-  fontFamily: FONT.family.interSemiBold,
+  fontFamily: FONT.family.bold,
   fontSize: FONT.size.body,
+  lineHeight: FONT.lineHeight.normal,
 };
 
 export const captionText: TextStyle = {
-  fontFamily: FONT.family.inter,
+  fontFamily: FONT.family.body,
   fontSize: FONT.size.caption,
+  lineHeight: FONT.lineHeight.tight,
 };
 
 export const captionStrongText: TextStyle = {
-  fontFamily: FONT.family.interSemiBold,
+  fontFamily: FONT.family.bold,
   fontSize: FONT.size.caption,
+  lineHeight: FONT.lineHeight.tight,
 };
 
+export const metaText: TextStyle = {
+  fontFamily: FONT.family.body,
+  fontSize: FONT.size.meta,
+  lineHeight: FONT.lineHeight.tight,
+};
+
+export const logoText: TextStyle = {
+  fontFamily: FONT.family.logo,
+  fontSize: FONT.size.logo,
+};
+
+// Legacy exports for backward compatibility during migration
+// These will be removed after all components are updated
+export const titleText = screenTitleText;
+export const bodyTextLoose = bodyText;
 export const monoSpacedText: TextStyle = {
-  fontFamily: 'monospace', // A generic font family that should work on both platforms
-  fontSize: responsiveFont(14, 12, 14),
+  fontFamily: 'monospace',
+  fontSize: FONT.size.caption,
 };

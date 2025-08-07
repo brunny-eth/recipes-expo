@@ -18,9 +18,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
+import { COLORS, SPACING, RADIUS, BORDER_WIDTH, SHADOWS } from '@/constants/theme';
 
-import { bodyText, screenTitleText, FONT, bodyStrongText } from '@/constants/typography';
+import { bodyText, screenTitleText, FONT, bodyStrongText, captionText, metaText } from '@/constants/typography';
 import { useAuth } from '@/context/AuthContext';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import ScreenHeader from '@/components/ScreenHeader';
@@ -593,11 +593,6 @@ export default function LibraryScreen() {
               style={styles.addFolderButton}
               onPress={() => setShowAddFolderModal(true)}
             >
-              <MaterialCommunityIcons
-                name="plus"
-                size={20}
-                color={COLORS.white}
-              />
               <Text style={styles.addFolderText}>Add new folder</Text>
             </TouchableOpacity>
           </View>
@@ -636,11 +631,6 @@ export default function LibraryScreen() {
             style={styles.addFolderButton}
             onPress={() => setShowAddFolderModal(true)}
           >
-            <MaterialCommunityIcons
-              name="plus"
-              size={20}
-              color={COLORS.white}
-            />
             <Text style={styles.addFolderText}>Add new folder</Text>
           </TouchableOpacity>
         </View>
@@ -680,19 +670,7 @@ export default function LibraryScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Subheading for explore tab */}
-      {selectedTab === 'explore' && (
-        <Text style={styles.subheading}>
-          Discover recipes from our community
-        </Text>
-      )}
 
-      {/* Subheading for saved tab */}
-      {selectedTab === 'saved' && (
-        <Text style={styles.subheading}>
-          Recipes you're saving for later.
-        </Text>
-      )}
 
       {/* Content */}
       {selectedTab === 'explore' ? renderExploreContent() : renderSavedContent()}
@@ -866,7 +844,7 @@ const styles = StyleSheet.create({
     paddingTop: '30%',
   },
   emptyText: {
-    fontFamily: FONT.family.ubuntu,
+    fontFamily: FONT.family.heading,
     fontSize: 18,
     color: COLORS.textDark,
     marginTop: SPACING.md,
@@ -918,11 +896,10 @@ const styles = StyleSheet.create({
     ...bodyStrongText,
     fontSize: FONT.size.body,
     color: COLORS.textDark,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   recipeCountText: {
-    ...bodyText,
-    fontSize: FONT.size.caption,
+    ...metaText,
     color: COLORS.textMuted,
   },
   folderActions: {
@@ -976,38 +953,30 @@ const styles = StyleSheet.create({
   
   // Add new folder styles
   bottomButtonContainer: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
     backgroundColor: COLORS.background,
   } as ViewStyle,
   addFolderButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: COLORS.primary,
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.lg,
-    backgroundColor: COLORS.primary,
     borderRadius: RADIUS.sm,
+    marginHorizontal: SPACING.pageHorizontal,
+    marginBottom: SPACING.lg,
+    marginTop: SPACING.md,
+    ...SHADOWS.small,
   } as ViewStyle,
   addFolderText: {
     ...bodyStrongText,
     color: COLORS.white,
-    marginLeft: SPACING.sm,
   } as TextStyle,
 
   // New styles for saved content
   savedContent: {
     flex: 1,
   } as ViewStyle,
-  subheading: {
-    ...bodyText,
-    fontSize: FONT.size.body,
-    fontWeight: '300',
-    color: COLORS.textMuted,
-    textAlign: 'center',
-    marginBottom: SPACING.md,
-    marginTop: SPACING.xs,
-  } as TextStyle,
 
   // Modal styles
      modalOverlay: {
@@ -1030,7 +999,7 @@ const styles = StyleSheet.create({
    },
    colorPickerTitle: {
      ...bodyStrongText,
-     fontSize: FONT.size.lg,
+     fontSize: FONT.size.sectionHeader,
      color: COLORS.textDark,
      marginBottom: SPACING.lg,
      textAlign: 'center',

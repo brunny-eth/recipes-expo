@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 // import { Timer } from 'lucide-react-native'; // Removed import
 import { MaterialCommunityIcons } from '@expo/vector-icons'; // Added import
 import { COLORS } from '@/constants/theme';
-import { captionStrongText } from '@/constants/typography';
+import { captionStrongText, FONT } from '@/constants/typography';
 
 interface MiniTimerDisplayProps {
   timeRemaining: number;
@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
   timeText: {
     ...captionStrongText,
     color: COLORS.white,
-    fontSize: 14,
+    fontSize: FONT.size.caption,
     fontVariant: ['tabular-nums'],
   },
 });

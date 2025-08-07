@@ -3,7 +3,7 @@ import { Tabs } from 'expo-router';
 import { StyleSheet, Platform, View, Text } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons'; 
 import { COLORS } from '@/constants/theme';
-import { captionText } from '@/constants/typography';
+import { captionText, FONT } from '@/constants/typography';
 
 const styles = StyleSheet.create({
   tabBar: {
@@ -16,6 +16,7 @@ const styles = StyleSheet.create({
   tabBarLabel: {
     ...captionText,
     fontSize: 11,
+    fontWeight: '600',
   },
   tabBarItem: {
     alignItems: 'center',
@@ -25,6 +26,7 @@ const styles = StyleSheet.create({
   tabBarText: {
     ...captionText,
     fontSize: 11,
+    fontWeight: '600',
     textAlign: 'center',
     width: 70,
   },
@@ -69,8 +71,8 @@ const MemoizedTabsNavigator = React.memo(() => {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Start',
-          tabBarIcon: createTabBarIcon('silverware-fork-knife', 'Start'),
+          title: 'Home',
+          tabBarIcon: createTabBarIcon('silverware-fork-knife', 'Home'),
           tabBarLabel: () => null,
           unmountOnBlur: false,
         }}
@@ -96,13 +98,12 @@ const MemoizedTabsNavigator = React.memo(() => {
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Account',
-          tabBarIcon: createTabBarIcon('account', 'Account'),
+          title: 'Settings',
+          tabBarIcon: createTabBarIcon('cog', 'Settings'),
           tabBarLabel: () => null,
           unmountOnBlur: false,
         }}
       />
-
 
     </Tabs>
   );

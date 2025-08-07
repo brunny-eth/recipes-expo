@@ -40,6 +40,8 @@ interface HouseholdStaplesModalProps {
   onClose: () => void;
   selectedStaples: string[];
   onStaplesChange: (staples: string[]) => void;
+  staplesEnabled: boolean;
+  onStaplesToggle: (enabled: boolean) => void;
 }
 
 export default function HouseholdStaplesModal({
@@ -47,6 +49,8 @@ export default function HouseholdStaplesModal({
   onClose,
   selectedStaples,
   onStaplesChange,
+  staplesEnabled,
+  onStaplesToggle,
 }: HouseholdStaplesModalProps) {
   const [localSelected, setLocalSelected] = useState<string[]>(selectedStaples);
 
@@ -106,6 +110,17 @@ export default function HouseholdStaplesModal({
                 <Text style={styles.subtitle}>
                   Select items you typically have at home to filter them from your grocery list
                 </Text>
+              </View>
+
+              <View style={styles.toggleRow}>
+                <TouchableOpacity 
+                  onPress={() => onStaplesToggle(!staplesEnabled)} 
+                  style={styles.toggleButton}
+                >
+                  <Text style={styles.toggleButtonText}>
+                    {staplesEnabled ? 'Hide Staples' : 'Show Staples'}
+                  </Text>
+                </TouchableOpacity>
               </View>
 
               <View style={styles.buttonRow}>
@@ -180,6 +195,21 @@ const styles = StyleSheet.create({
     ...bodyText,
     color: COLORS.textMuted,
     lineHeight: 20,
+  } as TextStyle,
+  toggleRow: {
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  } as ViewStyle,
+  toggleButton: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.sm,
+    backgroundColor: COLORS.primary,
+  } as ViewStyle,
+  toggleButtonText: {
+    ...bodyStrongText,
+    color: COLORS.white,
+    fontSize: 14,
   } as TextStyle,
   buttonRow: {
     alignItems: 'center',

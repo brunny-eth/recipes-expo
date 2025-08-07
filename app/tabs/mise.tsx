@@ -21,9 +21,10 @@ import {
   screenTitleText,
   bodyStrongText,
   bodyText,
-  bodyTextLoose,
   sectionHeaderText,
   FONT,
+  captionText,
+  metaText,
 } from '@/constants/typography';
 import { SHADOWS } from '@/constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -1367,7 +1368,7 @@ export default function MiseScreen() {
             styles.tabButtonText,
             selectedTab === 'recipes' && styles.tabButtonTextActive
           ]}>
-            Recipes
+            Ready to Cook
           </Text>
           {selectedTab === 'recipes' && <View style={styles.tabUnderline} />}
         </TouchableOpacity>
@@ -1385,12 +1386,7 @@ export default function MiseScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Subheading for recipes tab */}
-      {selectedTab === 'recipes' && (
-        <Text style={styles.subheading}>
-          Recipes you're getting ready to cook.
-        </Text>
-      )}
+
 
       {/* Controls for grocery tab */}
       {selectedTab === 'grocery' && groceryList.length > 0 && (
@@ -1400,29 +1396,28 @@ export default function MiseScreen() {
             onPress={handleToggleSortMode}
           >
             <Text style={styles.sortToggleText}>
-              Sort: {sortMode === 'alphabetical' ? 'By Category' : 'A-Z'}
+              {sortMode === 'alphabetical' ? 'Category' : 'A-Z'}
             </Text>
           </TouchableOpacity>
           
-          <View style={styles.staplesControlsContainer}>
+          {session && (
             <TouchableOpacity
-              style={styles.staplesToggle}
-              onPress={handleToggleStaples}
+              style={styles.shareButton}
+              onPress={handleShareGrocery}
             >
-              <Text style={styles.staplesToggleText}>
-                {staplesEnabled ? 'Show Staples' : 'Hide Staples'}
-              </Text>
+              <MaterialCommunityIcons name="export" size={16} color={COLORS.white} />
+              <Text style={styles.shareButtonText}>Share</Text>
             </TouchableOpacity>
-            
-            {selectedStaples.length > 0 && (
-              <TouchableOpacity
-                style={styles.staplesConfigButton}
-                onPress={handleOpenStaplesModal}
-              >
-                <MaterialCommunityIcons name="format-list-checks" size={16} color={COLORS.textMuted} />
-              </TouchableOpacity>
-            )}
-          </View>
+          )}
+          
+          <TouchableOpacity
+            style={styles.staplesButton}
+            onPress={handleOpenStaplesModal}
+          >
+            <Text style={styles.staplesButtonText}>
+              Staples
+            </Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -1440,16 +1435,7 @@ export default function MiseScreen() {
         </TouchableOpacity>
       )}
       
-      {/* Floating Action Button for sharing grocery list */}
-      {selectedTab === 'grocery' && session && groceryList.length > 0 && (
-        <TouchableOpacity
-          style={styles.floatingActionButton}
-          onPress={handleShareGrocery}
-        >
-          <MaterialCommunityIcons name="export" size={20} color={COLORS.white} />
-          <Text style={styles.floatingButtonText}>Share</Text>
-        </TouchableOpacity>
-      )}
+
 
       {/* Add Manual Item Modal */}
       <AddManualItemModal
@@ -1465,6 +1451,8 @@ export default function MiseScreen() {
         onClose={handleCloseStaplesModal}
         selectedStaples={selectedStaples}
         onStaplesChange={handleStaplesChange}
+        staplesEnabled={staplesEnabled}
+        onStaplesToggle={handleToggleStaples}
       />
 
     </View>
@@ -1528,7 +1516,7 @@ const styles = StyleSheet.create({
     paddingTop: '30%', // Move content higher up on the screen
   } as ViewStyle,
   emptyText: {
-            fontFamily: FONT.family.ubuntu,
+            fontFamily: FONT.family.heading,
     fontSize: 18,
     color: COLORS.textDark,
     marginTop: SPACING.md,
@@ -1626,8 +1614,10 @@ const styles = StyleSheet.create({
   groceryCategoryTitle: {
     ...bodyStrongText,
     color: COLORS.textDark,
-    fontSize: FONT.size.lg,
-    fontWeight: 'bold',
+    fontSize: FONT.size.caption,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   } as TextStyle,
   addButton: {
     padding: SPACING.xs,
@@ -1652,15 +1642,13 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   groceryItemText: {
     ...bodyText,
-    fontSize: FONT.size.bodyMedium,
+    fontSize: FONT.size.body,
     color: COLORS.textDark,
   } as TextStyle,
   groceryItemSubtext: {
-    ...bodyText,
-    fontSize: FONT.size.caption,
+    ...metaText,
     color: COLORS.textMuted,
-    fontStyle: 'italic',
-    marginTop: 2,
+    marginTop: 4,
   } as TextStyle,
   groceryItemPreparation: {
     ...bodyText,
@@ -1681,25 +1669,7 @@ const styles = StyleSheet.create({
     padding: SPACING.xs,
     marginLeft: SPACING.xs,
   } as ViewStyle,
-  floatingActionButton: {
-    position: 'absolute',
-    bottom: SPACING.xl,
-    right: SPACING.xl,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.primary,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...SHADOWS.medium,
-  } as ViewStyle,
-  floatingButtonText: {
-    ...bodyStrongText,
-    color: COLORS.white,
-    fontSize: FONT.size.smBody,
-    marginLeft: SPACING.xs,
-  } as TextStyle,
+
   cookingSessionButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1716,17 +1686,8 @@ const styles = StyleSheet.create({
   cookingSessionButtonText: {
     ...bodyStrongText,
     color: COLORS.white,
-    marginLeft: SPACING.sm,
   } as TextStyle,
-  subheading: {
-    ...bodyText,
-    fontSize: FONT.size.body,
-    fontWeight: '300',
-    color: COLORS.textMuted,
-    textAlign: 'center',
-    marginBottom: SPACING.md,
-    marginTop: SPACING.xs,
-  } as TextStyle,
+
   
   groceryControls: {
     flexDirection: 'row',
@@ -1739,61 +1700,58 @@ const styles = StyleSheet.create({
   sortToggle: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: SPACING.xs,
-    paddingHorizontal: SPACING.sm,
-    backgroundColor: COLORS.surface,
+    justifyContent: 'center',
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    backgroundColor: COLORS.primary,
     borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: COLORS.primaryLight,
+    flex: 1,
+    marginHorizontal: SPACING.xs,
   } as ViewStyle,
   
   sortToggleText: {
     ...bodyText,
     fontSize: FONT.size.caption,
-    color: COLORS.primary,
+    color: COLORS.white,
     marginLeft: SPACING.xs,
     fontWeight: '500',
   } as TextStyle,
 
-  staplesToggle: {
+
+  shareButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: SPACING.xs,
-    paddingHorizontal: SPACING.sm,
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.sm,
-    borderWidth: BORDER_WIDTH.default,
-    borderColor: COLORS.primaryLight,
-  } as ViewStyle,
-  
-  staplesToggleActive: {
+    justifyContent: 'center',
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
     backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    borderRadius: RADIUS.sm,
+    flex: 1,
+    marginHorizontal: SPACING.xs,
   } as ViewStyle,
-  
-  staplesToggleText: {
+  shareButtonText: {
     ...bodyText,
     fontSize: FONT.size.caption,
-    color: COLORS.primary,
+    color: COLORS.white,
+    marginLeft: SPACING.xs,
     fontWeight: '500',
   } as TextStyle,
-  
-  staplesToggleTextActive: {
-    color: COLORS.white,
-  } as TextStyle,
-  
-  staplesControlsContainer: {
+  staplesButton: {
     flexDirection: 'row',
     alignItems: 'center',
-  } as ViewStyle,
-  
-  staplesConfigButton: {
-    padding: SPACING.xs,
+    justifyContent: 'center',
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    backgroundColor: COLORS.primary,
     borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.surface,
-    borderWidth: BORDER_WIDTH.hairline,
-    borderColor: COLORS.primaryLight,
-    marginLeft: SPACING.xs,
+    flex: 1,
+    marginHorizontal: SPACING.xs,
   } as ViewStyle,
+  staplesButtonText: {
+    ...bodyText,
+    fontSize: FONT.size.caption,
+    color: COLORS.white,
+    fontWeight: '500',
+  } as TextStyle,
 
 }); 
