@@ -273,6 +273,13 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
+  // Log environment configuration
+  console.log('[Meez] 🌐 ENV CONFIG', {
+    API_URL: process.env.EXPO_PUBLIC_API_URL,
+    NODE_ENV: process.env.NODE_ENV,
+    VERSION: process.env.EXPO_PUBLIC_APP_VERSION,
+  });
+
   useFrameworkReady(); // Keep framework-level readiness in RootLayout
 
   // RootLayout now always renders context providers and RootLayoutNav
