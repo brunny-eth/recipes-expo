@@ -237,13 +237,16 @@ function checkForInstructionHallucination(instructions: string[]): string[] {
   
   instructions.forEach(instruction => {
     const text = instruction.toLowerCase();
-    if (genericInstructions.some(generic => text.includes(generic))) {
+    const wordCount = instruction.trim().split(/\s+/).length;
+    const hasGenericVerb = genericInstructions.some(generic => text.includes(generic));
+    // Only consider a step "generic" if it's very short and relies on boilerplate verbs
+    if (hasGenericVerb && wordCount <= 7) {
       genericCount++;
     }
   });
   
-  // If more than 70% of instructions are generic, it's suspicious
-  if (totalInstructions > 0 && (genericCount / totalInstructions) > 0.7) {
+  // If more than 90% of instructions are short and generic, it's suspicious
+  if (totalInstructions > 0 && (genericCount / totalInstructions) > 0.9) {
     signs.push('Too many generic instructions detected');
   }
   
@@ -385,7 +388,7 @@ function checkForOverlyPerfectRecipe(recipe: CombinedParsedRecipe): string[] {
   }
   
   // Check for overly detailed descriptions (sign of hallucination)
-  if (recipe.description && recipe.description.length > 500) {
+  if (recipe.description && recipe.description.length > 1500) {
     signs.push('Overly detailed description');
   }
   
