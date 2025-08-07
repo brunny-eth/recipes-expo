@@ -2,7 +2,22 @@ import { useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useAnalytics } from '@/utils/analytics';
 import { useErrorModal } from '@/context/ErrorModalContext';
-import { GroceryItem, GroceryCategory } from './useGroceryList';
+// Types from mise.tsx
+type GroceryItem = {
+  name: string;
+  amount: number | null;
+  unit: string | null;
+  category: string;
+  checked: boolean;
+  id: string;
+  isManual?: boolean;
+  preparation?: string | null;
+};
+
+type GroceryCategory = {
+  name: string;
+  items: GroceryItem[];
+};
 
 /**
  * Hook for managing grocery item toggle (check/uncheck) operations
@@ -26,7 +41,7 @@ export function useGroceryToggle(
     
     for (let i = 0; i < updatedList.length; i++) {
       const category = updatedList[i];
-      const foundIndex = category.items.findIndex(item => item.id === itemId);
+      const foundIndex = category.items.findIndex((item: GroceryItem) => item.id === itemId);
       if (foundIndex !== -1) {
         itemToUpdate = category.items[foundIndex];
         categoryIndex = i;

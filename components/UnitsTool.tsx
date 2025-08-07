@@ -21,6 +21,7 @@ import {
   bodyText,
   captionText,
   bodyStrongText,
+  FONT,
 } from '@/constants/typography';
 
 export default function UnitsTool() {
@@ -54,7 +55,9 @@ export default function UnitsTool() {
 
   // Sort units alphabetically by display name for the pickers
   const sortedUnits = [...availableUnits].sort((a, b) => {
-    return getUnitDisplayName(a).localeCompare(getUnitDisplayName(b));
+    const displayNameA = String(getUnitDisplayName(a) || a);
+    const displayNameB = String(getUnitDisplayName(b) || b);
+    return displayNameA.localeCompare(displayNameB);
   });
 
   return (
@@ -85,7 +88,7 @@ export default function UnitsTool() {
               {sortedUnits.map((unit) => (
                 <Picker.Item
                   key={unit}
-                  label={getUnitDisplayName(unit)}
+                  label={String(getUnitDisplayName(unit) || unit)}
                   value={unit}
                 />
               ))}
@@ -106,7 +109,7 @@ export default function UnitsTool() {
               {sortedUnits.map((unit) => (
                 <Picker.Item
                   key={unit}
-                  label={getUnitDisplayName(unit)}
+                  label={String(getUnitDisplayName(unit) || unit)}
                   value={unit}
                 />
               ))}
