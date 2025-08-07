@@ -46,7 +46,6 @@ import {
 import { abbreviateUnit } from '@/utils/format';
 
 export default function CookScreen() {
-  
   const router = useRouter();
   const params = useLocalSearchParams();
   const { session } = useAuth();
@@ -251,7 +250,7 @@ export default function CookScreen() {
             try {
               // Check if any recipes have modifications (scaling or substitutions)
               const hasModifications = recipeList.some((recipe: any) => {
-                const miseRecipe = miseRecipes.find((mr: any) => mr.id === recipe.miseRecipeId);
+                const miseRecipe = miseRecipes.find((mr: any) => String(mr.id) === String(recipe.miseRecipeId));
                 return miseRecipe?.local_modifications?.scaling_factor !== 1 || 
                        miseRecipe?.local_modifications?.ingredient_changes?.length > 0;
               });

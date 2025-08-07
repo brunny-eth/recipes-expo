@@ -6,8 +6,6 @@ import { Stack } from 'expo-router';
  * This is critical for maintaining tab screen state and preventing unnecessary useFocusEffect triggers.
  */
 const AppNavigators = React.memo(() => {
-  console.log('[AppNavigators] Rendered - this should only happen once after initial load');
-  
   return (
     <Stack initialRouteName="tabs">
       <Stack.Screen name="recipe/summary" options={{ headerShown: false }} />

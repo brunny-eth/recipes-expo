@@ -702,7 +702,7 @@ export default function MiseScreen() {
       const updatedRecipe = await response.json();
 
       setMiseRecipes((prev) =>
-        prev.map((r) => (r.id === recipeId ? { ...r, is_completed: isCompleted } : r))
+        prev.map((r) => (String(r.id) === String(recipeId) ? { ...r, is_completed: isCompleted } : r))
       );
       
       track('mise_recipe_completion_updated', {
@@ -1432,9 +1432,8 @@ export default function MiseScreen() {
       {selectedTab === 'recipes' && miseRecipes.length > 0 && (
         <TouchableOpacity
           style={styles.cookingSessionButton}
-          onPress={() => router.push('/mise/cook')}
+          onPress={() => router.navigate('/mise/cook')}
         >
-        
           <Text style={styles.cookingSessionButtonText}>
             Cook your recipes
           </Text>
