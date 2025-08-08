@@ -10,7 +10,9 @@
     "ios": "expo run:ios",
     "start": "expo start --dev-client",
     "update-normalized-urls": "npx ts-node scripts/updateNormalizedUrls.ts",
-    "reparse-test-recipes": "npx ts-node scripts/reparseAllRecipes.ts"
+    "reparse-test-recipes": "npx ts-node scripts/reparseAllRecipes.ts",
+    "bulk-import": "npx ts-node scripts/bulkImportLocalInputs.ts",
+    "bulk-import-csv": "npx ts-node scripts/bulkImportFromCsv.ts"
   },
   "dependencies": {
     "@d11/react-native-fast-image": "^8.9.2",

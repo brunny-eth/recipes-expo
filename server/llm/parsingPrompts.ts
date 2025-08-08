@@ -172,8 +172,15 @@ Return the extracted text exactly as it appears, preserving the original formatt
 
 Return the extracted text exactly as it appears, preserving the original formatting and structure.`;
 
+    // Use a dedicated system prompt for OCR-style extraction to avoid JSON hallucination
+    const IMAGE_OCR_SYSTEM_PROMPT = `You are an OCR/transcription engine for recipes.
+Extract ONLY the visible text from the provided image(s). Do not infer or generate content.
+Do not output JSON. Do not add labels like "Step 1" unless they exist in the source.
+If the recipe spans multiple pages, combine them into one continuous plain-text transcript.
+Preserve original line breaks and formatting as much as possible.`;
+
     return {
-        system: COMMON_SYSTEM_PROMPT,
+        system: IMAGE_OCR_SYSTEM_PROMPT,
         text: instructions,
         isJson: false, // We want plain text output, not JSON
         imageData: imageDataArray
