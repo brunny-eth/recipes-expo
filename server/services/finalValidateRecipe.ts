@@ -342,27 +342,9 @@ function checkForTitleHallucination(title: string): string[] {
  */
 function checkForUnreasonableTimesAndYields(recipe: CombinedParsedRecipe): string[] {
   const signs: string[] = [];
-  
-  // Check for unreasonable cooking times
-  if (recipe.cookTime) {
-    const cookTime = recipe.cookTime.toLowerCase();
-    if (cookTime.includes('hour') || cookTime.includes('hr')) {
-      const hours = parseInt(cookTime.match(/(\d+)/)?.[1] || '0');
-      if (hours > 8) {
-        signs.push('Unreasonably long cooking time detected');
-      }
-    }
-  }
-  
-  if (recipe.totalTime) {
-    const totalTime = recipe.totalTime.toLowerCase();
-    if (totalTime.includes('hour') || totalTime.includes('hr')) {
-      const hours = parseInt(totalTime.match(/(\d+)/)?.[1] || '0');
-      if (hours > 12) {
-        signs.push('Unreasonably long total time detected');
-      }
-    }
-  }
+  // Time sanity checks are intentionally disabled per product decision
+  // (e.g., braises, stock, or smoking can legitimately exceed many hours).
+  // Keeping only the yield sanity check below.
   
   // Check for unreasonable yields
   if (recipe.recipeYield) {

@@ -135,5 +135,4 @@ yarn-error.*
 # @end expo-cli
 
 # Project scripts (do not commit local import tools)
-scripts/bulkImportFromCsv.ts
-scripts/bulkImportLocalInputs.ts
+scripts/

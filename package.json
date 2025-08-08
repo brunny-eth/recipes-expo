@@ -33,6 +33,7 @@
     "@types/pino": "^7.0.4",
     "@vercel/node": "^5.3.5",
     "cheerio": "^1.0.0",
+    "csv-parse": "^6.1.0",
     "dotenv": "^16.6.1",
     "expo": "^53.0.12",
     "expo-apple-authentication": "~7.2.4",
