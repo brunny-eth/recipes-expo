@@ -324,13 +324,20 @@ function checkForTitleHallucination(title: string): string[] {
     signs.push('Generic or vague recipe title detected');
   }
   
-  // Check for placeholder titles
-  const placeholderPatterns = [
-    /recipe/i, /dish/i, /meal/i, /food/i, /cooking/i,
-    /sample/i, /example/i, /template/i, /placeholder/i
+  // Check for placeholder titles (only when the entire title is a placeholder word)
+  const placeholderWholeTitlePatterns = [
+    /^recipes?$/i,
+    /^dishes?$/i,
+    /^meals?$/i,
+    /^food$/i,
+    /^cooking$/i,
+    /^sample$/i,
+    /^example$/i,
+    /^template$/i,
+    /^placeholder$/i
   ];
   
-  if (placeholderPatterns.some(pattern => pattern.test(title))) {
+  if (placeholderWholeTitlePatterns.some(pattern => pattern.test(title.trim()))) {
     signs.push('Placeholder title detected');
   }
   
