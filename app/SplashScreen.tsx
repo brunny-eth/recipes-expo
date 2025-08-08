@@ -68,11 +68,11 @@ function SplashScreenMeez({ onFinish }: { onFinish: () => void }) {
         ]}
       >
         <Image 
-          source={require('@/assets/images/meezblue_underline.png')}
+          source={require('@/assets/images/SplashScreen3x.png')}
           style={styles.logoImage}
           resizeMode="contain"
         />
-        <Text style={styles.heading}>Prep and cook, without clutter</Text>
+        {/* Text baked into image; keep no overlay text to ensure identical splash */}
       </Animated.View>
     </ReanimatedAnimated.View>
   );

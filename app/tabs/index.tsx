@@ -90,7 +90,7 @@ export default function HomeScreen() {
   const nameIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const urlPrompt = "try a recipe blog with lots of ads";
-  const namePrompt = "try 'mac and cheese' or 'pasta'";
+  const namePrompt = "try 'mac and cheese' or 'garlic chicken'";
 
   // Local state for name input
   const [recipeName, setRecipeName] = useState('');
@@ -189,19 +189,9 @@ export default function HomeScreen() {
       if (__DEV__) console.log('[Typewriter][NAME] starting on tab switch');
       startTypewriter('NAME', namePrompt, setIsTypingNamePlaceholder, setNameDisplayedPlaceholder, nameIntervalRef);
     }
-    // Stop the other animation if switching away mid-run
-    if (importMode !== 'url' && urlIntervalRef.current) {
-      if (__DEV__) console.log('[Typewriter][URL] stopping due to mode change');
-      clearInterval(urlIntervalRef.current);
-      urlIntervalRef.current = null;
-      setIsTypingUrlPlaceholder(false);
-    }
-    if (importMode !== 'name' && nameIntervalRef.current) {
-      if (__DEV__) console.log('[Typewriter][NAME] stopping due to mode change');
-      clearInterval(nameIntervalRef.current);
-      nameIntervalRef.current = null;
-      setIsTypingNamePlaceholder(false);
-    }
+    // Do NOT stop the other animation when switching away.
+    // Let any in-progress typewriter finish in the background so
+    // placeholders are fully written when user returns.
   }, [importMode, urlDisplayedPlaceholder, isTypingUrlPlaceholder, nameDisplayedPlaceholder, isTypingNamePlaceholder, startTypewriter]);
 
   // Keyboard listeners (only track visible state for possible future use)
@@ -354,6 +344,24 @@ export default function HomeScreen() {
       const submissionId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
       const inputType = detectInputType(recipeInput);
+
+      // If user is in URL mode, strictly require a valid URL or video; do not allow raw text
+      if (importMode === 'url' && !(inputType === 'url' || inputType === 'video')) {
+        showError(
+          'Please enter a valid link',
+          'The URL field only accepts links (e.g., https://example.com/recipe). If you want to search by name, switch to Dish name.',
+        );
+        return;
+      }
+
+      // If user is in text mode, strictly disallow URLs/videos and require text
+      if (importMode === 'name' && inputType !== 'raw_text') {
+        showError(
+          'Please enter text',
+          'The Text field is for recipe text or a dish name. If you have a link, switch to URL.',
+        );
+        return;
+      }
       try { await track('input_mode_selected', { inputType }); } catch {}
       try { await track('recipe_submission_started', { inputLength: recipeInput.length, inputType, submissionId, userId: session?.user?.id }); } catch {}
 
@@ -380,7 +388,8 @@ export default function HomeScreen() {
         return;
       }
 
-      if (importMode === 'name' && result.action === 'show_match_modal' && result.matches) {
+      if (result.action === 'show_match_modal' && result.matches) {
+        // Always show match selection modal for textual queries, regardless of input field used
         setPotentialMatches(result.matches);
         setShowMatchSelectionModal(true);
         try { await track('recipe_matches_found', { match_count: result.matches.length, submissionId, userId: session?.user?.id }); } catch {}
@@ -394,12 +403,6 @@ export default function HomeScreen() {
         InteractionManager.runAfterInteractions(() => {
           router.push({ pathname: '/loading', params: { recipeUrl: result.normalizedUrl, inputType: result.inputType } });
         });
-      } else if (result.action === 'show_match_modal' && result.matches && importMode !== 'name') {
-        // For URL or image, pick best match automatically (highest similarity) and navigate
-        const best = [...result.matches].sort((a, b) => b.similarity - a.similarity)[0];
-        if (best?.recipe) {
-          router.push({ pathname: '/recipe/summary', params: { recipeData: JSON.stringify(best.recipe), entryPoint: 'new', from: '/tabs', inputType: result.inputType || detectInputType(recipeInput) } });
-        }
       }
     } catch (err) {
       console.error('[🔥 ERROR] Exception in handleSubmitInput:', err);
@@ -589,113 +592,111 @@ export default function HomeScreen() {
               <View style={styles.importSection}>
                 <Text style={styles.subheadingText}>Import recipes from anywhere</Text>
 
-                {/* Segmented control: URL | Image | Recipe name */}
-                <View style={styles.segmentedControl}>
-                  <TouchableOpacity
-                    style={[styles.segmentGhost, importMode === 'url' && styles.segmentSolid]}
-                    onPress={() => setImportMode('url')}
-                  >
-                    <Text style={[styles.segmentGhostText, importMode === 'url' && styles.segmentSolidText]}>URL</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.segmentGhost, importMode === 'image' && styles.segmentSolid]}
-                    onPress={() => setImportMode('image')}
-                  >
-                    <Text style={[styles.segmentGhostText, importMode === 'image' && styles.segmentSolidText]}>Image</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.segmentGhost, importMode === 'name' && styles.segmentSolid]}
-                    onPress={() => setImportMode('name')}
-                  >
-                    <Text style={[styles.segmentGhostText, importMode === 'name' && styles.segmentSolidText]}>Dish name</Text>
-                  </TouchableOpacity>
-                </View>
+                {/* Unified import card: segmented control + input */}
+                <View style={styles.importCard}>
+                  {/* Segmented control: URL | Image | Recipe name */}
+                  <View style={styles.segmentedControlContainer}>
+                    <TouchableOpacity
+                      style={[styles.segmentedItem, importMode === 'url' && styles.segmentedItemActive]}
+                      onPress={() => setImportMode('url')}
+                    >
+                      <Text style={[styles.segmentedItemText, importMode === 'url' && styles.segmentedItemTextActive]}>URL</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.segmentedItem, importMode === 'image' && styles.segmentedItemActive]}
+                      onPress={() => setImportMode('image')}
+                    >
+                      <Text style={[styles.segmentedItemText, importMode === 'image' && styles.segmentedItemTextActive]}>Image</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.segmentedItem, importMode === 'name' && styles.segmentedItemActive]}
+                      onPress={() => setImportMode('name')}
+                    >
+                    <Text style={[styles.segmentedItemText, importMode === 'name' && styles.segmentedItemTextActive]}>Dish name</Text>
+                    </TouchableOpacity>
+                  </View>
 
-                {importMode === 'url' ? (
-                  <View style={styles.inputContainer}>
-                    <TextInput
-                      style={styles.input}
-                      placeholder={urlDisplayedPlaceholder}
-                      placeholderTextColor={COLORS.darkGray}
-                      value={recipeUrl}
-                      onChangeText={handleChangeText}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      onSubmitEditing={handleSubmit}
-                      editable={!isSubmitting}
-                      onFocus={handleInputFocus}
-                      onBlur={handleInputBlur}
-                      returnKeyType="go"
-                      blurOnSubmit={false}
-                      enablesReturnKeyAutomatically={true}
-                      keyboardType="default"
-                      textContentType="none"
-                    />
-                    <TouchableOpacity
-                      style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
-                      onPress={handleSubmit}
-                      disabled={isSubmitting}
-                      onPressIn={() => console.log('[UI] 🎯 Submit button pressed in - isSubmitting:', isSubmitting)}
-                    >
-                      {getSubmitButtonContent()}
-                    </TouchableOpacity>
-                  </View>
-                ) : importMode === 'image' ? (
-                  <View style={styles.fullWidthRow}>
-                    <TouchableOpacity 
-                      style={styles.fullWidthPrimaryButton}
-                      onPress={handleShowUploadModal}
-                    >
-                      <Text style={styles.fullWidthPrimaryButtonText}>Choose image</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <View style={styles.inputContainer}>
-                    <TextInput
-                      style={styles.input}
-                      placeholder={nameDisplayedPlaceholder}
-                      placeholderTextColor={COLORS.darkGray}
-                      value={recipeName}
-                      onChangeText={setRecipeName}
-                      autoCapitalize="sentences"
-                      autoCorrect={true}
-                      editable={true}
-                      returnKeyType="search"
-                      blurOnSubmit={true}
-                      enablesReturnKeyAutomatically={true}
-                      keyboardType="default"
-                      onSubmitEditing={handleSubmitName}
-                    />
-                    <TouchableOpacity
-                      style={styles.submitButton}
-                      onPress={handleSubmitName}
-                    >
-                      <Text style={styles.submitButtonText}>Go</Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
+                  {importMode === 'url' ? (
+                    <View style={styles.inputContainer}>
+                      <TextInput
+                        style={styles.input}
+                        placeholder={urlDisplayedPlaceholder}
+                        placeholderTextColor={COLORS.darkGray}
+                        value={recipeUrl}
+                        onChangeText={handleChangeText}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        onSubmitEditing={handleSubmit}
+                        editable={!isSubmitting}
+                        onFocus={handleInputFocus}
+                        onBlur={handleInputBlur}
+                        returnKeyType="go"
+                        blurOnSubmit={false}
+                        enablesReturnKeyAutomatically={true}
+                        keyboardType="default"
+                        textContentType="none"
+                      />
+                      <TouchableOpacity
+                        style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+                        onPress={handleSubmit}
+                        disabled={isSubmitting}
+                        onPressIn={() => console.log('[UI] 🎯 Submit button pressed in - isSubmitting:', isSubmitting)}
+                      >
+                        {getSubmitButtonContent()}
+                      </TouchableOpacity>
+                    </View>
+                  ) : importMode === 'image' ? (
+                    <View style={styles.fullWidthRow}>
+                      <TouchableOpacity 
+                        style={styles.fullWidthPrimaryButton}
+                        onPress={handleShowUploadModal}
+                      >
+                        <Text style={styles.fullWidthPrimaryButtonText}>Choose image</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={styles.inputContainer}>
+                      <TextInput
+                        style={styles.input}
+                        placeholder={nameDisplayedPlaceholder}
+                        placeholderTextColor={COLORS.darkGray}
+                        value={recipeName}
+                        onChangeText={setRecipeName}
+                        autoCapitalize="sentences"
+                        autoCorrect={true}
+                        editable={true}
+                        returnKeyType="search"
+                        blurOnSubmit={true}
+                        enablesReturnKeyAutomatically={true}
+                        keyboardType="default"
+                        onSubmitEditing={handleSubmitName}
+                      />
+                      <TouchableOpacity
+                        style={styles.submitButton}
+                        onPress={handleSubmitName}
+                      >
+                        <Text style={styles.submitButtonText}>Go</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
               </View>
 
               {/* Action section */}
               <View style={styles.actionSection}>
-                <Text style={styles.subheadingText}>...or jump right back into it</Text>
+                <Text style={styles.subheadingText}>...or jump back into cooking</Text>
                 {/* Quick actions grid */}
                 <View style={styles.quickGrid}>
-                  <TouchableOpacity style={styles.quickTile} onPress={() => router.push('/tabs/library')}>
-                    <MaterialCommunityIcons name="compass" size={28} color={COLORS.primary} />
-                    <Text style={styles.quickTileText}>Discover new recipes</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.quickTile} onPress={() => router.push('/tabs/mise')}>
-                    <MaterialCommunityIcons name="chef-hat" size={28} color={COLORS.primary} />
-                    <Text style={styles.quickTileText}>Prep and cook</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.quickTile} onPress={() => router.push('/tabs/library')}>
+                  <TouchableOpacity
+                    style={[styles.quickTile, styles.quickTileSubtleShadow]}
+                    onPress={() => router.push({ pathname: '/tabs/library', params: { tab: 'saved' } })}
+                  >
                     <MaterialCommunityIcons name="bookmark-outline" size={28} color={COLORS.primary} />
                     <Text style={styles.quickTileText}>Saved recipes</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.quickTile} onPress={() => router.push('/tabs/settings')}>
-                    <MaterialCommunityIcons name="message-text-outline" size={28} color={COLORS.primary} />
-                    <Text style={styles.quickTileText}>Give us feedback</Text>
+                  <TouchableOpacity style={[styles.quickTile, styles.quickTileSubtleShadow]} onPress={() => router.push('/tabs/mise')}>
+                    <MaterialCommunityIcons name="chef-hat" size={28} color={COLORS.primary} />
+                    <Text style={styles.quickTileText}>Prep and cook</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -704,6 +705,13 @@ export default function HomeScreen() {
         </Animated.View>
       </TouchableWithoutFeedback>
       
+      {/* Hidden uploader anchor for image/PDF selection (driven by modal actions) */}
+      <RecipePDFImageUploader
+        ref={uploaderRef}
+        onUploadComplete={handleUploadComplete}
+        style={{ display: 'none' }}
+      />
+
       {/* Recipe Match Selection Modal */}
       {showMatchSelectionModal && (
         <RecipeMatchSelectionModal
@@ -750,18 +758,27 @@ const styles = StyleSheet.create({
   importSection: {
     gap: SPACING.md,
   },
+  importCard: {
+    width: '100%',
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    gap: SPACING.sm,
+    ...SHADOWS.small, // subtle shadow (~2px blur equivalent)
+  },
   actionSection: {
     gap: SPACING.md,
+    marginTop: SPACING.md, // move header and cards down together
   },
   quickGrid: {
-    marginTop: 0,
+    marginTop: 0, // keep equal spacing to match import header->card gap
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    justifyContent: 'space-evenly', // tiles closer together
     rowGap: SPACING.sm,
   },
   quickTile: {
-    width: '48%',
+    width: '46%', // slightly narrower so tiles sit a bit closer
     height: 104,
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.md,
@@ -769,6 +786,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: SPACING.sm,
     overflow: 'hidden',
+  },
+  quickTileSubtleShadow: {
     ...SHADOWS.small,
   },
   quickTileText: {
@@ -787,7 +806,10 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xs,
   },
   subheadingText: {
-    ...sectionHeaderText,
+    // Match the ScreenHeader font (Ubuntu heading), but keep a section-header size
+    fontFamily: FONT.family.heading,
+    fontSize: FONT.size.sectionHeader,
+    fontWeight: '600',
     color: COLORS.textDark,
     textAlign: 'center',
     marginTop: SPACING.xl,
@@ -877,32 +899,34 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: COLORS.lightGray,
   },
-  segmentedControl: {
+  // Removed legacy segmented pill styles (segmentGhost/segmentSolid) in favor of unified container
+  // New segmented control styles (unified container)
+  segmentedControlContainer: {
     flexDirection: 'row',
-    alignSelf: 'center',
-    gap: SPACING.xs,
+    alignItems: 'center',
     width: '100%',
-  },
-  segmentGhost: {
-    paddingVertical: SPACING.xs,
-    paddingHorizontal: SPACING.md,
     borderRadius: RADIUS.pill,
     borderWidth: BORDER_WIDTH.default,
     borderColor: COLORS.primary,
-    backgroundColor: 'transparent',
-    flex: 1,
-    alignItems: 'center',
+    overflow: 'hidden',
+    backgroundColor: COLORS.white,
   },
-  segmentGhostText: {
+  segmentedItem: {
+    flex: 1,
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentedItemActive: {
+    backgroundColor: COLORS.primary,
+  },
+  segmentedItemText: {
     ...bodyStrongText,
     color: COLORS.primary,
     fontSize: FONT.size.caption,
-    textAlign: 'center',
   },
-  segmentSolid: {
-    backgroundColor: COLORS.primary,
-  },
-  segmentSolidText: {
+  segmentedItemTextActive: {
     color: COLORS.white,
   },
   fullWidthRow: {

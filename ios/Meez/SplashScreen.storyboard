@@ -19,12 +19,7 @@
                             <imageView id="EXPO-SplashScreen" userLabel="SplashScreenLogo" image="SplashScreenLogo" contentMode="scaleAspectFit" clipsSubviews="true" userInteractionEnabled="false" translatesAutoresizingMaskIntoConstraints="false">
                                 <rect key="frame" x="0" y="0" width="414" height="736"/>
                             </imageView>
-                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Prep and cook, without clutter" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="splash-text">
-                                <rect key="frame" x="20" y="400" width="374" height="30"/>
-                                <fontDescription key="fontDescription" type="system" pointSize="18"/>
-                                <color key="textColor" red="0.152941176470588" green="0.141176470588235" blue="0.12156862745098" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
-                                <nil key="highlightedColor"/>
-                            </label>
+                            
                         </subviews>
                         <viewLayoutGuide key="safeArea" id="Rmq-lb-GrQ"/>
                         <constraints>
@@ -32,10 +27,7 @@
                             <constraint firstItem="EXPO-SplashScreen" firstAttribute="leading" secondItem="EXPO-ContainerView" secondAttribute="leading" id="61d16215e44b98e39d0a2c74fdbfaaa22601b12c"/>
                             <constraint firstItem="EXPO-SplashScreen" firstAttribute="trailing" secondItem="EXPO-ContainerView" secondAttribute="trailing" id="f934da460e9ab5acae3ad9987d5b676a108796c1"/>
                             <constraint firstItem="EXPO-SplashScreen" firstAttribute="bottom" secondItem="EXPO-ContainerView" secondAttribute="bottom" id="d6a0be88096b36fb132659aa90203d39139deda9"/>
-                            <constraint firstItem="splash-text" firstAttribute="centerX" secondItem="EXPO-ContainerView" secondAttribute="centerX" id="text-center-x"/>
-                            <constraint firstItem="splash-text" firstAttribute="top" secondItem="EXPO-SplashScreen" secondAttribute="bottom" constant="20" id="text-top"/>
-                            <constraint firstItem="splash-text" firstAttribute="leading" secondItem="EXPO-ContainerView" secondAttribute="leading" constant="20" id="text-leading"/>
-                            <constraint firstItem="splash-text" firstAttribute="trailing" secondItem="EXPO-ContainerView" secondAttribute="trailing" constant="-20" id="text-trailing"/>
+                            
                         </constraints>
                         <color key="backgroundColor" name="SplashScreenBackground"/>
                     </view>

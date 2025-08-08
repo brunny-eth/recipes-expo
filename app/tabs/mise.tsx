@@ -1144,24 +1144,23 @@ export default function MiseScreen() {
       {item.items.map((groceryItem, index) => {
         const isLastItem = index === item.items.length - 1;
         return (
-          <View
+          <TouchableOpacity
             key={groceryItem.id}
             style={[
               styles.groceryItem,
               isLastItem && styles.groceryItemLast
             ]}
+            onPress={() => handleGroceryToggle(groceryItem.id)}
+            activeOpacity={0.8}
           >
-            <TouchableOpacity
-              style={styles.groceryItemCheckbox}
-              onPress={() => handleGroceryToggle(groceryItem.id)}
-            >
+            <View style={styles.groceryItemCheckbox}>
               <MaterialCommunityIcons
                 name={groceryItem.checked ? "checkbox-marked" : "checkbox-blank-outline"}
                 size={28}
                 color={groceryItem.checked ? COLORS.primary : COLORS.textMuted}
               />
-            </TouchableOpacity>
-            
+            </View>
+
             <View style={styles.groceryItemTextContainer}>
               <Text 
                 style={[
@@ -1223,7 +1222,7 @@ export default function MiseScreen() {
                 <MaterialCommunityIcons name="close" size={16} color={COLORS.textMuted} />
               </TouchableOpacity>
             )}
-          </View>
+          </TouchableOpacity>
         );
       })}
     </View>

@@ -16,7 +16,7 @@ import {
 import FastImage from '@d11/react-native-fast-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, BORDER_WIDTH, SHADOWS } from '@/constants/theme';
 
@@ -54,12 +54,15 @@ const FOLDER_COLORS = [
 export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const params = useLocalSearchParams<{ tab?: string }>();
   const { session } = useAuth();
   const { showError } = useErrorModal();
   const { track } = useAnalytics();
   
   // Tab state
-  const [selectedTab, setSelectedTab] = useState<'explore' | 'saved'>('explore');
+  const [selectedTab, setSelectedTab] = useState<'explore' | 'saved'>(
+    params?.tab === 'saved' ? 'saved' : 'explore'
+  );
   
   // Explore recipes state
   const [exploreRecipes, setExploreRecipes] = useState<ParsedRecipe[]>([]);
@@ -942,7 +945,7 @@ const styles = StyleSheet.create({
     paddingLeft: SPACING.md,
     paddingRight: SPACING.sm,
     justifyContent: 'center',
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.white,
   },
   exploreCardTitle: {
     color: COLORS.textDark,
