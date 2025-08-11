@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
   InteractionManager,
   ScrollView,
+  useWindowDimensions,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 // import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -98,6 +99,10 @@ export default function HomeScreen() {
   const [isTypingUrlPlaceholder, setIsTypingUrlPlaceholder] = useState(false);
   const [nameDisplayedPlaceholder, setNameDisplayedPlaceholder] = useState('');
   const [isTypingNamePlaceholder, setIsTypingNamePlaceholder] = useState(false);
+  // Compact layout detection (smaller iPhones)
+  const { height } = useWindowDimensions();
+  const isCompact = height < 700;
+
 
   // Keep interval handles so we never run two animations at once
   const urlIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -271,13 +276,13 @@ export default function HomeScreen() {
     }, [clearState])
   );
 
-  const handleMatchSelectionAction = useCallback((action: 'select' | 'createNew' | 'returnHome', selectedRecipeId?: string) => {
+  const handleMatchSelectionAction = useCallback((action: 'select' | 'createNew' | 'returnHome', extra?: string) => {
     setShowMatchSelectionModal(false); // Always dismiss the modal first
 
-    if (action === 'select' && selectedRecipeId) {
+    if (action === 'select' && extra) {
       // Find the selected recipe from potentialMatches using the selectedRecipeId
       const selectedMatch = potentialMatches.find(match => 
-        match.recipe.id === Number(selectedRecipeId)
+        match.recipe.id === Number(extra)
       );
       
       if (selectedMatch) {
@@ -296,18 +301,26 @@ export default function HomeScreen() {
           userId: session?.user?.id,
         });
       } else {
-        console.error('[HomeScreen] Could not find selected recipe in potentialMatches:', selectedRecipeId);
+        console.error('[HomeScreen] Could not find selected recipe in potentialMatches:', extra);
         showError('Navigation Error', 'Could not load the selected recipe. Please try again.');
       }
     } else if (action === 'createNew') {
+      // Prefer user-supplied additional details from modal, otherwise fall back to last typed input
+      const inputToParse = (extra?.trim() || recipeName?.trim() || recipeUrl?.trim() || '');
+      if (!inputToParse) {
+        showError('Missing recipe text', 'Please enter some recipe text and try again.');
+        return;
+      }
       track('recipe_create_new_selected', {
-        recipeUrl: recipeUrl,
+        recipeInput: inputToParse,
+        inputType: 'raw_text',
         userId: session?.user?.id,
       });
       router.push({
         pathname: '/loading',
         params: {
-          recipeUrl: recipeUrl,
+          recipeUrl: inputToParse,
+          inputType: 'raw_text',
           forceNewParse: 'true',
         },
       });
@@ -318,7 +331,7 @@ export default function HomeScreen() {
         userId: session?.user?.id,
       });
     }
-  }, [potentialMatches, router, showError, recipeUrl, track, session?.user?.id]);
+  }, [potentialMatches, router, showError, recipeUrl, recipeName, track, session?.user?.id]);
 
   // Replace isValidRecipeInput with a function that uses detectInputType
   function isValidRecipeInput(input: string) {
@@ -567,19 +580,19 @@ export default function HomeScreen() {
         transform: [{ translateY: logoTranslateY }],
       }}
     >
-      <Image
+        <Image
         source={require('@/assets/images/meezblue_underline.png')}
         resizeMode="contain"
         style={{
-          width: 200,
-          height: 100,
+          width: isCompact ? 128 : 150,
+          height: isCompact ? 64 : 75,
           alignSelf: 'center',
-          marginTop: SPACING.xxl,
-          marginBottom: SPACING.xxl,
+          marginTop: isCompact ? SPACING.md : SPACING.lg,
+          marginBottom: 0,
         }}
       />
     </Animated.View>
-  ), [logoOpacity, logoTranslateY]); // Only recreate if animation values change
+  ), [logoOpacity, logoTranslateY, isCompact]); // Recreate if compact state changes
 
   // Get appropriate button text based on submission state
   const getSubmitButtonContent = () => {
@@ -610,9 +623,26 @@ export default function HomeScreen() {
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.sectionsContainer}>
+              {/* Marketing heading */}
+              <View style={[styles.heroSection, isCompact && { marginTop: 1, marginBottom: 0 }]}>
+                <Text
+                  style={[styles.heroHeading, isCompact && { fontSize: FONT.size.sectionHeader }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.9}
+                >
+                  the best way to prep and cook
+                </Text>
+              </View>
+
               {/* Import section */}
               <View style={styles.importSection}>
-                <Text style={styles.subheadingText}>Import recipes from anywhere</Text>
+                 <View style={styles.sectionTitleWrap}>
+                   <Text style={[styles.subheadingText, styles.importSubheading, { marginTop: 0, marginBottom: SPACING.xs }]}>
+                     import and customize any recipe
+                   </Text>
+                   <View style={styles.sectionRule} />
+                 </View>
 
                 {/* Unified import card: segmented control + input */}
                 <View style={styles.importCard}>
@@ -701,26 +731,47 @@ export default function HomeScreen() {
                       >
                         <Text style={styles.submitButtonText}>Go</Text>
                       </TouchableOpacity>
+                      
+                    </View>
+                  )}
+                  {importMode === 'name' && (
+                    <View style={{ minHeight: 24, justifyContent: 'center' }}>
+                      <TouchableOpacity onPress={() => router.push('/explore')}>
+                        <Text style={styles.inlineLink}>or scroll through our community recipes</Text>
+                      </TouchableOpacity>
                     </View>
                   )}
                 </View>
               </View>
 
-              {/* Action section */}
+              {/* Action section 1: Prep station */}
               <View style={styles.actionSection}>
-                <Text style={styles.subheadingText}>...or jump back into cooking</Text>
-                <View style={styles.quickList}>
-                  <TouchableOpacity
-                    style={styles.quickPill}
-                    onPress={() => router.push({ pathname: '/tabs/library', params: { tab: 'saved' } })}
-                  >
-                    <Text style={styles.quickPillText}>saved recipes</Text>
-                  </TouchableOpacity>
+                <View style={styles.sectionTitleWrap}>
+                  <Text style={[styles.subheadingText, { marginTop: 0, marginBottom: SPACING.xs }]}>shop and cook for multiple recipes at once</Text>
+                  <View style={styles.sectionRule} />
+                </View>
+                <View style={[styles.quickList, { marginBottom: SPACING.xl }]}> 
                   <TouchableOpacity
                     style={styles.quickPill}
                     onPress={() => router.push('/tabs/mise')}
                   >
                     <Text style={styles.quickPillText}>prep station</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Action section 2: Saved recipes */}
+              <View style={styles.actionSection}>
+                <View style={styles.sectionTitleWrap}>
+                  <Text style={[styles.subheadingText, { marginTop: 0, marginBottom: SPACING.xs }]}>save your recipes into cookbooks</Text>
+                  <View style={styles.sectionRule} />
+                </View>
+                <View style={[styles.quickList, { marginBottom: SPACING.xl }]}> 
+                  <TouchableOpacity
+                    style={styles.quickPill}
+                    onPress={() => router.push({ pathname: '/tabs/library', params: { tab: 'saved' } })}
+                  >
+                    <Text style={styles.quickPillText}>saved recipes</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -743,6 +794,7 @@ export default function HomeScreen() {
           matches={potentialMatches}
           onAction={handleMatchSelectionAction}
           debugSource={isHomeFocused ? 'HomeTab (focused)' : 'HomeTab (background)'}
+          initialInputText={(recipeName?.trim() || recipeUrl?.trim() || '')}
         />
       )}
 
@@ -776,17 +828,37 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.xxl,
-    paddingBottom: SPACING.xxl,
+    paddingTop: SPACING.xl,
+    paddingBottom: SPACING.xl,
     flexGrow: 1,
   },
   sectionsContainer: {
-    gap: SPACING.footerHeight,
+    gap: 0,
     flexGrow: 1,
     justifyContent: 'space-between',
   },
   importSection: {
-    gap: SPACING.md,
+    gap: 0,
+    marginTop: SPACING.xxxl,
+  },
+  heroSection: {
+    alignItems: 'center',
+    paddingHorizontal: SPACING.pageHorizontal,
+    marginTop: SPACING.smAlt - 6,
+    marginBottom: 1,
+  },
+  heroHeading: {
+    fontFamily: FONT.family.heading,
+    fontSize: FONT.size.screenTitle,
+    fontWeight: '600',
+    color: COLORS.textDark,
+    textAlign: 'center',
+  },
+  heroSubheading: {
+    ...bodyText,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    marginTop: SPACING.sm,
   },
   importCard: {
     width: '100%',
@@ -794,11 +866,12 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
     padding: 0,
     gap: SPACING.sm,
+    marginBottom: SPACING.xl,
     ...SHADOWS.small, // subtle shadow (~2px blur equivalent)
   },
   actionSection: {
-    gap: SPACING.md,
-    marginTop: SPACING.md,
+    gap: 0,
+    marginTop: 0,
   },
   quickList: {
     width: '100%',
@@ -806,18 +879,19 @@ const styles = StyleSheet.create({
   },
   quickPill: {
     width: '100%',
-    height: 50,
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.md,
     borderRadius: RADIUS.md,
     borderWidth: BORDER_WIDTH.default,
     borderColor: COLORS.primary,
-    backgroundColor: 'transparent',
+    backgroundColor: COLORS.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
   quickPillText: {
     ...bodyStrongText,
     color: COLORS.primary,
-    fontSize: 16,
+    fontSize: FONT.size.caption,
   },
   // Removed grid tile styles in favor of bottom-stacked pill buttons
   sectionLabel: {
@@ -831,11 +905,28 @@ const styles = StyleSheet.create({
   },
   subheadingText: {
     fontFamily: FONT.family.heading,
-    fontSize: FONT.size.sectionHeader,
+    fontSize: FONT.size.body,
     fontWeight: '600',
     color: COLORS.textDark,
     textAlign: 'center',
-    marginTop: SPACING.xl,
+    marginTop: SPACING.lg,
+    marginBottom: 0,
+  },
+  sectionTitleWrap: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+  },
+  sectionRule: {
+    height: BORDER_WIDTH.hairline,
+    alignSelf: 'stretch',
+    backgroundColor: COLORS.darkGray,
+    opacity: 0.25,
+    marginHorizontal: SPACING.pageHorizontal,
+  },
+  importSubheading: {
+    alignSelf: 'stretch',
+    textAlign: 'center',
+    paddingHorizontal: SPACING.pageHorizontal,
     marginBottom: 0,
   },
   sectionButton: {
@@ -868,7 +959,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
-    height: 50,
+    height: 46,
     gap: 0,
   },
   input: {
@@ -942,6 +1033,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
     overflow: 'hidden',
     backgroundColor: COLORS.white,
+    marginTop: SPACING.xs,
   },
   segmentedItem: {
     flex: 1,
@@ -963,7 +1055,7 @@ const styles = StyleSheet.create({
   },
   fullWidthRow: {
     width: '100%',
-    height: 50,
+    height: 46,
   },
   fullWidthPrimaryButton: {
     width: '100%',
@@ -976,5 +1068,12 @@ const styles = StyleSheet.create({
   fullWidthPrimaryButtonText: {
     ...bodyStrongText,
     color: COLORS.white,
+  },
+  inlineLink: {
+    marginTop: SPACING.xs,
+    alignSelf: 'center',
+    color: COLORS.primary,
+    textDecorationLine: 'underline',
+    ...captionText,
   },
 });

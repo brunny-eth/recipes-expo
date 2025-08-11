@@ -66,6 +66,9 @@ import ServingScaler from '@/components/recipe/ServingScaler';
 import RecipeFooterButtons from '@/components/recipe/RecipeFooterButtons';
 
 import RecipeStepsHeader from '@/components/recipe/RecipeStepsHeader';
+import ScreenHeader from '@/components/ScreenHeader';
+import { Modal, Pressable } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Type for a change (substitution or removal)
 type AppliedChange = {
@@ -227,6 +230,7 @@ export default function RecipeSummaryScreen() {
   const { showError, hideError } = useErrorModal();
   const { session } = useAuth();
   const { track } = useAnalytics();
+  const insets = useSafeAreaInsets();
 
   // Extract and validate entryPoint with logging
   const entryPoint = params.entryPoint || 'new'; // Default to 'new' for backward compatibility
@@ -237,6 +241,7 @@ export default function RecipeSummaryScreen() {
   const [originalRecipe, setOriginalRecipe] = useState<ParsedRecipe | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const [isTitleModalVisible, setIsTitleModalVisible] = useState(false);
   const [isAllergensExpanded, setIsAllergensExpanded] = useState(false);
   const [isSourceExpanded, setIsSourceExpanded] = useState(false);
   const [isRecipeSizeExpanded, setIsRecipeSizeExpanded] = useState(false);
@@ -1926,12 +1931,10 @@ export default function RecipeSummaryScreen() {
         </View>
       )}
       
-
-      
-      <RecipeStepsHeader
-        title={cleanTitle}
-        imageUrl={recipe.image || recipe.thumbnailUrl}
-        recipe={recipe}
+      <ScreenHeader 
+        title={cleanTitle || 'Recipe'} 
+        showBack={true} 
+        onTitlePress={() => setIsTitleModalVisible(true)}
       />
 
       {/* Sharp divider to separate title from content */}
@@ -2106,6 +2109,23 @@ export default function RecipeSummaryScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Title pop-up modal for long titles */}
+      <Modal
+        visible={isTitleModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsTitleModalVisible(false)}
+      >
+        <Pressable 
+          style={[styles.titleModalOverlay, { paddingTop: insets.top + SPACING.pageHorizontal }]}
+          onPress={() => setIsTitleModalVisible(false)}
+        >
+          <Pressable style={styles.titleModalContent}>
+            <Text style={styles.titleModalText}>{cleanTitle || 'Recipe'}</Text>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <RecipeFooterButtons
         handleGoToSteps={handleGoToSteps}
@@ -2351,5 +2371,23 @@ const styles = StyleSheet.create({
     color: COLORS.textDark,
     textDecorationLine: 'underline',
     opacity: 0.5,
+  },
+  titleModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.pageHorizontal,
+  },
+  titleModalContent: {
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.md,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    maxWidth: '90%',
+  },
+  titleModalText: {
+    ...sectionHeaderText,
+    color: COLORS.textDark,
+    textAlign: 'center',
   },
 });

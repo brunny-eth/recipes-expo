@@ -9,7 +9,6 @@ interface LogoHeaderProps {
 }
 
 const LogoHeader: React.FC<LogoHeaderProps> = React.memo(({ animatedLogo }) => {
-
   return (
     <View style={styles.logoContainer}>
       {animatedLogo || <MeezLogo />}
@@ -22,8 +21,8 @@ LogoHeader.displayName = 'LogoHeader';
 const styles = StyleSheet.create({
   logoContainer: {
     alignItems: 'center',
-    paddingTop: 24,
-    marginBottom: SPACING.md,
+    paddingTop: 4,
+    marginBottom: 0,
   },
 });
 

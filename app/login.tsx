@@ -36,8 +36,8 @@ const LoginScreen = () => {
         source={require('@/assets/images/meezblue_underline.png')}
         resizeMode="contain"
         style={{
-          width: 400,
-          height: 200,
+          width: 200,
+          height: 100,
           alignSelf: 'center',
         }}
       />

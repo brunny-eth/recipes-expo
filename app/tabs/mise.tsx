@@ -1355,7 +1355,7 @@ export default function MiseScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScreenHeader title="Your prep station" />
+        <ScreenHeader title="Prep station" showBack={false} />
       
       {/* Tab selector - underline style */}
       <View style={styles.tabContainer}>

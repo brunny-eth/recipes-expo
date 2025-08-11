@@ -289,12 +289,11 @@ export default function LibraryScreen() {
     }
   }, [session?.user]);
 
-  // Load data on focus
+  // Load data on focus (Saved only)
   useFocusEffect(
     useCallback(() => {
-      fetchExploreRecipes();
       fetchSavedFolders();
-    }, [fetchExploreRecipes, fetchSavedFolders])
+    }, [fetchSavedFolders])
   );
 
   // Handle refresh
@@ -652,40 +651,10 @@ export default function LibraryScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScreenHeader title="Recipe library" />
+      <ScreenHeader title="Cookbooks" showBack={false} />
       
-      {/* Tab selector - underline style */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={styles.tabButton}
-          onPress={() => setSelectedTab('explore')}
-        >
-          <Text style={[
-            styles.tabButtonText,
-            selectedTab === 'explore' && styles.tabButtonTextActive
-          ]}>
-            Explore
-          </Text>
-          {selectedTab === 'explore' && <View style={styles.tabUnderline} />}
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.tabButton}
-          onPress={() => setSelectedTab('saved')}
-        >
-          <Text style={[
-            styles.tabButtonText,
-            selectedTab === 'saved' && styles.tabButtonTextActive
-          ]}>
-            Saved
-          </Text>
-          {selectedTab === 'saved' && <View style={styles.tabUnderline} />}
-        </TouchableOpacity>
-      </View>
-
-
-
-      {/* Content */}
-      {selectedTab === 'explore' ? renderExploreContent() : renderSavedContent()}
+      {/* Content: Saved only */}
+      {renderSavedContent()}
 
       {/* Add New Folder Modal */}
       <AddNewFolderModal
