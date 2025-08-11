@@ -22,17 +22,19 @@ interface RecipeMatchSelectionModalProps {
   visible: boolean;
   matches: { recipe: CombinedParsedRecipe; similarity: number; }[];
   onAction: (action: 'select' | 'createNew' | 'returnHome', selectedRecipeId?: string) => void;
+  debugSource?: string;
 }
 
 const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
   visible,
   matches,
   onAction,
+  debugSource,
 }) => {
   // State to track which images have failed to load
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
 
-  console.log('[RecipeMatchSelectionModal] Modal rendered with', matches.length, 'matches.');
+  console.log('[RecipeMatchSelectionModal] Modal rendered with', matches.length, 'matches.', { visible, debugSource });
   console.log('[RecipeMatchSelectionModal] Matches data:', matches);
   console.log('[RecipeMatchSelectionModal] First match sample:', matches[0]);
 
@@ -102,6 +104,9 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
       animationType="slide"
       transparent={true}
       onRequestClose={handleReturnHome}
+      onShow={() => {
+        if (__DEV__) console.log('[RecipeMatchSelectionModal] onShow fired', { debugSource });
+      }}
     >
       <View style={styles.modalOverlay}>
         <SafeAreaView style={styles.modalContent}>

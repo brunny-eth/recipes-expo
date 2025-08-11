@@ -16,7 +16,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+// import { MaterialCommunityIcons } from '@expo/vector-icons';
 import {
   COLORS,
   SPACING,
@@ -45,6 +45,7 @@ import { detectInputType } from '../../server/utils/detectInputType';
 import { useAnalytics } from '@/utils/analytics';
 
 export default function HomeScreen() {
+  const [isHomeFocused, setIsHomeFocused] = useState(false);
   const [recipeUrl, setRecipeUrl] = useState('');
   
   // Debug: Log recipeUrl state changes
@@ -79,6 +80,19 @@ export default function HomeScreen() {
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const logoTranslateY = useRef(new Animated.Value(-30)).current;
 
+  // Dev logs for focus and modal state
+  useEffect(() => {
+    if (__DEV__) {
+      console.log(`[Home] focus changed: isHomeFocused=${isHomeFocused}`);
+    }
+  }, [isHomeFocused]);
+
+  useEffect(() => {
+    if (__DEV__) {
+      console.log(`[Home] showMatchSelectionModal=${showMatchSelectionModal}`);
+    }
+  }, [showMatchSelectionModal]);
+
   // Placeholder rotation state (separate for URL and Name)
   const [urlDisplayedPlaceholder, setUrlDisplayedPlaceholder] = useState('');
   const [isTypingUrlPlaceholder, setIsTypingUrlPlaceholder] = useState(false);
@@ -89,8 +103,8 @@ export default function HomeScreen() {
   const urlIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const nameIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const urlPrompt = "try a recipe blog with lots of ads";
-  const namePrompt = "try 'mac and cheese' or 'garlic chicken'";
+  const urlPrompt = "tip: try a recipe blog with annoying ads";
+  const namePrompt = "tip: search for 'garlic chicken' or 'pizza'";
 
   // Local state for name input
   const [recipeName, setRecipeName] = useState('');
@@ -242,9 +256,17 @@ export default function HomeScreen() {
   // Focus effect logging
   useFocusEffect(
     useCallback(() => {
+      setIsHomeFocused(true);
+      if (__DEV__) console.log('[Home] focus effect: focused');
       return () => {
+        setIsHomeFocused(false);
+        if (__DEV__) console.log('[Home] focus effect: blurred');
         // Clear submission state when leaving screen
         clearState();
+        // Also hard-close any Home tab modals to prevent background flashes
+        setShowMatchSelectionModal(false);
+        setShowUploadModal(false);
+        setPotentialMatches([]);
       };
     }, [clearState])
   );
@@ -562,13 +584,13 @@ export default function HomeScreen() {
   // Get appropriate button text based on submission state
   const getSubmitButtonContent = () => {
     if (submissionState === 'validating') {
-      return <ActivityIndicator size="small" color={COLORS.white} />;
+      return <ActivityIndicator size="small" color={COLORS.primary} />;
     } else if (submissionState === 'checking_cache') {
-      return <ActivityIndicator size="small" color={COLORS.white} />;
+      return <ActivityIndicator size="small" color={COLORS.primary} />;
     } else if (submissionState === 'parsing') {
-      return <ActivityIndicator size="small" color={COLORS.white} />;
+      return <ActivityIndicator size="small" color={COLORS.primary} />;
     } else if (submissionState === 'navigating') {
-      return <ActivityIndicator size="small" color={COLORS.white} />;
+      return <ActivityIndicator size="small" color={COLORS.primary} />;
     } else {
       return <Text style={styles.submitButtonText}>Go</Text>;
     }
@@ -594,7 +616,7 @@ export default function HomeScreen() {
 
                 {/* Unified import card: segmented control + input */}
                 <View style={styles.importCard}>
-                  {/* Segmented control: URL | Image | Recipe name */}
+                  {/* Segmented control: URL | Dish Name | Image */}
                   <View style={styles.segmentedControlContainer}>
                     <TouchableOpacity
                       style={[styles.segmentedItem, importMode === 'url' && styles.segmentedItemActive]}
@@ -603,23 +625,23 @@ export default function HomeScreen() {
                       <Text style={[styles.segmentedItemText, importMode === 'url' && styles.segmentedItemTextActive]}>URL</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
+                      style={[styles.segmentedItem, importMode === 'name' && styles.segmentedItemActive]}
+                      onPress={() => setImportMode('name')}
+                    >
+                      <Text style={[styles.segmentedItemText, importMode === 'name' && styles.segmentedItemTextActive]}>Dish Name</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
                       style={[styles.segmentedItem, importMode === 'image' && styles.segmentedItemActive]}
                       onPress={() => setImportMode('image')}
                     >
                       <Text style={[styles.segmentedItemText, importMode === 'image' && styles.segmentedItemTextActive]}>Image</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.segmentedItem, importMode === 'name' && styles.segmentedItemActive]}
-                      onPress={() => setImportMode('name')}
-                    >
-                    <Text style={[styles.segmentedItemText, importMode === 'name' && styles.segmentedItemTextActive]}>Dish name</Text>
                     </TouchableOpacity>
                   </View>
 
                   {importMode === 'url' ? (
                     <View style={styles.inputContainer}>
                       <TextInput
-                        style={styles.input}
+                        style={[styles.input, styles.inputLeft]}
                         placeholder={urlDisplayedPlaceholder}
                         placeholderTextColor={COLORS.darkGray}
                         value={recipeUrl}
@@ -635,9 +657,10 @@ export default function HomeScreen() {
                         enablesReturnKeyAutomatically={true}
                         keyboardType="default"
                         textContentType="none"
+                        underlineColorAndroid="transparent"
                       />
                       <TouchableOpacity
-                        style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+                        style={[styles.submitButton, styles.submitButtonConnected, isSubmitting && styles.submitButtonDisabled]}
                         onPress={handleSubmit}
                         disabled={isSubmitting}
                         onPressIn={() => console.log('[UI] 🎯 Submit button pressed in - isSubmitting:', isSubmitting)}
@@ -657,7 +680,7 @@ export default function HomeScreen() {
                   ) : (
                     <View style={styles.inputContainer}>
                       <TextInput
-                        style={styles.input}
+                        style={[styles.input, styles.inputLeft]}
                         placeholder={nameDisplayedPlaceholder}
                         placeholderTextColor={COLORS.darkGray}
                         value={recipeName}
@@ -670,9 +693,10 @@ export default function HomeScreen() {
                         enablesReturnKeyAutomatically={true}
                         keyboardType="default"
                         onSubmitEditing={handleSubmitName}
+                        underlineColorAndroid="transparent"
                       />
                       <TouchableOpacity
-                        style={styles.submitButton}
+                        style={[styles.submitButton, styles.submitButtonConnected]}
                         onPress={handleSubmitName}
                       >
                         <Text style={styles.submitButtonText}>Go</Text>
@@ -685,18 +709,18 @@ export default function HomeScreen() {
               {/* Action section */}
               <View style={styles.actionSection}>
                 <Text style={styles.subheadingText}>...or jump back into cooking</Text>
-                {/* Quick actions grid */}
-                <View style={styles.quickGrid}>
+                <View style={styles.quickList}>
                   <TouchableOpacity
-                    style={[styles.quickTile, styles.quickTileSubtleShadow]}
+                    style={styles.quickPill}
                     onPress={() => router.push({ pathname: '/tabs/library', params: { tab: 'saved' } })}
                   >
-                    <MaterialCommunityIcons name="bookmark-outline" size={28} color={COLORS.primary} />
-                    <Text style={styles.quickTileText}>Saved recipes</Text>
+                    <Text style={styles.quickPillText}>saved recipes</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.quickTile, styles.quickTileSubtleShadow]} onPress={() => router.push('/tabs/mise')}>
-                    <MaterialCommunityIcons name="chef-hat" size={28} color={COLORS.primary} />
-                    <Text style={styles.quickTileText}>Prep and cook</Text>
+                  <TouchableOpacity
+                    style={styles.quickPill}
+                    onPress={() => router.push('/tabs/mise')}
+                  >
+                    <Text style={styles.quickPillText}>prep station</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -713,22 +737,25 @@ export default function HomeScreen() {
       />
 
       {/* Recipe Match Selection Modal */}
-      {showMatchSelectionModal && (
+      {isHomeFocused && showMatchSelectionModal && (
         <RecipeMatchSelectionModal
-          visible={showMatchSelectionModal}
+          visible={isHomeFocused && showMatchSelectionModal}
           matches={potentialMatches}
           onAction={handleMatchSelectionAction}
+          debugSource={isHomeFocused ? 'HomeTab (focused)' : 'HomeTab (background)'}
         />
       )}
 
       {/* Upload Recipe Modal */}
-      <UploadRecipeModal
-        visible={showUploadModal}
+      {isHomeFocused && (
+        <UploadRecipeModal
+          visible={isHomeFocused && showUploadModal}
         onClose={handleCloseUploadModal}
         onTakePhoto={handleTakePhoto}
         onChooseImage={handleChooseImage}
         onBrowseFiles={handleBrowseFiles}
-      />
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -751,51 +778,48 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     paddingTop: SPACING.xxl,
     paddingBottom: SPACING.xxl,
+    flexGrow: 1,
   },
   sectionsContainer: {
     gap: SPACING.footerHeight,
+    flexGrow: 1,
+    justifyContent: 'space-between',
   },
   importSection: {
     gap: SPACING.md,
   },
   importCard: {
     width: '100%',
-    backgroundColor: COLORS.white,
+    backgroundColor: 'transparent',
     borderRadius: RADIUS.md,
-    padding: SPACING.md,
+    padding: 0,
     gap: SPACING.sm,
     ...SHADOWS.small, // subtle shadow (~2px blur equivalent)
   },
   actionSection: {
     gap: SPACING.md,
-    marginTop: SPACING.md, // move header and cards down together
+    marginTop: SPACING.md,
   },
-  quickGrid: {
-    marginTop: 0, // keep equal spacing to match import header->card gap
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-evenly', // tiles closer together
-    rowGap: SPACING.sm,
+  quickList: {
+    width: '100%',
+    gap: SPACING.sm,
   },
-  quickTile: {
-    width: '46%', // slightly narrower so tiles sit a bit closer
-    height: 104,
-    backgroundColor: COLORS.white,
+  quickPill: {
+    width: '100%',
+    height: 50,
     borderRadius: RADIUS.md,
+    borderWidth: BORDER_WIDTH.default,
+    borderColor: COLORS.primary,
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: SPACING.sm,
-    overflow: 'hidden',
   },
-  quickTileSubtleShadow: {
-    ...SHADOWS.small,
+  quickPillText: {
+    ...bodyStrongText,
+    color: COLORS.primary,
+    fontSize: 16,
   },
-  quickTileText: {
-    ...captionStrongText,
-    color: COLORS.textDark,
-    textAlign: 'center',
-    marginTop: SPACING.xs,
-  },
+  // Removed grid tile styles in favor of bottom-stacked pill buttons
   sectionLabel: {
     ...bodyText,
     fontSize: FONT.size.body,
@@ -806,7 +830,6 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xs,
   },
   subheadingText: {
-    // Match the ScreenHeader font (Ubuntu heading), but keep a section-header size
     fontFamily: FONT.family.heading,
     fontSize: FONT.size.sectionHeader,
     fontWeight: '600',
@@ -841,15 +864,12 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontSize: 16,
   },
-
-
-
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
     height: 50,
-    gap: SPACING.xs,
+    gap: 0,
   },
   input: {
     ...bodyText,
@@ -860,24 +880,38 @@ const styles = StyleSheet.create({
     fontSize: FONT.size.caption,
     lineHeight: undefined,
     backgroundColor: COLORS.white,
-    borderWidth: BORDER_WIDTH.default,
-    borderColor: COLORS.lightGray,
+    borderWidth: 0,
+    borderColor: 'transparent',
     borderRadius: RADIUS.sm,
+  },
+  inputLeft: {
+    borderTopRightRadius: 0,
+    borderBottomRightRadius: 0,
   },
   submitButton: {
     height: '100%',
-    width: 60,
-    backgroundColor: COLORS.primary,
+    minWidth: 60,
+    paddingHorizontal: SPACING.sm,
+    backgroundColor: COLORS.white,
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: RADIUS.sm,
+    borderWidth: 0,
+    borderColor: 'transparent',
+  },
+  submitButtonConnected: {
+    borderTopLeftRadius: 0,
+    borderBottomLeftRadius: 0,
+    borderLeftWidth: 0,
   },
   submitButtonDisabled: {
-    backgroundColor: COLORS.darkGray,
+    opacity: 0.6,
   },
   submitButtonText: {
     ...bodyStrongText,
-    color: COLORS.white,
+    color: COLORS.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   uploadButton: {
     backgroundColor: 'transparent',
@@ -899,13 +933,11 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: COLORS.lightGray,
   },
-  // Removed legacy segmented pill styles (segmentGhost/segmentSolid) in favor of unified container
-  // New segmented control styles (unified container)
   segmentedControlContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
-    borderRadius: RADIUS.pill,
+    borderRadius: RADIUS.md,
     borderWidth: BORDER_WIDTH.default,
     borderColor: COLORS.primary,
     overflow: 'hidden',
@@ -945,5 +977,4 @@ const styles = StyleSheet.create({
     ...bodyStrongText,
     color: COLORS.white,
   },
-  // submitButtonPlaceholder removed in favor of true full-width button
 });

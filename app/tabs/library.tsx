@@ -63,6 +63,15 @@ export default function LibraryScreen() {
   const [selectedTab, setSelectedTab] = useState<'explore' | 'saved'>(
     params?.tab === 'saved' ? 'saved' : 'explore'
   );
+
+  // Keep selected tab in sync with route params even if the screen stays mounted
+  useEffect(() => {
+    if (params?.tab === 'saved') {
+      setSelectedTab('saved');
+    } else if (params?.tab === 'explore') {
+      setSelectedTab('explore');
+    }
+  }, [params?.tab]);
   
   // Explore recipes state
   const [exploreRecipes, setExploreRecipes] = useState<ParsedRecipe[]>([]);

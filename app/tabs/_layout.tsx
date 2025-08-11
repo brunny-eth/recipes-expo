@@ -7,11 +7,11 @@ import { captionText, FONT } from '@/constants/typography';
 
 const styles = StyleSheet.create({
   tabBar: {
-    borderTopWidth: 1,
-    borderTopColor: COLORS.lightGray,
-    height: 60,
-    paddingBottom: Platform.OS === 'ios' ? 20 : 8,
-    paddingTop: 4,
+    borderTopWidth: 0,
+    borderTopColor: 'transparent',
+    height: 72,
+    paddingBottom: Platform.OS === 'ios' ? 26 : 12,
+    paddingTop: 6,
   },
   tabBarLabel: {
     ...captionText,
@@ -25,7 +25,7 @@ const styles = StyleSheet.create({
   },
   tabBarText: {
     ...captionText,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '600',
     textAlign: 'center',
     width: 70,

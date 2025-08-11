@@ -133,25 +133,26 @@ export const ErrorModalProvider: React.FC<{ children: ReactNode }> = ({
     requestAnimationFrame(() => {
       console.log('[ErrorModalContext] State update: setVisible(false)');
       setVisible(false);
-      
+
       // Store callback reference before clearing data
       const callbackToExecute = modalDataRef.current?.onDismissCallback;
-      
-      // Clear modal data immediately to prevent re-triggering
-      console.log('[ErrorModalContext] State update: setModalData(null) - clearing modal data');
-      setModalData(null);
-      
-      // Execute callback after a delay to prevent immediate re-triggering
-      if (callbackToExecute) {
-        setTimeout(() => {
-          console.log('[ErrorModalContext] Executing onDismissCallback after delay');
+
+      // Defer clearing modal data until after the hide animation finishes
+      // GlobalErrorModal hide animation duration is ~200ms
+      setTimeout(() => {
+        console.log('[ErrorModalContext] Deferred clear: setModalData(null) after animation');
+        setModalData(null);
+
+        // Execute callback after the modal content has unmounted to avoid jank
+        if (callbackToExecute) {
+          console.log('[ErrorModalContext] Executing onDismissCallback after modal unmount');
           try {
             callbackToExecute();
           } catch (error) {
             console.error('[ErrorModalContext] Error in onDismissCallback:', error);
           }
-        }, 100); // Short delay to break the cycle
-      }
+        }
+      }, 250);
     });
   }, []); // Empty dependency array - function is now truly stable
 

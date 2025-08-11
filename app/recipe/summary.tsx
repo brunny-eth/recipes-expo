@@ -276,6 +276,13 @@ export default function RecipeSummaryScreen() {
     to: string | null;
   } | null>(null);
 
+  // Dev log to correlate substitution modal with background modal flicker
+  useEffect(() => {
+    if (__DEV__) {
+      console.log(`[Summary] substitutionModalVisible=${substitutionModalVisible}`);
+    }
+  }, [substitutionModalVisible]);
+
   // Determine if we're viewing a saved recipe (clean display) vs actively editing (show indicators)
   // For mise recipes: we're actively editing even if appliedChanges exist in URL
   // The URL appliedChanges are just the baseline from existing mise recipe
@@ -1908,13 +1915,15 @@ export default function RecipeSummaryScreen() {
       <SafeAreaView style={styles.container}>
       {/* Modals */}
       {substitutionModalVisible && selectedIngredientOriginalData && (
-        <IngredientSubstitutionModal
-          visible={substitutionModalVisible}
-          onClose={() => setSubstitutionModalVisible(false)}
-          ingredientName={selectedIngredientOriginalData.name}
-          substitutions={processedSubstitutionsForModal}
-          onApply={onApplySubstitution}
-        />
+        <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }} pointerEvents="box-none">
+          <IngredientSubstitutionModal
+            visible={substitutionModalVisible}
+            onClose={() => setSubstitutionModalVisible(false)}
+            ingredientName={selectedIngredientOriginalData.name}
+            substitutions={processedSubstitutionsForModal}
+            onApply={onApplySubstitution}
+          />
+        </View>
       )}
       
 

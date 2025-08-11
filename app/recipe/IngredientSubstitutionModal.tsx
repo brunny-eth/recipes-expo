@@ -1,13 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Modal,
-  ScrollView,
-  Pressable,
-} from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Pressable } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Animated, {
   FadeIn,
@@ -105,116 +97,98 @@ export default function IngredientSubstitutionModal({
     return `(approx. ${amountStr}${unitStr ? ' ' + unitStr : ''})`.trim();
   };
 
+  if (!visible) return null;
+
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="none"
-      presentationStyle="overFullScreen"
-      onRequestClose={handleClose}
-    >
-      <View style={styles.modalContainer}>
-        <Pressable style={styles.backdrop} onPress={handleClose}>
-          <Animated.View
-            entering={FadeIn.duration(200)}
-            exiting={FadeOut.duration(150)}
-            style={styles.backdrop}
-          />
-        </Pressable>
-
+    <View style={styles.modalContainer}>
+      <Pressable style={styles.backdrop} onPress={handleClose}>
         <Animated.View
-          entering={SlideInDown.springify().damping(20).stiffness(150)}
-          exiting={SlideOutDown.duration(150)}
-          style={styles.modalContent}
-        >
-          <View style={styles.header}>
-            <Text style={styles.title}>Substitute {ingredientName}</Text>
-          </View>
+          entering={FadeIn.duration(200)}
+          exiting={FadeOut.duration(150)}
+          style={styles.backdrop}
+        />
+      </Pressable>
 
-          <ScrollView style={styles.optionsList}>
-            {options && options.length > 0 ? (
-              options.map((option, index) => {
-                const quantityText = formatQuantity(option.amount, option.unit); // Format quantity
-                return (
-                  <TouchableOpacity
-                    key={`${option.name}-${index}`}
+      <Animated.View
+        entering={SlideInDown.springify().damping(20).stiffness(150)}
+        exiting={SlideOutDown.duration(150)}
+        style={styles.modalContent}
+      >
+        <View style={styles.header}>
+          <Text style={styles.title}>Substitute {ingredientName}</Text>
+        </View>
+
+        <ScrollView style={styles.optionsList}>
+          {options && options.length > 0 ? (
+            options.map((option, index) => {
+              const quantityText = formatQuantity(option.amount, option.unit);
+              return (
+                <TouchableOpacity
+                  key={`${option.name}-${index}`}
+                  style={[
+                    styles.optionItem,
+                    option.name === 'Remove ingredient'
+                      ? styles.optionItemRemove
+                      : selectedOption?.name === option.name
+                        ? styles.optionItemSelected
+                        : null,
+                  ]}
+                  onPress={() => setSelectedOption(option)}
+                >
+                  <View
                     style={[
-                      styles.optionItem,
-                      option.name === 'Remove ingredient'
-                        ? (selectedOption?.name === option.name ? styles.optionItemRemove : styles.optionItemRemove)
-                        : (selectedOption?.name === option.name ? styles.optionItemSelected : null),
+                      styles.radioButton,
+                      option.name === 'Remove ingredient' ? styles.radioButtonRemove : null,
                     ]}
-                    onPress={() => setSelectedOption(option)}
                   >
-                    <View
-                      style={[
-                        styles.radioButton,
-                        option.name === 'Remove ingredient'
-                          ? styles.radioButtonRemove
-                          : null,
-                      ]}
-                    >
-                      {selectedOption?.name === option.name && (
-                        <View style={[
-                          styles.radioButtonInner,
-                          option.name === 'Remove ingredient' && styles.radioButtonInnerRemove
-                        ]} />
-                      )}
+                    {selectedOption?.name === option.name && (
+                      <View style={[styles.radioButtonInner, option.name === 'Remove ingredient' && styles.radioButtonInnerRemove]} />
+                    )}
+                  </View>
+                  <View style={styles.optionContent}>
+                    <View style={styles.optionNameContainer}>
+                      <Text
+                        style={[
+                          styles.optionName,
+                          option.name === 'Remove ingredient' && styles.optionNameRemove,
+                        ]}
+                      >
+                        {option.name}
+                      </Text>
+                      {quantityText && <Text style={styles.optionQuantity}>{quantityText}</Text>}
                     </View>
-                    <View style={styles.optionContent}>
-                      <View style={styles.optionNameContainer}>
-                        <Text
-                          style={[
-                            styles.optionName,
-                            option.name === 'Remove ingredient' &&
-                              styles.optionNameRemove,
-                          ]}
-                        >
-                          {option.name}
-                        </Text>
-                        {/* Display Formatted Quantity */}
-                        {quantityText && (
-                          <Text style={styles.optionQuantity}>
-                            {quantityText}
-                          </Text>
-                        )}
-                      </View>
-                      {option.description && (
-                        <Text style={styles.optionDescription}>
-                          {option.description}
-                        </Text>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })
-            ) : (
-              <Text style={styles.noSuggestionsText}>
-                No automatic substitutions found for this ingredient.
-              </Text>
-            )}
-          </ScrollView>
+                    {option.description && <Text style={styles.optionDescription}>{option.description}</Text>}
+                  </View>
+                </TouchableOpacity>
+              );
+            })
+          ) : (
+            <Text style={styles.noSuggestionsText}>No automatic substitutions found for this ingredient.</Text>
+          )}
+        </ScrollView>
 
-          <TouchableOpacity
-            style={[
-              styles.applyButton,
-              !selectedOption && styles.applyButtonDisabled,
-            ]}
-            onPress={handleApply}
-            disabled={!selectedOption}
-          >
-            <Text style={styles.applyButtonText}>Make changes</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      </View>
-    </Modal>
+        <TouchableOpacity
+          style={[styles.applyButton, !selectedOption && styles.applyButtonDisabled]}
+          onPress={handleApply}
+          disabled={!selectedOption}
+        >
+          <Text style={styles.applyButtonText}>Make changes</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   modalContainer: {
-    flex: 1,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
     justifyContent: 'flex-end',
+    zIndex: 2000,
+    elevation: 20,
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
@@ -226,6 +200,8 @@ const styles = StyleSheet.create({
     borderTopRightRadius: RADIUS.xl,
     padding: SPACING.pageHorizontal,
     maxHeight: '80%',
+    width: '100%',
+    zIndex: 2001,
   },
   header: {
     alignItems: 'center',
