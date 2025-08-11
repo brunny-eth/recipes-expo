@@ -27,9 +27,11 @@ import {
   FONT,
 } from '@/constants/typography';
 import ScreenHeader from '@/components/ScreenHeader';
+import { useRenderCounter } from '@/hooks/useRenderCounter';
 
 export default function AccountScreen() {
   const { signOut, isAuthenticated, session } = useAuth();
+  useRenderCounter('AccountScreen', { hasSession: !!session, isAuthenticated });
   const { showError } = useErrorModal();
   const { showSuccess } = useSuccessModal();
   const insets = useSafeAreaInsets();

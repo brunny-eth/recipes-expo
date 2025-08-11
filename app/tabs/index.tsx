@@ -38,9 +38,12 @@ import { CombinedParsedRecipe } from '@/common/types';
 import { useRecipeSubmission } from '@/hooks/useRecipeSubmission';
 import { detectInputType } from '../../server/utils/detectInputType';
 import { useAnalytics } from '@/utils/analytics';
+import { useRenderCounter } from '@/hooks/useRenderCounter';
 
 export default function HomeScreen() {
   const [recipeUrl, setRecipeUrl] = useState('');
+  const { session } = useAuth();
+  useRenderCounter('HomeScreen', { hasSession: !!session });
   
   // Debug: Log recipeUrl state changes
   useEffect(() => {
@@ -56,7 +59,6 @@ export default function HomeScreen() {
   const uploaderRef = useRef<any>(null);
   const router = useRouter();
   const { showError, hideError } = useErrorModal();
-  const { session } = useAuth();
   const { track } = useAnalytics();
   
   // Use the new submission hook

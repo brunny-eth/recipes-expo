@@ -28,6 +28,7 @@ import AddNewFolderModal from '@/components/AddNewFolderModal';
 import ConfirmationModal from '@/components/ConfirmationModal';
 import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
 import { useAnalytics } from '@/utils/analytics';
+import { useRenderCounter } from '@/hooks/useRenderCounter';
 
 // Types for folders
 type SavedFolder = {
@@ -55,6 +56,7 @@ export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { session } = useAuth();
+  useRenderCounter('LibraryScreen', { hasSession: !!session });
   const { showError } = useErrorModal();
   const { track } = useAnalytics();
   

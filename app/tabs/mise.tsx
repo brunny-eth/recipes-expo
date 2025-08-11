@@ -31,6 +31,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import { useAnalytics } from '@/utils/analytics';
+import { useRenderCounter } from '@/hooks/useRenderCounter';
 import ScreenHeader from '@/components/ScreenHeader';
 import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
 import { parseServingsValue } from '@/utils/recipeUtils';
@@ -304,6 +305,7 @@ export default function MiseScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { session } = useAuth();
+  useRenderCounter('MiseScreen', { hasSession: !!session });
   const { showError } = useErrorModal();
   const { track } = useAnalytics();
   const { hasResumableSession, state: cookingState, invalidateSession } = useCooking();
