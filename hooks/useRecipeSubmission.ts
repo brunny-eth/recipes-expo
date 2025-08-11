@@ -4,6 +4,7 @@ import { normalizeUrl } from '../utils/normalizeUrl';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
 import { getNetworkErrorMessage, getSubmissionErrorMessage } from '../utils/errorMessages';
+import { normalizeAppError } from '../utils/normalizeAppError';
 import type { 
   CacheCheckResult, 
   SubmissionState, 
@@ -263,10 +264,11 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
       console.error('[useRecipeSubmission] Submission error:', error);
       setSubmissionState('idle');
       
+      const normalized = normalizeAppError(error, { stage: submissionState });
       return {
         success: false,
         action: 'show_validation_error',
-        error: getSubmissionErrorMessage(submissionState, error instanceof Error ? error : String(error))
+        error: normalized.message,
       };
     } finally {
       setIsSubmitting(false);

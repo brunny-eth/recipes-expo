@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
+import { useHandleError } from '@/hooks/useHandleError';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, BORDER_WIDTH, SHADOWS } from '@/constants/theme';
 import { titleText, captionStrongText, bodyStrongText } from '@/constants/typography';
@@ -26,10 +27,11 @@ export default function TimerTool({
 }: TimerToolProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [timeInput, setTimeInput] = useState('');
+  const handleError = useHandleError();
 
   const handleTimeInputPress = () => {
     if (isActive) {
-      Alert.alert('Timer Active', 'Please pause the timer before setting a new time.');
+      handleError('Timer Active', 'Please pause the timer before setting a new time.');
       return;
     }
     setTimeInput(''); // Start with empty input instead of current time
@@ -92,7 +94,7 @@ export default function TimerTool({
       addSeconds(totalSeconds);
       setIsEditing(false);
     } else {
-      Alert.alert('Invalid Time', 'Please enter a valid time (e.g., "2:30", "150", "2m30s"). Maximum 10 hours.');
+      handleError('Invalid Time', 'Please enter a valid time (e.g., "2:30", "150", "2m30s"). Maximum 10 hours.');
     }
   };
 

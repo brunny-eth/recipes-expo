@@ -14,6 +14,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { supabase } from '@/lib/supabaseClient';
 import { useErrorModal } from './ErrorModalContext';
+import { useHandleError } from '@/hooks/useHandleError';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { createLogger } from '@/utils/logger';
 import { useAnalytics } from '@/utils/analytics';
@@ -67,6 +68,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   const [isLoading, setIsLoading] = useState(true);
   const [justLoggedIn, setJustLoggedIn] = useState(false);
   const { showError } = useErrorModal();
+  const handleError = useHandleError();
   const { maybeIdentifyUser, resetUser } = useAnalytics();
 
   // Keep stable references to external callbacks used inside long-lived listeners
@@ -385,10 +387,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           return true; // Indicate success for Apple
         } catch (err: any) {
           logger.error('Apple sign-in failed', { provider, error: err.message });
-          showError(
-            'Sign In Error',
-            err.message || 'An unknown error occurred during Apple sign-in.',
-          );
+          handleError('Sign In Error', err);
           return false; // Indicate failure
         }
       } else { // Google OAuth flow
@@ -398,7 +397,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           const errorMsg =
             'Missing EXPO_PUBLIC_AUTH_URL environment variable. Cannot proceed with authentication.';
           logger.error('Configuration Error: Missing EXPO_PUBLIC_AUTH_URL', { error: errorMsg });
-          showError('Configuration Error', errorMsg);
+          handleError('Configuration Error', errorMsg);
           return false; // Indicate failure
         }
 
@@ -425,37 +424,25 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
             return true; // Indicate that browser flow completed successfully
           } else if (result.type === 'cancel') {
             logger.warn('Web browser session cancelled by user', { provider });
-            showError(
-              'Sign In Cancelled',
-              'You cancelled the sign-in process.',
-            );
+            handleError('Sign In Cancelled', 'You cancelled the sign-in process.');
             return false; // Indicate cancellation
           } else {
             logger.error('Web browser session unknown result type', { 
               provider, 
               resultType: result.type 
             });
-            showError(
-              'Sign In Error',
-              `Sign-in was not completed. Reason: ${result.type}`,
-            );
+            handleError('Sign In Error', `Sign-in was not completed. Reason: ${result.type}`);
             return false; // Indicate other failure
           }
         } else {
           logger.error('Sign-in failed: No redirect URL received', { provider });
-          showError(
-            'Sign In Error',
-            'No redirect URL received. Please try again.',
-          );
+          handleError('Sign In Error', 'No redirect URL received. Please try again.');
           return false; // Indicate failure to get URL
         }
       }
     } catch (err: any) {
       logger.error('Generic Sign-In Error', { error: err.message, provider });
-      showError(
-        'Sign In Error',
-        err.message || 'An unknown error occurred during sign-in.',
-      );
+      handleError('Sign In Error', err);
       return false; // Indicate failure due to an exception
     } finally {
       // Always ensure isLoading is set to false when the signIn process finishes,
@@ -516,10 +503,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         userId: session?.user?.id, 
         error: err.message 
       });
-      showError(
-        'Sign Out Error',
-        err.message || 'An unknown error occurred during sign-out.',
-      );
+      handleError('Sign Out Error', err);
 
       logger.info('Local session cleared due to sign out error/timeout', { userId: session?.user?.id });
       setSession(null);

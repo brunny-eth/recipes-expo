@@ -15,6 +15,7 @@ interface ModalData {
   title: string | null;
   onDismissCallback?: () => void;
   onButtonPress?: () => void;
+  primaryButtonLabel?: string;
   secondButtonLabel?: string;
   onSecondButtonPress?: () => void;
 }
@@ -25,6 +26,7 @@ interface ErrorModalContextType {
     message: string,
     onDismissCallback?: () => void,
     onButtonPress?: () => void,
+    primaryButtonLabel?: string,
     secondButtonLabel?: string,
     onSecondButtonPress?: () => void,
   ) => void;
@@ -79,6 +81,7 @@ export const ErrorModalProvider: React.FC<{ children: ReactNode }> = ({
       message: string,
       onDismissCallback?: () => void,
       onButtonPress?: () => void,
+      primaryButtonLabel?: string,
       secondButtonLabel?: string,
       onSecondButtonPress?: () => void,
     ) => {
@@ -112,7 +115,7 @@ export const ErrorModalProvider: React.FC<{ children: ReactNode }> = ({
       });
       console.trace('[DEBUG] Trace for showError');
       console.log('[ErrorModalContext] State update: setModalData() called with new modal data');
-      setModalData({ title, message, onDismissCallback, onButtonPress, secondButtonLabel, onSecondButtonPress });
+      setModalData({ title, message, onDismissCallback, onButtonPress, primaryButtonLabel, secondButtonLabel, onSecondButtonPress });
     },
     [], // Empty dependency array - function is now truly stable
   );
@@ -133,25 +136,23 @@ export const ErrorModalProvider: React.FC<{ children: ReactNode }> = ({
     requestAnimationFrame(() => {
       console.log('[ErrorModalContext] State update: setVisible(false)');
       setVisible(false);
-      
+
       // Store callback reference before clearing data
       const callbackToExecute = modalDataRef.current?.onDismissCallback;
-      
-      // Clear modal data immediately to prevent re-triggering
-      console.log('[ErrorModalContext] State update: setModalData(null) - clearing modal data');
-      setModalData(null);
-      
-      // Execute callback after a delay to prevent immediate re-triggering
-      if (callbackToExecute) {
-        setTimeout(() => {
-          console.log('[ErrorModalContext] Executing onDismissCallback after delay');
-          try {
+
+      // Defer clearing modal content until fade-out animation (~200ms) completes to avoid jank
+      setTimeout(() => {
+        console.log('[ErrorModalContext] State update: setModalData(null) - clearing modal data after fade-out');
+        setModalData(null);
+
+        try {
+          if (callbackToExecute) {
             callbackToExecute();
-          } catch (error) {
-            console.error('[ErrorModalContext] Error in onDismissCallback:', error);
           }
-        }, 100); // Short delay to break the cycle
-      }
+        } catch (error) {
+          console.error('[ErrorModalContext] Error in onDismissCallback:', error);
+        }
+      }, 220);
     });
   }, []); // Empty dependency array - function is now truly stable
 
@@ -186,6 +187,7 @@ export const ErrorModalProvider: React.FC<{ children: ReactNode }> = ({
         message={modalData?.message ?? ''}
         onClose={hideError}
         onButtonPress={modalData?.onButtonPress}
+        primaryButtonLabel={modalData?.primaryButtonLabel}
         secondButtonLabel={modalData?.secondButtonLabel}
         onSecondButtonPress={modalData?.onSecondButtonPress}
       />

@@ -28,11 +28,13 @@ import {
 } from '@/constants/typography';
 import ScreenHeader from '@/components/ScreenHeader';
 import { useRenderCounter } from '@/hooks/useRenderCounter';
+import { useHandleError } from '@/hooks/useHandleError';
 
 export default function AccountScreen() {
   const { signOut, isAuthenticated, session } = useAuth();
   useRenderCounter('AccountScreen', { hasSession: !!session, isAuthenticated });
   const { showError } = useErrorModal();
+  const handleError = useHandleError();
   const { showSuccess } = useSuccessModal();
   const insets = useSafeAreaInsets();
   const [feedbackMessage, setFeedbackMessage] = useState('');
@@ -41,19 +43,19 @@ export default function AccountScreen() {
 
   const handleSubmitFeedback = async () => {
     if (!feedbackMessage.trim()) {
-      showError('Input Required', 'Please enter a message before submitting feedback.');
+      handleError('Input Required', 'Please enter a message before submitting feedback.');
       return;
     }
 
     if (!session?.user?.email) {
-      showError('Login Required', 'You must be logged in to submit feedback.');
+      handleError('Login Required', 'You must be logged in to submit feedback.');
       return;
     }
 
     const backendUrl = process.env.EXPO_PUBLIC_API_URL;
     if (!backendUrl) {
       console.error('Missing EXPO_PUBLIC_API_URL environment variable');
-      showError('Configuration Error', 'Server configuration error. Please try again later.');
+      handleError('Configuration Error', 'Server configuration error. Please try again later.');
       return;
     }
 
@@ -83,7 +85,7 @@ export default function AccountScreen() {
       }
     } catch (error) {
       console.error('[AccountScreen] Error submitting feedback:', error);
-      showError('Submission Error', 'Failed to submit feedback. Please try again.');
+      handleError('Submission Error', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -97,7 +99,7 @@ export default function AccountScreen() {
       // Success message will be shown by AuthNavigationHandler
     } catch (error) {
       console.error('[AccountScreen] Sign out error:', error);
-      showError('Sign Out Error', 'Failed to sign out. Please try again.');
+      handleError('Sign Out Error', error);
     } finally {
       setIsSigningOut(false);
     }

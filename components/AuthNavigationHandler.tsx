@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useSuccessModal } from '@/context/SuccessModalContext';
 import { useErrorModal } from '@/context/ErrorModalContext';
+import { useHandleError } from '@/hooks/useHandleError';
 import { createLogger } from '@/utils/logger';
 
 const logger = createLogger('auth-navigation');
@@ -12,6 +13,7 @@ export function AuthNavigationHandler() {
   const { onAuthNavigation } = useAuth();
   const { showSuccess } = useSuccessModal();
   const { showError } = useErrorModal();
+  const handleError = useHandleError();
 
   useEffect(() => {
     const unsubscribe = onAuthNavigation((event) => {
@@ -55,10 +57,7 @@ export function AuthNavigationHandler() {
         
         case 'AUTH_ERROR':
           logger.warn('Auth error occurred, staying on current screen', { error: event.error });
-          showError(
-            'Authentication Error',
-            event.error || 'An unexpected authentication error occurred. Please try again.'
-          );
+          handleError('Authentication Error', event.error || 'An unexpected authentication error occurred. Please try again.');
           break;
         
         default:

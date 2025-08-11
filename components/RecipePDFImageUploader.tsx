@@ -1,15 +1,8 @@
 import React, { useState } from 'react';
-import {
-  Alert,
-  TouchableOpacity,
-  View,
-  Text,
-  StyleSheet,
-  ActivityIndicator,
-  Modal,
-} from 'react-native';
+import { TouchableOpacity, View, Text, StyleSheet, ActivityIndicator, Modal } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { useHandleError } from '@/hooks/useHandleError';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import { COLORS, SPACING, RADIUS, ICON_SIZE } from '@/constants/theme';
@@ -40,6 +33,7 @@ type Props = {
 
 const RecipePDFImageUploader = React.forwardRef<any, Props>(({ onUploadComplete, isLoading, style, onShowUploadModal }, ref) => {
   const [isProcessing, setIsProcessing] = useState(false);
+  const handleError = useHandleError();
   const [isPickerActive, setIsPickerActive] = useState(false);
 
   // Expose methods via useImperativeHandle
@@ -52,7 +46,19 @@ const RecipePDFImageUploader = React.forwardRef<any, Props>(({ onUploadComplete,
   const requestPermissions = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission Required', 'We need camera roll permissions to upload images.');
+      handleError(
+        'Permission Required',
+        'We need photo library access to upload images.',
+        { context: 'photos' },
+        {
+          primaryButtonLabel: 'Open Settings',
+          onButtonPress: () => {
+            try { require('react-native').Linking.openSettings(); } finally { /* dismiss modal */ }
+          },
+          secondButtonLabel: 'OK',
+          onSecondButtonPress: () => {/* dismiss modal */},
+        },
+      );
       return false;
     }
     return true;
@@ -240,7 +246,10 @@ const RecipePDFImageUploader = React.forwardRef<any, Props>(({ onUploadComplete,
       }
     } catch (error) {
       console.error('Image picker error:', error);
-      Alert.alert('Error', 'Failed to pick image. Please try again.');
+      handleError('Upload Error', error, { context: 'photos' }, {
+        secondButtonLabel: 'Browse Files',
+        onSecondButtonPress: handleDocumentPicker,
+      });
     } finally {
       setIsPickerActive(false);
     }
@@ -256,7 +265,19 @@ const RecipePDFImageUploader = React.forwardRef<any, Props>(({ onUploadComplete,
       setIsPickerActive(true);
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Required', 'We need camera permissions to take photos.');
+        handleError(
+          'Permission Required',
+          'We need camera permissions to take photos.',
+          { context: 'camera' },
+          {
+            primaryButtonLabel: 'Open Settings',
+            onButtonPress: () => {
+              try { require('react-native').Linking.openSettings(); } catch {}
+            },
+            secondButtonLabel: 'OK',
+            onSecondButtonPress: () => {},
+          },
+        );
         return;
       }
 
@@ -277,7 +298,10 @@ const RecipePDFImageUploader = React.forwardRef<any, Props>(({ onUploadComplete,
       }
     } catch (error) {
       console.error('Camera picker error:', error);
-      Alert.alert('Error', 'Failed to take photo. Please try again.');
+      handleError('Upload Error', error, { context: 'camera' }, {
+        secondButtonLabel: 'Choose Image',
+        onSecondButtonPress: handleImagePicker,
+      });
     } finally {
       setIsPickerActive(false);
     }
@@ -323,7 +347,10 @@ const RecipePDFImageUploader = React.forwardRef<any, Props>(({ onUploadComplete,
       }
     } catch (error) {
       console.error('Document picker error:', error);
-      Alert.alert('Error', 'Failed to pick document. Please try again.');
+      handleError('Upload Error', error, { context: 'documents' }, {
+        secondButtonLabel: 'Browse Files',
+        onSecondButtonPress: handleDocumentPicker,
+      });
     } finally {
       setIsPickerActive(false);
     }
@@ -336,17 +363,8 @@ const RecipePDFImageUploader = React.forwardRef<any, Props>(({ onUploadComplete,
       // Use custom modal if provided
       onShowUploadModal();
     } else {
-      // Fallback to native alert
-      Alert.alert(
-        'Upload Recipe',
-        'Choose how you\'d like to add your recipe',
-        [
-          { text: 'Take Photo', onPress: handleCamera },
-          { text: 'Choose Image', onPress: handleImagePicker },
-          { text: 'Browse Files (PDF/Images)', onPress: handleDocumentPicker },
-          { text: 'Cancel', style: 'cancel' },
-        ]
-      );
+      // Fallback to simple modal flows: prefer using the custom modal provided by parent
+      handleError('Action Required', 'Choose how you would like to add your recipe.');
     }
   };
 

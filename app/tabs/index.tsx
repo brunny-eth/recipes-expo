@@ -39,6 +39,7 @@ import { useRecipeSubmission } from '@/hooks/useRecipeSubmission';
 import { detectInputType } from '../../server/utils/detectInputType';
 import { useAnalytics } from '@/utils/analytics';
 import { useRenderCounter } from '@/hooks/useRenderCounter';
+import { useHandleError } from '@/hooks/useHandleError';
 
 export default function HomeScreen() {
   const [recipeUrl, setRecipeUrl] = useState('');
@@ -60,6 +61,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { showError, hideError } = useErrorModal();
   const { track } = useAnalytics();
+  const handleError = useHandleError();
   
   // Use the new submission hook
   const {
@@ -250,15 +252,18 @@ export default function HomeScreen() {
       if (__DEV__) {
         console.log('[UI] ❌ recipeUrl is empty, showing error');
       }
-      showError(
+      // Use normalized handler to supply the button label via UI options
+      const handleError = require('@/hooks/useHandleError').useHandleError();
+      handleError(
         'Input Required',
         'Add a recipe to get started.\n\nLooking for ideas? Head to the Explore tab.',
         undefined,
-        undefined,
-        'Go to Explore',
-        () => {
-          hideError();
-          router.push('/tabs/library');
+        {
+          secondButtonLabel: 'Go to Explore',
+          onSecondButtonPress: () => {
+            hideError();
+            router.push('/tabs/library');
+          },
         }
       );
       setRecipeUrl(''); // Clear the input bar on error
@@ -275,15 +280,17 @@ export default function HomeScreen() {
       if (__DEV__) {
         console.log('[UI] ❌ Input validation failed');
       }
-      showError(
+      const handleError = require('@/hooks/useHandleError').useHandleError();
+      handleError(
         'Input Not Recognized',
         'Please enter a real dish name (like "chicken soup" or "tomato pasta") or a recipe link',
         undefined,
-        undefined,
-        'Go to Explore',
-        () => {
-          hideError();
-          router.push('/tabs/library');
+        {
+          secondButtonLabel: 'Go to Explore',
+          onSecondButtonPress: () => {
+            hideError();
+            router.push('/tabs/library');
+          },
         }
       );
       setRecipeUrl('');
@@ -393,7 +400,7 @@ export default function HomeScreen() {
       
       if (!result.success) {
         if (result.action === 'show_validation_error' && result.error) {
-          showError('Validation Error', result.error);
+          handleError('Validation Error', result.error, { stage: 'validation' });
         }
         return;
       }
@@ -459,7 +466,7 @@ export default function HomeScreen() {
         inputType: detectInputType(recipeInput),
       });
       
-      showError('Recipe Submission Failed', 'Something went wrong while submitting your recipe. Please try again, and if the problem continues, try pasting the recipe text instead of a URL.');
+      handleError('Recipe Submission Failed', error, { stage: 'navigation' });
     }
   } catch (err) {
     console.error('[🔥 ERROR] Exception in handleSubmit:', err);

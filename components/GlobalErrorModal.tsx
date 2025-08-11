@@ -23,6 +23,7 @@ interface GlobalErrorModalProps {
   message: string;
   onClose: () => void; // overlay tap
   onButtonPress?: () => void; // button action (defaults to onClose)
+  primaryButtonLabel?: string; // optional custom label for primary button
   secondButtonLabel?: string; // label for optional second button
   onSecondButtonPress?: () => void; // action for optional second button
 }
@@ -33,6 +34,7 @@ const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
   message,
   onClose,
   onButtonPress,
+  primaryButtonLabel,
   secondButtonLabel,
   onSecondButtonPress,
 }) => {
@@ -72,6 +74,7 @@ const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
     typeof message === 'string' ? message : String(message ?? '');
 
   const isAccountRequired = safeTitle === 'Account Required';
+  const primaryLabel = primaryButtonLabel || (isAccountRequired ? 'Go to Login' : 'OK');
 
   if (!isRendered) {
     return null;
@@ -86,11 +89,30 @@ const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
       >
         <Text style={styles.message}>{safeMessage}</Text>
         <View style={styles.buttonRow}>
-          <Pressable style={styles.button} onPress={onButtonPress || onClose}>
-            <Text style={styles.buttonText}>{isAccountRequired ? 'Go to Login' : 'OK'}</Text>
+          <Pressable
+            style={styles.button}
+            onPress={() => {
+              // First close (start fade-out), then invoke the callback after the fade to avoid visual flicker
+              onClose();
+              if (onButtonPress) {
+                setTimeout(() => {
+                  try { onButtonPress(); } catch {}
+                }, 230);
+              }
+            }}
+          >
+            <Text style={styles.buttonText}>{primaryLabel}</Text>
           </Pressable>
           {secondButtonLabel && onSecondButtonPress && (
-            <Pressable style={[styles.button, styles.secondaryButton]} onPress={onSecondButtonPress}>
+            <Pressable
+              style={[styles.button, styles.secondaryButton]}
+              onPress={() => {
+                onClose();
+                setTimeout(() => {
+                  try { onSecondButtonPress(); } catch {}
+                }, 230);
+              }}
+            >
               <Text style={[styles.buttonText, styles.secondaryButtonText]}>{secondButtonLabel}</Text>
             </Pressable>
           )}
