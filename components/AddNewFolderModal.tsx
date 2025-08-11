@@ -82,7 +82,7 @@ export default function AddNewFolderModal({
             details: createError.details,
             hint: createError.hint
           });
-          setError('Could not create folder. Please try again.');
+      setError("We couldn't create the folder. Please try again.");
         }
         return;
       }

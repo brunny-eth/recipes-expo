@@ -80,7 +80,7 @@ export default function FolderPickerModal({
 
       if (foldersError) {
         console.error('[FolderPickerModal] Error fetching folders:', foldersError);
-        setError('Could not load folders. Please try again.');
+      setError("We couldn't load your folders. Please try again.");
         return;
       }
 
@@ -145,7 +145,7 @@ export default function FolderPickerModal({
         if (createError.code === '23505') { // Unique constraint violation
           setCreateError('You already have a folder with this name.');
         } else {
-          setCreateError('Could not create folder. Please try again.');
+      setCreateError("We couldn't create the folder. Please try again.");
         }
         return;
       }

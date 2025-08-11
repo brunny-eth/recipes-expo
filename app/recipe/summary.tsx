@@ -1556,7 +1556,7 @@ export default function RecipeSummaryScreen() {
         } else if (result.alreadySaved) {
           handleError('Already Saved', 'This recipe is already saved. Make modifications if you want to save a different variation.');
         } else {
-          handleError('Save Failed', 'Could not save recipe. Please try again.');
+      handleError('Save Failed', "We couldn't save your recipe. Please try again.");
         }
       } catch (error) {
         console.error('Error saving recipe:', error);
@@ -1579,7 +1579,7 @@ export default function RecipeSummaryScreen() {
       if (success) {
         router.replace('/tabs/library' as any);
       } else {
-        handleError('Remove Failed', 'Could not remove recipe from saved. Please try again.');
+        handleError('Remove Failed', "We couldn't remove the recipe. Please try again.");
       }
     } catch (error) {
       console.error('Error removing recipe from saved:', error);
@@ -1883,7 +1883,7 @@ export default function RecipeSummaryScreen() {
   if (!recipe) {
     return (
       <SafeAreaView style={styles.centeredStatusContainer}>
-        <InlineErrorBanner message="Could not load recipe summary." showGoBackButton />
+      <InlineErrorBanner message="We couldn't load the recipe summary." showGoBackButton />
       </SafeAreaView>
     );
   }

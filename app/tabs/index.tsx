@@ -195,7 +195,7 @@ export default function HomeScreen() {
         });
       } else {
         console.error('[HomeScreen] Could not find selected recipe in potentialMatches:', selectedRecipeId);
-        showError('Navigation Error', 'Could not load the selected recipe. Please try again.');
+        showError('Navigation Error', "We couldn't open that recipe. Please try again.");
       }
     } else if (action === 'createNew') {
       track('recipe_create_new_selected', {

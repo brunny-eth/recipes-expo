@@ -654,7 +654,7 @@ export default function StepsScreen() {
         ) : (
           <View style={styles.centeredStatusContainerForBanner}>
             <InlineErrorBanner
-              message="Could not load recipe steps. Data might be missing or invalid."
+        message="We couldn't load the steps. Data might be missing or invalid."
               showGoBackButton={true}
             />
           </View>
