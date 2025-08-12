@@ -10,7 +10,9 @@
     "ios": "expo run:ios",
     "start": "expo start --dev-client",
     "update-normalized-urls": "npx ts-node scripts/updateNormalizedUrls.ts",
-    "reparse-test-recipes": "npx ts-node scripts/reparseAllRecipes.ts"
+    "reparse-test-recipes": "npx ts-node scripts/reparseAllRecipes.ts",
+    "bulk-import": "npx ts-node scripts/bulkImportLocalInputs.ts",
+    "bulk-import-csv": "npx ts-node scripts/bulkImportFromCsv.ts"
   },
   "dependencies": {
     "@d11/react-native-fast-image": "^8.9.2",
@@ -31,6 +33,7 @@
     "@types/pino": "^7.0.4",
     "@vercel/node": "^5.3.5",
     "cheerio": "^1.0.0",
+    "csv-parse": "^6.1.0",
     "dotenv": "^16.6.1",
     "expo": "^53.0.12",
     "expo-apple-authentication": "~7.2.4",

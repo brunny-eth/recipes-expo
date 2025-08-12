@@ -14,9 +14,8 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { supabase } from '@/lib/supabaseClient';
 import { useErrorModal } from './ErrorModalContext';
-import { useSegments } from 'expo-router';
+import { useHandleError } from '@/hooks/useHandleError';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import * as SecureStore from 'expo-secure-store';
 import { createLogger } from '@/utils/logger';
 import { useAnalytics } from '@/utils/analytics';
 
@@ -69,13 +68,18 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   const [isLoading, setIsLoading] = useState(true);
   const [justLoggedIn, setJustLoggedIn] = useState(false);
   const { showError } = useErrorModal();
+  const handleError = useHandleError();
   const { maybeIdentifyUser, resetUser } = useAnalytics();
 
-  // Use refs to access PostHog functions to avoid stale closures
+  // Keep stable references to external callbacks used inside long-lived listeners
+  const showErrorRef = useRef(showError);
   const maybeIdentifyUserRef = useRef(maybeIdentifyUser);
   const resetUserRef = useRef(resetUser);
 
-  // Update refs when functions change
+  useEffect(() => {
+    showErrorRef.current = showError;
+  }, [showError]);
+
   useEffect(() => {
     maybeIdentifyUserRef.current = maybeIdentifyUser;
     resetUserRef.current = resetUser;
@@ -84,13 +88,8 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   // Navigation event listeners
   const navigationListeners = useRef<Set<(event: AuthNavigationEvent) => void>>(new Set());
 
-  // Use refs to access the latest values without causing function re-creation
-  const showErrorRef = useRef(showError);
-
-  // Update refs whenever the values change
-  useEffect(() => {
-    showErrorRef.current = showError;
-  }, [showError]);
+  // Note: We use callbacks directly from hooks (showError, maybeIdentifyUser, resetUser)
+  // and include them in dependency arrays where appropriate instead of storing in refs.
 
   // Navigation event emitter
   const emitNavigationEvent = useCallback((event: AuthNavigationEvent) => {
@@ -171,39 +170,16 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
               error: sessionError.message, 
               url 
             });
-            showErrorRef.current(
+              showErrorRef.current(
               'Authentication Error',
               `Authentication failed: ${sessionError.message}`,
             );
             emitNavigationEvent({ type: 'AUTH_ERROR', error: sessionError.message });
           } else if (newSession) {
+            // We intentionally avoid local state updates and event emission here.
+            // Setting the session triggers Supabase's onAuthStateChange listener, which is our single source of truth.
             logger.info('Session set via deep link', { userId: newSession.user.id });
-            setSession(newSession);
-            setJustLoggedIn(true);
-            
-            // Identify user in PostHog
-            maybeIdentifyUserRef.current(newSession.user);
-            
-            // Check if user is new and update metadata accordingly
-            const isNew = await isNewUser(newSession.user.id);
-            if (isNew) {
-              logger.info('New user detected, updating metadata', { userId: newSession.user.id });
-              const { error: metadataError } = await supabase.auth.updateUser({
-                data: { 
-                  first_login_at: new Date().toISOString(),
-                },
-              });
-              
-              if (metadataError) {
-                logger.error('Error updating new user metadata', { 
-                  userId: newSession.user.id, 
-                  error: metadataError.message 
-                });
-              }
-            }
-
-            // Emit navigation event instead of direct navigation
-            emitNavigationEvent({ type: 'SIGNED_IN', userId: newSession.user.id, userMetadata: newSession.user.user_metadata as UserMetadata });
+            // Do not call setSession / setJustLoggedIn / maybeIdentifyUser / emit SIGNED_IN here
           }
         } catch (e: any) {
           logger.error('Authentication Error: Unexpected error setting session via deeplink', { 
@@ -220,7 +196,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         logger.warn('No access/refresh tokens found in URL fragment', { url });
       }
     },
-    [emitNavigationEvent], // Add emitNavigationEvent back to dependencies
+    [emitNavigationEvent],
   );
 
   // Effect to set up auth state change listener and deep link listener
@@ -318,7 +294,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       authListener?.subscription?.unsubscribe();
       urlSubscription?.remove();
     };
-  }, [handleUrl, emitNavigationEvent]); // Add emitNavigationEvent back to dependencies
+  }, [handleUrl, emitNavigationEvent]);
 
   const signIn = useCallback(async (provider: AuthProvider): Promise<boolean> => {
     logger.info('Sign-in process started', { provider });
@@ -411,10 +387,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           return true; // Indicate success for Apple
         } catch (err: any) {
           logger.error('Apple sign-in failed', { provider, error: err.message });
-          showErrorRef.current(
-            'Sign In Error',
-            err.message || 'An unknown error occurred during Apple sign-in.',
-          );
+          handleError('Sign In Error', err);
           return false; // Indicate failure
         }
       } else { // Google OAuth flow
@@ -424,7 +397,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           const errorMsg =
             'Missing EXPO_PUBLIC_AUTH_URL environment variable. Cannot proceed with authentication.';
           logger.error('Configuration Error: Missing EXPO_PUBLIC_AUTH_URL', { error: errorMsg });
-          showErrorRef.current('Configuration Error', errorMsg);
+          handleError('Configuration Error', errorMsg);
           return false; // Indicate failure
         }
 
@@ -451,44 +424,32 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
             return true; // Indicate that browser flow completed successfully
           } else if (result.type === 'cancel') {
             logger.warn('Web browser session cancelled by user', { provider });
-            showErrorRef.current(
-              'Sign In Cancelled',
-              'You cancelled the sign-in process.',
-            );
+            handleError('Sign In Cancelled', 'You cancelled the sign-in process.');
             return false; // Indicate cancellation
           } else {
             logger.error('Web browser session unknown result type', { 
               provider, 
               resultType: result.type 
             });
-            showErrorRef.current(
-              'Sign In Error',
-              `Sign-in was not completed. Reason: ${result.type}`,
-            );
+            handleError('Sign In Error', `Sign-in was not completed. Reason: ${result.type}`);
             return false; // Indicate other failure
           }
         } else {
           logger.error('Sign-in failed: No redirect URL received', { provider });
-          showErrorRef.current(
-            'Sign In Error',
-            'No redirect URL received. Please try again.',
-          );
+          handleError('Sign In Error', 'No redirect URL received. Please try again.');
           return false; // Indicate failure to get URL
         }
       }
     } catch (err: any) {
       logger.error('Generic Sign-In Error', { error: err.message, provider });
-      showErrorRef.current(
-        'Sign In Error',
-        err.message || 'An unknown error occurred during sign-in.',
-      );
+      handleError('Sign In Error', err);
       return false; // Indicate failure due to an exception
     } finally {
       // Always ensure isLoading is set to false when the signIn process finishes,
       // regardless of success, error, or cancellation.
       setIsLoading(false);
     }
-  }, [handleUrl, showErrorRef]); // Added showErrorRef to dependencies
+  }, [handleUrl, showError]);
 
   const signOut = useCallback(async () => {
     logger.info('Sign-out process initiated', { userId: session?.user?.id });
@@ -542,10 +503,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         userId: session?.user?.id, 
         error: err.message 
       });
-      showErrorRef.current(
-        'Sign Out Error',
-        err.message || 'An unknown error occurred during sign-out.',
-      );
+      handleError('Sign Out Error', err);
 
       logger.info('Local session cleared due to sign out error/timeout', { userId: session?.user?.id });
       setSession(null);
@@ -553,7 +511,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       // Emit navigation event even on error
       emitNavigationEvent({ type: 'SIGNED_OUT' });
     }
-  }, [session?.user?.id, emitNavigationEvent]); // Added emitNavigationEvent to dependencies
+  }, [session?.user?.id, emitNavigationEvent, showError]);
 
   const clearJustLoggedIn = useCallback(() => {
     logger.info('Clearing justLoggedIn flag', { userId: session?.user?.id });

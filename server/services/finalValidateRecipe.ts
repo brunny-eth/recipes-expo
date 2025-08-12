@@ -69,12 +69,31 @@ export function finalValidateRecipe(recipe: CombinedParsedRecipe | null, request
     // Check for hallucinated instructions (too generic, vague, or placeholder-like)
     const instructionHallucinationSigns = checkForInstructionHallucination(recipe.instructions);
     if (instructionHallucinationSigns.length > 0) {
-      logger.warn({ 
-        requestId, 
-        instructionHallucinationSigns,
-        title: recipe.title 
-      }, 'Final validation: Potential instruction hallucination detected');
-      reasons.push(...instructionHallucinationSigns);
+      // Treat certain instruction anomalies as non-fatal (do not fail validation)
+      const nonFatalInstructionSigns = new Set([
+        'Placeholder instructions detected',
+        'Vague instructions detected'
+      ]);
+
+      const fatalInstructionSigns = instructionHallucinationSigns.filter(sign => !nonFatalInstructionSigns.has(sign));
+      const nonFatalDetected = instructionHallucinationSigns.filter(sign => nonFatalInstructionSigns.has(sign));
+
+      if (nonFatalDetected.length > 0) {
+        logger.info({
+          requestId,
+          nonFatalDetected,
+          title: recipe.title
+        }, 'Final validation: Non-fatal instruction anomalies detected');
+      }
+
+      if (fatalInstructionSigns.length > 0) {
+        logger.warn({
+          requestId,
+          instructionHallucinationSigns: fatalInstructionSigns,
+          title: recipe.title
+        }, 'Final validation: Potential instruction hallucination detected');
+        reasons.push(...fatalInstructionSigns);
+      }
     }
   }
   
@@ -106,14 +125,15 @@ export function finalValidateRecipe(recipe: CombinedParsedRecipe | null, request
   }
 
   // Check for overly perfect/unrealistic recipes (sign of hallucination)
+  // Downgrade to informational only; DO NOT fail validation for these.
   const perfectionSigns = checkForOverlyPerfectRecipe(recipe);
   if (perfectionSigns.length > 0) {
-    logger.warn({ 
-      requestId, 
+    logger.info({
+      requestId,
       perfectionSigns,
-      title: recipe.title 
-    }, 'Final validation: Overly perfect recipe detected');
-    reasons.push(...perfectionSigns);
+      title: recipe.title
+    }, 'Final validation: Overly perfect recipe detected (non-fatal)');
+    // Intentionally not pushing to reasons
   }
 
   // Log informational warnings for optional fields, but don't fail validation for them.
@@ -237,24 +257,36 @@ function checkForInstructionHallucination(instructions: string[]): string[] {
   
   instructions.forEach(instruction => {
     const text = instruction.toLowerCase();
-    if (genericInstructions.some(generic => text.includes(generic))) {
+    const wordCount = instruction.trim().split(/\s+/).length;
+    const hasGenericVerb = genericInstructions.some(generic => text.includes(generic));
+    // Only consider a step "generic" if it's very short and relies on boilerplate verbs
+    if (hasGenericVerb && wordCount <= 7) {
       genericCount++;
     }
   });
   
-  // If more than 70% of instructions are generic, it's suspicious
-  if (totalInstructions > 0 && (genericCount / totalInstructions) > 0.7) {
+  // If more than 90% of instructions are short and generic, it's suspicious
+  if (totalInstructions > 0 && (genericCount / totalInstructions) > 0.9) {
     signs.push('Too many generic instructions detected');
   }
   
   // Check for placeholder instructions
-  const placeholderPatterns = [
-    /step/i, /instruction/i, /direction/i, /procedure/i,
-    /as desired/i, /to taste/i, /optional/i, /your preference/i
+  // Treat as placeholder only if the entire instruction is effectively a placeholder,
+  // not when it contains real content like "Step 1: Preheat the oven".
+  const placeholderWholeLinePatterns = [
+    /^instructions?\s*:?\s*$/i,
+    /^directions?\s*:?\s*$/i,
+    /^procedure\s*:?\s*$/i,
+    /^as desired\.?$/i,
+    /^to taste\.?$/i,
+    /^optional\.?$/i,
+    /^your preference\.?$/i,
+    /^step\s*\d*\s*:?\s*$/i // line is just "Step" or "Step 1:"
   ];
   
   instructions.forEach(instruction => {
-    if (placeholderPatterns.some(pattern => pattern.test(instruction))) {
+    const trimmed = instruction.trim();
+    if (placeholderWholeLinePatterns.some(pattern => pattern.test(trimmed))) {
       signs.push('Placeholder instructions detected');
     }
   });
@@ -292,13 +324,20 @@ function checkForTitleHallucination(title: string): string[] {
     signs.push('Generic or vague recipe title detected');
   }
   
-  // Check for placeholder titles
-  const placeholderPatterns = [
-    /recipe/i, /dish/i, /meal/i, /food/i, /cooking/i,
-    /sample/i, /example/i, /template/i, /placeholder/i
+  // Check for placeholder titles (only when the entire title is a placeholder word)
+  const placeholderWholeTitlePatterns = [
+    /^recipes?$/i,
+    /^dishes?$/i,
+    /^meals?$/i,
+    /^food$/i,
+    /^cooking$/i,
+    /^sample$/i,
+    /^example$/i,
+    /^template$/i,
+    /^placeholder$/i
   ];
   
-  if (placeholderPatterns.some(pattern => pattern.test(title))) {
+  if (placeholderWholeTitlePatterns.some(pattern => pattern.test(title.trim()))) {
     signs.push('Placeholder title detected');
   }
   
@@ -310,27 +349,9 @@ function checkForTitleHallucination(title: string): string[] {
  */
 function checkForUnreasonableTimesAndYields(recipe: CombinedParsedRecipe): string[] {
   const signs: string[] = [];
-  
-  // Check for unreasonable cooking times
-  if (recipe.cookTime) {
-    const cookTime = recipe.cookTime.toLowerCase();
-    if (cookTime.includes('hour') || cookTime.includes('hr')) {
-      const hours = parseInt(cookTime.match(/(\d+)/)?.[1] || '0');
-      if (hours > 8) {
-        signs.push('Unreasonably long cooking time detected');
-      }
-    }
-  }
-  
-  if (recipe.totalTime) {
-    const totalTime = recipe.totalTime.toLowerCase();
-    if (totalTime.includes('hour') || totalTime.includes('hr')) {
-      const hours = parseInt(totalTime.match(/(\d+)/)?.[1] || '0');
-      if (hours > 12) {
-        signs.push('Unreasonably long total time detected');
-      }
-    }
-  }
+  // Time sanity checks are intentionally disabled per product decision
+  // (e.g., braises, stock, or smoking can legitimately exceed many hours).
+  // Keeping only the yield sanity check below.
   
   // Check for unreasonable yields
   if (recipe.recipeYield) {
@@ -385,7 +406,7 @@ function checkForOverlyPerfectRecipe(recipe: CombinedParsedRecipe): string[] {
   }
   
   // Check for overly detailed descriptions (sign of hallucination)
-  if (recipe.description && recipe.description.length > 500) {
+  if (recipe.description && recipe.description.length > 1500) {
     signs.push('Overly detailed description');
   }
   

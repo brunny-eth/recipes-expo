@@ -19,8 +19,6 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { useHandleError } from '@/hooks/useHandleError';
-import { normalizeError } from '@/utils/normalizeError';
-import { useErrorModal } from '@/context/ErrorModalContext';
 import { CombinedParsedRecipe as ParsedRecipe } from '../../common/types';
 import { useAnalytics } from '@/utils/analytics';
 import { FONT } from '@/constants/typography';
@@ -57,7 +55,6 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
   const [showSpinner, setShowSpinner] = useState(false);
   const [hideChecklist, setHideChecklist] = useState(false);
   const handleError = useHandleError();
-  const { showError } = useErrorModal();
   const isMountedRef = useRef(true);
   const { track } = useAnalytics();
   
@@ -280,10 +277,11 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
           // The source URL in the recipe data will correctly point to the blog post.
         } else if (result.source === null && !result.recipe) {
           // This is a specific failure case for videos where no recipe or link was found.
-          showError(
+          handleError(
             'Could Not Find Recipe',
             "We couldn't find a recipe in this video's caption or a link to one.",
-            handleBack
+          undefined,
+          { onDismissCallback: handleBack }
           );
           return null; // Stop further processing
         }
@@ -310,25 +308,30 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
             ? processBackendError(result)
             : "We received an incomplete response from the server. Please try again.";
           if (isMountedRef.current) {
-            showError('Oops!', userMessage, handleBack);
+            handleError('Oops!', userMessage, { stage: 'parsing' }, { onDismissCallback: handleBack });
           }
         }
       } else {
         try {
           const errorResponse = await response.json();
           if (isMountedRef.current) {
-            showError('Oops!', processBackendError(errorResponse), handleBack);
+            handleError(
+              'Oops!',
+              processBackendError(errorResponse),
+              { stage: 'parsing', statusCode: response.status },
+              { onDismissCallback: handleBack }
+            );
           }
         } catch {
           const statusMessage = getNetworkErrorMessage(`HTTP ${response.status}`, response.status);
           if (isMountedRef.current) {
-            showError('Oops!', statusMessage, handleBack);
+            handleError('Oops!', statusMessage, { statusCode: response.status }, { onDismissCallback: handleBack });
           }
         }
       }
     } catch (e: any) {
       if (isMountedRef.current) {
-        showError('Oops!', getNetworkErrorMessage(e), handleBack);
+        handleError('Oops!', e, undefined, { onDismissCallback: handleBack });
       }
     } finally {
       setIsParsingFinished(true);

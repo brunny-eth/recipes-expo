@@ -8,22 +8,12 @@ import { convertUnits, availableUnits, Unit, getUnitDisplayName } from './units'
  * Converts decimal amounts to readable fractions for grocery list display
  */
 export function formatAmountForGroceryDisplay(amount: number | null): string | null {
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[groceryHelpers] 📊 formatAmountForGroceryDisplay called with:', amount);
-  }
-  
   if (amount === null || amount === 0) {
-    if (process.env.NODE_ENV === 'development') {
-    console.log('[groceryHelpers] 📊 formatAmountForGroceryDisplay returning null - amount is null or 0');
-  }
     return null;
   }
 
   // Use the existing formatMeasurement function which already handles fractions properly
   const result = formatMeasurement(amount);
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[groceryHelpers] 📊 formatAmountForGroceryDisplay returning:', result);
-  }
   return result;
 }
 

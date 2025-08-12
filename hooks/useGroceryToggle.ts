@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useAnalytics } from '@/utils/analytics';
 import { useErrorModal } from '@/context/ErrorModalContext';
+import { useHandleError } from '@/hooks/useHandleError';
 // Types from mise.tsx
 type GroceryItem = {
   name: string;
@@ -29,6 +30,7 @@ export function useGroceryToggle(
   const { session } = useAuth();
   const { track } = useAnalytics();
   const { showError } = useErrorModal();
+  const handleError = useHandleError();
 
   const handleGroceryToggle = useCallback((itemId: string) => {
     // Optimistically update local state for instant feedback
@@ -82,7 +84,7 @@ export function useGroceryToggle(
           userId: session.user.id,
         });
         // Optionally, revert the optimistic update and show an error
-        showError('Sync Error', 'Could not save check state. Please try again.');
+        handleError('Sync Error', err);
         itemToUpdate!.checked = !newCheckedState;
         setGroceryList([...groceryList]);
       });

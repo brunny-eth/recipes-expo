@@ -154,7 +154,7 @@ export default function SavedFolderDetailScreen() {
 
       if (!response.ok) {
         console.error('[SavedFolderDetailScreen] Error fetching folder recipes:', response.statusText);
-        setError('Could not load recipes. Please try again.');
+    setError("We couldn't load your recipes. Please try again.");
         return;
       }
 

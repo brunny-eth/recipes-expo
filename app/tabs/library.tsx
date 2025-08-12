@@ -28,6 +28,8 @@ import AddNewFolderModal from '@/components/AddNewFolderModal';
 import ConfirmationModal from '@/components/ConfirmationModal';
 import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
 import { useAnalytics } from '@/utils/analytics';
+import { useRenderCounter } from '@/hooks/useRenderCounter';
+import { useHandleError } from '@/hooks/useHandleError';
 
 // Types for folders
 type SavedFolder = {
@@ -56,7 +58,9 @@ export default function LibraryScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ tab?: string }>();
   const { session } = useAuth();
+  useRenderCounter('LibraryScreen', { hasSession: !!session });
   const { showError } = useErrorModal();
+  const handleError = useHandleError();
   const { track } = useAnalytics();
   
   // Tab state
@@ -140,7 +144,7 @@ export default function LibraryScreen() {
         errorMessage: error instanceof Error ? error.message : String(error),
         userId: session?.user?.id,
       });
-      showError('Error', 'Failed to update folder color. Please try again.');
+      handleError('Error', error);
     } finally {
       setIsUpdatingColor(false);
       setFolderToEdit(null);

@@ -44,10 +44,14 @@ import { CombinedParsedRecipe } from '@/common/types';
 import { useRecipeSubmission } from '@/hooks/useRecipeSubmission';
 import { detectInputType } from '../../server/utils/detectInputType';
 import { useAnalytics } from '@/utils/analytics';
+import { useRenderCounter } from '@/hooks/useRenderCounter';
+import { useHandleError } from '@/hooks/useHandleError';
 
 export default function HomeScreen() {
   const [isHomeFocused, setIsHomeFocused] = useState(false);
   const [recipeUrl, setRecipeUrl] = useState('');
+  const { session } = useAuth();
+  useRenderCounter('HomeScreen', { hasSession: !!session });
   
   // Debug: Log recipeUrl state changes
   useEffect(() => {
@@ -63,8 +67,8 @@ export default function HomeScreen() {
   const uploaderRef = useRef<any>(null);
   const router = useRouter();
   const { showError, hideError } = useErrorModal();
-  const { session } = useAuth();
   const { track } = useAnalytics();
+  const handleError = useHandleError();
   
   // Use the new submission hook
   const {
@@ -302,7 +306,7 @@ export default function HomeScreen() {
         });
       } else {
         console.error('[HomeScreen] Could not find selected recipe in potentialMatches:', extra);
-        showError('Navigation Error', 'Could not load the selected recipe. Please try again.');
+        showError('Navigation Error', "We couldn't open that recipe. Please try again.");
       }
     } else if (action === 'createNew') {
       // Prefer user-supplied additional details from modal, otherwise fall back to last typed input
@@ -348,24 +352,54 @@ export default function HomeScreen() {
       console.log('[UI] 🚀 Submit pressed with value:', inputRaw);
     }
 
+    // Prepare shared variables so catch block can reference them
+    const preTrimmed = (inputRaw || '').trim();
+    let localSubmissionId: string | undefined;
+    let localRecipeInput: string = preTrimmed;
+
     try {
-      // Validate
-      if (!inputRaw || inputRaw.trim().length === 0) {
-        showError(
-          'Input Not Recognized',
-          'Please enter a real dish name (like "chicken soup" or "tomato pasta") or a recipe link',
+      // Validate (adopt main's friendlier UX via useHandleError)
+      if (localRecipeInput.length === 0) {
+        const handleError = require('@/hooks/useHandleError').useHandleError();
+        handleError(
+          'Input Required',
+          'Add a recipe to get started.\n\nLooking for ideas? Head to the Explore tab.',
           undefined,
-          undefined,
-          'Go to Explore',
-          () => {
-            hideError();
-            router.push('/tabs/library');
+          {
+            secondButtonLabel: 'Go to Explore',
+            onSecondButtonPress: () => {
+              hideError();
+              router.push('/tabs/library');
+            },
           }
         );
+        // Clear the active input for better UX
+        if (importMode === 'url') setRecipeUrl('');
+        if (importMode === 'name') setRecipeName('');
         return;
       }
 
-      const recipeInput = inputRaw.trim();
+      // Early validation of the text/URL before mode-specific checks
+      if (!isValidRecipeInput(localRecipeInput)) {
+        const handleError = require('@/hooks/useHandleError').useHandleError();
+        handleError(
+          'Input Not Recognized',
+          'Please enter a real dish name (like "chicken soup" or "tomato pasta") or a recipe link',
+          undefined,
+          {
+            secondButtonLabel: 'Go to Explore',
+            onSecondButtonPress: () => {
+              hideError();
+              router.push('/tabs/library');
+            },
+          }
+        );
+        if (importMode === 'url') setRecipeUrl('');
+        if (importMode === 'name') setRecipeName('');
+        return;
+      }
+
+      // localRecipeInput already set above for catch; continue using within try
 
       if (!session) {
         showError(
@@ -376,9 +410,9 @@ export default function HomeScreen() {
         return;
       }
 
-      const submissionId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      localSubmissionId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-      const inputType = detectInputType(recipeInput);
+      const inputType = detectInputType(localRecipeInput);
 
       // If user is in URL mode, strictly require a valid URL or video; do not allow raw text
       if (importMode === 'url' && !(inputType === 'url' || inputType === 'video')) {
@@ -398,9 +432,9 @@ export default function HomeScreen() {
         return;
       }
       try { await track('input_mode_selected', { inputType }); } catch {}
-      try { await track('recipe_submission_started', { inputLength: recipeInput.length, inputType, submissionId, userId: session?.user?.id }); } catch {}
+      try { await track('recipe_submission_started', { inputLength: localRecipeInput.length, inputType, submissionId: localSubmissionId, userId: session?.user?.id }); } catch {}
 
-      const result = await submitRecipe(recipeInput);
+      const result = await submitRecipe(localRecipeInput);
 
       try {
         await track('recipe_submission_result', {
@@ -410,15 +444,15 @@ export default function HomeScreen() {
           matches_count: result.matches?.length,
           recipeId: result.recipe?.id,
           normalizedUrl: result.normalizedUrl,
-          inputType: result.inputType,
-          submissionId,
+           inputType: result.inputType,
+           submissionId: localSubmissionId,
           userId: session?.user?.id,
         });
       } catch {}
 
       if (!result.success) {
         if (result.action === 'show_validation_error' && result.error) {
-          showError('Validation Error', result.error);
+          handleError('Validation Error', result.error, { stage: 'validation' });
         }
         return;
       }
@@ -427,21 +461,32 @@ export default function HomeScreen() {
         // Always show match selection modal for textual queries, regardless of input field used
         setPotentialMatches(result.matches);
         setShowMatchSelectionModal(true);
-        try { await track('recipe_matches_found', { match_count: result.matches.length, submissionId, userId: session?.user?.id }); } catch {}
+        try { await track('recipe_matches_found', { match_count: result.matches.length, submissionId: localSubmissionId, userId: session?.user?.id }); } catch {}
       } else if (result.action === 'navigate_to_summary' && result.recipe) {
-        try { await track('navigation_to_recipe_summary', { recipeId: result.recipe.id, entryPoint: 'new', submissionId, userId: session?.user?.id }); } catch {}
+        try { await track('navigation_to_recipe_summary', { recipeId: result.recipe.id, entryPoint: 'new', submissionId: localSubmissionId, userId: session?.user?.id }); } catch {}
         InteractionManager.runAfterInteractions(() => {
-          router.push({ pathname: '/recipe/summary', params: { recipeData: JSON.stringify(result.recipe), entryPoint: 'new', from: '/tabs', inputType: result.inputType || detectInputType(recipeInput) } });
+          router.push({ pathname: '/recipe/summary', params: { recipeData: JSON.stringify(result.recipe), entryPoint: 'new', from: '/tabs', inputType: result.inputType || detectInputType(localRecipeInput) } });
         });
       } else if (result.action === 'navigate_to_loading' && result.normalizedUrl) {
-        try { await track('navigation_to_loading_screen', { normalizedUrl: result.normalizedUrl, inputType: result.inputType, submissionId, userId: session?.user?.id }); } catch {}
+        try { await track('navigation_to_loading_screen', { normalizedUrl: result.normalizedUrl, inputType: result.inputType, submissionId: localSubmissionId, userId: session?.user?.id }); } catch {}
         InteractionManager.runAfterInteractions(() => {
           router.push({ pathname: '/loading', params: { recipeUrl: result.normalizedUrl, inputType: result.inputType } });
         });
       }
-    } catch (err) {
-      console.error('[🔥 ERROR] Exception in handleSubmitInput:', err);
-      showError('Recipe Submission Failed', 'Something went wrong while submitting your recipe. Please try again.');
+    } catch (error) {
+      console.error('[HomeScreen] Submission error:', error);
+      // Log and show normalized error
+      try {
+        track('recipe_submission_failed', {
+          errorMessage: error instanceof Error ? error.message : String(error),
+          errorStack: error instanceof Error ? error.stack : undefined,
+          submissionId: localSubmissionId || 'unknown',
+          userId: session?.user?.id,
+          recipeInput: localRecipeInput,
+          inputType: detectInputType(localRecipeInput),
+        });
+      } catch {}
+      handleError('Recipe Submission Failed', error, { stage: 'navigation' });
     }
   };
 

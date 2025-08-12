@@ -24,6 +24,7 @@ import SplashScreenMeez from './SplashScreen';
 import { AuthNavigationHandler } from '@/components/AuthNavigationHandler';
 import OfflineBanner from '@/components/OfflineBanner';
 import { getNetworkStatus } from '@/utils/networkUtils';
+import { useRenderCounter } from '@/hooks/useRenderCounter';
 
 SplashScreen.preventAutoHideAsync();
 console.log('[GLOBAL] SplashScreen.preventAutoHideAsync called.');
@@ -41,6 +42,11 @@ function RootLayoutNav() {
   const { session, isLoading: isAuthLoading } = useAuth();
   const router = useRouter();
   const segments = useSegments();
+  useRenderCounter('RootLayoutNav', {
+    sessionUserId: session?.user?.id,
+    isAuthLoading,
+    firstSegment: segments[0],
+  });
 
   // Simplified readiness states
   const [isFirstLaunch, setIsFirstLaunch] = useState<boolean | null>(null); // null means not yet determined

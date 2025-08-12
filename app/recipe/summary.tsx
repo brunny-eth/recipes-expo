@@ -46,6 +46,7 @@ import {
   parseRecipeDisplayName,
 } from '@/utils/ingredientHelpers';
 import { useErrorModal } from '@/context/ErrorModalContext';
+import { useHandleError } from '@/hooks/useHandleError';
 import InlineErrorBanner from '@/components/InlineErrorBanner';
 import {
   sectionHeaderText,
@@ -228,6 +229,7 @@ export default function RecipeSummaryScreen() {
   const params = useLocalSearchParams<{ recipeData?: string; from?: string; appliedChanges?: string; isModified?: string; entryPoint?: string; miseRecipeId?: string; finalYield?: string; originalRecipeData?: string; titleOverride?: string; inputType?: string }>();
   const router = useRouter();
   const { showError, hideError } = useErrorModal();
+  const handleError = useHandleError();
   const { session } = useAuth();
   const { track } = useAnalytics();
   const insets = useSafeAreaInsets();
@@ -542,7 +544,7 @@ export default function RecipeSummaryScreen() {
       try {
         const parsed = JSON.parse(params.recipeData as string);
         if (!parsed || typeof parsed !== 'object' || Object.keys(parsed).length === 0) {
-          showError('Error Loading Summary', 'Recipe data is invalid.');
+          handleError('Error Loading Summary', 'Recipe data is invalid.');
           setIsLoading(false);
           return;
         }
@@ -703,10 +705,10 @@ export default function RecipeSummaryScreen() {
         
 
       } catch (e: any) {
-        showError('Error Loading Summary', `Could not load recipe details: ${e.message}.`);
+        handleError('Error Loading Summary', e);
       }
     } else {
-      showError('Error Loading Summary', 'Recipe data not provided.');
+      handleError('Error Loading Summary', 'Recipe data not provided.');
     }
     setIsLoading(false);
   }, [params.recipeData, params.appliedChanges, showError]);
@@ -863,7 +865,7 @@ export default function RecipeSummaryScreen() {
           willProceed: currentRemovals < 2,
         });
         if (currentRemovals >= 2) {
-          showError('Limit Reached', 'You can only remove up to 2 ingredients.');
+          handleError('Limit Reached', 'You can only remove up to 2 ingredients.');
           return;
         }
       }
@@ -1016,9 +1018,9 @@ export default function RecipeSummaryScreen() {
       
       if (!recipe) {
         console.error('[Summary] No recipe data available for navigation');
-        showError('Navigation Error', 'Recipe data is missing.');
-      return;
-    }
+        handleError('Navigation Error', 'Recipe data is missing.');
+        return;
+      }
 
       const needsSubstitution = currentUnsavedChanges.length > 0;
     const needsScaling = selectedScaleFactor !== 1;
@@ -1101,7 +1103,7 @@ export default function RecipeSummaryScreen() {
 
         } catch (modificationError: any) {
           setIsRewriting(false);
-          showError('Update Failed', `Couldn't apply modifications: ${modificationError.message}`);
+          handleError('Update Failed', modificationError);
           return;
         }
       } else {
@@ -1124,7 +1126,7 @@ export default function RecipeSummaryScreen() {
     // Regular flow for new/saved recipes
     const removalCount = [...persistedChanges, ...currentUnsavedChanges].filter((c) => !c.to).length;
     if (removalCount > 2) {
-      showError('Limit Reached', 'You can only remove up to 2 ingredients per recipe.');
+      handleError('Limit Reached', 'You can only remove up to 2 ingredients per recipe.');
       return;
     }
 
@@ -1182,7 +1184,7 @@ export default function RecipeSummaryScreen() {
         }
         
       } catch (modificationError: any) {
-        showError('Update Failed', `Couldn't update recipe instructions: ${modificationError.message}`);
+        handleError('Update Failed', modificationError);
         return; // Stop navigation on failure
       } finally {
         setIsRewriting(false);
@@ -1281,15 +1283,9 @@ export default function RecipeSummaryScreen() {
 
     // Check authentication before saving
     if (!session?.user?.id) {
-      showError(
-        'Account Required',
-        'You need an account to prepare your mise en place. Sign up to save your recipes!',
-        undefined,
-        () => {
-          hideError();
-          router.push('/login');
-        }
-      );
+      handleError('Authentication Required', 'You need an account to prepare your mise en place.', undefined, {
+        onButtonPress: () => router.push('/login')
+      });
       return;
     }
 
@@ -1327,14 +1323,9 @@ export default function RecipeSummaryScreen() {
         if (response.status === 409) {
           // Recipe already exists in mise with same modifications
           setIsAlreadyInMise(true);
-          showError(
-            'Already in Mise',
-            result.message || 'This recipe with these modifications is already in your mise en place.',
-            () => {
-              hideError();
-              router.push('/tabs/mise');
-            }
-          );
+          handleError('Already in Mise', result.message || 'This recipe with these modifications is already in your mise en place.', undefined, {
+            onButtonPress: () => router.push('/tabs/mise')
+          });
         } else {
           throw new Error(result.error || `Save failed (Status: ${response.status})`);
         }
@@ -1355,7 +1346,7 @@ export default function RecipeSummaryScreen() {
       router.replace('/tabs/mise' as any);
 
     } catch (saveError: any) {
-      showError('Save Failed', `Couldn't save recipe to mise: ${saveError.message}`);
+      handleError('Save Failed', saveError);
       return; // Stop execution on failure
     }
   }, [recipe, scaledIngredients, scaledIngredientGroups, persistedChanges, currentUnsavedChanges, router, showError, selectedScaleFactor, session, entryPoint, miseRecipeId]);
@@ -1397,16 +1388,10 @@ export default function RecipeSummaryScreen() {
   };
 
   const handleSaveToFolder = async (folderId: number) => {
-    if (!recipe?.id || !session?.user) {
-      showError(
-        'Account Required',
-        'You need an account to save recipes. Sign up to save your recipes!',
-        undefined,
-        () => {
-          hideError();
-          router.push('/login');
-        }
-      );
+  if (!recipe?.id || !session?.user) {
+      handleError('Authentication Required', 'You need an account to save recipes.', undefined, {
+        onButtonPress: () => router.push('/login')
+      });
       return;
     }
 
@@ -1561,7 +1546,7 @@ export default function RecipeSummaryScreen() {
       } catch (error: any) {
         setIsSavingForLater(false);
         console.error('Error saving modified recipe:', error);
-        showError('Save Failed', `Could not save modified recipe: ${error.message}`);
+        handleError('Save Failed', error);
       }
     } else {
       // No modifications, save original recipe (instant - no loading state needed)
@@ -1582,23 +1567,22 @@ export default function RecipeSummaryScreen() {
           // Navigate to the specific folder that the recipe was saved to
           router.replace(`/saved/folder-detail?folderId=${folderId}` as any);
         } else if (result.alreadySaved) {
-          showError(
-            'Recipe Already Saved', 
-            'This recipe is already saved. Make modifications if you want to save a different variation.'
-          );
+          handleError('Already Saved', 'This recipe is already saved. Make modifications if you want to save a different variation.');
         } else {
-          showError('Save Failed', 'Could not save recipe. Please try again.');
+      handleError('Save Failed', "We couldn't save your recipe. Please try again.");
         }
       } catch (error) {
         console.error('Error saving recipe:', error);
-        showError('Save Failed', 'Could not save recipe. Please try again.');
+        handleError('Save Failed', error);
       }
     }
   };
 
   const handleRemoveFromSaved = async () => {
     if (!recipe?.id || !session?.user) {
-      showError('Account Required', 'You need an account to manage saved recipes.');
+      handleError('Authentication Required', 'You need an account to manage saved recipes.', undefined, {
+        onButtonPress: () => router.push('/login')
+      });
       return;
     }
 
@@ -1608,11 +1592,11 @@ export default function RecipeSummaryScreen() {
       if (success) {
         router.replace('/tabs/library' as any);
       } else {
-        showError('Remove Failed', 'Could not remove recipe from saved. Please try again.');
+        handleError('Remove Failed', "We couldn't remove the recipe. Please try again.");
       }
     } catch (error) {
       console.error('Error removing recipe from saved:', error);
-      showError('Remove Failed', 'Could not remove recipe from saved. Please try again.');
+      handleError('Remove Failed', error);
     }
   };
 
@@ -1654,7 +1638,7 @@ export default function RecipeSummaryScreen() {
         // Check removal limit
         const removalCount = [...persistedChanges, ...currentUnsavedChanges].filter((c) => !c.to).length;
         if (removalCount > 2) {
-          showError('Limit Reached', 'You can only remove up to 2 ingredients per recipe.');
+          handleError('Limit Reached', 'You can only remove up to 2 ingredients per recipe.');
           setIsCookingNow(false);
           return;
         }
@@ -1734,7 +1718,7 @@ export default function RecipeSummaryScreen() {
 
     } catch (error: any) {
       console.error('[Summary] Error in cook now:', error);
-      showError('Cook Now Failed', `Could not start cooking: ${error.message}`);
+      handleError('Cook Now Failed', error);
     } finally {
       setIsCookingNow(false);
     }
@@ -1747,7 +1731,9 @@ export default function RecipeSummaryScreen() {
     }
 
     if (!session?.user?.id) {
-      showError('Authentication Required', 'You must be logged in to save modifications.');
+      handleError('Authentication Required', 'You must be logged in to save modifications.', undefined, {
+        onButtonPress: () => router.push('/login')
+      });
       return;
     }
 
@@ -1893,7 +1879,7 @@ export default function RecipeSummaryScreen() {
 
     } catch (error: any) {
       console.error('[Summary] Failed to save modifications:', error);
-      showError('Save Failed', `Could not save modifications: ${error.message}`);
+      handleError('Save Failed', error);
     } finally {
       setIsSavingModifications(false);
     }
@@ -1910,7 +1896,7 @@ export default function RecipeSummaryScreen() {
   if (!recipe) {
     return (
       <SafeAreaView style={styles.centeredStatusContainer}>
-        <InlineErrorBanner message="Could not load recipe summary." showGoBackButton />
+      <InlineErrorBanner message="We couldn't load the recipe summary." showGoBackButton />
       </SafeAreaView>
     );
   }

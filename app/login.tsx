@@ -1,16 +1,6 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-  Platform,
-  ViewStyle,
-  TextStyle,
-  Image,
-  Alert,
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Platform, ViewStyle, TextStyle, Image } from 'react-native';
+import { useHandleError } from '@/hooks/useHandleError';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
 import { useSuccessModal } from '@/context/SuccessModalContext';
@@ -26,6 +16,7 @@ type AuthProvider = 'google' | 'apple';
 
 const LoginScreen = () => {
   const { signIn, isLoading: isAuthLoading } = useAuth();
+  const handleError = useHandleError();
   const { showSuccess } = useSuccessModal();
   const [isSigningIn, setIsSigningIn] = useState<AuthProvider | null>(null);
 
@@ -53,11 +44,7 @@ const LoginScreen = () => {
       if (isSigningIn === provider) {
         console.warn(`[LoginScreen] Sign-in timeout for ${provider}`);
         setIsSigningIn(null);
-        Alert.alert(
-          'Sign-in Timeout',
-          'The sign-in process is taking longer than expected. Please try again.',
-          [{ text: 'OK' }]
-        );
+        handleError('Sign-in Timeout', 'The sign-in process is taking longer than expected. Please try again.');
       }
     }, 30000); // 30 second timeout
     

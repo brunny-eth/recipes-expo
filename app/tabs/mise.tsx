@@ -31,7 +31,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useErrorModal } from '@/context/ErrorModalContext';
+import { useHandleError } from '@/hooks/useHandleError';
 import { useAnalytics } from '@/utils/analytics';
+import { useRenderCounter } from '@/hooks/useRenderCounter';
 import ScreenHeader from '@/components/ScreenHeader';
 import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
 import { parseServingsValue } from '@/utils/recipeUtils';
@@ -305,7 +307,9 @@ export default function MiseScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { session } = useAuth();
+  useRenderCounter('MiseScreen', { hasSession: !!session });
   const { showError } = useErrorModal();
+  const handleError = useHandleError();
   const { track } = useAnalytics();
   const { hasResumableSession, state: cookingState, invalidateSession } = useCooking();
   const [miseRecipes, setMiseRecipes] = useState<MiseRecipe[]>([]);
@@ -691,7 +695,7 @@ export default function MiseScreen() {
         errorStack: err instanceof Error ? err.stack : undefined,
         userId: session?.user?.id,
       });
-      showError('Recipe Error', 'Failed to update completion status. Please try again.');
+      handleError('Recipe Error', err);
     }
   }, [session, showError, track]);
 
@@ -739,7 +743,7 @@ export default function MiseScreen() {
         errorStack: err instanceof Error ? err.stack : undefined,
         userId: session?.user?.id,
       });
-      showError('Error', errorMessage);
+      handleError('Error', err);
     }
   }, [session, showError, refreshGroceryListOnly, track]);
 
@@ -797,7 +801,7 @@ export default function MiseScreen() {
           userId: session.user.id,
         });
         // Optionally, revert the optimistic update and show an error
-        showError('Sync Error', 'Could not save check state. Please try again.');
+        handleError('Sync Error', err);
         itemToUpdate!.checked = !newCheckedState;
         setGroceryList([...groceryList]);
       });
@@ -883,7 +887,7 @@ export default function MiseScreen() {
         errorStack: error instanceof Error ? error.stack : undefined,
         userId: session?.user?.id,
       });
-      showError('Share Error', 'Failed to share grocery list');
+      handleError('Share Error', error);
     }
   }, [groceryList, miseRecipes, showError, staplesEnabled, selectedStaples, sortMode, track, session?.user?.id]);
 
@@ -918,7 +922,7 @@ export default function MiseScreen() {
         errorStack: error instanceof Error ? error.stack : undefined,
         userId: session?.user?.id,
       });
-      showError('Error', 'Failed to add item. Please try again.');
+      handleError('Error', error);
     }
   }, [manualItems, groceryList, showError, track, session?.user?.id]);
 
@@ -951,7 +955,7 @@ export default function MiseScreen() {
         errorStack: error instanceof Error ? error.stack : undefined,
         userId: session?.user?.id,
       });
-      showError('Error', 'Failed to delete item. Please try again.');
+      handleError('Error', error);
     }
   }, [manualItems, groceryList, showError, track, session?.user?.id]);
 
@@ -982,7 +986,7 @@ export default function MiseScreen() {
         errorStack: error instanceof Error ? error.stack : undefined,
         userId: session?.user?.id,
       });
-      showError('Error', 'Failed to clear items. Please try again.');
+      handleError('Error', error);
     }
   }, [groceryList, showError, track, session?.user?.id]);
 

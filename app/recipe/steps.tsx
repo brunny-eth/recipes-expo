@@ -36,6 +36,7 @@ import ToolsModal from '@/components/ToolsModal';
 import MiniTimerDisplay from '@/components/MiniTimerDisplay';
 import { ActiveTool } from '@/components/ToolsModal';
 import { useErrorModal } from '@/context/ErrorModalContext';
+import { useHandleError } from '@/hooks/useHandleError';
 import InlineErrorBanner from '@/components/InlineErrorBanner';
 import { StructuredIngredient, CombinedParsedRecipe as ParsedRecipe, IngredientGroup } from '../../common/types';
 import { IngredientChange } from '../../server/llm/modificationPrompts';
@@ -73,6 +74,7 @@ export default function StepsScreen() {
   }>();
   const router = useRouter();
   const { showError } = useErrorModal();
+  const handleError = useHandleError();
   const { session } = useAuth();
   const { track } = useAnalytics();
 
@@ -230,20 +232,14 @@ export default function StepsScreen() {
 
       } else {
         console.error('[StepsScreen] ❌ No recipe data provided in params');
-        showError(
-          'Error Loading Steps',
-          'Recipe data was not provided. Please go back and try again.',
-        );
+        handleError('Error Loading Steps', 'Recipe data was not provided. Please go back and try again.');
         setInstructions([]);
         setIsLoading(false);
         return;
       }
     } catch (e: any) {
       console.error('[StepsScreen] ❌ Error parsing recipe data from params:', e);
-      showError(
-        'Error Loading Steps',
-        `Could not load recipe data: ${e.message}. Please go back and try again.`,
-      );
+      handleError('Error Loading Steps', e);
       setInstructions([]);
       setIsLoading(false);
       return;
@@ -285,7 +281,7 @@ export default function StepsScreen() {
           if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
           setTimerTimeRemaining(0);
           // Optional: Add sound/vibration feedback here
-          showError('Timer', "Time's up!");
+          handleError('Timer', "Time's up!");
         } else {
           setTimerTimeRemaining(newTimeRemaining);
         }
@@ -658,7 +654,7 @@ export default function StepsScreen() {
         ) : (
           <View style={styles.centeredStatusContainerForBanner}>
             <InlineErrorBanner
-              message="Could not load recipe steps. Data might be missing or invalid."
+        message="We couldn't load the steps. Data might be missing or invalid."
               showGoBackButton={true}
             />
           </View>
