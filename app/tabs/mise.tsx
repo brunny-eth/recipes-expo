@@ -1224,7 +1224,7 @@ export default function MiseScreen() {
           />
           <Text style={styles.emptyText}>Log in to see your mise</Text>
           <Text style={styles.emptySubtext}>
-            Your mise recipes and shopping list will appear here once you're logged in.
+            Your mise recipes and shopping list will appear here once you&apos;re logged in.
           </Text>
           <TouchableOpacity
             style={styles.retryButton}
@@ -1244,7 +1244,7 @@ export default function MiseScreen() {
             size={48}
             color={COLORS.lightGray}
           />
-          <Text style={styles.emptyText}>Couldn't load mise recipes</Text>
+          <Text style={styles.emptyText}>Couldn&apos;t load mise recipes</Text>
           <Text style={styles.emptySubtext}>{error}</Text>
           <TouchableOpacity
             style={styles.retryButton}

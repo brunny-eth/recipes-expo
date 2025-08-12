@@ -163,7 +163,7 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
           ) : (
             <>
               <View style={styles.header}>
-                <Text style={styles.title}>OK! We'll make a new recipe</Text>
+                <Text style={styles.title}>OK! We&apos;ll make a new recipe</Text>
                 <Text style={styles.subtitle}>Want to add any more detail? This helps us create the best recipe.</Text>
               </View>
 

@@ -565,7 +565,7 @@ export default function LibraryScreen() {
           <MaterialCommunityIcons name="login" size={48} color={COLORS.lightGray} />
           <Text style={styles.emptyText}>Log in to see your recipe folders</Text>
           <Text style={styles.emptySubtext}>
-            Your saved recipe folders will appear here once you're logged in.
+            Your saved recipe folders will appear here once you&apos;re logged in.
           </Text>
           <TouchableOpacity
             style={styles.loginButton}
@@ -706,7 +706,7 @@ export default function LibraryScreen() {
                onPress={(e) => e.stopPropagation()}
              >
                <Text style={styles.colorPickerTitle}>
-                 Choose a color for "{folderToEdit.name}"
+                 Choose a color for &quot;{folderToEdit.name}&quot;
                </Text>
                
                <View style={styles.colorGrid}>
