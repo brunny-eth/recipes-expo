@@ -3,19 +3,20 @@ import { Tabs } from 'expo-router';
 import { StyleSheet, Platform, View, Text } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons'; 
 import { COLORS } from '@/constants/theme';
-import { captionText } from '@/constants/typography';
+import { captionText, FONT } from '@/constants/typography';
 
 const styles = StyleSheet.create({
   tabBar: {
-    borderTopWidth: 1,
-    borderTopColor: COLORS.lightGray,
-    height: 60,
-    paddingBottom: Platform.OS === 'ios' ? 20 : 8,
-    paddingTop: 4,
+    borderTopWidth: 0,
+    borderTopColor: 'transparent',
+    height: 72,
+    paddingBottom: Platform.OS === 'ios' ? 26 : 12,
+    paddingTop: 6,
   },
   tabBarLabel: {
     ...captionText,
     fontSize: 11,
+    fontWeight: '600',
   },
   tabBarItem: {
     alignItems: 'center',
@@ -24,7 +25,8 @@ const styles = StyleSheet.create({
   },
   tabBarText: {
     ...captionText,
-    fontSize: 11,
+    fontSize: 13,
+    fontWeight: '600',
     textAlign: 'center',
     width: 70,
   },
@@ -69,8 +71,8 @@ const MemoizedTabsNavigator = React.memo(() => {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Start',
-          tabBarIcon: createTabBarIcon('silverware-fork-knife', 'Start'),
+          title: 'Import',
+          tabBarIcon: createTabBarIcon('silverware-fork-knife', 'Import'),
           tabBarLabel: () => null,
           unmountOnBlur: false,
         }}
@@ -78,8 +80,8 @@ const MemoizedTabsNavigator = React.memo(() => {
       <Tabs.Screen
         name="library"
         options={{
-          title: 'Library',
-          tabBarIcon: createTabBarIcon('book-open-variant', 'Library'),
+          title: 'Cookbooks',
+          tabBarIcon: createTabBarIcon('book-open-variant', 'Cookbooks'),
           tabBarLabel: () => null,
           unmountOnBlur: false,
         }}
@@ -96,13 +98,12 @@ const MemoizedTabsNavigator = React.memo(() => {
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Account',
-          tabBarIcon: createTabBarIcon('account', 'Account'),
+          title: 'Settings',
+          tabBarIcon: createTabBarIcon('cog', 'Settings'),
           tabBarLabel: () => null,
           unmountOnBlur: false,
         }}
       />
-
 
     </Tabs>
   );

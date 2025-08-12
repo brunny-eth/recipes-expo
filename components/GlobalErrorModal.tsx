@@ -12,6 +12,7 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
   withTiming,
+    withDelay,
   runOnJS,
 } from 'react-native-reanimated';
 import { COLORS, OVERLAYS, SPACING, RADIUS } from '../constants/theme';
@@ -41,6 +42,7 @@ const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
   const [isRendered, setIsRendered] = useState(visible);
   const scale = useSharedValue(0.7);
   const opacity = useSharedValue(0);
+  const contentOpacity = useSharedValue(0);
 
   useEffect(() => {
     try {
@@ -48,8 +50,10 @@ const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
         setIsRendered(true);
         scale.value = withSpring(1, { damping: 15, stiffness: 200 });
         opacity.value = withTiming(1, { duration: 200 });
+        contentOpacity.value = withDelay(50, withTiming(1, { duration: 150 }));
       } else {
         scale.value = withSpring(0.7, { damping: 15, stiffness: 200 });
+        contentOpacity.value = withTiming(0, { duration: 120 });
         opacity.value = withTiming(0, { duration: 200 }, (isFinished) => {
           'worklet';
           if (isFinished) {
@@ -66,6 +70,12 @@ const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
     return {
       transform: [{ scale: scale.value }],
       opacity: opacity.value,
+    };
+  });
+
+  const contentStyle = useAnimatedStyle(() => {
+    return {
+      opacity: contentOpacity.value,
     };
   });
 
@@ -87,7 +97,9 @@ const GlobalErrorModal: React.FC<GlobalErrorModalProps> = ({
         onStartShouldSetResponder={() => true}
         onResponderStart={e => e.stopPropagation()}
       >
-        <Text style={styles.message}>{safeMessage}</Text>
+        <Animated.View style={contentStyle}>
+          <Text style={styles.message}>{safeMessage}</Text>
+        </Animated.View>
         <View style={styles.buttonRow}>
           <Pressable
             style={styles.button}

@@ -21,9 +21,10 @@ import {
   screenTitleText,
   bodyStrongText,
   bodyText,
-  bodyTextLoose,
   sectionHeaderText,
   FONT,
+  captionText,
+  metaText,
 } from '@/constants/typography';
 import { SHADOWS } from '@/constants/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -349,42 +350,15 @@ export default function MiseScreen() {
     }
   }, []); // Remove dependencies to prevent infinite re-renders
 
-  // Load sort mode preference from storage
+  // Load sort mode preference from storage (deprecated; always category)
   const loadSortModeFromStorage = useCallback(async () => {
-    try {
-      const stored = await AsyncStorage.getItem(GROCERY_SORT_MODE_KEY);
-      if (stored && (stored === 'category' || stored === 'alphabetical')) {
-        setSortMode(stored as 'category' | 'alphabetical');
-      }
-    } catch (error) {
-      // Track error without causing re-renders
-      if (session?.user?.id) {
-        track('mise_sort_mode_load_error', {
-          errorMessage: error instanceof Error ? error.message : String(error),
-          errorStack: error instanceof Error ? error.stack : undefined,
-          userId: session.user.id,
-        });
-      }
-      // Default to category mode on error
-    }
-  }, []); // Remove dependencies to prevent infinite re-renders
+    setSortMode('category');
+  }, []);
 
-  // Save sort mode preference to storage
-  const saveSortModeToStorage = useCallback(async (mode: 'category' | 'alphabetical') => {
-    try {
-      await AsyncStorage.setItem(GROCERY_SORT_MODE_KEY, mode);
-    } catch (error) {
-      // Track error without causing re-renders
-      if (session?.user?.id) {
-        track('mise_sort_mode_save_error', {
-          errorMessage: error instanceof Error ? error.message : String(error),
-          errorStack: error instanceof Error ? error.stack : undefined,
-          userId: session.user.id,
-          sortMode: mode,
-        });
-      }
-    }
-  }, []); // Remove dependencies to prevent infinite re-renders
+  // Save sort mode preference (deprecated no-op)
+  const saveSortModeToStorage = useCallback(async (_mode: 'category' | 'alphabetical') => {
+    // no-op; alphabetical sorting removed
+  }, []);
 
   // Load household staples preferences from storage
   const loadStaplesPreferences = useCallback(async () => {
@@ -1031,12 +1005,10 @@ export default function MiseScreen() {
     await handleAddManualItem(selectedCategory, itemText);
   }, [handleAddManualItem, selectedCategory]);
 
-  // Sort mode toggle
+  // Sort mode toggle (deprecated)
   const handleToggleSortMode = useCallback(async () => {
-    const newMode = sortMode === 'category' ? 'alphabetical' : 'category';
-    setSortMode(newMode);
-    await saveSortModeToStorage(newMode);
-  }, [sortMode, saveSortModeToStorage]);
+    setSortMode('category');
+  }, []);
 
   // Household staples toggle
   const handleToggleStaples = useCallback(async () => {
@@ -1147,24 +1119,23 @@ export default function MiseScreen() {
       {item.items.map((groceryItem, index) => {
         const isLastItem = index === item.items.length - 1;
         return (
-          <View
+          <TouchableOpacity
             key={groceryItem.id}
             style={[
               styles.groceryItem,
               isLastItem && styles.groceryItemLast
             ]}
+            onPress={() => handleGroceryToggle(groceryItem.id)}
+            activeOpacity={0.8}
           >
-            <TouchableOpacity
-              style={styles.groceryItemCheckbox}
-              onPress={() => handleGroceryToggle(groceryItem.id)}
-            >
+            <View style={styles.groceryItemCheckbox}>
               <MaterialCommunityIcons
                 name={groceryItem.checked ? "checkbox-marked" : "checkbox-blank-outline"}
                 size={28}
                 color={groceryItem.checked ? COLORS.primary : COLORS.textMuted}
               />
-            </TouchableOpacity>
-            
+            </View>
+
             <View style={styles.groceryItemTextContainer}>
               <Text 
                 style={[
@@ -1226,7 +1197,7 @@ export default function MiseScreen() {
                 <MaterialCommunityIcons name="close" size={16} color={COLORS.textMuted} />
               </TouchableOpacity>
             )}
-          </View>
+          </TouchableOpacity>
         );
       })}
     </View>
@@ -1253,7 +1224,7 @@ export default function MiseScreen() {
           />
           <Text style={styles.emptyText}>Log in to see your mise</Text>
           <Text style={styles.emptySubtext}>
-            Your mise recipes and shopping list will appear here once you're logged in.
+            Your mise recipes and shopping list will appear here once you&apos;re logged in.
           </Text>
           <TouchableOpacity
             style={styles.retryButton}
@@ -1273,7 +1244,7 @@ export default function MiseScreen() {
             size={48}
             color={COLORS.lightGray}
           />
-          <Text style={styles.emptyText}>Couldn't load mise recipes</Text>
+          <Text style={styles.emptyText}>Couldn&apos;t load mise recipes</Text>
           <Text style={styles.emptySubtext}>{error}</Text>
           <TouchableOpacity
             style={styles.retryButton}
@@ -1359,7 +1330,7 @@ export default function MiseScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScreenHeader title="Your prep station" />
+        <ScreenHeader title="Prep station" showBack={false} />
       
       {/* Tab selector - underline style */}
       <View style={styles.tabContainer}>
@@ -1371,9 +1342,9 @@ export default function MiseScreen() {
             styles.tabButtonText,
             selectedTab === 'recipes' && styles.tabButtonTextActive
           ]}>
-            Recipes
+            Ready to Cook
           </Text>
-          {selectedTab === 'recipes' && <View style={styles.tabUnderline} />}
+          {/* underline removed */}
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.tabButton}
@@ -1385,48 +1356,52 @@ export default function MiseScreen() {
           ]}>
             Shopping List
           </Text>
-          {selectedTab === 'grocery' && <View style={styles.tabUnderline} />}
+          {/* underline removed */}
         </TouchableOpacity>
       </View>
 
-      {/* Subheading for recipes tab */}
-      {selectedTab === 'recipes' && (
-        <Text style={styles.subheading}>
-          Recipes you're getting ready to cook.
-        </Text>
-      )}
+
 
       {/* Controls for grocery tab */}
       {selectedTab === 'grocery' && groceryList.length > 0 && (
         <View style={styles.groceryControls}>
+          {session && (
+            <TouchableOpacity
+              style={styles.shareButton}
+              onPress={handleShareGrocery}
+            >
+              <MaterialCommunityIcons name="export" size={16} color={COLORS.white} />
+              <Text style={styles.shareButtonText}>Share</Text>
+            </TouchableOpacity>
+          )}
+
+          <View style={{ flex: 1 }} />
+
           <TouchableOpacity
-            style={styles.sortToggle}
-            onPress={handleToggleSortMode}
+            style={styles.staplesSettingsButton}
+            onPress={handleOpenStaplesModal}
+            accessibilityLabel="Pantry settings"
+            accessibilityHint="Opens pantry selection settings"
           >
-            <Text style={styles.sortToggleText}>
-              Sort: {sortMode === 'alphabetical' ? 'By Category' : 'A-Z'}
+            <MaterialCommunityIcons name="tune" size={16} color={COLORS.primary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.staplesButton,
+              !staplesEnabled && styles.staplesButtonDisabled,
+            ]}
+            onPress={handleToggleStaples}
+          >
+            <Text
+              style={[
+                styles.staplesButtonText,
+                !staplesEnabled && styles.staplesButtonTextDisabled,
+              ]}
+            >
+              {staplesEnabled ? 'Hide pantry' : 'Show pantry'}
             </Text>
           </TouchableOpacity>
-          
-          <View style={styles.staplesControlsContainer}>
-            <TouchableOpacity
-              style={styles.staplesToggle}
-              onPress={handleToggleStaples}
-            >
-              <Text style={styles.staplesToggleText}>
-                {staplesEnabled ? 'Show Staples' : 'Hide Staples'}
-              </Text>
-            </TouchableOpacity>
-            
-            {selectedStaples.length > 0 && (
-              <TouchableOpacity
-                style={styles.staplesConfigButton}
-                onPress={handleOpenStaplesModal}
-              >
-                <MaterialCommunityIcons name="format-list-checks" size={16} color={COLORS.textMuted} />
-              </TouchableOpacity>
-            )}
-          </View>
         </View>
       )}
 
@@ -1444,16 +1419,7 @@ export default function MiseScreen() {
         </TouchableOpacity>
       )}
       
-      {/* Floating Action Button for sharing grocery list */}
-      {selectedTab === 'grocery' && session && groceryList.length > 0 && (
-        <TouchableOpacity
-          style={styles.floatingActionButton}
-          onPress={handleShareGrocery}
-        >
-          <MaterialCommunityIcons name="export" size={20} color={COLORS.white} />
-          <Text style={styles.floatingButtonText}>Share</Text>
-        </TouchableOpacity>
-      )}
+
 
       {/* Add Manual Item Modal */}
       <AddManualItemModal
@@ -1469,6 +1435,8 @@ export default function MiseScreen() {
         onClose={handleCloseStaplesModal}
         selectedStaples={selectedStaples}
         onStaplesChange={handleStaplesChange}
+        staplesEnabled={staplesEnabled}
+        onStaplesToggle={handleToggleStaples}
       />
 
     </View>
@@ -1512,7 +1480,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase' as const,
   } as TextStyle,
   tabButtonTextActive: {
-    color: COLORS.textDark,
+    color: COLORS.primary,
   } as TextStyle,
   listContent: {
     paddingTop: SPACING.sm,
@@ -1532,7 +1500,7 @@ const styles = StyleSheet.create({
     paddingTop: '30%', // Move content higher up on the screen
   } as ViewStyle,
   emptyText: {
-            fontFamily: FONT.family.ubuntu,
+            fontFamily: FONT.family.heading,
     fontSize: 18,
     color: COLORS.textDark,
     marginTop: SPACING.md,
@@ -1630,8 +1598,10 @@ const styles = StyleSheet.create({
   groceryCategoryTitle: {
     ...bodyStrongText,
     color: COLORS.textDark,
-    fontSize: FONT.size.lg,
-    fontWeight: 'bold',
+    fontSize: FONT.size.caption,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   } as TextStyle,
   addButton: {
     padding: SPACING.xs,
@@ -1656,15 +1626,13 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   groceryItemText: {
     ...bodyText,
-    fontSize: FONT.size.bodyMedium,
+    fontSize: FONT.size.body,
     color: COLORS.textDark,
   } as TextStyle,
   groceryItemSubtext: {
-    ...bodyText,
-    fontSize: FONT.size.caption,
+    ...metaText,
     color: COLORS.textMuted,
-    fontStyle: 'italic',
-    marginTop: 2,
+    marginTop: 4,
   } as TextStyle,
   groceryItemPreparation: {
     ...bodyText,
@@ -1685,25 +1653,7 @@ const styles = StyleSheet.create({
     padding: SPACING.xs,
     marginLeft: SPACING.xs,
   } as ViewStyle,
-  floatingActionButton: {
-    position: 'absolute',
-    bottom: SPACING.xl,
-    right: SPACING.xl,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.primary,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...SHADOWS.medium,
-  } as ViewStyle,
-  floatingButtonText: {
-    ...bodyStrongText,
-    color: COLORS.white,
-    fontSize: FONT.size.smBody,
-    marginLeft: SPACING.xs,
-  } as TextStyle,
+
   cookingSessionButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1720,17 +1670,8 @@ const styles = StyleSheet.create({
   cookingSessionButtonText: {
     ...bodyStrongText,
     color: COLORS.white,
-    marginLeft: SPACING.sm,
   } as TextStyle,
-  subheading: {
-    ...bodyText,
-    fontSize: FONT.size.body,
-    fontWeight: '300',
-    color: COLORS.textMuted,
-    textAlign: 'center',
-    marginBottom: SPACING.md,
-    marginTop: SPACING.xs,
-  } as TextStyle,
+
   
   groceryControls: {
     flexDirection: 'row',
@@ -1743,61 +1684,78 @@ const styles = StyleSheet.create({
   sortToggle: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: SPACING.xs,
-    paddingHorizontal: SPACING.sm,
-    backgroundColor: COLORS.surface,
+    justifyContent: 'center',
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    backgroundColor: COLORS.primary,
     borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: COLORS.primaryLight,
+    flex: 1,
+    marginHorizontal: SPACING.xs,
   } as ViewStyle,
   
   sortToggleText: {
     ...bodyText,
     fontSize: FONT.size.caption,
-    color: COLORS.primary,
+    color: COLORS.white,
     marginLeft: SPACING.xs,
     fontWeight: '500',
   } as TextStyle,
 
-  staplesToggle: {
+
+  shareButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: SPACING.xs,
-    paddingHorizontal: SPACING.sm,
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.sm,
-    borderWidth: BORDER_WIDTH.default,
-    borderColor: COLORS.primaryLight,
-  } as ViewStyle,
-  
-  staplesToggleActive: {
+    justifyContent: 'center',
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
     backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    borderRadius: RADIUS.sm,
+    marginRight: SPACING.xs,
   } as ViewStyle,
-  
-  staplesToggleText: {
+  shareButtonText: {
     ...bodyText,
     fontSize: FONT.size.caption,
-    color: COLORS.primary,
+    color: COLORS.white,
+    marginLeft: SPACING.xs,
     fontWeight: '500',
   } as TextStyle,
-  
-  staplesToggleTextActive: {
-    color: COLORS.white,
-  } as TextStyle,
-  
-  staplesControlsContainer: {
+  staplesButton: {
     flexDirection: 'row',
     alignItems: 'center',
-  } as ViewStyle,
-  
-  staplesConfigButton: {
-    padding: SPACING.xs,
+    justifyContent: 'center',
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    backgroundColor: COLORS.primary,
     borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.surface,
-    borderWidth: BORDER_WIDTH.hairline,
-    borderColor: COLORS.primaryLight,
-    marginLeft: SPACING.xs,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    marginLeft: 0,
+    minWidth: 120,
+  } as ViewStyle,
+  staplesButtonText: {
+    ...bodyText,
+    fontSize: FONT.size.caption,
+    color: COLORS.white,
+    fontWeight: '500',
+    minWidth: 0,
+    textAlign: 'center',
+  } as TextStyle,
+  staplesButtonDisabled: {
+    backgroundColor: COLORS.white,
+  } as ViewStyle,
+  staplesButtonTextDisabled: {
+    color: COLORS.primary,
+  } as TextStyle,
+  staplesSettingsButton: {
+    height: 32,
+    width: 32,
+    borderRadius: RADIUS.sm,
+    borderWidth: 0,
+    borderColor: 'transparent',
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.xs,
   } as ViewStyle,
 
 }); 

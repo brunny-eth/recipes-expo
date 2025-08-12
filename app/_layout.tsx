@@ -122,7 +122,7 @@ function RootLayoutNav() {
       try {
         // Preload critical assets
         await Asset.loadAsync([
-          require('../assets/images/meezblue_underline.png'),
+          require('../assets/images/SplashScreen3x.png'),
         ]);
         
         if (!isMounted) return;

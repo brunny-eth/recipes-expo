@@ -13,21 +13,27 @@ import {
   SafeAreaView,
   ActivityIndicator,
   InteractionManager,
+  ScrollView,
+  useWindowDimensions,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+// import { MaterialCommunityIcons } from '@expo/vector-icons';
 import {
   COLORS,
   SPACING,
   RADIUS,
   BORDER_WIDTH,
   ICON_SIZE,
+  SHADOWS,
 } from '@/constants/theme';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import {
   bodyText,
   bodyStrongText,
   FONT,
+  captionText,
+  sectionHeaderText,
+  captionStrongText,
 } from '@/constants/typography';
 import { useAuth } from '@/context/AuthContext';
 import LogoHeader from '@/components/LogoHeader';
@@ -42,6 +48,7 @@ import { useRenderCounter } from '@/hooks/useRenderCounter';
 import { useHandleError } from '@/hooks/useHandleError';
 
 export default function HomeScreen() {
+  const [isHomeFocused, setIsHomeFocused] = useState(false);
   const [recipeUrl, setRecipeUrl] = useState('');
   const { session } = useAuth();
   useRenderCounter('HomeScreen', { hasSession: !!session });
@@ -78,41 +85,137 @@ export default function HomeScreen() {
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const logoTranslateY = useRef(new Animated.Value(-30)).current;
 
-  // Placeholder rotation state
-  const [displayedPlaceholder, setDisplayedPlaceholder] = useState('');
-  const [isTypingPlaceholder, setIsTypingPlaceholder] = useState(false);
-
-  const firstPrompt = "Try 'mac and cheese' or 'www...'";
-
-  // Typewriter effect for placeholder
-  const typewriterEffect = useCallback((text: string, onComplete?: () => void) => {
-    setIsTypingPlaceholder(true);
-    setDisplayedPlaceholder('');
-    
-    let index = 0;
-    const interval = setInterval(() => {
-      if (index < text.length) {
-        setDisplayedPlaceholder(text.slice(0, index + 1));
-        index++;
-      } else {
-        clearInterval(interval);
-        setIsTypingPlaceholder(false);
-        onComplete?.();
-      }
-    }, 60); // 50ms per character for smooth typewriter effect
-
-    return () => clearInterval(interval);
-  }, []);
-
-  // On mount, typewriter animate first prompt after a short delay, and keep it until first focus
+  // Dev logs for focus and modal state
   useEffect(() => {
-    let typewriterTimeout: NodeJS.Timeout;
-    setDisplayedPlaceholder(""); // Start with empty placeholder
-    typewriterTimeout = setTimeout(() => {
-      typewriterEffect(firstPrompt);
-    }, 2500); // 2500ms initial delay
-    return () => clearTimeout(typewriterTimeout);
-  }, []);
+    if (__DEV__) {
+      console.log(`[Home] focus changed: isHomeFocused=${isHomeFocused}`);
+    }
+  }, [isHomeFocused]);
+
+  useEffect(() => {
+    if (__DEV__) {
+      console.log(`[Home] showMatchSelectionModal=${showMatchSelectionModal}`);
+    }
+  }, [showMatchSelectionModal]);
+
+  // Placeholder rotation state (separate for URL and Name)
+  const [urlDisplayedPlaceholder, setUrlDisplayedPlaceholder] = useState('');
+  const [isTypingUrlPlaceholder, setIsTypingUrlPlaceholder] = useState(false);
+  const [nameDisplayedPlaceholder, setNameDisplayedPlaceholder] = useState('');
+  const [isTypingNamePlaceholder, setIsTypingNamePlaceholder] = useState(false);
+  // Compact layout detection (smaller iPhones)
+  const { height } = useWindowDimensions();
+  const isCompact = height < 700;
+
+
+  // Keep interval handles so we never run two animations at once
+  const urlIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const nameIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const urlPrompt = "www.recipe.com/too_many_ads";
+  const namePrompt = "try 'garlic chicken' or 'pizza'";
+
+  // Local state for name input
+  const [recipeName, setRecipeName] = useState('');
+
+  // Generic typewriter starter for any placeholder with logging and cleanup
+  const startTypewriter = useCallback(
+    (
+      label: 'URL' | 'NAME',
+      text: string,
+      setTyping: (b: boolean) => void,
+      setDisplayed: (s: string) => void,
+      intervalRef: React.MutableRefObject<NodeJS.Timeout | null>
+    ) => {
+      try {
+        if (intervalRef.current) {
+          if (__DEV__) console.log(`[Typewriter][${label}] clearing previous interval`);
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+        setTyping(true);
+        setDisplayed('');
+        if (__DEV__) console.log(`[Typewriter][${label}] starting with text:`, text);
+
+        let index = 0;
+        const interval = setInterval(() => {
+          index += 1;
+          const slice = text.slice(0, index);
+          setDisplayed(slice);
+          if (__DEV__) {
+            // Log every ~6th char to reduce noise
+            if (index % 6 === 0 || index === text.length) {
+              console.log(`[Typewriter][${label}] tick index=${index}/${text.length} slice='${slice}'`);
+            }
+          }
+          if (index >= text.length) {
+            if (__DEV__) console.log(`[Typewriter][${label}] completed`);
+            clearInterval(interval);
+            intervalRef.current = null;
+            setTyping(false);
+          }
+        }, 60);
+
+        intervalRef.current = interval as unknown as NodeJS.Timeout;
+        return () => {
+          if (intervalRef.current) {
+            if (__DEV__) console.log(`[Typewriter][${label}] cleanup (external)`);
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
+          setTyping(false);
+        };
+      } catch (err) {
+        console.error('[Typewriter] error starting animation', err);
+      }
+    },
+    []
+  );
+
+  // Import mode: 'url' | 'image' | 'name'
+  const [importMode, setImportMode] = useState<'url' | 'image' | 'name'>('url');
+
+  // On mount, animate URL prompt once
+  useEffect(() => {
+    if (__DEV__) console.log('[Typewriter][URL] mount kick-off');
+    const timeoutId = setTimeout(() => {
+      startTypewriter('URL', urlPrompt, setIsTypingUrlPlaceholder, setUrlDisplayedPlaceholder, urlIntervalRef);
+    }, 1200);
+    return () => {
+      clearTimeout(timeoutId);
+      // Hard cleanup for both animations on unmount
+      if (urlIntervalRef.current) clearInterval(urlIntervalRef.current);
+      if (nameIntervalRef.current) clearInterval(nameIntervalRef.current);
+    };
+  }, [startTypewriter]);
+
+  // Track whether the initial mount kick-off has completed
+  const mountKickoffDoneRef = useRef(false);
+  useEffect(() => {
+    // When URL placeholder completes, mark kickoff done
+    if (!isTypingUrlPlaceholder && urlDisplayedPlaceholder === urlPrompt) {
+      mountKickoffDoneRef.current = true;
+    }
+  }, [isTypingUrlPlaceholder, urlDisplayedPlaceholder]);
+
+  // When switching tabs, start the appropriate animation if it hasn't run yet
+  useEffect(() => {
+    // Avoid starting again during the first mount kick-off window
+    if (!mountKickoffDoneRef.current && importMode === 'url') {
+      return;
+    }
+    if (importMode === 'url' && !urlDisplayedPlaceholder && !isTypingUrlPlaceholder) {
+      if (__DEV__) console.log('[Typewriter][URL] starting on tab switch');
+      startTypewriter('URL', urlPrompt, setIsTypingUrlPlaceholder, setUrlDisplayedPlaceholder, urlIntervalRef);
+    }
+    if (importMode === 'name' && !nameDisplayedPlaceholder && !isTypingNamePlaceholder) {
+      if (__DEV__) console.log('[Typewriter][NAME] starting on tab switch');
+      startTypewriter('NAME', namePrompt, setIsTypingNamePlaceholder, setNameDisplayedPlaceholder, nameIntervalRef);
+    }
+    // Do NOT stop the other animation when switching away.
+    // Let any in-progress typewriter finish in the background so
+    // placeholders are fully written when user returns.
+  }, [importMode, urlDisplayedPlaceholder, isTypingUrlPlaceholder, nameDisplayedPlaceholder, isTypingNamePlaceholder, startTypewriter]);
 
   // Keyboard listeners (only track visible state for possible future use)
   useEffect(() => {
@@ -162,20 +265,28 @@ export default function HomeScreen() {
   // Focus effect logging
   useFocusEffect(
     useCallback(() => {
+      setIsHomeFocused(true);
+      if (__DEV__) console.log('[Home] focus effect: focused');
       return () => {
+        setIsHomeFocused(false);
+        if (__DEV__) console.log('[Home] focus effect: blurred');
         // Clear submission state when leaving screen
         clearState();
+        // Also hard-close any Home tab modals to prevent background flashes
+        setShowMatchSelectionModal(false);
+        setShowUploadModal(false);
+        setPotentialMatches([]);
       };
     }, [clearState])
   );
 
-  const handleMatchSelectionAction = useCallback((action: 'select' | 'createNew' | 'returnHome', selectedRecipeId?: string) => {
+  const handleMatchSelectionAction = useCallback((action: 'select' | 'createNew' | 'returnHome', extra?: string) => {
     setShowMatchSelectionModal(false); // Always dismiss the modal first
 
-    if (action === 'select' && selectedRecipeId) {
+    if (action === 'select' && extra) {
       // Find the selected recipe from potentialMatches using the selectedRecipeId
       const selectedMatch = potentialMatches.find(match => 
-        match.recipe.id === Number(selectedRecipeId)
+        match.recipe.id === Number(extra)
       );
       
       if (selectedMatch) {
@@ -194,18 +305,26 @@ export default function HomeScreen() {
           userId: session?.user?.id,
         });
       } else {
-        console.error('[HomeScreen] Could not find selected recipe in potentialMatches:', selectedRecipeId);
+        console.error('[HomeScreen] Could not find selected recipe in potentialMatches:', extra);
         showError('Navigation Error', "We couldn't open that recipe. Please try again.");
       }
     } else if (action === 'createNew') {
+      // Prefer user-supplied additional details from modal, otherwise fall back to last typed input
+      const inputToParse = (extra?.trim() || recipeName?.trim() || recipeUrl?.trim() || '');
+      if (!inputToParse) {
+        showError('Missing recipe text', 'Please enter some recipe text and try again.');
+        return;
+      }
       track('recipe_create_new_selected', {
-        recipeUrl: recipeUrl,
+        recipeInput: inputToParse,
+        inputType: 'raw_text',
         userId: session?.user?.id,
       });
       router.push({
         pathname: '/loading',
         params: {
-          recipeUrl: recipeUrl,
+          recipeUrl: inputToParse,
+          inputType: 'raw_text',
           forceNewParse: 'true',
         },
       });
@@ -216,7 +335,7 @@ export default function HomeScreen() {
         userId: session?.user?.id,
       });
     }
-  }, [potentialMatches, router, showError, recipeUrl, track, session?.user?.id]);
+  }, [potentialMatches, router, showError, recipeUrl, recipeName, track, session?.user?.id]);
 
   // Replace isValidRecipeInput with a function that uses detectInputType
   function isValidRecipeInput(input: string) {
@@ -226,161 +345,97 @@ export default function HomeScreen() {
     return detectedType === 'url' || detectedType === 'video' || detectedType === 'raw_text';
   }
 
-  const handleSubmit = async () => {
+  // Generic submit handler that takes arbitrary input text (URL or name)
+  const handleSubmitInput = async (inputRaw: string) => {
     if (__DEV__) {
-      console.log('[DEBUG] handleSubmit – START');
-      console.log('[UI] 🚀 Submit button pressed with value:', recipeUrl);
-      console.log('[UI] 🚀 Submit button pressed - recipeUrl type:', typeof recipeUrl);
-      console.log('[UI] 🚀 Submit button pressed - recipeUrl length:', recipeUrl?.length);
+      console.log('[DEBUG] handleSubmitInput – START');
+      console.log('[UI] 🚀 Submit pressed with value:', inputRaw);
     }
-    
+
+    // Prepare shared variables so catch block can reference them
+    const preTrimmed = (inputRaw || '').trim();
+    let localSubmissionId: string | undefined;
+    let localRecipeInput: string = preTrimmed;
+
     try {
-      // Temporary debug: Test PostHog directly
-      if (__DEV__) {
-        console.log('[DEBUG] Testing PostHog directly...');
-        try {
-          await track('debug_test', { test: true, timestamp: Date.now() });
-          console.log('[DEBUG] PostHog test call succeeded');
-        } catch (err) {
-          console.error('[POSTHOG] Test call failed:', err);
-        }
-      }
-    if (__DEV__) {
-      console.log('[UI] 🔍 Checking if recipeUrl is empty...');
-    }
-    if (!recipeUrl || recipeUrl.trim() === '') {
-      if (__DEV__) {
-        console.log('[UI] ❌ recipeUrl is empty, showing error');
-      }
-      // Use normalized handler to supply the button label via UI options
-      const handleError = require('@/hooks/useHandleError').useHandleError();
-      handleError(
-        'Input Required',
-        'Add a recipe to get started.\n\nLooking for ideas? Head to the Explore tab.',
-        undefined,
-        {
-          secondButtonLabel: 'Go to Explore',
-          onSecondButtonPress: () => {
-            hideError();
-            router.push('/tabs/library');
-          },
-        }
-      );
-      setRecipeUrl(''); // Clear the input bar on error
-      return;
-    }
-    if (__DEV__) {
-      console.log('[UI] ✅ recipeUrl is not empty, continuing...');
-    }
-    // --- New client-side validation ---
-    if (__DEV__) {
-      console.log('[UI] 🔍 Running input validation...');
-    }
-    if (!isValidRecipeInput(recipeUrl)) {
-      if (__DEV__) {
-        console.log('[UI] ❌ Input validation failed');
-      }
-      const handleError = require('@/hooks/useHandleError').useHandleError();
-      handleError(
-        'Input Not Recognized',
-        'Please enter a real dish name (like "chicken soup" or "tomato pasta") or a recipe link',
-        undefined,
-        {
-          secondButtonLabel: 'Go to Explore',
-          onSecondButtonPress: () => {
-            hideError();
-            router.push('/tabs/library');
-          },
-        }
-      );
-      setRecipeUrl('');
-      return;
-    }
-    if (__DEV__) {
-      console.log('[UI] ✅ Input validation passed');
-    }
-
-    const recipeInput = recipeUrl.trim();
-
-    // Users must be authenticated to use the app
-    if (__DEV__) {
-      console.log('[UI] 🔍 Checking authentication...');
-    }
-    if (!session) {
-      if (__DEV__) {
-        console.log('[UI] ❌ No session found, showing login error');
-      }
-      showError(
-        'Login Required',
-        'Please log in to continue using the app.',
-        () => router.replace('/login'),
-      );
-      setRecipeUrl('');
-      return;
-    }
-    if (__DEV__) {
-      console.log('[UI] ✅ User is authenticated');
-    }
-
-    // Generate submission ID for tracking
-    const submissionId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
-    try {
-      if (__DEV__) {
-        console.log('[UI] 🚀 Starting recipe submission process...');
-      }
-      // Track input mode selection
-      const inputType = detectInputType(recipeInput);
-      if (__DEV__) {
-        console.log('[UI] 🔍 Detected input type:', inputType);
-      }
-      if (__DEV__) {
-        console.log('[POSTHOG] Tracking event: input_mode_selected', { inputType });
-      }
-      try {
-        await track('input_mode_selected', { inputType });
-        if (__DEV__) {
-          console.log('[POSTHOG] input_mode_selected tracking succeeded');
-        }
-      } catch (err) {
-        if (__DEV__) {
-          console.error('[POSTHOG] input_mode_selected tracking failed:', err);
-        }
-      }
-      
-      console.log('[POSTHOG] Tracking event: recipe_submission_started', {
-        inputLength: recipeInput.length,
-        inputType: inputType,
-        submissionId,
-        userId: session?.user?.id,
-      });
-      try {
-        await track('recipe_submission_started', {
-          inputLength: recipeInput.length,
-          inputType: inputType,
-          submissionId,
-          userId: session?.user?.id,
-        });
-        console.log('[POSTHOG] recipe_submission_started tracking succeeded');
-      } catch (err) {
-        console.error('[POSTHOG] recipe_submission_started tracking failed:', err);
+      // Validate (adopt main's friendlier UX via useHandleError)
+      if (localRecipeInput.length === 0) {
+        const handleError = require('@/hooks/useHandleError').useHandleError();
+        handleError(
+          'Input Required',
+          'Add a recipe to get started.\n\nLooking for ideas? Head to the Explore tab.',
+          undefined,
+          {
+            secondButtonLabel: 'Go to Explore',
+            onSecondButtonPress: () => {
+              hideError();
+              router.push('/tabs/library');
+            },
+          }
+        );
+        // Clear the active input for better UX
+        if (importMode === 'url') setRecipeUrl('');
+        if (importMode === 'name') setRecipeName('');
+        return;
       }
 
-      console.log('[UI] 🚀 Calling submitRecipe with:', recipeInput);
-      const result = await submitRecipe(recipeInput);
-      console.log('[UI] ✅ submitRecipe completed with result:', result);
-      
-      console.log('[POSTHOG] Tracking event: recipe_submission_result', {
-        success: result.success,
-        action: result.action,
-        error: result.error,
-        matches_count: result.matches?.length,
-        recipeId: result.recipe?.id,
-        normalizedUrl: result.normalizedUrl,
-        inputType: result.inputType,
-        submissionId,
-        userId: session?.user?.id,
-      });
+      // Early validation of the text/URL before mode-specific checks
+      if (!isValidRecipeInput(localRecipeInput)) {
+        const handleError = require('@/hooks/useHandleError').useHandleError();
+        handleError(
+          'Input Not Recognized',
+          'Please enter a real dish name (like "chicken soup" or "tomato pasta") or a recipe link',
+          undefined,
+          {
+            secondButtonLabel: 'Go to Explore',
+            onSecondButtonPress: () => {
+              hideError();
+              router.push('/tabs/library');
+            },
+          }
+        );
+        if (importMode === 'url') setRecipeUrl('');
+        if (importMode === 'name') setRecipeName('');
+        return;
+      }
+
+      // localRecipeInput already set above for catch; continue using within try
+
+      if (!session) {
+        showError(
+          'Login Required',
+          'Please log in to continue using the app.',
+          () => router.replace('/login'),
+        );
+        return;
+      }
+
+      localSubmissionId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      const inputType = detectInputType(localRecipeInput);
+
+      // If user is in URL mode, strictly require a valid URL or video; do not allow raw text
+      if (importMode === 'url' && !(inputType === 'url' || inputType === 'video')) {
+        showError(
+          'Please enter a valid link',
+          'The URL field only accepts links (e.g., https://example.com/recipe). If you want to search by name, switch to Dish name.',
+        );
+        return;
+      }
+
+      // If user is in text mode, strictly disallow URLs/videos and require text
+      if (importMode === 'name' && inputType !== 'raw_text') {
+        showError(
+          'Please enter text',
+          'The Text field is for recipe text or a dish name. If you have a link, switch to URL.',
+        );
+        return;
+      }
+      try { await track('input_mode_selected', { inputType }); } catch {}
+      try { await track('recipe_submission_started', { inputLength: localRecipeInput.length, inputType, submissionId: localSubmissionId, userId: session?.user?.id }); } catch {}
+
+      const result = await submitRecipe(localRecipeInput);
+
       try {
         await track('recipe_submission_result', {
           success: result.success,
@@ -389,15 +444,12 @@ export default function HomeScreen() {
           matches_count: result.matches?.length,
           recipeId: result.recipe?.id,
           normalizedUrl: result.normalizedUrl,
-          inputType: result.inputType,
-          submissionId,
+           inputType: result.inputType,
+           submissionId: localSubmissionId,
           userId: session?.user?.id,
         });
-        console.log('[POSTHOG] recipe_submission_result tracking succeeded');
-      } catch (err) {
-        console.error('[POSTHOG] recipe_submission_result tracking failed:', err);
-      }
-      
+      } catch {}
+
       if (!result.success) {
         if (result.action === 'show_validation_error' && result.error) {
           handleError('Validation Error', result.error, { stage: 'validation' });
@@ -406,72 +458,42 @@ export default function HomeScreen() {
       }
 
       if (result.action === 'show_match_modal' && result.matches) {
-        // Show the match selection modal
+        // Always show match selection modal for textual queries, regardless of input field used
         setPotentialMatches(result.matches);
         setShowMatchSelectionModal(true);
-        track('recipe_matches_found', {
-          match_count: result.matches.length,
-          submissionId,
-          userId: session?.user?.id,
-        });
+        try { await track('recipe_matches_found', { match_count: result.matches.length, submissionId: localSubmissionId, userId: session?.user?.id }); } catch {}
       } else if (result.action === 'navigate_to_summary' && result.recipe) {
-        // Navigate to summary with cached recipe
-        track('navigation_to_recipe_summary', {
-          recipeId: result.recipe.id,
-          entryPoint: 'new',
-          submissionId,
-          userId: session?.user?.id,
-        });
+        try { await track('navigation_to_recipe_summary', { recipeId: result.recipe.id, entryPoint: 'new', submissionId: localSubmissionId, userId: session?.user?.id }); } catch {}
         InteractionManager.runAfterInteractions(() => {
-          router.push({
-            pathname: '/recipe/summary',
-            params: {
-              recipeData: JSON.stringify(result.recipe),
-              entryPoint: 'new',
-              from: '/tabs',
-              inputType: result.inputType || detectInputType(recipeInput), // Use the result inputType or detect it
-            },
-          });
+          router.push({ pathname: '/recipe/summary', params: { recipeData: JSON.stringify(result.recipe), entryPoint: 'new', from: '/tabs', inputType: result.inputType || detectInputType(localRecipeInput) } });
         });
-        setRecipeUrl(''); // Clear input after successful submission
       } else if (result.action === 'navigate_to_loading' && result.normalizedUrl) {
-        // Navigate to loading with normalized URL
-        track('navigation_to_loading_screen', {
-          normalizedUrl: result.normalizedUrl,
-          inputType: result.inputType,
-          submissionId,
-          userId: session?.user?.id,
-        });
+        try { await track('navigation_to_loading_screen', { normalizedUrl: result.normalizedUrl, inputType: result.inputType, submissionId: localSubmissionId, userId: session?.user?.id }); } catch {}
         InteractionManager.runAfterInteractions(() => {
-                  router.push({
-          pathname: '/loading',
-          params: { 
-            recipeUrl: result.normalizedUrl,
-            inputType: result.inputType
-          },
+          router.push({ pathname: '/loading', params: { recipeUrl: result.normalizedUrl, inputType: result.inputType } });
         });
-        });
-        setRecipeUrl(''); // Clear input after successful submission
       }
     } catch (error) {
       console.error('[HomeScreen] Submission error:', error);
-      
-      // Log to Logtail for production error tracking
-      track('recipe_submission_failed', {
-        errorMessage: error instanceof Error ? error.message : String(error),
-        errorStack: error instanceof Error ? error.stack : undefined,
-        submissionId: submissionId || 'unknown',
-        userId: session?.user?.id,
-        recipeInput: recipeInput,
-        inputType: detectInputType(recipeInput),
-      });
-      
+      // Log and show normalized error
+      try {
+        track('recipe_submission_failed', {
+          errorMessage: error instanceof Error ? error.message : String(error),
+          errorStack: error instanceof Error ? error.stack : undefined,
+          submissionId: localSubmissionId || 'unknown',
+          userId: session?.user?.id,
+          recipeInput: localRecipeInput,
+          inputType: detectInputType(localRecipeInput),
+        });
+      } catch {}
       handleError('Recipe Submission Failed', error, { stage: 'navigation' });
     }
-  } catch (err) {
-    console.error('[🔥 ERROR] Exception in handleSubmit:', err);
-  }
   };
+
+  // URL submit wrapper
+  const handleSubmit = async () => handleSubmitInput(recipeUrl);
+  // Name submit wrapper
+  const handleSubmitName = async () => handleSubmitInput(recipeName);
 
   const handleUploadComplete = async (result: UploadResult) => {
     if (result.success && result.navigateToLoading) {
@@ -593,13 +615,7 @@ export default function HomeScreen() {
     }
   };
 
-  // Placeholder logic - show first prompt until user starts typing
-  let placeholder = '';
-  if (hasUserTyped) {
-    placeholder = '';
-  } else {
-    placeholder = displayedPlaceholder;
-  }
+  // Removed legacy placeholder logic (now handled per-tab typewriter placeholders)
 
   // Memoized animated logo component to prevent recreation on re-renders
   const animatedLogo = useMemo(() => (
@@ -609,28 +625,30 @@ export default function HomeScreen() {
         transform: [{ translateY: logoTranslateY }],
       }}
     >
-      <Image
+        <Image
         source={require('@/assets/images/meezblue_underline.png')}
         resizeMode="contain"
         style={{
-          width: 400,
-          height: 200,
+          width: isCompact ? 128 : 150,
+          height: isCompact ? 64 : 75,
           alignSelf: 'center',
+          marginTop: isCompact ? SPACING.md : SPACING.lg,
+          marginBottom: 0,
         }}
       />
     </Animated.View>
-  ), [logoOpacity, logoTranslateY]); // Only recreate if animation values change
+  ), [logoOpacity, logoTranslateY, isCompact]); // Recreate if compact state changes
 
   // Get appropriate button text based on submission state
   const getSubmitButtonContent = () => {
     if (submissionState === 'validating') {
-      return <ActivityIndicator size="small" color={COLORS.white} />;
+      return <ActivityIndicator size="small" color={COLORS.primary} />;
     } else if (submissionState === 'checking_cache') {
-      return <ActivityIndicator size="small" color={COLORS.white} />;
+      return <ActivityIndicator size="small" color={COLORS.primary} />;
     } else if (submissionState === 'parsing') {
-      return <ActivityIndicator size="small" color={COLORS.white} />;
+      return <ActivityIndicator size="small" color={COLORS.primary} />;
     } else if (submissionState === 'navigating') {
-      return <ActivityIndicator size="small" color={COLORS.white} />;
+      return <ActivityIndicator size="small" color={COLORS.primary} />;
     } else {
       return <Text style={styles.submitButtonText}>Go</Text>;
     }
@@ -644,88 +662,206 @@ export default function HomeScreen() {
       {/* Dynamic content that can re-render without affecting the logo */}
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
         <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
-          <View style={styles.contentContainer}>
-            <View style={styles.headerContainer}>
-              <View style={{ width: '90%', maxWidth: 340, alignSelf: 'center' }}>
-                <Text style={styles.mainFeatureText}>Meez helps you prep and cook without clutter
-                </Text>
-              </View>
-            </View>
-            <View style={styles.secondaryTextContainer}>
-              <View style={{ width: '90%', maxWidth: 340, alignSelf: 'center' }}>
-                <Text style={styles.subheadingText}>
-                  Paste a link or recipe idea to get started
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          <KeyboardAvoidingView
-            behavior="padding"
-            style={styles.keyboardAvoidingView}
-            keyboardVerticalOffset={60}
+                    <ScrollView 
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
           >
-            <View style={styles.inputSection}>
-              <View style={styles.inputContainer}>
-                <View style={styles.textInputWrapper}>
-                  <RecipePDFImageUploader
-                    ref={uploaderRef}
-                    onUploadComplete={handleUploadComplete}
-                    isLoading={isSubmitting}
-                    style={styles.uploadButton}
-                    onShowUploadModal={handleShowUploadModal}
-                  />
-                  <View style={styles.divider} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder={placeholder}
-                    placeholderTextColor={COLORS.darkGray}
-                    value={recipeUrl}
-                    onChangeText={handleChangeText}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    onSubmitEditing={handleSubmit}
-                    editable={!isSubmitting}
-                    onFocus={handleInputFocus}
-                    onBlur={handleInputBlur}
-                    returnKeyType="go"
-                    blurOnSubmit={false}
-                    enablesReturnKeyAutomatically={true}
-                    keyboardType="default"
-                    textContentType="none"
-                  />
-                </View>
-                <TouchableOpacity
-                  style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
-                  onPress={handleSubmit}
-                  disabled={isSubmitting}
-                  onPressIn={() => console.log('[UI] 🎯 Submit button pressed in - isSubmitting:', isSubmitting)}
+            <View style={styles.sectionsContainer}>
+              {/* Marketing heading */}
+              <View style={[styles.heroSection, isCompact && { marginTop: 0, marginBottom: 0 }]}>
+                <Text
+                  style={[styles.heroHeading, isCompact && { fontSize: FONT.size.sectionHeader }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.9}
                 >
-                  {getSubmitButtonContent()}
-                </TouchableOpacity>
+                  the best way to prep and cook
+                </Text>
+              </View>
+
+              {/* Import section */}
+              <View style={styles.importSection}>
+                 {/* Removed legacy subheading above the import card */}
+
+                {/* Unified import card: header + segmented control + input */}
+                <View style={styles.importCard}>
+                  <Text style={styles.importCardTitle}>import & customize</Text>
+                  {/* Segmented control: URL | Dish Name | Image */}
+                  <View style={styles.segmentedControlContainer}>
+                    <TouchableOpacity
+                      style={[styles.segmentedItem, importMode === 'url' && styles.segmentedItemActive]}
+                      onPress={() => setImportMode('url')}
+                    >
+                      <Text style={[styles.segmentedItemText, importMode === 'url' && styles.segmentedItemTextActive]}>url</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.segmentedItem, importMode === 'name' && styles.segmentedItemActive]}
+                      onPress={() => setImportMode('name')}
+                    >
+                      <Text style={[styles.segmentedItemText, importMode === 'name' && styles.segmentedItemTextActive]}>dish name</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.segmentedItem, importMode === 'image' && styles.segmentedItemActive]}
+                      onPress={() => setImportMode('image')}
+                    >
+                      <Text style={[styles.segmentedItemText, importMode === 'image' && styles.segmentedItemTextActive]}>image</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {importMode === 'url' ? (
+                    <View style={styles.inputContainer}>
+                      <TextInput
+                        style={[styles.input, styles.inputLeft]}
+                        placeholder={urlDisplayedPlaceholder}
+                        placeholderTextColor={COLORS.darkGray}
+                        value={recipeUrl}
+                        onChangeText={handleChangeText}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        onSubmitEditing={handleSubmit}
+                        editable={!isSubmitting}
+                        onFocus={handleInputFocus}
+                        onBlur={handleInputBlur}
+                        returnKeyType="go"
+                        blurOnSubmit={false}
+                        enablesReturnKeyAutomatically={true}
+                        keyboardType="default"
+                        textContentType="none"
+                        underlineColorAndroid="transparent"
+                      />
+                      <TouchableOpacity
+                        style={[styles.submitButton, styles.submitButtonConnected, isSubmitting && styles.submitButtonDisabled]}
+                        onPress={handleSubmit}
+                        disabled={isSubmitting}
+                        onPressIn={() => console.log('[UI] 🎯 Submit button pressed in - isSubmitting:', isSubmitting)}
+                      >
+                        {getSubmitButtonContent()}
+                      </TouchableOpacity>
+                    </View>
+                  ) : importMode === 'image' ? (
+                    <View style={styles.fullWidthRow}>
+                      <TouchableOpacity 
+                        style={styles.fullWidthPrimaryButton}
+                        onPress={handleShowUploadModal}
+                      >
+                        <Text style={styles.fullWidthPrimaryButtonText}>choose image</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={styles.inputContainer}>
+                      <TextInput
+                        style={[styles.input, styles.inputLeft]}
+                        placeholder={nameDisplayedPlaceholder}
+                        placeholderTextColor={COLORS.darkGray}
+                        value={recipeName}
+                        onChangeText={setRecipeName}
+                        autoCapitalize="sentences"
+                        autoCorrect={true}
+                        editable={true}
+                        returnKeyType="search"
+                        blurOnSubmit={true}
+                        enablesReturnKeyAutomatically={true}
+                        keyboardType="default"
+                        onSubmitEditing={handleSubmitName}
+                        underlineColorAndroid="transparent"
+                      />
+                      <TouchableOpacity
+                        style={[styles.submitButton, styles.submitButtonConnected]}
+                        onPress={handleSubmitName}
+                      >
+                        <Text style={styles.submitButtonText}>Go</Text>
+                      </TouchableOpacity>
+                      
+                    </View>
+                  )}
+                  {/* Removed inline community link for name mode */}
+                </View>
+              </View>
+
+              {/* Flexible spacer to push secondary actions lower */}
+              <View style={{ flexGrow: 1 }} />
+
+              {/* Secondary actions grouped near bottom */}
+              <View style={styles.secondarySections}>
+                {/* Action section 1: Prep station */}
+                <View style={styles.actionSection}>
+                  <View style={styles.sectionTitleWrap}>
+                    <Text style={[styles.subheadingText, { marginTop: 0, marginBottom: SPACING.xs }]}>shop & cook</Text>
+                  </View>
+                  <View style={[styles.quickList, { marginBottom: SPACING.smMd }]}> 
+                    <TouchableOpacity
+                      style={styles.quickPill}
+                      onPress={() => router.push('/tabs/mise')}
+                    >
+                      <Text style={styles.quickPillText}>prep station</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Action section 2: Saved recipes */}
+                <View style={styles.actionSection}>
+                  <View style={styles.sectionTitleWrap}>
+                    <Text style={[styles.subheadingText, { marginTop: 0, marginBottom: SPACING.xs }]}>save & organize</Text>
+                  </View>
+                  <View style={[styles.quickList, { marginBottom: SPACING.smMd }]}> 
+                    <TouchableOpacity
+                      style={styles.quickPill}
+                      onPress={() => router.push({ pathname: '/tabs/library', params: { tab: 'saved' } })}
+                    >
+                        <Text style={styles.quickPillText}>cookbooks</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                  {/* Action section 3: Explore */}
+                  <View style={styles.actionSection}>
+                    <View style={styles.sectionTitleWrap}>
+                      <Text style={[styles.subheadingText, { marginTop: 0, marginBottom: SPACING.xs }]}>see what others are cooking</Text>
+                    </View>
+                    <View style={[styles.quickList, { marginBottom: 0 }]}> 
+                      <TouchableOpacity
+                        style={styles.quickPill}
+                        onPress={() => router.push('/explore')}
+                      >
+                        <Text style={styles.quickPillText}>explore</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
               </View>
             </View>
-          </KeyboardAvoidingView>
+          </ScrollView>
         </Animated.View>
       </TouchableWithoutFeedback>
       
+      {/* Hidden uploader anchor for image/PDF selection (driven by modal actions) */}
+      <RecipePDFImageUploader
+        ref={uploaderRef}
+        onUploadComplete={handleUploadComplete}
+        style={{ display: 'none' }}
+      />
+
       {/* Recipe Match Selection Modal */}
-      {showMatchSelectionModal && (
+      {isHomeFocused && showMatchSelectionModal && (
         <RecipeMatchSelectionModal
-          visible={showMatchSelectionModal}
+          visible={isHomeFocused && showMatchSelectionModal}
           matches={potentialMatches}
           onAction={handleMatchSelectionAction}
+          debugSource={isHomeFocused ? 'HomeTab (focused)' : 'HomeTab (background)'}
+          initialInputText={(recipeName?.trim() || recipeUrl?.trim() || '')}
         />
       )}
 
       {/* Upload Recipe Modal */}
-      <UploadRecipeModal
-        visible={showUploadModal}
+      {isHomeFocused && (
+        <UploadRecipeModal
+          visible={isHomeFocused && showUploadModal}
         onClose={handleCloseUploadModal}
         onTakePhoto={handleTakePhoto}
         onChooseImage={handleChooseImage}
         onBrowseFiles={handleBrowseFiles}
-      />
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -740,78 +876,161 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
   },
-  contentContainer: {
-    alignItems: 'center',
-    marginTop: -SPACING.md,
-  },
-  headerContainer: {
-    alignItems: 'center',
-    marginBottom: SPACING.xl,
-    maxWidth: 365,
-    alignSelf: 'center',
-    paddingHorizontal: SPACING.md,
-    marginTop: -SPACING.xl,
-  },
-  keyboardAvoidingView: {
+  scrollView: {
     flex: 1,
     width: '100%',
+  },
+  scrollContent: {
     paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.xl,
+    flexGrow: 1,
   },
-  inputSection: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    paddingBottom: 240,
+  sectionsContainer: {
+    gap: 0,
+    flexGrow: 1,
+    justifyContent: 'space-between',
   },
-  mainFeatureText: {
-    fontFamily: FONT.family.interSemiBold,
-    fontSize: 26,
+  importSection: {
+    gap: 0,
+    marginTop: SPACING.xxxl,
+  },
+  secondarySections: {
+    width: '100%',
+    marginTop: SPACING.xl,
+    paddingBottom: SPACING.xl,
+  },
+  heroSection: {
+    alignItems: 'center',
+    paddingHorizontal: SPACING.pageHorizontal,
+    marginTop: 0,
+    marginBottom: SPACING.md,
+  },
+  heroHeading: {
+    fontFamily: FONT.family.heading,
+    fontSize: FONT.size.screenTitle,
+    fontWeight: '600',
     color: COLORS.textDark,
     textAlign: 'center',
-    lineHeight: 34,
-    letterSpacing: -0.5,
+  },
+  heroSubheading: {
+    ...bodyText,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    marginTop: SPACING.xs,
+  },
+  importCard: {
+    width: '100%',
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    gap: SPACING.sm,
+    marginTop: SPACING.smLg,
+    marginBottom: SPACING.xl,
+    ...SHADOWS.small, // subtle shadow (~2px blur equivalent)
+  },
+  importCardTitle: {
+    fontFamily: FONT.family.heading,
+    fontSize: FONT.size.screenTitle,
+    fontWeight: '700',
+    color: COLORS.textDark,
+    textAlign: 'center',
+    marginBottom: SPACING.sm,
+  },
+  actionSection: {
+    gap: 0,
+    marginTop: 0,
+  },
+  quickList: {
+    width: '100%',
+    gap: SPACING.sm,
+    marginTop: SPACING.xs,
+  },
+  quickPill: {
+    width: '100%',
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.md,
+    borderWidth: 0,
+    borderColor: 'transparent',
+    backgroundColor: COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOWS.small,
+  },
+  quickPillText: {
+    ...bodyStrongText,
+    color: COLORS.primary,
+    fontSize: FONT.size.caption,
+  },
+  // Removed grid tile styles in favor of bottom-stacked pill buttons
+  sectionLabel: {
+    ...bodyText,
+    fontSize: FONT.size.body,
+    fontWeight: '300',
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    marginTop: SPACING.xl,
+    marginBottom: SPACING.xs,
   },
   subheadingText: {
-    fontFamily: FONT.family.inter,
-    fontSize: 18, // slightly larger than before
+    fontFamily: FONT.family.heading,
+    fontSize: FONT.size.body,
+    fontWeight: '600',
     color: COLORS.textDark,
     textAlign: 'center',
-    marginTop: SPACING.xxs, 
-    marginBottom: SPACING.lg, 
-    lineHeight: 24,
+    marginTop: SPACING.lg,
+    marginBottom: 0,
   },
-  secondaryTextContainer: {
+  sectionTitleWrap: {
+    alignSelf: 'stretch',
     alignItems: 'center',
-    marginBottom: SPACING.lg,
-    maxWidth: 365,
-    alignSelf: 'center',
-    paddingHorizontal: SPACING.md,
   },
-  secondaryText: {
-    fontFamily: FONT.family.inter,
-    fontSize: FONT.size.body + 2,
-    color: COLORS.darkGray,
-    opacity: 0.8,
+  sectionRule: {
+    height: BORDER_WIDTH.hairline,
+    alignSelf: 'stretch',
+    backgroundColor: COLORS.darkGray,
+    opacity: 0.25,
+    marginHorizontal: SPACING.pageHorizontal,
+  },
+  importSubheading: {
+    alignSelf: 'stretch',
     textAlign: 'center',
-    lineHeight: 22,
+    paddingHorizontal: SPACING.pageHorizontal,
+    marginBottom: 0,
+  },
+  sectionButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.sm,
+    alignItems: 'center',
+  },
+  sectionButtonText: {
+    ...bodyStrongText,
+    color: COLORS.white,
+    fontSize: 16,
+  },
+  ghostButton: {
+    backgroundColor: 'transparent',
+    borderWidth: BORDER_WIDTH.default,
+    borderColor: COLORS.primary,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.sm,
+    alignItems: 'center',
+  },
+  ghostButtonText: {
+    ...bodyStrongText,
+    color: COLORS.primary,
+    fontSize: 16,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
-    height: 50,
-    marginTop: 20,
-  },
-  textInputWrapper: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: '100%',
-    backgroundColor: COLORS.white,
-    borderWidth: BORDER_WIDTH.default,
-    borderColor: COLORS.lightGray,
-    borderRightWidth: 0,
-    borderTopLeftRadius: RADIUS.sm,
-    borderBottomLeftRadius: RADIUS.sm,
+    height: 46,
+    gap: 0,
   },
   input: {
     ...bodyText,
@@ -819,34 +1038,112 @@ const styles = StyleSheet.create({
     height: '100%',
     paddingHorizontal: SPACING.base,
     color: COLORS.textDark,
-    fontSize: FONT.size.smBody,
+    fontSize: FONT.size.caption,
     lineHeight: undefined,
+    backgroundColor: COLORS.surface,
+    borderWidth: 0,
+    borderColor: 'transparent',
+    borderRadius: RADIUS.sm,
+  },
+  inputLeft: {
+    borderTopRightRadius: 0,
+    borderBottomRightRadius: 0,
   },
   submitButton: {
     height: '100%',
-    width: 60,
-    backgroundColor: COLORS.primary,
+    minWidth: 60,
+    paddingHorizontal: SPACING.sm,
+    backgroundColor: COLORS.surface,
     justifyContent: 'center',
     alignItems: 'center',
-    borderTopRightRadius: RADIUS.sm,
-    borderBottomRightRadius: RADIUS.sm,
+    borderRadius: RADIUS.sm,
+    borderWidth: 0,
+    borderColor: 'transparent',
+  },
+  submitButtonConnected: {
+    borderTopLeftRadius: 0,
+    borderBottomLeftRadius: 0,
+    borderLeftWidth: 0,
   },
   submitButtonDisabled: {
-    backgroundColor: COLORS.darkGray,
+    opacity: 0.6,
   },
   submitButtonText: {
     ...bodyStrongText,
-    color: COLORS.white,
+    color: COLORS.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   uploadButton: {
-    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    borderWidth: BORDER_WIDTH.default,
+    borderColor: COLORS.primary,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.sm,
     alignItems: 'center',
-    paddingLeft: SPACING.sm,
-    paddingRight: SPACING.sm,
+    justifyContent: 'center',
+  },
+  uploadButtonText: {
+    ...bodyStrongText,
+    color: COLORS.primary,
+    fontSize: 14,
   },
   divider: {
     width: BORDER_WIDTH.default,
     height: '100%',
     backgroundColor: COLORS.lightGray,
+  },
+  segmentedControlContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    borderRadius: RADIUS.md,
+    borderWidth: BORDER_WIDTH.default,
+    borderColor: COLORS.primary,
+    overflow: 'hidden',
+    backgroundColor: COLORS.white,
+    marginTop: 0,
+  },
+  segmentedItem: {
+    flex: 1,
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentedItemActive: {
+    backgroundColor: COLORS.primary,
+  },
+  segmentedItemText: {
+    ...bodyStrongText,
+    color: COLORS.primary,
+    fontSize: FONT.size.caption,
+  },
+  segmentedItemTextActive: {
+    color: COLORS.white,
+  },
+  fullWidthRow: {
+    width: '100%',
+    height: 46,
+  },
+  fullWidthPrimaryButton: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullWidthPrimaryButtonText: {
+    ...bodyStrongText,
+    color: COLORS.white,
+  },
+  inlineLink: {
+    marginTop: SPACING.xs,
+    alignSelf: 'center',
+    color: COLORS.primary,
+    textDecorationLine: 'underline',
+    ...captionText,
   },
 });

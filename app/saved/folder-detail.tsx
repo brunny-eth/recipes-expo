@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Image,
+  TextInput,
 } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
 
@@ -44,6 +45,30 @@ type SavedRecipe = {
   display_order: number;
 };
 
+// Helpers for client-side search
+function normalizeForSearch(text: string): string {
+  return text
+    ? text
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/\s+/g, ' ') // collapse whitespace
+        .trim()
+    : '';
+}
+
+function buildSearchBlob(item: SavedRecipe): string {
+  const data = item.processed_recipes_cache?.recipe_data;
+  if (!data) return '';
+
+  const title = item.title_override || data.title || '';
+  const ingredientNames = (data.ingredientGroups || []).flatMap((group) =>
+    (group.ingredients || []).map((ing) => [ing.name, ing.preparation].filter(Boolean).join(' ')),
+  );
+
+  return normalizeForSearch([title, ...ingredientNames].join(' '));
+}
+
 export default function SavedFolderDetailScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -54,6 +79,15 @@ export default function SavedFolderDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [folderName, setFolderName] = useState<string>('Folder'); // State for actual folder name
+  const [isRenaming, setIsRenaming] = useState<boolean>(false);
+  const [editedFolderName, setEditedFolderName] = useState<string>('');
+  const [isSavingFolderName, setIsSavingFolderName] = useState<boolean>(false);
+  const [renameError, setRenameError] = useState<string | null>(null);
+  const nameInputRef = useRef<TextInput | null>(null);
+
+  // Search state
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('');
   
   // Bulk move state
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -144,6 +178,83 @@ export default function SavedFolderDetailScreen() {
       fetchFolderName(); // Fetch folder name on focus
     }, [fetchFolderRecipes, fetchFolderName])
   );
+
+  // Focus the input when starting rename
+  useEffect(() => {
+    if (isRenaming) {
+      setTimeout(() => nameInputRef.current?.focus(), 50);
+    }
+  }, [isRenaming]);
+
+  const handleStartRenaming = useCallback(() => {
+    if (!session?.user) return;
+    setEditedFolderName(folderName);
+    setRenameError(null);
+    setIsRenaming(true);
+  }, [session?.user, folderName]);
+
+  const saveFolderName = useCallback(async () => {
+    if (!session?.user || !folderId) {
+      setIsRenaming(false);
+      return;
+    }
+
+    const newName = editedFolderName.trim();
+    if (newName.length === 0) {
+      setRenameError("Name can't be empty");
+      return;
+    }
+    if (newName === folderName) {
+      setIsRenaming(false);
+      setRenameError(null);
+      return;
+    }
+
+    setIsSavingFolderName(true);
+    try {
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+      const response = await fetch(`${backendUrl}/api/saved/folders/${folderId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: session.user.id, name: newName }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update folder name');
+      }
+
+      setFolderName(newName);
+      setIsRenaming(false);
+      setRenameError(null);
+    } catch (e) {
+      setRenameError('Could not rename. Try again.');
+    } finally {
+      setIsSavingFolderName(false);
+    }
+  }, [editedFolderName, session?.user, folderId, folderName]);
+
+  // Debounce search input (200ms)
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 200);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Build indexed list for search
+  const indexedRecipes = useMemo(() => {
+    return savedRecipes.map((r) => ({ recipe: r, blob: buildSearchBlob(r) }));
+  }, [savedRecipes]);
+
+  // Filtered recipes based on query
+  const filteredRecipes = useMemo(() => {
+    const q = normalizeForSearch(debouncedSearchQuery);
+    if (!q) return savedRecipes;
+    const tokens = q.split(' ').filter(Boolean);
+    return indexedRecipes
+      .filter((ir) => tokens.every((t) => ir.blob.includes(t)))
+      .map((ir) => ir.recipe);
+  }, [debouncedSearchQuery, savedRecipes, indexedRecipes]);
 
   // Handle recipe press
   const handleRecipePress = useCallback((item: SavedRecipe) => {
@@ -397,12 +508,19 @@ export default function SavedFolderDetailScreen() {
     return (
       <>
         <FlatList
-          data={savedRecipes}
+          data={filteredRecipes}
           renderItem={renderRecipeItem}
           keyExtractor={(item) => item.processed_recipes_cache?.id.toString() || item.base_recipe_id.toString()}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
         />
+        {savedRecipes.length > 0 && filteredRecipes.length === 0 && (
+          <View style={styles.emptyContainer}>
+            <MaterialCommunityIcons name="magnify" size={48} color={COLORS.lightGray} />
+            <Text style={styles.emptyText}>No matches</Text>
+            <Text style={styles.emptySubtext}>Try a different search term.</Text>
+          </View>
+        )}
         
         {/* Bulk actions bar */}
         {isSelectionMode && (
@@ -444,8 +562,32 @@ export default function SavedFolderDetailScreen() {
 
   // Header action
   const renderHeaderAction = () => {
+    // When renaming, show a checkmark to confirm save
+    if (isRenaming) {
+      const isSaveDisabled =
+        isSavingFolderName || editedFolderName.trim().length === 0 || editedFolderName.trim() === folderName.trim();
+      return (
+        <TouchableOpacity
+          style={styles.selectButton}
+          onPress={saveFolderName}
+          disabled={isSaveDisabled}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          {isSavingFolderName ? (
+            <ActivityIndicator size="small" color={COLORS.primary} />
+          ) : (
+            <MaterialCommunityIcons
+              name="check"
+              size={24}
+              color={isSaveDisabled ? COLORS.textMuted : COLORS.primary}
+            />
+          )}
+        </TouchableOpacity>
+      );
+    }
+
     if (savedRecipes.length === 0 || isSelectionMode) return null;
-    
+
     return (
       <TouchableOpacity
         style={styles.selectButton}
@@ -468,11 +610,55 @@ export default function SavedFolderDetailScreen() {
         >
           <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textDark} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{folderName}</Text>
+        {isRenaming ? (
+          <TextInput
+            ref={nameInputRef}
+            style={[styles.headerTitle, styles.headerTitleInput]}
+            value={editedFolderName}
+            onChangeText={setEditedFolderName}
+            // Do not auto-save on blur or submit; rely on the checkmark
+            editable={!isSavingFolderName}
+            maxLength={50}
+            returnKeyType="done"
+            blurOnSubmit={false}
+          />
+        ) : (
+          <TouchableOpacity
+            style={styles.headerTitleTouchable}
+            onPress={handleStartRenaming}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.headerTitle} numberOfLines={1}>{folderName}</Text>
+          </TouchableOpacity>
+        )}
         <View style={styles.headerRight}>
           {renderHeaderAction()}
         </View>
       </View>
+      {/* Search bar */}
+      <View style={styles.searchContainer}>
+        <MaterialCommunityIcons name="magnify" size={20} color={COLORS.textMuted} style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search by title or ingredient"
+          placeholderTextColor={COLORS.textMuted}
+          returnKeyType="search"
+          autoCorrect={false}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity
+            onPress={() => setSearchQuery('')}
+            style={styles.clearButton}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <MaterialCommunityIcons name="close" size={18} color={COLORS.textMuted} />
+          </TouchableOpacity>
+        )}
+      </View>
+      {renameError ? <Text style={styles.renameErrorText}>{renameError}</Text> : null}
       
       {renderContent()}
       
@@ -527,6 +713,23 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
   },
+  headerTitleInput: {
+    ...screenTitleText,
+    color: COLORS.textDark,
+    flex: 1,
+    textAlign: 'center',
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+    borderRadius: RADIUS.sm,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  headerTitleTouchable: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   headerRight: {
     width: 85, // Wider to accommodate "Select" button without wrapping
     alignItems: 'flex-end',
@@ -561,6 +764,34 @@ const styles = StyleSheet.create({
   listContent: {
     paddingTop: SPACING.sm,
     paddingBottom: 100, // Extra space for bulk actions bar
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+    paddingHorizontal: SPACING.sm,
+    // Fix height so it doesn't change between placeholder and typed text
+    height: 40,
+    marginBottom: SPACING.sm,
+  },
+  searchIcon: {
+    marginRight: SPACING.xs,
+  },
+  searchInput: {
+    // Avoid inheriting bodyText lineHeight which can misalign TextInput vertically
+    fontFamily: FONT.family.body,
+    fontSize: FONT.size.body,
+    flex: 1,
+    color: COLORS.textDark,
+    paddingVertical: 0,
+    height: '100%',
+    lineHeight: FONT.size.body,
+  },
+  clearButton: {
+    padding: 4,
   },
   recipeCard: {
     flexDirection: 'row',
@@ -702,5 +933,12 @@ const styles = StyleSheet.create({
     color: COLORS.error,
     textAlign: 'center',
     marginTop: SPACING.lg,
+  },
+  renameErrorText: {
+    ...bodyText,
+    color: COLORS.error,
+    textAlign: 'center',
+    marginTop: SPACING.xs,
+    marginBottom: SPACING.xs,
   },
 }); 

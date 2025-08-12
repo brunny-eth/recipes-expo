@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Modal,
   View,
@@ -11,6 +11,7 @@ import {
   TextStyle,
   ImageStyle,
   Image,
+  TextInput,
 } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -21,20 +22,36 @@ import { bodyStrongText, bodyText, titleText, FONT } from '@/constants/typograph
 interface RecipeMatchSelectionModalProps {
   visible: boolean;
   matches: { recipe: CombinedParsedRecipe; similarity: number; }[];
-  onAction: (action: 'select' | 'createNew' | 'returnHome', selectedRecipeId?: string) => void;
+  onAction: (action: 'select' | 'createNew' | 'returnHome', extra?: string) => void; // extra: recipeId for 'select', inputText for 'createNew'
+  debugSource?: string;
+  initialInputText?: string; // Seed text when expanding to create-new input
 }
 
 const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
   visible,
   matches,
   onAction,
+  debugSource,
+  initialInputText,
 }) => {
   // State to track which images have failed to load
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+  const [isCreateExpanded, setIsCreateExpanded] = useState(false);
+  const [inputText, setInputText] = useState('');
+  const [showValidation, setShowValidation] = useState(false);
 
-  console.log('[RecipeMatchSelectionModal] Modal rendered with', matches.length, 'matches.');
+  console.log('[RecipeMatchSelectionModal] Modal rendered with', matches.length, 'matches.', { visible, debugSource });
   console.log('[RecipeMatchSelectionModal] Matches data:', matches);
   console.log('[RecipeMatchSelectionModal] First match sample:', matches[0]);
+
+  React.useEffect(() => {
+    // Seed input when modal becomes visible or initial text changes
+    if (visible) {
+      setInputText(initialInputText || '');
+      setIsCreateExpanded(false);
+      setShowValidation(false);
+    }
+  }, [visible, initialInputText]);
 
   const handleRecipeSelect = (recipeId: string | number) => {
     const selectedRecipeId = recipeId.toString();
@@ -43,8 +60,8 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
   };
 
   const handleCreateNew = () => {
-    console.log('[RecipeMatchSelectionModal] User clicked "Create a new recipe".');
-    onAction('createNew');
+    console.log('[RecipeMatchSelectionModal] User clicked "Create a new recipe". Expanding input.');
+    setIsCreateExpanded(true);
   };
 
   const handleReturnHome = () => {
@@ -102,41 +119,95 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
       animationType="slide"
       transparent={true}
       onRequestClose={handleReturnHome}
+      onShow={() => {
+        if (__DEV__) console.log('[RecipeMatchSelectionModal] onShow fired', { debugSource });
+      }}
     >
       <View style={styles.modalOverlay}>
         <SafeAreaView style={styles.modalContent}>
-          <View style={styles.header}>
-            <Text style={styles.title}>How about one of these?</Text>
-            <Text style={styles.subtitle}>
-              We found {matches.length} similar recipe{matches.length > 1 ? 's' : ''}
-            </Text>
-          </View>
+          {!isCreateExpanded ? (
+            <>
+              <View style={styles.header}>
+                <Text style={styles.title}>How about one of these?</Text>
+                <Text style={styles.subtitle}>
+                  We found {matches.length} similar recipe{matches.length > 1 ? 's' : ''}
+                </Text>
+              </View>
 
-          <FlatList
-            data={matches}
-            initialNumToRender={8}
-            maxToRenderPerBatch={8}
-            renderItem={renderRecipeItem}
-            keyExtractor={(item) => item.recipe.id?.toString() || Math.random().toString()}
-            style={styles.recipeList}
-            showsVerticalScrollIndicator={false}
-          />
+              <FlatList
+                data={matches}
+                initialNumToRender={8}
+                maxToRenderPerBatch={8}
+                renderItem={renderRecipeItem}
+                keyExtractor={(item) => item.recipe.id?.toString() || Math.random().toString()}
+                style={styles.recipeList}
+                showsVerticalScrollIndicator={false}
+              />
 
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={[styles.button, styles.secondaryButton]}
-              onPress={handleCreateNew}
-            >
-              <Text style={styles.secondaryButtonText}>None of these. Make a new recipe for me</Text>
-            </TouchableOpacity>
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity
+                  style={[styles.button, styles.secondaryButton]}
+                  onPress={handleCreateNew}
+                >
+                  <Text style={styles.secondaryButtonText}>None of these. Make a new recipe for me</Text>
+                </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.button, styles.primaryButton]}
-              onPress={handleReturnHome}
-            >
-              <Text style={styles.primaryButtonText}>Return to Home</Text>
-            </TouchableOpacity>
-          </View>
+                <TouchableOpacity
+                  style={[styles.button, styles.primaryButton]}
+                  onPress={handleReturnHome}
+                >
+                  <Text style={styles.primaryButtonText}>Return to Home</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={styles.header}>
+                <Text style={styles.title}>OK! We&apos;ll make a new recipe</Text>
+                <Text style={styles.subtitle}>Want to add any more detail? This helps us create the best recipe.</Text>
+              </View>
+
+              <View style={styles.inputSection}>
+                <TextInput
+                  style={[styles.textArea, showValidation && inputText.trim().length === 0 && styles.textAreaError]}
+                  placeholder="Add ingredients, style, or dietary needs (optional)"
+                  placeholderTextColor="#8D8D8D"
+                  value={inputText}
+                  onChangeText={(t) => {
+                    setInputText(t);
+                    if (showValidation) setShowValidation(false);
+                  }}
+                  multiline
+                  numberOfLines={5}
+                  textAlignVertical="top"
+                  autoFocus
+                  returnKeyType="done"
+                />
+                {showValidation && inputText.trim().length === 0 && (
+                  <Text style={styles.validationText}>You can continue without adding details, or type a few hints.</Text>
+                )}
+              </View>
+
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity
+                  style={[styles.button, styles.primaryButton]}
+                  onPress={() => {
+                    console.log('[RecipeMatchSelectionModal] Confirm create with input text length:', inputText?.length || 0);
+                    onAction('createNew', inputText.trim());
+                  }}
+                >
+                  <Text style={styles.primaryButtonText}>Make my recipe</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.button, styles.secondaryButton]}
+                  onPress={() => setIsCreateExpanded(false)}
+                >
+                  <Text style={styles.secondaryButtonText}>Back to matches</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
         </SafeAreaView>
       </View>
     </Modal>
@@ -231,6 +302,27 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.md,
     gap: SPACING.md,
   } as ViewStyle,
+  inputSection: {
+    paddingTop: SPACING.sm,
+  } as ViewStyle,
+  textArea: {
+    minHeight: 120,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+    borderRadius: RADIUS.sm,
+    padding: SPACING.md,
+    backgroundColor: COLORS.surface,
+    color: COLORS.textDark,
+    ...bodyText,
+  } as TextStyle,
+  textAreaError: {
+    borderColor: COLORS.error,
+  } as TextStyle,
+  validationText: {
+    marginTop: SPACING.xs,
+    color: COLORS.darkGray,
+    ...bodyText,
+  } as TextStyle,
   button: {
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.lg,

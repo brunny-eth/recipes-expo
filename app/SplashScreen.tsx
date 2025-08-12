@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, StyleSheet, Animated, Dimensions, Image } from 'react-native';
-import { COLORS } from '@/constants/theme';
+import { COLORS, SPACING } from '@/constants/theme';
+import { bodyStrongText } from '@/constants/typography';
 import ReanimatedAnimated, { FadeOut } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 
@@ -67,10 +68,11 @@ function SplashScreenMeez({ onFinish }: { onFinish: () => void }) {
         ]}
       >
         <Image 
-          source={require('@/assets/images/meezblue_underline.png')}
+          source={require('@/assets/images/SplashScreen3x.png')}
           style={styles.logoImage}
           resizeMode="contain"
         />
+        {/* Text baked into image; keep no overlay text to ensure identical splash */}
       </Animated.View>
     </ReanimatedAnimated.View>
   );
@@ -97,4 +99,5 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  heading: {},
 });

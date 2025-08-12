@@ -167,22 +167,28 @@ export async function parseTextRecipe(
     // --- End Fuzzy Match Logic ---
 
     try {
-        if (trimmedInput.length < 20 && !trimmedInput.includes(' ')) {
-             const errorPayload: StructuredError = {
-                code: ParseErrorCode.INVALID_INPUT,
-                message: "That didn't look like a real recipe. Try describing a dish or pasting a full recipe."
-            };
-            logger.warn({ requestId, input: trimmedInput }, "Rejected input as invalid (too short, no spaces).");
-            return {
-                recipe: null,
-                error: errorPayload,
-                fromCache: false,
-                inputType,
-                cacheKey,
-                timings: { dbCheck: -1, geminiParse: -1, dbInsert: -1, total: Date.now() - requestStartTime },
-                usage: { inputTokens: 0, outputTokens: 0 },
-                fetchMethodUsed: 'N/A'
-            };
+        // Relax validation: allow concise single-word dish names like "chicken".
+        // Only reject truly trivial inputs (e.g., too short or lacking letters),
+        // and skip this guard entirely if forceNewParse was requested or text came from image extraction.
+        if (!forceNewParseBool && !isFromImageExtraction) {
+            const letterCount = (trimmedInput.match(/[a-zA-Z]/g) || []).length;
+            if (letterCount < 3) {
+                const errorPayload: StructuredError = {
+                    code: ParseErrorCode.INVALID_INPUT,
+                    message: "Please include at least a few letters of a dish or recipe."
+                };
+                logger.warn({ requestId, input: trimmedInput, letterCount }, "Rejected input as invalid (insufficient letters).");
+                return {
+                    recipe: null,
+                    error: errorPayload,
+                    fromCache: false,
+                    inputType,
+                    cacheKey,
+                    timings: { dbCheck: -1, geminiParse: -1, dbInsert: -1, total: Date.now() - requestStartTime },
+                    usage: { inputTokens: 0, outputTokens: 0 },
+                    fetchMethodUsed: 'N/A'
+                };
+            }
         }
 
         logger.info({ requestId, inputType, inputLength: trimmedInput.length, cacheKey }, `Received parse request.`);

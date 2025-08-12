@@ -17,7 +17,7 @@ import {
   BORDER_WIDTH,
   ICON_SIZE,
 } from '@/constants/theme';
-import { FONT, bodyStrongText } from '@/constants/typography';
+import { FONT, bodyStrongText, metaText } from '@/constants/typography';
 
 type RecipeCardProps = {
   recipe: {
@@ -78,8 +78,8 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
   } as ViewStyle,
   title: {
-    fontFamily: FONT.family.interSemiBold,
-    fontSize: FONT.size.lg,
+    fontFamily: FONT.family.bold,
+    fontSize: FONT.size.sectionHeader,
     color: COLORS.textDark,
     marginBottom: SPACING.smMd,
   } as TextStyle,
@@ -95,8 +95,7 @@ const styles = StyleSheet.create({
     color: COLORS.textDark,
   } as TextStyle,
   nutritionLabel: {
-    fontFamily: FONT.family.inter,
-    fontSize: FONT.size.xs,
+    ...metaText,
     color: COLORS.darkGray,
   } as TextStyle,
   divider: {

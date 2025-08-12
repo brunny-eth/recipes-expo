@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
-import { sectionHeaderText, FONT } from '@/constants/typography';
+import { FONT, screenTitleText } from '@/constants/typography';
 
 type RecipeStepsHeaderProps = {
   title?: string | null;
@@ -54,22 +54,22 @@ const styles = StyleSheet.create({
     marginTop: SPACING.md,
   },
   recipeTitle: {
-    ...sectionHeaderText,
-    fontSize: FONT.size.xl,
-    lineHeight: FONT.size.xl * 1.3,
+    ...screenTitleText,
+    fontSize: FONT.size.screenTitle,
+    lineHeight: FONT.size.screenTitle * 1.3,
     textAlign: 'center',
     marginHorizontal: SPACING.xs,
     paddingHorizontal: SPACING.sm,
   },
   shortDescription: {
-    fontFamily: FONT.family.inter,
+    fontFamily: FONT.family.body,
     fontSize: FONT.size.body,
     color: COLORS.darkGray,
     textAlign: 'center',
     marginTop: SPACING.xs,
     marginHorizontal: SPACING.xs,
     paddingHorizontal: SPACING.sm,
-    lineHeight: FONT.lineHeight.compact,
+    lineHeight: FONT.lineHeight.tight,
   },
 });
 

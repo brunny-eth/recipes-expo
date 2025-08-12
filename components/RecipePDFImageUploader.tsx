@@ -393,6 +393,8 @@ const RecipePDFImageUploader = React.forwardRef<any, Props>(({ onUploadComplete,
   );
 });
 
+RecipePDFImageUploader.displayName = 'RecipePDFImageUploader';
+
 export default RecipePDFImageUploader;
 
 const styles = StyleSheet.create({

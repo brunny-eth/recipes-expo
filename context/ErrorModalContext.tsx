@@ -140,11 +140,10 @@ export const ErrorModalProvider: React.FC<{ children: ReactNode }> = ({
       // Store callback reference before clearing data
       const callbackToExecute = modalDataRef.current?.onDismissCallback;
 
-      // Defer clearing modal content until fade-out animation (~200ms) completes to avoid jank
+      // Defer clearing modal data until after the hide animation finishes (~220ms)
       setTimeout(() => {
-        console.log('[ErrorModalContext] State update: setModalData(null) - clearing modal data after fade-out');
+        console.log('[ErrorModalContext] Clearing modal data after fade-out');
         setModalData(null);
-
         try {
           if (callbackToExecute) {
             callbackToExecute();

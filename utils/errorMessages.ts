@@ -83,7 +83,7 @@ export function getNetworkErrorMessage(error: Error | string, statusCode?: numbe
   }
   
   // Generic fallback
-  return "Something unexpected happened.\nIf the problem continues, try pasting recipe text directly.";
+  return "Something unexpected happened when trying to process your recipe. \nIf the problem continues, try pasting recipe text directly.";
 }
 
 /**

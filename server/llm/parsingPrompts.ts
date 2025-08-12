@@ -75,10 +75,15 @@ The response must be exactly one object with the following shape:
 
 export function buildTextParsePrompt(input: string, fromImageExtraction: boolean = false): PromptPayload {
   const basePrompt = COMMON_SYSTEM_PROMPT;
-  
-  // If this is from image extraction, add guidance for handling potentially structured input
-  const enhancedPrompt = fromImageExtraction ? 
-    basePrompt + `
+
+  // Detect whether the user input looks like a short dish name/brief description
+  const trimmed = (input || '').trim();
+  const wordCount = trimmed.split(/\s+/).filter(Boolean).length;
+  const hasStructureMarkers = /ingredients?:|instructions?:|\n|•|-\s|\d+\./i.test(trimmed);
+  const looksLikeBriefRequest = !fromImageExtraction && !hasStructureMarkers && wordCount > 0 && wordCount <= 30;
+
+  // Additional guidance for different contexts
+  const imageGuidance = `
 
 **ADDITIONAL GUIDANCE FOR IMAGE-EXTRACTED TEXT:**
 This text was extracted from an image/PDF. It may be:
@@ -90,11 +95,33 @@ If the input appears to be valid JSON with recipe data already structured:
 - ENHANCE by adding missing suggested_substitutions and other fields
 - DO NOT reinterpret or change the core recipe information
 
-If the input is unstructured text, follow the standard parsing rules completely.` 
-    : basePrompt;
+If the input is unstructured text, follow the standard parsing rules completely.`;
+
+  const briefRequestGuidance = `
+
+**WHEN INPUT IS ONLY A DISH NAME OR SHORT DESCRIPTION:**
+Sometimes the user provides only a brief phrase (e.g., "chicken with rice and lemon"). In this case, you MUST design a complete, realistic recipe that fits the request using solid culinary knowledge. Specifically:
+- Create a concise, descriptive title
+- Produce a full set of ingredientGroups with concrete ingredient items (no placeholders)
+- Produce clear, step-by-step instructions (actionable and specific)
+- Reasonably estimate recipeYield, prepTime, cookTime, and totalTime
+- Prefer common, accessible ingredients and proportions that make culinary sense
+- Avoid vague fillers; make the result cookable as-is
+
+For this brief-request mode, do NOT set core fields (title, ingredientGroups, instructions) to null.
+Only optional fields may be null if unknown.`;
+
+  // Construct final system prompt
+  let system = basePrompt;
+  if (fromImageExtraction) {
+    system += imageGuidance;
+  } else if (looksLikeBriefRequest) {
+    // Override the "No Inference" rule for brief requests by appending explicit generation guidance
+    system += briefRequestGuidance;
+  }
 
   return {
-    system: enhancedPrompt,
+    system,
     text: input,
     isJson: true
   };

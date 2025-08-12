@@ -55,6 +55,7 @@ import {
   bodyStrongText,
   captionText,
   FONT,
+  metaText,
 } from '@/constants/typography';
 import { useAuth } from '@/context/AuthContext';
 import IngredientSubstitutionModal from '@/app/recipe/IngredientSubstitutionModal';
@@ -66,6 +67,9 @@ import ServingScaler from '@/components/recipe/ServingScaler';
 import RecipeFooterButtons from '@/components/recipe/RecipeFooterButtons';
 
 import RecipeStepsHeader from '@/components/recipe/RecipeStepsHeader';
+import ScreenHeader from '@/components/ScreenHeader';
+import { Modal, Pressable } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Type for a change (substitution or removal)
 type AppliedChange = {
@@ -228,6 +232,7 @@ export default function RecipeSummaryScreen() {
   const handleError = useHandleError();
   const { session } = useAuth();
   const { track } = useAnalytics();
+  const insets = useSafeAreaInsets();
 
   // Extract and validate entryPoint with logging
   const entryPoint = params.entryPoint || 'new'; // Default to 'new' for backward compatibility
@@ -238,6 +243,7 @@ export default function RecipeSummaryScreen() {
   const [originalRecipe, setOriginalRecipe] = useState<ParsedRecipe | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const [isTitleModalVisible, setIsTitleModalVisible] = useState(false);
   const [isAllergensExpanded, setIsAllergensExpanded] = useState(false);
   const [isSourceExpanded, setIsSourceExpanded] = useState(false);
   const [isRecipeSizeExpanded, setIsRecipeSizeExpanded] = useState(false);
@@ -276,6 +282,13 @@ export default function RecipeSummaryScreen() {
     from: string;
     to: string | null;
   } | null>(null);
+
+  // Dev log to correlate substitution modal with background modal flicker
+  useEffect(() => {
+    if (__DEV__) {
+      console.log(`[Summary] substitutionModalVisible=${substitutionModalVisible}`);
+    }
+  }, [substitutionModalVisible]);
 
   // Determine if we're viewing a saved recipe (clean display) vs actively editing (show indicators)
   // For mise recipes: we're actively editing even if appliedChanges exist in URL
@@ -1893,21 +1906,21 @@ export default function RecipeSummaryScreen() {
       <SafeAreaView style={styles.container}>
       {/* Modals */}
       {substitutionModalVisible && selectedIngredientOriginalData && (
-        <IngredientSubstitutionModal
-          visible={substitutionModalVisible}
-          onClose={() => setSubstitutionModalVisible(false)}
-          ingredientName={selectedIngredientOriginalData.name}
-          substitutions={processedSubstitutionsForModal}
-          onApply={onApplySubstitution}
-        />
+        <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }} pointerEvents="box-none">
+          <IngredientSubstitutionModal
+            visible={substitutionModalVisible}
+            onClose={() => setSubstitutionModalVisible(false)}
+            ingredientName={selectedIngredientOriginalData.name}
+            substitutions={processedSubstitutionsForModal}
+            onApply={onApplySubstitution}
+          />
+        </View>
       )}
       
-
-      
-      <RecipeStepsHeader
-        title={cleanTitle}
-        imageUrl={recipe.image || recipe.thumbnailUrl}
-        recipe={recipe}
+      <ScreenHeader 
+        title={cleanTitle || 'Recipe'} 
+        showBack={true} 
+        onTitlePress={() => setIsTitleModalVisible(true)}
       />
 
       {/* Sharp divider to separate title from content */}
@@ -2083,6 +2096,23 @@ export default function RecipeSummaryScreen() {
         )}
       </ScrollView>
 
+      {/* Title pop-up modal for long titles */}
+      <Modal
+        visible={isTitleModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsTitleModalVisible(false)}
+      >
+        <Pressable 
+          style={[styles.titleModalOverlay, { paddingTop: insets.top + SPACING.pageHorizontal }]}
+          onPress={() => setIsTitleModalVisible(false)}
+        >
+          <Pressable style={styles.titleModalContent}>
+            <Text style={styles.titleModalText}>{cleanTitle || 'Recipe'}</Text>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       <RecipeFooterButtons
         handleGoToSteps={handleGoToSteps}
         isRewriting={isRewriting}
@@ -2131,7 +2161,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   infoRowLabel: {
-            fontFamily: FONT.family.ubuntu,
+            fontFamily: FONT.family.heading,
     fontSize: FONT.size.body,
   },
   infoRowContent: {
@@ -2157,7 +2187,7 @@ const styles = StyleSheet.create({
   } as TextStyle,
   sectionTitle: {
     ...sectionHeaderText,
-    fontFamily: FONT.family.interSemiBold,
+    fontFamily: FONT.family.bold,
     color: COLORS.textDark,
     textAlign: 'left',
     marginBottom: SPACING.xs,
@@ -2238,7 +2268,7 @@ const styles = StyleSheet.create({
   readMoreText: {
     ...bodyStrongText,
     color: COLORS.primary,
-    fontSize: FONT.size.smBody,
+    fontSize: FONT.size.caption,
   },
   saveButtonContainer: {
     paddingHorizontal: SPACING.pageHorizontal,
@@ -2268,7 +2298,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 0,
   },
   ingredientsSubtext: {
-    fontFamily: FONT.family.inter,
+    fontFamily: FONT.family.body,
     fontSize: FONT.size.caption,
     color: COLORS.textMuted,
     marginBottom: SPACING.sm, // Use small spacing for consistency
@@ -2283,28 +2313,28 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   shortDescriptionHeader: {
-    fontFamily: FONT.family.inter,
+    fontFamily: FONT.family.body,
     fontSize: FONT.size.body,
     color: COLORS.darkGray,
     textAlign: 'center',
     marginTop: SPACING.xs,
     marginHorizontal: SPACING.xs,
     paddingHorizontal: SPACING.sm,
-    lineHeight: FONT.lineHeight.compact,
+    lineHeight: FONT.lineHeight.tight,
   },
   shortDescriptionHeaderLeft: {
-    fontFamily: FONT.family.inter,
-    fontSize: FONT.size.smBody+1,
+    fontFamily: FONT.family.body,
+    fontSize: FONT.size.caption + 1,
     color: COLORS.textMuted,
     textAlign: 'center',
     marginTop: SPACING.xxs,
     marginBottom: SPACING.sm,
     marginHorizontal: SPACING.xs, // Reduced for wider text area
     paddingHorizontal: SPACING.xs, // Reduced for wider text area
-    lineHeight: FONT.lineHeight.compact,
+    lineHeight: FONT.lineHeight.tight,
   },
   metaInfoCondensed: {
-    fontFamily: FONT.family.inter,
+    fontFamily: FONT.family.body,
     alignItems: 'center',
     marginBottom: SPACING.sm
   },
@@ -2322,10 +2352,28 @@ const styles = StyleSheet.create({
     elevation: 1, // For Android
   },
   visitSourceLink: {
-    fontFamily: FONT.family.inter,
+    fontFamily: FONT.family.body,
     fontSize: FONT.size.caption,
     color: COLORS.textDark,
     textDecorationLine: 'underline',
     opacity: 0.5,
+  },
+  titleModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.pageHorizontal,
+  },
+  titleModalContent: {
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.md,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    maxWidth: '90%',
+  },
+  titleModalText: {
+    ...sectionHeaderText,
+    color: COLORS.textDark,
+    textAlign: 'center',
   },
 });
