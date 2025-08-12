@@ -641,7 +641,6 @@ export default function HomeScreen() {
                    <Text style={[styles.subheadingText, styles.importSubheading, { marginTop: 0, marginBottom: SPACING.xs }]}>
                      import and customize any recipe
                    </Text>
-                   <View style={styles.sectionRule} />
                  </View>
 
                 {/* Unified import card: segmented control + input */}
@@ -747,8 +746,7 @@ export default function HomeScreen() {
               {/* Action section 1: Prep station */}
               <View style={styles.actionSection}>
                 <View style={styles.sectionTitleWrap}>
-                  <Text style={[styles.subheadingText, { marginTop: 0, marginBottom: SPACING.xs }]}>shop and cook for multiple recipes at once</Text>
-                  <View style={styles.sectionRule} />
+                  <Text style={[styles.subheadingText, { marginTop: 0, marginBottom: SPACING.xs }]}>shop and cook multiple recipes together</Text>
                 </View>
                 <View style={[styles.quickList, { marginBottom: SPACING.xl }]}> 
                   <TouchableOpacity
@@ -764,7 +762,6 @@ export default function HomeScreen() {
               <View style={styles.actionSection}>
                 <View style={styles.sectionTitleWrap}>
                   <Text style={[styles.subheadingText, { marginTop: 0, marginBottom: SPACING.xs }]}>save your recipes into cookbooks</Text>
-                  <View style={styles.sectionRule} />
                 </View>
                 <View style={[styles.quickList, { marginBottom: SPACING.xl }]}> 
                   <TouchableOpacity
@@ -876,6 +873,7 @@ const styles = StyleSheet.create({
   quickList: {
     width: '100%',
     gap: SPACING.sm,
+    marginTop: SPACING.xs,
   },
   quickPill: {
     width: '100%',
