@@ -48,12 +48,30 @@ export function finalValidateRecipe(recipe: CombinedParsedRecipe | null, request
       // Check for hallucinated ingredients (too generic, vague, or placeholder-like)
       const hallucinationSigns = checkForIngredientHallucination(recipe.ingredientGroups);
       if (hallucinationSigns.length > 0) {
-        logger.warn({ 
-          requestId, 
-          hallucinationSigns,
-          title: recipe.title 
-        }, 'Final validation: Potential ingredient hallucination detected');
-        reasons.push(...hallucinationSigns);
+        // Treat certain ingredient anomalies as non-fatal (do not fail validation)
+        const nonFatalIngredientSigns = new Set<string>([
+          'Repetitive ingredient patterns detected',
+        ]);
+
+        const fatalIngredientSigns = hallucinationSigns.filter(sign => !nonFatalIngredientSigns.has(sign));
+        const nonFatalDetected = hallucinationSigns.filter(sign => nonFatalIngredientSigns.has(sign));
+
+        if (nonFatalDetected.length > 0) {
+          logger.info({
+            requestId,
+            nonFatalDetected,
+            title: recipe.title,
+          }, 'Final validation: Non-fatal ingredient anomalies detected');
+        }
+
+        if (fatalIngredientSigns.length > 0) {
+          logger.warn({ 
+            requestId, 
+            hallucinationSigns: fatalIngredientSigns,
+            title: recipe.title 
+          }, 'Final validation: Potential ingredient hallucination detected');
+          reasons.push(...fatalIngredientSigns);
+        }
       }
     }
   }
