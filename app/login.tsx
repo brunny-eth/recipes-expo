@@ -27,8 +27,8 @@ const LoginScreen = () => {
         source={require('@/assets/images/meezblue_underline.png')}
         resizeMode="contain"
         style={{
-          width: 200,
-          height: 100,
+          width: 120,
+          height: 60,
           alignSelf: 'center',
         }}
       />
@@ -78,10 +78,11 @@ const LoginScreen = () => {
       <View style={styles.content}>
         <View style={styles.logoSection}>
           <LogoHeader animatedLogo={animatedLogo} />
+          <Text style={styles.title}>Before we get started...</Text>
         </View>
         <View style={styles.authSection}>
           <Text style={styles.subtitle}>
-            Create an account or login to your account to use Meez.
+          Sign in. Start cooking.
           </Text>
 
           {Platform.OS === 'ios' && (
@@ -137,10 +138,10 @@ const LoginScreen = () => {
         {/* TOS/Privacy Policy agreement text */}
         <View style={styles.tosSection}>
           <Text style={styles.tosText}>
-            By continuing, you agree to our{' '}
-            <Text style={styles.tosLink} onPress={() => Linking.openURL('https://meez.app/tos.html')}>Terms of Service</Text>
+            By logging in, you agree to the{' '}
+            <Text style={styles.tosLink} onPress={() => Linking.openURL('https://meez.app/tos.html')}>TOS</Text>
             {' '}and{' '}
-            <Text style={styles.tosLink} onPress={() => Linking.openURL('https://meez.app/privacy.html')}>Privacy Policy</Text>.
+            <Text style={styles.tosLink} onPress={() => Linking.openURL('https://meez.app/privacy.html')}>Privacy Policy</Text>
           </Text>
         </View>
       </View>
@@ -172,7 +173,7 @@ const styles = StyleSheet.create({
     flex: 1,
   } as ViewStyle,
   logoSection: {
-    paddingTop: SPACING.xl,
+    paddingTop: SPACING.xxl,
     alignItems: 'center',
   } as ViewStyle,
   authSection: {
@@ -185,18 +186,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   } as ViewStyle,
   title: {
-    fontSize: FONT.size.xxl,
-    fontWeight: FONT.weight.bold,
+    fontSize: FONT.size.xl,
+    fontWeight: FONT.weight.semiBold,
     color: COLORS.textDark,
+    marginTop: SPACING.lg,
     marginBottom: SPACING.md,
-            fontFamily: FONT.family.ubuntu,
+    fontFamily: FONT.family.ubuntu,
   } as TextStyle,
   subtitle: {
-    ...bodyTextLoose,
-    fontSize: FONT.size.lg, // Make text bigger
-    color: COLORS.secondary,
+    ...bodyText,
+    fontSize: FONT.size.sectionHeader,
+    color: COLORS.textDark,
     textAlign: 'center',
-    marginBottom: SPACING.xxxl, // Increased spacing to push buttons further away
+    marginTop: SPACING.xs,
+    marginBottom: SPACING.xl,
   } as TextStyle,
   button: {
     flexDirection: 'row',
@@ -206,7 +209,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
     borderRadius: RADIUS.md,
     marginBottom: SPACING.md,
-    minHeight: 54, // TODO: Consider tokenizing if reused elsewhere
+    minHeight: 54,
   } as ViewStyle,
   googleButton: {
     backgroundColor: COLORS.googleBlue,

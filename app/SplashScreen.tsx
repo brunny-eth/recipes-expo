@@ -67,12 +67,11 @@ function SplashScreenMeez({ onFinish }: { onFinish: () => void }) {
           },
         ]}
       >
-        <Image 
-          source={require('@/assets/images/SplashScreen3x.png')}
+        <Image
+          source={require('@/assets/images/meezblue_underline.png')}
           style={styles.logoImage}
           resizeMode="contain"
         />
-        {/* Text baked into image; keep no overlay text to ensure identical splash */}
       </Animated.View>
     </ReanimatedAnimated.View>
   );
@@ -96,8 +95,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logoImage: {
-    width: '100%',
-    height: '100%',
+    // Centered logo only – match native splash placement
+    width: Math.min(width * 0.6, 300),
+    height: Math.min(width * 0.6, 300) * 0.48,
   },
   heading: {},
 });

@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "jsEngine": "hermes",
     "splash": {
-      "image": "./assets/images/SplashScreen3x.png",
+      "image": "./assets/images/meezblue_underline.png",
       "resizeMode": "contain",
       "backgroundColor": "#fefcf7"
     },
@@ -27,7 +27,7 @@
         ]
       },
       "splash": {
-        "image": "./assets/images/SplashScreen3x.png",
+        "image": "./assets/images/meezblue_underline.png",
         "resizeMode": "contain",
         "backgroundColor": "#fefcf7"
       },
@@ -48,7 +48,7 @@
     "android": {
       "package": "com.meez.recipes",
       "splash": {
-        "image": "./assets/images/SplashScreen3x.png",
+        "image": "./assets/images/meezblue_underline.png",
         "resizeMode": "contain",
         "backgroundColor": "#fefcf7"
       },

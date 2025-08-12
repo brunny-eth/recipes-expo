@@ -44,14 +44,12 @@ import { CombinedParsedRecipe } from '@/common/types';
 import { useRecipeSubmission } from '@/hooks/useRecipeSubmission';
 import { detectInputType } from '../../server/utils/detectInputType';
 import { useAnalytics } from '@/utils/analytics';
-import { useRenderCounter } from '@/hooks/useRenderCounter';
 import { useHandleError } from '@/hooks/useHandleError';
 
 export default function HomeScreen() {
   const [isHomeFocused, setIsHomeFocused] = useState(false);
   const [recipeUrl, setRecipeUrl] = useState('');
   const { session } = useAuth();
-  useRenderCounter('HomeScreen', { hasSession: !!session });
   
   // Debug: Log recipeUrl state changes
   useEffect(() => {
@@ -85,18 +83,6 @@ export default function HomeScreen() {
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const logoTranslateY = useRef(new Animated.Value(-30)).current;
 
-  // Dev logs for focus and modal state
-  useEffect(() => {
-    if (__DEV__) {
-      console.log(`[Home] focus changed: isHomeFocused=${isHomeFocused}`);
-    }
-  }, [isHomeFocused]);
-
-  useEffect(() => {
-    if (__DEV__) {
-      console.log(`[Home] showMatchSelectionModal=${showMatchSelectionModal}`);
-    }
-  }, [showMatchSelectionModal]);
 
   // Placeholder rotation state (separate for URL and Name)
   const [urlDisplayedPlaceholder, setUrlDisplayedPlaceholder] = useState('');
@@ -118,7 +104,7 @@ export default function HomeScreen() {
   // Local state for name input
   const [recipeName, setRecipeName] = useState('');
 
-  // Generic typewriter starter for any placeholder with logging and cleanup
+  // Generic typewriter starter for any placeholder with cleanup
   const startTypewriter = useCallback(
     (
       label: 'URL' | 'NAME',
@@ -129,27 +115,18 @@ export default function HomeScreen() {
     ) => {
       try {
         if (intervalRef.current) {
-          if (__DEV__) console.log(`[Typewriter][${label}] clearing previous interval`);
           clearInterval(intervalRef.current);
           intervalRef.current = null;
         }
         setTyping(true);
         setDisplayed('');
-        if (__DEV__) console.log(`[Typewriter][${label}] starting with text:`, text);
 
         let index = 0;
         const interval = setInterval(() => {
           index += 1;
           const slice = text.slice(0, index);
           setDisplayed(slice);
-          if (__DEV__) {
-            // Log every ~6th char to reduce noise
-            if (index % 6 === 0 || index === text.length) {
-              console.log(`[Typewriter][${label}] tick index=${index}/${text.length} slice='${slice}'`);
-            }
-          }
           if (index >= text.length) {
-            if (__DEV__) console.log(`[Typewriter][${label}] completed`);
             clearInterval(interval);
             intervalRef.current = null;
             setTyping(false);
@@ -159,7 +136,6 @@ export default function HomeScreen() {
         intervalRef.current = interval as unknown as NodeJS.Timeout;
         return () => {
           if (intervalRef.current) {
-            if (__DEV__) console.log(`[Typewriter][${label}] cleanup (external)`);
             clearInterval(intervalRef.current);
             intervalRef.current = null;
           }
@@ -177,7 +153,6 @@ export default function HomeScreen() {
 
   // On mount, animate URL prompt once
   useEffect(() => {
-    if (__DEV__) console.log('[Typewriter][URL] mount kick-off');
     const timeoutId = setTimeout(() => {
       startTypewriter('URL', urlPrompt, setIsTypingUrlPlaceholder, setUrlDisplayedPlaceholder, urlIntervalRef);
     }, 1200);
@@ -205,11 +180,9 @@ export default function HomeScreen() {
       return;
     }
     if (importMode === 'url' && !urlDisplayedPlaceholder && !isTypingUrlPlaceholder) {
-      if (__DEV__) console.log('[Typewriter][URL] starting on tab switch');
       startTypewriter('URL', urlPrompt, setIsTypingUrlPlaceholder, setUrlDisplayedPlaceholder, urlIntervalRef);
     }
     if (importMode === 'name' && !nameDisplayedPlaceholder && !isTypingNamePlaceholder) {
-      if (__DEV__) console.log('[Typewriter][NAME] starting on tab switch');
       startTypewriter('NAME', namePrompt, setIsTypingNamePlaceholder, setNameDisplayedPlaceholder, nameIntervalRef);
     }
     // Do NOT stop the other animation when switching away.
@@ -690,22 +663,43 @@ export default function HomeScreen() {
                   {/* Segmented control: URL | Dish Name | Image */}
                   <View style={styles.segmentedControlContainer}>
                     <TouchableOpacity
-                      style={[styles.segmentedItem, importMode === 'url' && styles.segmentedItemActive]}
+                      style={[styles.segmentedItem, styles.segmentedItemNarrow, importMode === 'url' && styles.segmentedItemActive]}
                       onPress={() => setImportMode('url')}
                     >
-                      <Text style={[styles.segmentedItemText, importMode === 'url' && styles.segmentedItemTextActive]}>url</Text>
+                      <Text
+                        style={[styles.segmentedItemText, importMode === 'url' && styles.segmentedItemTextActive]}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.75}
+                      >
+                        url
+                      </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.segmentedItem, importMode === 'name' && styles.segmentedItemActive]}
+                      style={[styles.segmentedItem, styles.segmentedItemWide, importMode === 'name' && styles.segmentedItemActive]}
                       onPress={() => setImportMode('name')}
                     >
-                      <Text style={[styles.segmentedItemText, importMode === 'name' && styles.segmentedItemTextActive]}>dish name</Text>
+                      <Text
+                        style={[styles.segmentedItemText, importMode === 'name' && styles.segmentedItemTextActive]}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.7}
+                      >
+                        dish name
+                      </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.segmentedItem, importMode === 'image' && styles.segmentedItemActive]}
+                      style={[styles.segmentedItem, styles.segmentedItemNarrow, importMode === 'image' && styles.segmentedItemActive]}
                       onPress={() => setImportMode('image')}
                     >
-                      <Text style={[styles.segmentedItemText, importMode === 'image' && styles.segmentedItemTextActive]}>image</Text>
+                      <Text
+                        style={[styles.segmentedItemText, importMode === 'image' && styles.segmentedItemTextActive]}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.75}
+                      >
+                        image
+                      </Text>
                     </TouchableOpacity>
                   </View>
 
@@ -1111,6 +1105,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  segmentedItemWide: {
+    flex: 1.3,
+  },
+  segmentedItemNarrow: {
+    flex: 0.85,
   },
   segmentedItemActive: {
     backgroundColor: COLORS.primary,

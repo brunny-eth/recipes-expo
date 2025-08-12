@@ -236,6 +236,7 @@ export default function AccountScreen() {
           </TouchableOpacity>
         </View>
         <Text style={styles.versionText}>Version 1.0.0</Text>
+        <Text style={styles.tagline}>Designed for home cooks, by home cooks</Text>
       </View>
     </View>
   );
@@ -342,6 +343,13 @@ const styles = StyleSheet.create({
     ...bodyText,
     color: COLORS.textSubtle,
     textAlign: 'center',
+    fontSize: FONT.size.caption,
+  } as TextStyle,
+  tagline: {
+    ...bodyText,
+    textAlign: 'center',
+    color: COLORS.textSubtle,
+    marginTop: SPACING.xs,
     fontSize: FONT.size.caption,
   } as TextStyle,
   loginButton: {

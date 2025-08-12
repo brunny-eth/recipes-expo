@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, SafeAreaView, TextStyle, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, SafeAreaView, TextStyle, ViewStyle, StyleSheet } from 'react-native';
 import { COLORS } from '@/constants/theme';
 import { FONT } from '@/constants/typography';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -9,6 +9,12 @@ type WelcomeScreenState = 'welcome' | 'onboarding';
 
 export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) {
   const [currentScreen, setCurrentScreen] = useState<WelcomeScreenState>('welcome');
+  const features: { verb: string; rest: string }[] = [
+    { verb: 'Import', rest: ' any recipe from any source' },
+    { verb: 'Customize', rest: ' recipes to your preferences' },
+    { verb: 'Shop & cook', rest: ' multiple recipes at the same time' },
+    { verb: 'Save', rest: ' cookbooks of your favorite recipes' },
+  ];
 
   if (currentScreen === 'onboarding') {
     return (
@@ -30,10 +36,10 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
       <SafeAreaView style={{
         flex: 1,
       }}>
-        <View style={{
+          <View style={{
           flex: 1,
           justifyContent: 'space-between',
-          paddingTop: '20%', // Increased from 3% to 20%
+            paddingTop: '20%',
           paddingHorizontal: 30,
           alignItems: 'center'
         }}>
@@ -48,70 +54,36 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
             >
               <Text style={{ 
                 fontSize: 24,
-                marginBottom: 60,
+                marginBottom: 68,
                 textAlign: 'center',
                 color: COLORS.textDark,
                 lineHeight: 28,
                 paddingTop: 30,
                 fontFamily: FONT.family.interSemiBold
               }}>
-                Meez helps you prep and cook without clutter
+                The best way to prep and cook meals at home
               </Text>
             </Animated.View>
 
-            {/* Bullets - each in its own animated container */}
-
-            <Animated.View
-              entering={FadeIn.duration(1000).delay(2000)}
-              style={{ width: '100%' }}
-            >
-              <Text style={styles.bullet}>• Import any recipe and customize it</Text>
-            </Animated.View>
-
-            <Animated.View
-              entering={FadeIn.duration(1000).delay(3500)}
-              style={{ width: '100%' }}
-            >
-              <Text style={styles.bullet}>• Easily swap or remove ingredients</Text>
-            </Animated.View>
-
-            <Animated.View
-              entering={FadeIn.duration(1000).delay(5000)}
-              style={{ width: '100%' }}
-            >
-              <Text style={styles.bullet}>• Cook multiple dishes at the same time</Text>
-            </Animated.View>
+            {/* Numbered list */}
+            <View style={{ width: '100%' }}>
+              {features.map((item, index) => (
+                <View key={index} style={styles.listItem}>
+                  <View style={styles.listNumber}>
+                    <Text style={styles.listNumberText}>{index + 1}</Text>
+                  </View>
+                  <Text style={styles.listText}>
+                    <Text style={styles.listVerb}>{item.verb}</Text>
+                    {item.rest}
+                  </Text>
+                </View>
+              ))}
+            </View>
           </View>
 
-          {/* Button container with tagline */}
+          {/* Button container */}
           <View style={{ width: '100%', alignItems: 'center' }}>
-            <Animated.View
-              entering={FadeIn.duration(1000).delay(6500)}
-              style={{
-                width: '100%',
-                alignItems: 'center',
-                marginBottom: 24
-              }}
-            >
-              <Text style={{ 
-                fontSize: 16,
-                textAlign: 'center',
-                color: COLORS.textDark,
-                lineHeight: 26,
-                fontFamily: FONT.family.ubuntu
-              }}>
-                Designed by home cooks, for home cooks
-              </Text>
-            </Animated.View>
-
-            <Animated.View
-              entering={FadeIn.duration(1000).delay(6500)}
-              style={{
-                width: '100%',
-                alignItems: 'center',
-                marginBottom: 140
-              }}
-            >
+            <Animated.View entering={FadeIn.duration(1000).delay(3000)} style={{ width: '100%', alignItems: 'center', marginTop: 0, marginBottom: 140 }}>
               <TouchableOpacity 
                 style={{
                   backgroundColor: COLORS.primary,
@@ -129,7 +101,7 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
                   shadowRadius: 8,
                   elevation: 5,
                 }}
-                onPress={() => setCurrentScreen('onboarding')}
+                onPress={onDismiss}
               >
                 <Text style={{ 
                   color: COLORS.white, 
@@ -154,5 +126,49 @@ const styles = StyleSheet.create({
     color: COLORS.textDark,
     lineHeight: 22,
     marginBottom: 48,
+  } as TextStyle,
+  listItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 36,
+  } as ViewStyle,
+  listNumber: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+    marginTop: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 3,
+  } as ViewStyle,
+  listNumberText: {
+    color: COLORS.white,
+    fontSize: 13,
+    fontFamily: FONT.family.interSemiBold,
+  } as TextStyle,
+  listText: {
+    flex: 1,
+    fontSize: 17,
+    color: COLORS.textDark,
+    lineHeight: 22,
+    // Nudge so the first line is vertically centered to the number badge
+    marginTop: 2,
+  } as TextStyle,
+  listVerb: {
+    fontFamily: FONT.family.interSemiBold,
+    color: COLORS.textDark,
+  } as TextStyle,
+  tagline: {
+    fontSize: 13,
+    textAlign: 'center',
+    color: COLORS.textDark,
+    lineHeight: 18,
+    fontFamily: FONT.family.ubuntu,
+    marginBottom: 5,
   } as TextStyle,
 });

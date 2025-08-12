@@ -16,14 +16,21 @@
         "simulator": true
       }
     },
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview",
+      "env": {
+        "BUNDLE_ID": "com.meez.recipes"
+      },
+      "ios": { "simulator": false }
+    },
     "production": {
       "developmentClient": false,
       "distribution": "store",
       "channel": "production",
       "autoIncrement": true,
       "env": {
-        "BUNDLE_ID": "com.meez.dev",
-        "APP_ENV": "dev",
+        "BUNDLE_ID": "com.meez.recipes",
         "EXPO_DEBUG": "1"
       },
       "ios": {
