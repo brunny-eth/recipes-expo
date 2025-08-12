@@ -11,8 +11,8 @@ import {
   TextStyle,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
-import { bodyStrongText, bodyText, sectionHeaderText } from '@/constants/typography';
+import { COLORS, SPACING, RADIUS, BORDER_WIDTH, OVERLAYS } from '@/constants/theme';
+import { bodyStrongText, bodyText, sectionHeaderText, FONT } from '@/constants/typography';
 
 // Predefined list of common household staples
 const HOUSEHOLD_STAPLES = [
@@ -97,7 +97,7 @@ export default function HouseholdStaplesModal({
   return (
     <Modal
       visible={visible}
-      animationType="slide"
+      animationType="fade"
       transparent
       onRequestClose={handleCancel}
     >
@@ -106,33 +106,15 @@ export default function HouseholdStaplesModal({
           <TouchableWithoutFeedback onPress={() => {}}>
             <View style={styles.modalContainer}>
               <View style={styles.header}>
-                <Text style={styles.title}>Household Staples</Text>
+                <Text style={styles.title}>Pantry</Text>
                 <Text style={styles.subtitle}>
-                  Select items you typically have at home to filter them from your grocery list
+                  Select items to leave out of your shopping list
                 </Text>
               </View>
 
-              <View style={styles.toggleRow}>
-                <TouchableOpacity 
-                  onPress={() => onStaplesToggle(!staplesEnabled)} 
-                  style={styles.toggleButton}
-                >
-                  <Text style={styles.toggleButtonText}>
-                    {staplesEnabled ? 'Hide Staples' : 'Show Staples'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.buttonRow}>
-                <TouchableOpacity onPress={handleToggleAll} style={styles.selectButton}>
-                  <Text style={styles.selectButtonText}>
-                    {localSelected.length === HOUSEHOLD_STAPLES.length ? 'Clear All' : 'Select All'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+              {/* Toggle removed from modal; handled on main grocery list */}
 
               <View style={styles.scrollWrapper}>
-                <Text style={styles.scrollHint}>Scroll to see all items</Text>
                 <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={true}>
                   {HOUSEHOLD_STAPLES.map((staple) => (
                   <TouchableOpacity
@@ -151,14 +133,20 @@ export default function HouseholdStaplesModal({
                 </ScrollView>
               </View>
 
+              <View style={styles.buttonRow}>
+                <TouchableOpacity onPress={handleToggleAll} style={styles.selectButton}>
+                  <Text style={styles.selectButtonText}>
+                    {localSelected.length === HOUSEHOLD_STAPLES.length ? 'Clear all' : 'Select all'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
               <View style={styles.actionButtons}>
-                <TouchableOpacity onPress={handleCancel} style={styles.cancelButton}>
+                <TouchableOpacity onPress={handleCancel} style={[styles.button, styles.cancelButton]}>
                   <Text style={styles.cancelButtonText}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={handleSave} style={styles.saveButton}>
-                  <Text style={styles.saveButtonText}>
-                    Save Staples
-                  </Text>
+                <TouchableOpacity onPress={handleSave} style={[styles.button, styles.saveButton]}>
+                  <Text style={styles.saveButtonText}>Save</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -172,29 +160,34 @@ export default function HouseholdStaplesModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: OVERLAYS.medium,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: SPACING.pageHorizontal,
   } as ViewStyle,
   modalContainer: {
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     padding: SPACING.xl,
-    width: '90%',
+    width: '100%',
+    maxWidth: 420,
     maxHeight: '80%',
   } as ViewStyle,
   header: {
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.md,
   } as ViewStyle,
   title: {
-    ...sectionHeaderText,
+    fontFamily: FONT.family.bold,
+    fontSize: FONT.size.sectionHeader,
     color: COLORS.textDark,
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.xs,
+    textAlign: 'center',
   } as TextStyle,
   subtitle: {
-    ...bodyText,
+    fontSize: FONT.size.caption,
     color: COLORS.textMuted,
-    lineHeight: 20,
+    lineHeight: 18,
+    textAlign: 'center',
   } as TextStyle,
   toggleRow: {
     alignItems: 'center',
@@ -213,20 +206,22 @@ const styles = StyleSheet.create({
   } as TextStyle,
   buttonRow: {
     alignItems: 'center',
-    marginBottom: SPACING.lg,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.md,
   } as ViewStyle,
   selectButton: {
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.sm,
-    borderWidth: BORDER_WIDTH.default,
-    borderColor: COLORS.primaryLight,
-    backgroundColor: COLORS.surface,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    borderRadius: 0,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+    alignSelf: 'center',
+    marginBottom: SPACING.xl,
   } as ViewStyle,
   selectButtonText: {
-    ...bodyStrongText,
-    color: COLORS.primary,
-    fontSize: 14,
+    color: COLORS.textDark,
+    fontSize: FONT.size.caption,
+    textAlign: 'left',
   } as TextStyle,
   scrollWrapper: {
     marginBottom: SPACING.lg,
@@ -244,6 +239,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primaryLight,
     borderRadius: RADIUS.sm,
     paddingHorizontal: SPACING.sm,
+    backgroundColor: COLORS.white,
   } as ViewStyle,
   stapleItem: {
     flexDirection: 'row',
@@ -262,27 +258,28 @@ const styles = StyleSheet.create({
   actionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: SPACING.md,
   } as ViewStyle,
-  cancelButton: {
+  button: {
     flex: 1,
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.lg,
     borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.surface,
-    marginRight: SPACING.md,
     alignItems: 'center',
+  } as ViewStyle,
+  cancelButton: {
+    backgroundColor: COLORS.white,
+    borderWidth: BORDER_WIDTH.default,
+    borderColor: COLORS.lightGray,
   } as ViewStyle,
   cancelButtonText: {
     ...bodyStrongText,
     color: COLORS.textMuted,
   } as TextStyle,
   saveButton: {
-    flex: 1,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.sm,
     backgroundColor: COLORS.primary,
-    alignItems: 'center',
+    borderWidth: BORDER_WIDTH.default,
+    borderColor: COLORS.primary,
   } as ViewStyle,
   saveButtonText: {
     ...bodyStrongText,

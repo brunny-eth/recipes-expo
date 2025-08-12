@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, Animated, Dimensions, Image, Text } from 'react-native';
+import { View, StyleSheet, Animated, Dimensions, Image } from 'react-native';
 import { COLORS, SPACING } from '@/constants/theme';
 import { bodyStrongText } from '@/constants/typography';
 import ReanimatedAnimated, { FadeOut } from 'react-native-reanimated';
@@ -99,13 +99,5 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  heading: {
-    ...bodyStrongText,
-    fontSize: 26,
-    color: COLORS.textDark,
-    textAlign: 'center',
-    lineHeight: 34,
-    letterSpacing: -0.5,
-    marginTop: SPACING.xl,
-  },
+  heading: {},
 });

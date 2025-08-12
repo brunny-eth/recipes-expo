@@ -9,7 +9,7 @@ import {
   TextStyle,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS } from '@/constants/theme';
+import { COLORS, SPACING, RADIUS, SHADOWS, BORDER_WIDTH } from '@/constants/theme';
 import { bodyStrongText, bodyText, FONT, screenTitleText } from '@/constants/typography';
 
 interface UploadRecipeModalProps {
@@ -68,7 +68,7 @@ export default function UploadRecipeModal({
               <MaterialCommunityIcons
                 name="chevron-right"
                 size={20}
-                color={COLORS.textMuted}
+                color={COLORS.gray}
               />
             </TouchableOpacity>
 
@@ -89,7 +89,7 @@ export default function UploadRecipeModal({
               <MaterialCommunityIcons
                 name="chevron-right"
                 size={20}
-                color={COLORS.textMuted}
+                color={COLORS.gray}
               />
             </TouchableOpacity>
 
@@ -110,7 +110,7 @@ export default function UploadRecipeModal({
               <MaterialCommunityIcons
                 name="chevron-right"
                 size={20}
-                color={COLORS.textMuted}
+                color={COLORS.gray}
               />
             </TouchableOpacity>
           </View>
@@ -141,11 +141,7 @@ const styles = StyleSheet.create({
     padding: SPACING.xl,
     width: '100%',
     maxWidth: 400,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 10,
+    ...SHADOWS.medium,
   } as ViewStyle,
   title: {
     ...screenTitleText,
@@ -161,15 +157,18 @@ const styles = StyleSheet.create({
   } as TextStyle,
   optionsContainer: {
     marginBottom: SPACING.xl,
+    gap: SPACING.sm,
   } as ViewStyle,
   optionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.sm,
-    borderRadius: RADIUS.sm,
-    marginBottom: SPACING.sm,
-    backgroundColor: COLORS.background,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.surface,
+    borderWidth: BORDER_WIDTH.default,
+    borderColor: COLORS.divider,
+    minHeight: 50,
   } as ViewStyle,
   optionIcon: {
     width: 40,
@@ -187,19 +186,20 @@ const styles = StyleSheet.create({
     ...bodyStrongText,
     color: COLORS.textDark,
     fontSize: FONT.size.body,
+    letterSpacing: 0.2,
   } as TextStyle,
   cancelButton: {
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.sm,
+    borderRadius: RADIUS.md,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
+    backgroundColor: COLORS.surface,
+    borderWidth: BORDER_WIDTH.default,
+    borderColor: COLORS.divider,
   } as ViewStyle,
   cancelButtonText: {
     ...bodyStrongText,
-    color: COLORS.textMuted,
+    color: COLORS.primary,
   } as TextStyle,
 }); 

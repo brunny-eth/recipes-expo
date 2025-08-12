@@ -108,8 +108,8 @@ export default function HomeScreen() {
   const urlIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const nameIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const urlPrompt = "tip: try a recipe blog with annoying ads";
-  const namePrompt = "tip: search for 'garlic chicken' or 'pizza'";
+  const urlPrompt = "www.recipe.com/too_many_ads";
+  const namePrompt = "try 'garlic chicken' or 'pizza'";
 
   // Local state for name input
   const [recipeName, setRecipeName] = useState('');
@@ -624,7 +624,7 @@ export default function HomeScreen() {
           >
             <View style={styles.sectionsContainer}>
               {/* Marketing heading */}
-              <View style={[styles.heroSection, isCompact && { marginTop: 1, marginBottom: 0 }]}>
+              <View style={[styles.heroSection, isCompact && { marginTop: 0, marginBottom: 0 }]}>
                 <Text
                   style={[styles.heroHeading, isCompact && { fontSize: FONT.size.sectionHeader }]}
                   numberOfLines={1}
@@ -637,33 +637,30 @@ export default function HomeScreen() {
 
               {/* Import section */}
               <View style={styles.importSection}>
-                 <View style={styles.sectionTitleWrap}>
-                   <Text style={[styles.subheadingText, styles.importSubheading, { marginTop: 0, marginBottom: SPACING.xs }]}>
-                     import and customize any recipe
-                   </Text>
-                 </View>
+                 {/* Removed legacy subheading above the import card */}
 
-                {/* Unified import card: segmented control + input */}
+                {/* Unified import card: header + segmented control + input */}
                 <View style={styles.importCard}>
+                  <Text style={styles.importCardTitle}>import & customize</Text>
                   {/* Segmented control: URL | Dish Name | Image */}
                   <View style={styles.segmentedControlContainer}>
                     <TouchableOpacity
                       style={[styles.segmentedItem, importMode === 'url' && styles.segmentedItemActive]}
                       onPress={() => setImportMode('url')}
                     >
-                      <Text style={[styles.segmentedItemText, importMode === 'url' && styles.segmentedItemTextActive]}>URL</Text>
+                      <Text style={[styles.segmentedItemText, importMode === 'url' && styles.segmentedItemTextActive]}>url</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.segmentedItem, importMode === 'name' && styles.segmentedItemActive]}
                       onPress={() => setImportMode('name')}
                     >
-                      <Text style={[styles.segmentedItemText, importMode === 'name' && styles.segmentedItemTextActive]}>Dish Name</Text>
+                      <Text style={[styles.segmentedItemText, importMode === 'name' && styles.segmentedItemTextActive]}>dish name</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.segmentedItem, importMode === 'image' && styles.segmentedItemActive]}
                       onPress={() => setImportMode('image')}
                     >
-                      <Text style={[styles.segmentedItemText, importMode === 'image' && styles.segmentedItemTextActive]}>Image</Text>
+                      <Text style={[styles.segmentedItemText, importMode === 'image' && styles.segmentedItemTextActive]}>image</Text>
                     </TouchableOpacity>
                   </View>
 
@@ -703,7 +700,7 @@ export default function HomeScreen() {
                         style={styles.fullWidthPrimaryButton}
                         onPress={handleShowUploadModal}
                       >
-                        <Text style={styles.fullWidthPrimaryButtonText}>Choose image</Text>
+                        <Text style={styles.fullWidthPrimaryButtonText}>choose image</Text>
                       </TouchableOpacity>
                     </View>
                   ) : (
@@ -733,44 +730,59 @@ export default function HomeScreen() {
                       
                     </View>
                   )}
-                  {importMode === 'name' && (
-                    <View style={{ minHeight: 24, justifyContent: 'center' }}>
-                      <TouchableOpacity onPress={() => router.push('/explore')}>
-                        <Text style={styles.inlineLink}>or scroll through our community recipes</Text>
+                  {/* Removed inline community link for name mode */}
+                </View>
+              </View>
+
+              {/* Flexible spacer to push secondary actions lower */}
+              <View style={{ flexGrow: 1 }} />
+
+              {/* Secondary actions grouped near bottom */}
+              <View style={styles.secondarySections}>
+                {/* Action section 1: Prep station */}
+                <View style={styles.actionSection}>
+                  <View style={styles.sectionTitleWrap}>
+                    <Text style={[styles.subheadingText, { marginTop: 0, marginBottom: SPACING.xs }]}>shop & cook</Text>
+                  </View>
+                  <View style={[styles.quickList, { marginBottom: SPACING.smMd }]}> 
+                    <TouchableOpacity
+                      style={styles.quickPill}
+                      onPress={() => router.push('/tabs/mise')}
+                    >
+                      <Text style={styles.quickPillText}>prep station</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Action section 2: Saved recipes */}
+                <View style={styles.actionSection}>
+                  <View style={styles.sectionTitleWrap}>
+                    <Text style={[styles.subheadingText, { marginTop: 0, marginBottom: SPACING.xs }]}>save & organize</Text>
+                  </View>
+                  <View style={[styles.quickList, { marginBottom: SPACING.smMd }]}> 
+                    <TouchableOpacity
+                      style={styles.quickPill}
+                      onPress={() => router.push({ pathname: '/tabs/library', params: { tab: 'saved' } })}
+                    >
+                        <Text style={styles.quickPillText}>cookbooks</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                  {/* Action section 3: Explore */}
+                  <View style={styles.actionSection}>
+                    <View style={styles.sectionTitleWrap}>
+                      <Text style={[styles.subheadingText, { marginTop: 0, marginBottom: SPACING.xs }]}>see what others are cooking</Text>
+                    </View>
+                    <View style={[styles.quickList, { marginBottom: 0 }]}> 
+                      <TouchableOpacity
+                        style={styles.quickPill}
+                        onPress={() => router.push('/explore')}
+                      >
+                        <Text style={styles.quickPillText}>explore</Text>
                       </TouchableOpacity>
                     </View>
-                  )}
-                </View>
-              </View>
-
-              {/* Action section 1: Prep station */}
-              <View style={styles.actionSection}>
-                <View style={styles.sectionTitleWrap}>
-                  <Text style={[styles.subheadingText, { marginTop: 0, marginBottom: SPACING.xs }]}>shop and cook multiple recipes together</Text>
-                </View>
-                <View style={[styles.quickList, { marginBottom: SPACING.xl }]}> 
-                  <TouchableOpacity
-                    style={styles.quickPill}
-                    onPress={() => router.push('/tabs/mise')}
-                  >
-                    <Text style={styles.quickPillText}>prep station</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Action section 2: Saved recipes */}
-              <View style={styles.actionSection}>
-                <View style={styles.sectionTitleWrap}>
-                  <Text style={[styles.subheadingText, { marginTop: 0, marginBottom: SPACING.xs }]}>save your recipes into cookbooks</Text>
-                </View>
-                <View style={[styles.quickList, { marginBottom: SPACING.xl }]}> 
-                  <TouchableOpacity
-                    style={styles.quickPill}
-                    onPress={() => router.push({ pathname: '/tabs/library', params: { tab: 'saved' } })}
-                  >
-                    <Text style={styles.quickPillText}>saved recipes</Text>
-                  </TouchableOpacity>
-                </View>
+                  </View>
               </View>
             </View>
           </ScrollView>
@@ -825,7 +837,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.xl,
+    paddingTop: SPACING.lg,
     paddingBottom: SPACING.xl,
     flexGrow: 1,
   },
@@ -838,11 +850,16 @@ const styles = StyleSheet.create({
     gap: 0,
     marginTop: SPACING.xxxl,
   },
+  secondarySections: {
+    width: '100%',
+    marginTop: SPACING.xl,
+    paddingBottom: SPACING.xl,
+  },
   heroSection: {
     alignItems: 'center',
     paddingHorizontal: SPACING.pageHorizontal,
-    marginTop: SPACING.smAlt - 6,
-    marginBottom: 1,
+    marginTop: 0,
+    marginBottom: SPACING.md,
   },
   heroHeading: {
     fontFamily: FONT.family.heading,
@@ -855,16 +872,25 @@ const styles = StyleSheet.create({
     ...bodyText,
     color: COLORS.textMuted,
     textAlign: 'center',
-    marginTop: SPACING.sm,
+    marginTop: SPACING.xs,
   },
   importCard: {
     width: '100%',
-    backgroundColor: 'transparent',
+    backgroundColor: COLORS.white,
     borderRadius: RADIUS.md,
-    padding: 0,
+    padding: SPACING.md,
     gap: SPACING.sm,
+    marginTop: SPACING.smLg,
     marginBottom: SPACING.xl,
     ...SHADOWS.small, // subtle shadow (~2px blur equivalent)
+  },
+  importCardTitle: {
+    fontFamily: FONT.family.heading,
+    fontSize: FONT.size.screenTitle,
+    fontWeight: '700',
+    color: COLORS.textDark,
+    textAlign: 'center',
+    marginBottom: SPACING.sm,
   },
   actionSection: {
     gap: 0,
@@ -880,11 +906,12 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xs,
     paddingHorizontal: SPACING.md,
     borderRadius: RADIUS.md,
-    borderWidth: BORDER_WIDTH.default,
-    borderColor: COLORS.primary,
+    borderWidth: 0,
+    borderColor: 'transparent',
     backgroundColor: COLORS.white,
     alignItems: 'center',
     justifyContent: 'center',
+    ...SHADOWS.small,
   },
   quickPillText: {
     ...bodyStrongText,
@@ -968,7 +995,7 @@ const styles = StyleSheet.create({
     color: COLORS.textDark,
     fontSize: FONT.size.caption,
     lineHeight: undefined,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     borderWidth: 0,
     borderColor: 'transparent',
     borderRadius: RADIUS.sm,
@@ -981,7 +1008,7 @@ const styles = StyleSheet.create({
     height: '100%',
     minWidth: 60,
     paddingHorizontal: SPACING.sm,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.surface,
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: RADIUS.sm,
@@ -1031,7 +1058,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
     overflow: 'hidden',
     backgroundColor: COLORS.white,
-    marginTop: SPACING.xs,
+    marginTop: 0,
   },
   segmentedItem: {
     flex: 1,
