@@ -64,11 +64,11 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
     
     switch (entryPoint) {
       case 'saved':
-        return 'Add to your prep station';
+        return 'Cook now';
       case 'mise':
         return 'Update Recipe';
       default:
-        return 'Add to your prep station';
+        return 'Cook now';
     }
   };
 
@@ -97,30 +97,7 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
   const getSecondaryButton = () => {
     switch (entryPoint) {
       case 'saved':
-        return (
-          <TouchableOpacity
-            style={[
-              styles.saveButton,
-              isCookingNow && styles.saveButtonDisabled
-            ]}
-            onPress={handleCookNow}
-            disabled={isCookingNow}
-          >
-            {isCookingNow && (
-              <ActivityIndicator
-                size="small"
-                color={COLORS.primary}
-                style={{ marginRight: 8 }}
-              />
-            )}
-            <Text style={[
-              styles.saveButtonText,
-              isCookingNow && styles.saveButtonTextDisabled
-            ]}>
-              {isCookingNow ? 'Starting...' : 'Cook now'}
-            </Text>
-          </TouchableOpacity>
-        );
+        return null; // Only one primary button for saved entrypoint
       case 'mise':
         return null; // Don't show the modifications button for mise entrypoint
       default:
@@ -144,7 +121,7 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
               styles.saveButtonText,
               isSavingForLater && styles.saveButtonTextDisabled
             ]}>
-              {isSavingForLater ? 'Processing modifications...' : 'Save for later'}
+              {isSavingForLater ? 'Processing modifications...' : 'Cook later'}
             </Text>
           </TouchableOpacity>
         );
