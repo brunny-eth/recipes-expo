@@ -1399,7 +1399,7 @@ export default function MiseScreen() {
                 !staplesEnabled && styles.staplesButtonTextDisabled,
               ]}
             >
-              {staplesEnabled ? 'Hide pantry' : 'Show pantry'}
+              {staplesEnabled ? 'Show pantry' : 'Hide pantry'}
             </Text>
           </TouchableOpacity>
         </View>

@@ -19,6 +19,8 @@ import { useSuccessModal } from '@/context/SuccessModalContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Updates from 'expo-updates';
+import Constants from 'expo-constants';
+import * as Application from 'expo-application';
 import {
   bodyText,
   bodyStrongText,
@@ -40,6 +42,7 @@ export default function AccountScreen() {
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const appVersion = (Application?.nativeApplicationVersion as string | null) || (Constants?.expoConfig?.version as string | undefined) || 'dev';
 
   const handleSubmitFeedback = async () => {
     if (!feedbackMessage.trim()) {
@@ -70,7 +73,7 @@ export default function AccountScreen() {
         body: JSON.stringify({
           email: session.user.email,
           message: feedbackMessage.trim(),
-          app_version: '1.0.1', // Hardcoded version
+          app_version: appVersion,
         }),
       });
 
@@ -222,7 +225,7 @@ export default function AccountScreen() {
       {/* Bottom info - ordered: tagline, version, legal links */}
       <View style={styles.bottomLegalSection}>
         <Text style={styles.tagline}>Designed for home cooks, by home cooks</Text>
-        <Text style={styles.versionText}>Version 1.0</Text>
+        <Text style={styles.versionText}>Version {appVersion}</Text>
         <View style={styles.legalSection}>
           <TouchableOpacity 
             style={styles.legalLink} 

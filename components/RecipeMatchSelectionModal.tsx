@@ -154,7 +154,7 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
                   style={[styles.button, styles.primaryButton]}
                   onPress={handleCreateNew}
                 >
-                  <Text style={styles.primaryButtonText}>None of these. Make a new recipe for me</Text>
+                  <Text style={styles.primaryButtonText}>Just make a new recipe for me</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -169,7 +169,7 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
             <>
               <View style={styles.header}>
                 <Text style={styles.title}>OK! We&apos;ll make a new recipe</Text>
-                <Text style={styles.subtitle}>Want to add any more detail? This helps us create the best recipe.</Text>
+                <Text style={styles.subtitle}>Add more detail to help us create the best recipe for you.</Text>
               </View>
 
               <View style={styles.inputSection}>
@@ -206,9 +206,9 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
 
                 <TouchableOpacity
                   style={[styles.button, styles.secondaryButton]}
-                  onPress={() => setIsCreateExpanded(false)}
+                  onPress={() => onAction('returnHome')}
                 >
-                  <Text style={styles.secondaryButtonText}>Back to matches</Text>
+                  <Text style={styles.secondaryButtonText}>Back to home</Text>
                 </TouchableOpacity>
               </View>
             </>
@@ -248,6 +248,8 @@ const styles = StyleSheet.create({
     ...bodyText,
     color: COLORS.textMuted,
     textAlign: 'center',
+    maxWidth: 280,
+    alignSelf: 'center',
   } as TextStyle,
   recipeList: {
     flex: 1,
