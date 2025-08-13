@@ -16,10 +16,10 @@ export default function ScreenHeader({ title, onLayout, showBack = true, onTitle
   const router = useRouter();
   return (
     <View style={styles.header} onLayout={onLayout}>
-      {showBack && (
+      {showBack ? (
         <TouchableOpacity
           onPress={() => router.back()}
-          style={styles.backButton}
+          style={styles.side}
           activeOpacity={0.7}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           accessibilityRole="button"
@@ -27,6 +27,8 @@ export default function ScreenHeader({ title, onLayout, showBack = true, onTitle
         >
           <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textDark} />
         </TouchableOpacity>
+      ) : (
+        <View style={styles.side} />
       )}
       {onTitlePress ? (
         <TouchableOpacity
@@ -34,12 +36,14 @@ export default function ScreenHeader({ title, onLayout, showBack = true, onTitle
           activeOpacity={0.7}
           accessibilityRole="button"
           accessibilityLabel={title}
+          style={{ flex: 1 }}
         >
           <Text style={styles.title} numberOfLines={2} ellipsizeMode="tail">{title}</Text>
         </TouchableOpacity>
       ) : (
-        <Text style={styles.title} numberOfLines={2} ellipsizeMode="tail">{title}</Text>
+        <Text style={[styles.title, { flex: 1 }]} numberOfLines={2} ellipsizeMode="tail">{title}</Text>
       )}
+      <View style={styles.side} />
     </View>
   );
 }
@@ -47,25 +51,21 @@ export default function ScreenHeader({ title, onLayout, showBack = true, onTitle
 const styles = StyleSheet.create({
   header: {
     paddingHorizontal: SPACING.pageHorizontal,
-    paddingBottom: SPACING.md, // Use a consistent spacing token
-    marginTop: SPACING.pageHorizontal, // Re-add your desired padding as a margin
+    paddingBottom: SPACING.md,
+    marginTop: SPACING.pageHorizontal,
     minHeight: 44 + SPACING.md,
-    justifyContent: 'center',
-    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   } as ViewStyle,
-  backButton: {
-    position: 'absolute',
-    left: SPACING.pageHorizontal,
-    top: 0,
-    bottom: 0,
-    justifyContent: 'center',
+  side: {
     width: 44,
-    zIndex: 2,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
   } as ViewStyle,
   title: {
     ...screenTitleText,
     color: COLORS.textDark,
     textAlign: 'center',
-    paddingHorizontal: 56, // Reserve space so long titles don't overlap the back button
   } as TextStyle,
 }); 

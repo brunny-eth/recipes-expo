@@ -368,13 +368,6 @@ export default function LibraryScreen() {
   const confirmDeleteFolder = useCallback(async () => {
     if (!folderToDelete || !session?.user) return;
     
-    // If folder has recipes, just close the modal (it's an info message)
-    if (folderToDelete.recipe_count > 0) {
-      setShowDeleteFolderModal(false);
-      setFolderToDelete(null);
-      return;
-    }
-    
     setIsSavedLoading(true);
     try {
       const backendUrl = process.env.EXPO_PUBLIC_API_URL;
@@ -671,19 +664,16 @@ export default function LibraryScreen() {
       {folderToDelete && (
         <ConfirmationModal
           visible={showDeleteFolderModal}
-          title={folderToDelete.recipe_count > 0 ? "Cannot Delete Folder" : "Delete Folder"}
-          message={folderToDelete.recipe_count > 0 
-            ? `This folder contains ${folderToDelete.recipe_count} recipe${folderToDelete.recipe_count !== 1 ? 's' : ''}. Please move or delete the recipes first.`
-            : `Are you sure you want to delete "${folderToDelete.name}"?`
-          }
-          confirmLabel={folderToDelete.recipe_count > 0 ? "OK" : "Delete"}
-          cancelLabel={folderToDelete.recipe_count > 0 ? undefined : "Cancel"}
+          title={"Delete Folder"}
+          message={`Are you sure? You'll be removing ${folderToDelete.recipe_count} recipe${folderToDelete.recipe_count !== 1 ? 's' : ''} from your saved folders.`}
+          confirmLabel={"Delete"}
+          cancelLabel={"Cancel"}
           onConfirm={confirmDeleteFolder}
           onCancel={() => {
             setShowDeleteFolderModal(false);
             setFolderToDelete(null);
           }}
-          destructive={false}
+          destructive={true}
         />
       )}
 

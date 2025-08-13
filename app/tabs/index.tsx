@@ -605,7 +605,7 @@ export default function HomeScreen() {
           width: isCompact ? 128 : 150,
           height: isCompact ? 64 : 75,
           alignSelf: 'center',
-          marginTop: isCompact ? SPACING.md : SPACING.lg,
+          marginTop: isCompact ? SPACING.lg : SPACING.xl,
           marginBottom: 0,
         }}
       />
@@ -649,7 +649,7 @@ export default function HomeScreen() {
                   adjustsFontSizeToFit
                   minimumFontScale={0.9}
                 >
-                  the best way to prep and cook
+                  The best way to prep and cook
                 </Text>
               </View>
 
@@ -659,7 +659,7 @@ export default function HomeScreen() {
 
                 {/* Unified import card: header + segmented control + input */}
                 <View style={styles.importCard}>
-                  <Text style={styles.importCardTitle}>import & customize</Text>
+                  <Text style={styles.importCardTitle}>Import & customize</Text>
                   {/* Segmented control: URL | Dish Name | Image */}
                   <View style={styles.segmentedControlContainer}>
                     <TouchableOpacity
@@ -672,7 +672,7 @@ export default function HomeScreen() {
                         adjustsFontSizeToFit
                         minimumFontScale={0.75}
                       >
-                        url
+                        URL
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -685,7 +685,7 @@ export default function HomeScreen() {
                         adjustsFontSizeToFit
                         minimumFontScale={0.7}
                       >
-                        dish name
+                        Dish name
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -698,7 +698,7 @@ export default function HomeScreen() {
                         adjustsFontSizeToFit
                         minimumFontScale={0.75}
                       >
-                        image
+                        Image
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -739,7 +739,7 @@ export default function HomeScreen() {
                         style={styles.fullWidthPrimaryButton}
                         onPress={handleShowUploadModal}
                       >
-                        <Text style={styles.fullWidthPrimaryButtonText}>choose image</Text>
+                        <Text style={styles.fullWidthPrimaryButtonText}>Choose image</Text>
                       </TouchableOpacity>
                     </View>
                   ) : (
@@ -761,10 +761,15 @@ export default function HomeScreen() {
                         underlineColorAndroid="transparent"
                       />
                       <TouchableOpacity
-                        style={[styles.submitButton, styles.submitButtonConnected]}
+                        style={[
+                          styles.submitButton,
+                          styles.submitButtonConnected,
+                          isSubmitting && styles.submitButtonDisabled,
+                        ]}
                         onPress={handleSubmitName}
+                        disabled={isSubmitting}
                       >
-                        <Text style={styles.submitButtonText}>Go</Text>
+                        {getSubmitButtonContent()}
                       </TouchableOpacity>
                       
                     </View>
@@ -781,14 +786,14 @@ export default function HomeScreen() {
                 {/* Action section 1: Prep station */}
                 <View style={styles.actionSection}>
                   <View style={styles.sectionTitleWrap}>
-                    <Text style={[styles.subheadingText, { marginTop: 0, marginBottom: SPACING.xs }]}>shop & cook</Text>
+                    <Text style={[styles.subheadingText, { marginTop: 0, marginBottom: SPACING.xs }]}>{''}</Text>
                   </View>
-                  <View style={[styles.quickList, { marginBottom: SPACING.smMd }]}> 
+                  <View style={[styles.quickList, { marginBottom: SPACING.xs }]}> 
                     <TouchableOpacity
                       style={styles.quickPill}
                       onPress={() => router.push('/tabs/mise')}
                     >
-                      <Text style={styles.quickPillText}>prep station</Text>
+                      <Text style={styles.quickPillText}>Shop & cook in your Prep Station</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -796,14 +801,14 @@ export default function HomeScreen() {
                 {/* Action section 2: Saved recipes */}
                 <View style={styles.actionSection}>
                   <View style={styles.sectionTitleWrap}>
-                    <Text style={[styles.subheadingText, { marginTop: 0, marginBottom: SPACING.xs }]}>save & organize</Text>
+                    <Text style={[styles.subheadingText, { marginTop: 0, marginBottom: SPACING.xs }]}>{''}</Text>
                   </View>
-                  <View style={[styles.quickList, { marginBottom: SPACING.smMd }]}> 
+                  <View style={[styles.quickList, { marginBottom: SPACING.xs }]}> 
                     <TouchableOpacity
                       style={styles.quickPill}
                       onPress={() => router.push({ pathname: '/tabs/library', params: { tab: 'saved' } })}
                     >
-                        <Text style={styles.quickPillText}>cookbooks</Text>
+                        <Text style={styles.quickPillText}>Save & organize your Cookbooks</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -811,14 +816,14 @@ export default function HomeScreen() {
                   {/* Action section 3: Explore */}
                   <View style={styles.actionSection}>
                     <View style={styles.sectionTitleWrap}>
-                      <Text style={[styles.subheadingText, { marginTop: 0, marginBottom: SPACING.xs }]}>see what others are cooking</Text>
+                      <Text style={[styles.subheadingText, { marginTop: 0, marginBottom: SPACING.xs }]}>{''}</Text>
                     </View>
                     <View style={[styles.quickList, { marginBottom: 0 }]}> 
                       <TouchableOpacity
                         style={styles.quickPill}
                         onPress={() => router.push('/explore')}
                       >
-                        <Text style={styles.quickPillText}>explore</Text>
+                        <Text style={styles.quickPillText}>Discover new dishes</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -876,7 +881,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.lg,
+    paddingTop: SPACING.md,
     paddingBottom: SPACING.xl,
     flexGrow: 1,
   },
@@ -925,7 +930,7 @@ const styles = StyleSheet.create({
   },
   importCardTitle: {
     fontFamily: FONT.family.heading,
-    fontSize: FONT.size.screenTitle,
+    fontSize: FONT.size.sectionHeader,
     fontWeight: '700',
     color: COLORS.textDark,
     textAlign: 'center',
@@ -937,7 +942,7 @@ const styles = StyleSheet.create({
   },
   quickList: {
     width: '100%',
-    gap: SPACING.sm,
+    gap: SPACING.xs,
     marginTop: SPACING.xs,
   },
   quickPill: {
@@ -957,7 +962,6 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontSize: FONT.size.caption,
   },
-  // Removed grid tile styles in favor of bottom-stacked pill buttons
   sectionLabel: {
     ...bodyText,
     fontSize: FONT.size.body,

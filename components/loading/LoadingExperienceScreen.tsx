@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -25,6 +25,9 @@ import { FONT } from '@/constants/typography';
 import { Image } from 'react-native';
 import { getErrorMessage, getNetworkErrorMessage } from '../../utils/errorMessages';
 import { ParseErrorCode } from '../../common/types/errors';
+import LogoHeader from '@/components/LogoHeader';
+import { useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface LoadingExperienceScreenProps {
   recipeInput: string;
@@ -47,6 +50,9 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
       console.log(`[${new Date().toISOString()}] [LoadingExperienceScreen] render/mount with input: ${recipeInput}`);
     }
   const router = useRouter();
+  const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const isCompact = height < 700;
   const alreadyNavigated = useRef(false);
   const [isParsingFinished, setIsParsingFinished] = useState(false);
   const [recipeData, setRecipeData] = useState<ParsedRecipe | null>(null);
@@ -390,16 +396,30 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
     onFailure();
   };
 
+  const headerLogo = useMemo(() => (
+    <LogoHeader
+      animatedLogo={(
+        <Animated.View>
+          <Image
+            source={require('@/assets/images/meezblue_underline.png')}
+            resizeMode="contain"
+            style={{
+              width: isCompact ? 128 : 150,
+              height: isCompact ? 64 : 75,
+              alignSelf: 'center',
+              marginTop: isCompact ? SPACING.lg : SPACING.xl,
+              marginBottom: 0,
+            }}
+          />
+        </Animated.View>
+      )}
+    />
+  ), [isCompact]);
+
   if (loadingMode === 'checklist') {
     return (
       <View style={{ flex: 1 }}>
-        <View style={styles.logoContainer}>
-          <Image
-            source={require('@/assets/images/meezblue_underline.png')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-        </View>
+        {headerLogo}
         {!hideChecklist && (
           <View style={styles.contentWrapper}>
             <Text style={styles.tagline}>{getTagline()}</Text>
@@ -464,12 +484,8 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
   }
 
   return (
-    <View style={styles.logoContainer}>
-      <Image
-        source={require('@/assets/images/meezblue_underline.png')}
-        style={styles.logo}
-        resizeMode="contain"
-      />
+    <View style={{ flex: 1 }}>
+      {headerLogo}
     </View>
   );
 };
@@ -477,7 +493,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
 const styles = StyleSheet.create({
   contentWrapper: {
     width: '100%',
-    marginTop: -SPACING.xxxl,
+    marginTop: SPACING.xs,
   } as ViewStyle,
   checklistContainer: {
     alignItems: 'stretch',
@@ -499,7 +515,7 @@ const styles = StyleSheet.create({
     color: COLORS.darkGray,
     textAlign: 'center',
     paddingHorizontal: SPACING.xl,
-    marginTop: SPACING.sm,
+    marginTop: SPACING.xs,
     marginBottom: SPACING.xxxl,
   } as TextStyle,
   loadingText: {

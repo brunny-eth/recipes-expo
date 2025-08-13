@@ -115,7 +115,10 @@ export default function IngredientSubstitutionModal({
         style={styles.modalContent}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>Substitute {ingredientName}</Text>
+          <Text style={styles.title}>Substitute</Text>
+          <Text style={styles.ingredientTitle} numberOfLines={2}>
+            {ingredientName}
+          </Text>
         </View>
 
         <ScrollView style={styles.optionsList}>
@@ -152,12 +155,21 @@ export default function IngredientSubstitutionModal({
                           styles.optionName,
                           option.name === 'Remove ingredient' && styles.optionNameRemove,
                         ]}
+                        numberOfLines={2}
                       >
                         {option.name}
                       </Text>
-                      {quantityText && <Text style={styles.optionQuantity}>{quantityText}</Text>}
+                      {quantityText && (
+                        <Text style={styles.optionQuantity} numberOfLines={1}>
+                          {quantityText}
+                        </Text>
+                      )}
                     </View>
-                    {option.description && <Text style={styles.optionDescription}>{option.description}</Text>}
+                    {option.description && (
+                      <Text style={styles.optionDescription} numberOfLines={2}>
+                        {option.description}
+                      </Text>
+                    )}
                   </View>
                 </TouchableOpacity>
               );
@@ -210,6 +222,13 @@ const styles = StyleSheet.create({
   title: {
     ...sectionHeaderText,
     color: COLORS.textDark,
+    textAlign: 'center',
+  },
+  ingredientTitle: {
+    ...bodyStrongText,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    marginTop: SPACING.xs,
   },
   optionsList: {
     marginBottom: SPACING.pageHorizontal,
@@ -223,6 +242,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.base,
     borderWidth: BORDER_WIDTH.default,
     borderColor: COLORS.lightGray,
+    minHeight: 72,
   },
   optionItemSelected: {
     borderColor: COLORS.primary,

@@ -171,7 +171,7 @@ router.get('/folders/:id/recipes', async (req: Request, res: Response) => {
   }
 });
 
-// DELETE /api/saved/folders/:id - Delete a folder
+// DELETE /api/saved/folders/:id - Delete a folder (and remove all saved recipes inside it for this user)
 router.delete('/folders/:id', async (req: Request, res: Response) => {
   const requestId = (req as any).id;
   
@@ -183,23 +183,36 @@ router.delete('/folders/:id', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Missing userId' });
     }
 
-    logger.info({ requestId, folderId: id, userId }, 'Deleting folder');
+    logger.info({ requestId, folderId: id, userId }, 'Deleting folder and contained saved recipes');
 
-    const { error: deleteError } = await supabaseAdmin
+    // First, delete saved recipes within this folder for the user
+    const { error: recipesDeleteError } = await supabaseAdmin
+      .from('user_saved_recipes')
+      .delete()
+      .eq('user_id', userId)
+      .eq('folder_id', id);
+
+    if (recipesDeleteError) {
+      logger.error({ requestId, err: recipesDeleteError }, 'Failed to delete saved recipes before folder deletion');
+      return res.status(500).json({ error: 'Failed to remove recipes in folder' });
+    }
+
+    // Then, delete the folder itself
+    const { error: folderDeleteError } = await supabaseAdmin
       .from('user_saved_folders')
       .delete()
       .eq('user_id', userId)
       .eq('id', id);
 
-    if (deleteError) {
-      logger.error({ requestId, err: deleteError }, 'Failed to delete folder');
+    if (folderDeleteError) {
+      logger.error({ requestId, err: folderDeleteError }, 'Failed to delete folder after removing recipes');
       return res.status(500).json({ error: 'Failed to delete folder' });
     }
 
-    logger.info({ requestId, folderId: id }, 'Successfully deleted folder');
+    logger.info({ requestId, folderId: id }, 'Successfully deleted folder and its recipes');
 
     res.json({
-      message: 'Folder deleted successfully'
+      message: 'Folder and its recipes deleted successfully'
     });
 
   } catch (err) {

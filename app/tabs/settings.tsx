@@ -137,7 +137,7 @@ export default function AccountScreen() {
 
         {/* Feedback Form Section - Always at consistent position */}
         <View style={styles.feedbackSection}>
-          <Text style={styles.sectionTitle}>Send Feedback</Text>
+          <Text style={[styles.sectionTitle, styles.feedbackTitle]}>Tell us what to improve</Text>
           <TextInput
             style={styles.feedbackInput}
             placeholder="Send us a note if you have an idea for a feature, found a bug, or just want to say hi."
@@ -219,24 +219,24 @@ export default function AccountScreen() {
 
       </ScrollView>
 
-      {/* Legal Links and Version - Fixed to bottom */}
-      <View style={[styles.bottomLegalSection, { paddingBottom: insets.bottom }]}>
+      {/* Bottom info - ordered: tagline, version, legal links */}
+      <View style={styles.bottomLegalSection}>
+        <Text style={styles.tagline}>Designed for home cooks, by home cooks</Text>
+        <Text style={styles.versionText}>Version 1.0</Text>
         <View style={styles.legalSection}>
           <TouchableOpacity 
             style={styles.legalLink} 
-            onPress={() => Linking.openURL('https://meez.app/tos.html')}
+            onPress={() => Linking.openURL('https://meez.app/privacy.html')}
           >
             <Text style={styles.legalLinkText}>Privacy Policy</Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.legalLink} 
-            onPress={() => Linking.openURL('https://meez.app/privacy.html')}
+            onPress={() => Linking.openURL('https://meez.app/tos.html')}
           >
             <Text style={styles.legalLinkText}>Terms of Service</Text>
           </TouchableOpacity>
         </View>
-        <Text style={styles.versionText}>Version 1.0.0</Text>
-        <Text style={styles.tagline}>Designed for home cooks, by home cooks</Text>
       </View>
     </View>
   );
@@ -247,8 +247,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
     paddingHorizontal: SPACING.pageHorizontal,
+    justifyContent: 'space-between',
   } as ViewStyle,
   scrollView: {
+    flex: 1,
   } as ViewStyle,
   userInfoContainer: {
     marginBottom: SPACING.lg,
@@ -262,7 +264,7 @@ const styles = StyleSheet.create({
   signOutButton: {
     marginTop: SPACING.sm,
     marginBottom: SPACING.xxl,
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.lightGray,
     padding: SPACING.smLg,
     borderRadius: RADIUS.smMd,
     alignItems: 'center',
@@ -285,6 +287,10 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
     color: COLORS.textDark,
     textAlign: 'center',
+  } as TextStyle,
+  feedbackTitle: {
+    fontSize: FONT.size.body,
+    fontFamily: FONT.family.heading,
   } as TextStyle,
   feedbackInput: {
     backgroundColor: COLORS.white,
@@ -330,7 +336,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: SPACING.lg,
-    marginBottom: SPACING.md,
+    marginBottom: 0,
   } as ViewStyle,
   legalLink: {
   } as ViewStyle,
@@ -344,12 +350,14 @@ const styles = StyleSheet.create({
     color: COLORS.textSubtle,
     textAlign: 'center',
     fontSize: FONT.size.caption,
+    marginTop: 0,
   } as TextStyle,
   tagline: {
     ...bodyText,
     textAlign: 'center',
     color: COLORS.textSubtle,
     marginTop: SPACING.xs,
+    marginBottom: SPACING.xxl,
     fontSize: FONT.size.caption,
   } as TextStyle,
   loginButton: {
@@ -369,7 +377,9 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   bottomLegalSection: {
     paddingHorizontal: SPACING.pageHorizontal,
-    paddingTop: SPACING.sm,
+    paddingTop: 0,
+    paddingBottom: 0,
+    alignItems: 'center',
   } as ViewStyle,
   signOutButtonDisabled: {
     backgroundColor: COLORS.disabled,

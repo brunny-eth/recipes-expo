@@ -216,3 +216,37 @@ export async function moveRecipesToFolder(recipeIds: number[], targetFolderId: n
   console.log("Successfully moved", recipeIds.length, "recipes to folder:", targetFolderId);
   return true;
 } 
+
+/**
+ * Removes multiple recipes from the current user's saved list.
+ * @param recipeIds Array of base recipe IDs to remove from saved.
+ * @returns {Promise<boolean>} True if the operation succeeded.
+ */
+export async function unsaveRecipes(recipeIds: number[]): Promise<boolean> {
+  console.log("Attempting to bulk unsave recipes:", recipeIds);
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) {
+    console.error("No user session found. Cannot bulk unsave recipes.");
+    return false;
+  }
+  const user = session.user;
+
+  if (!Array.isArray(recipeIds) || recipeIds.length === 0) {
+    return true; // nothing to do
+  }
+
+  const { error } = await supabase
+    .from('user_saved_recipes')
+    .delete()
+    .eq('user_id', user.id)
+    .in('base_recipe_id', recipeIds);
+
+  if (error) {
+    console.error("Error bulk unsaving recipes:", error);
+    return false;
+  }
+
+  console.log("Successfully unsaved", recipeIds.length, "recipes for user:", user.id);
+  return true;
+}

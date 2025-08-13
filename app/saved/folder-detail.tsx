@@ -8,10 +8,11 @@ import {
   ActivityIndicator,
   Image,
   TextInput,
+  Pressable,
 } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
 
-import { COLORS, SPACING, RADIUS } from '@/constants/theme';
+import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import {
   bodyStrongText,
@@ -26,7 +27,7 @@ import { useAuth } from '@/context/AuthContext';
 
 import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
 import { parseServingsValue } from '@/utils/recipeUtils';
-import { moveRecipesToFolder } from '@/lib/savedRecipes';
+import { moveRecipesToFolder, unsaveRecipes } from '@/lib/savedRecipes';
 import ScreenHeader from '@/components/ScreenHeader';
 import FolderPickerModal from '@/components/FolderPickerModal';
 import ConfirmationModal from '@/components/ConfirmationModal';
@@ -89,11 +90,14 @@ export default function SavedFolderDetailScreen() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('');
   
-  // Bulk move state
+  // Bulk actions state
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedRecipes, setSelectedRecipes] = useState<Set<number>>(new Set());
   const [showFolderPicker, setShowFolderPicker] = useState(false);
   const [isMovingRecipes, setIsMovingRecipes] = useState(false);
+  const [isRemovingRecipes, setIsRemovingRecipes] = useState(false);
+  const [showBulkRemoveModal, setShowBulkRemoveModal] = useState(false);
+  const [bulkActionsHeight, setBulkActionsHeight] = useState(0);
   
   // Confirmation modals state
   const [showDeleteFolderModal, setShowDeleteFolderModal] = useState(false);
@@ -192,6 +196,12 @@ export default function SavedFolderDetailScreen() {
     setRenameError(null);
     setIsRenaming(true);
   }, [session?.user, folderName]);
+
+  const cancelRenaming = useCallback(() => {
+    setIsRenaming(false);
+    setEditedFolderName('');
+    setRenameError(null);
+  }, []);
 
   const saveFolderName = useCallback(async () => {
     if (!session?.user || !folderId) {
@@ -368,6 +378,11 @@ export default function SavedFolderDetailScreen() {
     setShowFolderPicker(true);
   }, [selectedRecipes.size]);
 
+  const handleStartBulkRemove = useCallback(() => {
+    if (selectedRecipes.size === 0) return;
+    setShowBulkRemoveModal(true);
+  }, [selectedRecipes.size]);
+
   const handleFolderPickerSelect = useCallback(async (targetFolderId: number) => {
     setShowFolderPicker(false);
     
@@ -397,6 +412,30 @@ export default function SavedFolderDetailScreen() {
       setIsMovingRecipes(false);
     }
   }, [selectedRecipes, folderId]);
+
+  const confirmBulkRemoveSelectedRecipes = useCallback(async () => {
+    if (selectedRecipes.size === 0) {
+      setShowBulkRemoveModal(false);
+      return;
+    }
+    setIsRemovingRecipes(true);
+    try {
+      const success = await unsaveRecipes(Array.from(selectedRecipes));
+      if (success) {
+        setSavedRecipes(prev => prev.filter(r => !selectedRecipes.has(r.base_recipe_id)));
+        setIsSelectionMode(false);
+        setSelectedRecipes(new Set());
+      } else {
+        setError('Failed to remove recipes. Please try again.');
+      }
+    } catch (err) {
+      console.error('[SavedFolderDetailScreen] Error bulk removing recipes:', err);
+      setError('Failed to remove recipes. Please try again.');
+    } finally {
+      setIsRemovingRecipes(false);
+      setShowBulkRemoveModal(false);
+    }
+  }, [selectedRecipes]);
 
   // Render recipe item
   const renderRecipeItem = useCallback(({ item }: { item: SavedRecipe }) => {
@@ -499,7 +538,7 @@ export default function SavedFolderDetailScreen() {
           <MaterialCommunityIcons name="heart-outline" size={48} color={COLORS.lightGray} />
           <Text style={styles.emptyText}>No recipes in this folder yet</Text>
           <Text style={styles.emptySubtext}>
-            Save recipes to this folder from the recipe summary screen.
+            Save recipes to this folder or move recipes from another folder.
           </Text>
         </View>
       );
@@ -511,7 +550,10 @@ export default function SavedFolderDetailScreen() {
           data={filteredRecipes}
           renderItem={renderRecipeItem}
           keyExtractor={(item) => item.processed_recipes_cache?.id.toString() || item.base_recipe_id.toString()}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[
+            styles.listContent,
+            { paddingBottom: 100 + (isSelectionMode ? bulkActionsHeight + insets.bottom : 0) },
+          ]}
           showsVerticalScrollIndicator={false}
         />
         {savedRecipes.length > 0 && filteredRecipes.length === 0 && (
@@ -524,34 +566,49 @@ export default function SavedFolderDetailScreen() {
         
         {/* Bulk actions bar */}
         {isSelectionMode && (
-          <View style={styles.bulkActionsBar}>
+          <View
+            style={styles.bulkActionsBar}
+            onLayout={(e) => setBulkActionsHeight(e.nativeEvent.layout.height)}
+          >
             <View style={styles.bulkActionsHeader}>
               <Text style={styles.selectedCountText}>
                 {selectedRecipes.size} recipe{selectedRecipes.size !== 1 ? 's' : ''} selected
               </Text>
             </View>
-            <View style={styles.bulkActionsButtons}>
-              <TouchableOpacity 
-                style={styles.cancelButton}
-                onPress={handleCancelSelection}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
+            <View style={styles.bulkActionsButtonsStack}>
               <TouchableOpacity
                 style={[
-                  styles.moveButton,
-                  selectedRecipes.size === 0 && styles.moveButtonDisabled
+                  styles.primaryActionButton,
+                  (selectedRecipes.size === 0 || isMovingRecipes) && styles.primaryActionButtonDisabled,
                 ]}
                 onPress={handleMoveSelectedRecipes}
                 disabled={selectedRecipes.size === 0 || isMovingRecipes}
               >
-                {isMovingRecipes ? (
-                  <ActivityIndicator size="small" color={COLORS.white} />
-                ) : (
-                  <Text style={styles.moveButtonText}>
-                    Move folders
-                  </Text>
+                {isMovingRecipes && (
+                  <ActivityIndicator size="small" color={COLORS.white} style={{ marginRight: 8 }} />
                 )}
+                <Text style={styles.primaryActionButtonText}>Move to...</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.dangerOutlineButton,
+                  (selectedRecipes.size === 0 || isRemovingRecipes) && styles.dangerOutlineButtonDisabled,
+                ]}
+                onPress={handleStartBulkRemove}
+                disabled={selectedRecipes.size === 0 || isRemovingRecipes}
+              >
+                {isRemovingRecipes && (
+                  <ActivityIndicator size="small" color={COLORS.error} style={{ marginRight: 8 }} />
+                )}
+                <Text style={styles.dangerOutlineButtonText}>Remove from saved</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.secondaryOutlineButton}
+                onPress={handleCancelSelection}
+              >
+                <Text style={styles.secondaryOutlineButtonText}>Cancel</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -600,7 +657,7 @@ export default function SavedFolderDetailScreen() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <Pressable style={[styles.container, { paddingTop: insets.top }]} onPress={isRenaming ? cancelRenaming : undefined}>
       {/* Custom Header */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -684,7 +741,19 @@ export default function SavedFolderDetailScreen() {
         }}
         destructive={false}
       />
-    </View>
+
+      {/* Bulk Remove Confirmation Modal */}
+      <ConfirmationModal
+        visible={showBulkRemoveModal}
+        title="Remove from saved"
+        message={`Remove ${selectedRecipes.size} recipe${selectedRecipes.size !== 1 ? 's' : ''} from your saved list?`}
+        confirmLabel="Remove"
+        cancelLabel="Cancel"
+        onConfirm={confirmBulkRemoveSelectedRecipes}
+        onCancel={() => setShowBulkRemoveModal(false)}
+        destructive={false}
+      />
+    </Pressable>
   );
 }
 
@@ -858,18 +927,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   bulkActionsBar: {
-    backgroundColor: COLORS.white,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.xl,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.lightGray,
-    marginTop: SPACING.lg,
-    marginHorizontal: -SPACING.pageHorizontal,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 8,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: SPACING.pageHorizontal,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.xxl,
+    backgroundColor: COLORS.background,
+    borderTopWidth: BORDER_WIDTH.hairline,
+    borderTopColor: COLORS.divider,
   },
   bulkActionsHeader: {
     alignItems: 'center',
@@ -881,52 +948,57 @@ const styles = StyleSheet.create({
     fontSize: FONT.size.lg,
     textAlign: 'center',
   },
-  bulkActionsButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: SPACING.lg,
+  bulkActionsButtonsStack: {
+    gap: SPACING.sm,
   },
-  cancelButton: {
-    flex: 1,
-    paddingVertical: SPACING.lg,
-    paddingHorizontal: SPACING.xl,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-    backgroundColor: COLORS.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 48,
-  },
-  cancelButtonText: {
-    ...bodyStrongText,
-    color: COLORS.primary,
-    fontSize: FONT.size.body,
-    letterSpacing: 0.5,
-  },
-  moveButton: {
-    flex: 1,
+  primaryActionButton: {
     backgroundColor: COLORS.primary,
-    paddingVertical: SPACING.lg,
-    paddingHorizontal: SPACING.xl,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-    alignItems: 'center',
+    borderRadius: RADIUS.sm,
+    paddingVertical: SPACING.md,
+    flexDirection: 'row',
     justifyContent: 'center',
-    minHeight: 48,
+    alignItems: 'center',
+    paddingHorizontal: SPACING.pageHorizontal,
   },
-  moveButtonDisabled: {
-    backgroundColor: COLORS.lightGray,
-    shadowOpacity: 0,
-    elevation: 0,
+  primaryActionButtonDisabled: {
+    backgroundColor: COLORS.darkGray,
   },
-  moveButtonText: {
+  primaryActionButtonText: {
     ...bodyStrongText,
     color: COLORS.white,
-    fontSize: FONT.size.body,
-    letterSpacing: 0.5,
+  },
+  secondaryOutlineButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.sm,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  secondaryOutlineButtonText: {
+    ...bodyStrongText,
+    color: COLORS.primary,
+  },
+  dangerOutlineButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.sm,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: COLORS.error,
+  },
+  dangerOutlineButtonDisabled: {
+    borderColor: COLORS.lightGray,
+  },
+  dangerOutlineButtonText: {
+    ...bodyStrongText,
+    color: COLORS.error,
   },
   errorText: {
     ...bodyText,

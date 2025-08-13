@@ -17,7 +17,7 @@ import FastImage from '@d11/react-native-fast-image';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { CombinedParsedRecipe } from '@/common/types';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
-import { bodyStrongText, bodyText, titleText, FONT } from '@/constants/typography';
+import { bodyStrongText, bodyText, titleText, sectionHeaderText, FONT } from '@/constants/typography';
 
 interface RecipeMatchSelectionModalProps {
   visible: boolean;
@@ -39,6 +39,7 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
   const [isCreateExpanded, setIsCreateExpanded] = useState(false);
   const [inputText, setInputText] = useState('');
   const [showValidation, setShowValidation] = useState(false);
+  const [buttonsHeight, setButtonsHeight] = useState(0);
 
   console.log('[RecipeMatchSelectionModal] Modal rendered with', matches.length, 'matches.', { visible, debugSource });
   console.log('[RecipeMatchSelectionModal] Matches data:', matches);
@@ -141,22 +142,26 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
                 renderItem={renderRecipeItem}
                 keyExtractor={(item) => item.recipe.id?.toString() || Math.random().toString()}
                 style={styles.recipeList}
+                contentContainerStyle={[
+                  styles.recipeListContent,
+                  { paddingBottom: buttonsHeight + SPACING.md },
+                ]}
                 showsVerticalScrollIndicator={false}
               />
 
-              <View style={styles.buttonContainer}>
+              <View style={styles.buttonContainer} onLayout={(e) => setButtonsHeight(e.nativeEvent.layout.height)}>
                 <TouchableOpacity
-                  style={[styles.button, styles.secondaryButton]}
+                  style={[styles.button, styles.primaryButton]}
                   onPress={handleCreateNew}
                 >
-                  <Text style={styles.secondaryButtonText}>None of these. Make a new recipe for me</Text>
+                  <Text style={styles.primaryButtonText}>None of these. Make a new recipe for me</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.button, styles.primaryButton]}
+                  style={[styles.button, styles.secondaryButton]}
                   onPress={handleReturnHome}
                 >
-                  <Text style={styles.primaryButtonText}>Return to Home</Text>
+                  <Text style={styles.secondaryButtonText}>Return to Home</Text>
                 </TouchableOpacity>
               </View>
             </>
@@ -188,7 +193,7 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
                 )}
               </View>
 
-              <View style={styles.buttonContainer}>
+              <View style={styles.buttonContainer} onLayout={(e) => setButtonsHeight(e.nativeEvent.layout.height)}>
                 <TouchableOpacity
                   style={[styles.button, styles.primaryButton]}
                   onPress={() => {
@@ -234,20 +239,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   } as ViewStyle,
   title: {
-    ...titleText,
-    fontSize: FONT.size.xl,
+    ...sectionHeaderText,
     color: COLORS.textDark,
+    textAlign: 'center',
     marginBottom: SPACING.xs,
   } as TextStyle,
   subtitle: {
     ...bodyText,
-    color: COLORS.darkGray,
+    color: COLORS.textMuted,
     textAlign: 'center',
-    fontSize: FONT.size.body + 2, // Make text a few points bigger
   } as TextStyle,
   recipeList: {
     flex: 1,
     paddingVertical: SPACING.md,
+  } as ViewStyle,
+  recipeListContent: {
+    paddingBottom: SPACING.lg,
   } as ViewStyle,
   recipeCard: {
     flexDirection: 'row',
@@ -333,9 +340,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
   } as ViewStyle,
   secondaryButton: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: COLORS.lightGray,
+    borderColor: COLORS.primary,
   } as ViewStyle,
   primaryButtonText: {
     ...bodyStrongText,
@@ -343,7 +350,7 @@ const styles = StyleSheet.create({
   } as TextStyle,
   secondaryButtonText: {
     ...bodyStrongText,
-    color: COLORS.textDark,
+    color: COLORS.primary,
     textAlign: 'center',
   } as TextStyle,
 });

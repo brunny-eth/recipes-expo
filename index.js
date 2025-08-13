@@ -55,4 +55,12 @@ console.error = (...args) => {
   originalConsoleError(...args);
 };
 
+// Preload critical images (Meez logo) before app entry
+import { Asset } from 'expo-asset';
+try {
+  Asset.fromModule(require('./assets/images/meezblue_underline.png')).downloadAsync();
+} catch (e) {
+  // Non-fatal: continue app startup even if preloading fails
+}
+
 import 'expo-router/entry';
