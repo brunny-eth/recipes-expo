@@ -120,9 +120,9 @@ function RootLayoutNav() {
 
     const prepareApp = async () => {
       try {
-        // Preload critical assets
+        // Preload critical assets (ensure these exist in the asset registry)
         await Asset.loadAsync([
-          require('../assets/images/SplashScreen3x.png'),
+          require('../assets/images/meezblue_underline.png'),
         ]);
         
         if (!isMounted) return;

@@ -47,7 +47,6 @@ import {
   clearAllManualItems,
   ManualGroceryItem 
 } from '@/utils/manualGroceryStorage';
-import AddManualItemModal from '@/components/AddManualItemModal';
 import HouseholdStaplesModal from '@/components/HouseholdStaplesModal';
 
 // Cache removed - always fetch fresh data for consistency
@@ -188,7 +187,7 @@ const mergeManualItemsIntoCategories = (
     // Convert manual item to GroceryItem format
     const groceryItem: GroceryItem = {
       id: manualItem.id,
-      name: `${manualItem.itemText} (manually added)`,
+      name: manualItem.itemText,
       amount: null,
       unit: null,
       category: categoryName,
@@ -200,12 +199,14 @@ const mergeManualItemsIntoCategories = (
     mergedCategories[categoryName].push(groceryItem);
   });
   
-  // Only create "Miscellaneous" category if there are actually items to put in it
-  // (Don't create empty categories)
-  
-  // Convert back to array format, but only include categories that have items
+  // Ensure a catch-all Miscellaneous category always exists, even if empty
+  if (!mergedCategories['Miscellaneous']) {
+    mergedCategories['Miscellaneous'] = [];
+  }
+
+  // Convert back to array format, include Miscellaneous even if empty
   const result = Object.entries(mergedCategories)
-    .filter(([categoryName, items]) => items.length > 0) // Only include categories with items
+    .filter(([categoryName, items]) => categoryName === 'Miscellaneous' || items.length > 0)
     .map(([categoryName, items]) => ({
       name: categoryName,
       items: items,
@@ -300,7 +301,7 @@ const filterHouseholdStaples = (
       
       return !isStaple;
     })
-  })).filter(category => category.items.length > 0); // Remove empty categories
+  })).filter(category => category.name === 'Miscellaneous' || category.items.length > 0); // Keep Miscellaneous even if empty
 };
 
 export default function MiseScreen() {
@@ -318,8 +319,9 @@ export default function MiseScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState<'recipes' | 'grocery'>('recipes');
-  const [addModalVisible, setAddModalVisible] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  // Inline add state (replaces modal)
+  const [inlineAddCategory, setInlineAddCategory] = useState<string | null>(null);
+  const [inlineAddText, setInlineAddText] = useState<string>('');
   const [sortMode, setSortMode] = useState<'category' | 'alphabetical'>('category');
   const [staplesModalVisible, setStaplesModalVisible] = useState(false);
   const [staplesEnabled, setStaplesEnabled] = useState(false);
@@ -990,20 +992,27 @@ export default function MiseScreen() {
     }
   }, [groceryList, showError, track, session?.user?.id]);
 
-  // Modal handlers
-  const handleOpenAddModal = useCallback((categoryName: string) => {
-    setSelectedCategory(categoryName);
-    setAddModalVisible(true);
+  // Inline add handlers
+  const handleStartInlineAdd = useCallback((categoryName: string) => {
+    setInlineAddCategory(categoryName);
+    setInlineAddText('');
   }, []);
 
-  const handleCloseAddModal = useCallback(() => {
-    setAddModalVisible(false);
-    setSelectedCategory('');
+  const handleCancelInlineAdd = useCallback(() => {
+    setInlineAddCategory(null);
+    setInlineAddText('');
   }, []);
 
-  const handleAddItemFromModal = useCallback(async (itemText: string) => {
-    await handleAddManualItem(selectedCategory, itemText);
-  }, [handleAddManualItem, selectedCategory]);
+  const handleConfirmInlineAdd = useCallback(async () => {
+    if (!inlineAddCategory || !inlineAddText.trim()) {
+      setInlineAddCategory(null);
+      setInlineAddText('');
+      return;
+    }
+    await handleAddManualItem(inlineAddCategory, inlineAddText.trim());
+    setInlineAddCategory(null);
+    setInlineAddText('');
+  }, [inlineAddCategory, inlineAddText, handleAddManualItem]);
 
   // Sort mode toggle (deprecated)
   const handleToggleSortMode = useCallback(async () => {
@@ -1109,7 +1118,7 @@ export default function MiseScreen() {
         {/* Hide add button in alphabetical mode since "All Items" isn't a real category */}
         {sortMode === 'category' && (
           <TouchableOpacity 
-            onPress={() => handleOpenAddModal(item.name)}
+            onPress={() => handleStartInlineAdd(item.name)}
             style={styles.addButton}
           >
             <MaterialCommunityIcons name="plus" size={20} color={COLORS.primary} />
@@ -1152,6 +1161,11 @@ export default function MiseScreen() {
                 ]}
               >
                 {(() => {
+                  // Manual items: show a consistent subtext
+                  if (groceryItem.isManual) {
+                    return '(manually added)';
+                  }
+
                   const amountText = groceryItem.amount ? formatAmountForGroceryDisplay(groceryItem.amount) : '';
                   const unitText = groceryItem.unit ? ` ${groceryItem.unit}` : '';
                   
@@ -1200,8 +1214,38 @@ export default function MiseScreen() {
           </TouchableOpacity>
         );
       })}
+      {/* Inline add row for this category */}
+      {inlineAddCategory === item.name && (
+        <View style={[styles.groceryItem, styles.groceryItemLast]}>
+          <View style={styles.groceryItemCheckbox}>
+            <MaterialCommunityIcons
+              name="checkbox-blank-outline"
+              size={28}
+              color={COLORS.textMuted}
+            />
+          </View>
+          <View style={[styles.groceryItemTextContainer, { flexDirection: 'row', alignItems: 'center' }] }>
+            <TextInput
+              style={[styles.inlineTextInput, inlineAddText.length > 0 && styles.inlineTextInputTyped]}
+              value={inlineAddText}
+              onChangeText={setInlineAddText}
+              returnKeyType="done"
+              onSubmitEditing={handleConfirmInlineAdd}
+              multiline={false}
+              blurOnSubmit
+              autoFocus
+            />
+            <TouchableOpacity onPress={handleConfirmInlineAdd} style={styles.inlineIconButton}>
+              <MaterialCommunityIcons name="check" size={22} color={COLORS.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleCancelInlineAdd} style={styles.inlineIconButton}>
+              <MaterialCommunityIcons name="close" size={22} color={COLORS.textMuted} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </View>
-  ), [handleGroceryToggle, handleOpenAddModal, handleDeleteManualItem, sortMode]);
+  ), [handleGroceryToggle, handleStartInlineAdd, handleDeleteManualItem, inlineAddCategory, inlineAddText, handleConfirmInlineAdd, handleCancelInlineAdd, sortMode]);
 
   const renderContent = () => {
     if (isLoading) {
@@ -1294,24 +1338,9 @@ export default function MiseScreen() {
         displayGroceryList = sortGroceryItemsAlphabetically(displayGroceryList);
       }
 
-      // Check if the displayed list is empty (after filtering)
+      // Always render the grocery list; ensure there's always a Miscellaneous category
       if (displayGroceryList.length === 0) {
-        return (
-          <View style={styles.emptyContainer}>
-            <MaterialCommunityIcons
-              name="cart-outline"
-              size={48}
-              color={COLORS.lightGray}
-            />
-            <Text style={styles.emptyText}>No grocery items</Text>
-            <Text style={styles.emptySubtext}>
-              {groceryList.length === 0 
-                ? "Add recipes to your mise to see grocery items."
-                : "All items are hidden by your staples filter."
-              }
-            </Text>
-          </View>
-        );
+        displayGroceryList = [{ name: 'Miscellaneous', items: [] }];
       }
 
       return (
@@ -1420,14 +1449,6 @@ export default function MiseScreen() {
       )}
       
 
-
-      {/* Add Manual Item Modal */}
-      <AddManualItemModal
-        visible={addModalVisible}
-        onClose={handleCloseAddModal}
-        onAdd={handleAddItemFromModal}
-        categoryName={selectedCategory}
-      />
 
       {/* Household Staples Modal */}
       <HouseholdStaplesModal
@@ -1650,6 +1671,31 @@ const styles = StyleSheet.create({
     color: COLORS.darkGray,
   } as TextStyle,
   deleteManualButton: {
+    padding: SPACING.xs,
+    marginLeft: SPACING.xs,
+  } as ViewStyle,
+  inlineTextInput: {
+    flex: 1,
+    fontFamily: FONT.family.body,
+    fontSize: FONT.size.body,
+    lineHeight: 22, // iOS optical alignment for Inter 16
+    height: 28, // match checkbox size for vertical alignment
+    borderWidth: 0,
+    borderColor: 'transparent',
+    borderRadius: 0,
+    paddingTop: 2,
+    paddingBottom: 0,
+    paddingHorizontal: 0,
+    color: COLORS.textDark,
+    backgroundColor: 'transparent',
+    textAlignVertical: 'center' as any,
+  } as TextStyle,
+  // Nudge baseline by 1px only once text is present to eliminate the tiny perceived droop
+  inlineTextInputTyped: {
+    paddingTop: 0,
+    transform: [{ translateY: -1 }],
+  } as TextStyle,
+  inlineIconButton: {
     padding: SPACING.xs,
     marginLeft: SPACING.xs,
   } as ViewStyle,

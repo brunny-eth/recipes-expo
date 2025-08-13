@@ -48,9 +48,11 @@ export function finalValidateRecipe(recipe: CombinedParsedRecipe | null, request
       // Check for hallucinated ingredients (too generic, vague, or placeholder-like)
       const hallucinationSigns = checkForIngredientHallucination(recipe.ingredientGroups);
       if (hallucinationSigns.length > 0) {
-        // Treat certain ingredient anomalies as non-fatal (do not fail validation)
+        // Treat most ingredient anomalies as non-fatal (log only) to reduce false negatives
         const nonFatalIngredientSigns = new Set<string>([
           'Repetitive ingredient patterns detected',
+          'Too many generic ingredients detected',
+          'Placeholder ingredients detected',
         ]);
 
         const fatalIngredientSigns = hallucinationSigns.filter(sign => !nonFatalIngredientSigns.has(sign));

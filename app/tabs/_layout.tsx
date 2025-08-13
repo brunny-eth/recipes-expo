@@ -25,10 +25,10 @@ const styles = StyleSheet.create({
   },
   tabBarText: {
     ...captionText,
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '600',
     textAlign: 'center',
-    width: 70,
+    width: 64,
   },
 });
 
