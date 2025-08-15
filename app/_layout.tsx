@@ -293,9 +293,9 @@ export default function RootLayout() {
   
   return (
     <PostHogProvider
-      apiKey="phc_LHzQ18078GlMjpjRz43tJHQ7HdiJ971AtSLK4wtdaSu"
+      apiKey={process.env.EXPO_PUBLIC_POSTHOG_API_KEY!}
       options={{
-        host: 'https://us.i.posthog.com',
+        host: process.env.EXPO_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com',
         enableSessionReplay: true,
       }}
       autocapture
