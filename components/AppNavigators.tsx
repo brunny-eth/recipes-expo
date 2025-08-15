@@ -13,6 +13,7 @@ const AppNavigators = React.memo(() => {
       <Stack.Screen name="+not-found" />
       <Stack.Screen name="tabs" options={{ headerShown: false }} />
       <Stack.Screen name="explore" options={{ headerShown: false }} />
+      <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       <Stack.Screen
         name="loading"
         options={{

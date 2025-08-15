@@ -7,18 +7,30 @@ import { isOfflineError } from './networkUtils';
 export function getErrorMessage(errorCode: ParseErrorCode, context?: string): string {
   switch (errorCode) {
     case ParseErrorCode.INVALID_INPUT:
+      if (context === 'image' || context === 'images') {
+        return "Those images don't appear to contain a recipe. Please try uploading images that show recipe ingredients and instructions.";
+      }
       return "That doesn't look like a valid recipe. \n\n Please try a URL with an actual recipe in it, or just paste the recipe text directly.";
       
     case ParseErrorCode.GENERATION_FAILED:
+      if (context === 'image' || context === 'images') {
+        return "We couldn't find a recipe in those images. Please try uploading clearer images that show recipe ingredients and cooking steps.";
+      }
       return "We couldn't process that recipe. \n\n Please try a URL with an actual recipe on it, or just paste the recipe text directly.";
       
     case ParseErrorCode.GENERATION_EMPTY:
+      if (context === 'image' || context === 'images') {
+        return "We couldn't find enough recipe details in those images. Please make sure the images clearly show ingredients and cooking instructions.";
+      }
       if (context === 'url') {
         return "No recipe found at that URL. Please try a different link or paste the recipe text directly.";
       }
       return "We couldn't find enough recipe details in that text. Please include ingredients and cooking instructions.";
       
     case ParseErrorCode.FINAL_VALIDATION_FAILED:
+      if (context === 'image' || context === 'images') {
+        return "The recipe from those images seems incomplete. Please try uploading images with more complete recipe information.";
+      }
       if (context === 'url') {
         return "The recipe from that URL seems incomplete. Please try a different link or paste the recipe text directly.";
       }

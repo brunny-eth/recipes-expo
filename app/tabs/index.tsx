@@ -98,7 +98,7 @@ export default function HomeScreen() {
   const urlIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const nameIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const urlPrompt = "www.recipe.com/too_many_ads";
+  const urlPrompt = "www.recipe.com/too-many-ads";
   const namePrompt = "try 'garlic chicken' or 'pizza'";
 
   // Local state for name input
@@ -352,6 +352,19 @@ export default function HomeScreen() {
         return;
       }
 
+      // Name mode: require a minimal amount of descriptive letters
+      if (importMode === 'name') {
+        const letterCount = (localRecipeInput.match(/[a-zA-Z]/g) || []).length;
+        if (letterCount < 6) {
+          showError(
+            'Please enter more detail',
+            'Please be a bit more descriptive about the dish you want to cook.'
+          );
+          setRecipeName('');
+          return;
+        }
+      }
+
       // Early validation of the text/URL before mode-specific checks
       if (!isValidRecipeInput(localRecipeInput)) {
         const handleError = require('@/hooks/useHandleError').useHandleError();
@@ -424,8 +437,13 @@ export default function HomeScreen() {
       } catch {}
 
       if (!result.success) {
-        if (result.action === 'show_validation_error' && result.error) {
-          handleError('Validation Error', result.error, { stage: 'validation' });
+        if (result.action === 'show_validation_error') {
+          // In Dish name mode, show a name-specific message instead of the generic URL/text one
+          if (importMode === 'name') {
+            showError('Invalid dish name', 'Please input a valid dish name.');
+          } else if (result.error) {
+            handleError('Validation Error', result.error, { stage: 'validation' });
+          }
         }
         return;
       }
@@ -659,7 +677,7 @@ export default function HomeScreen() {
 
                 {/* Unified import card: header + segmented control + input */}
                 <View style={styles.importCard}>
-                  <Text style={styles.importCardTitle}>Import & customize</Text>
+                  <Text style={styles.importCardTitle}>Bring your recipes in</Text>
                   {/* Segmented control: URL | Dish Name | Image */}
                   <View style={styles.segmentedControlContainer}>
                     <TouchableOpacity
@@ -778,41 +796,11 @@ export default function HomeScreen() {
                 </View>
               </View>
 
-              {/* Flexible spacer to push secondary actions lower */}
-              <View style={{ flexGrow: 1 }} />
+              {/* Slight spacer before secondary actions (reduced from flexGrow to bring items up slightly) */}
+              <View style={{ height: SPACING.lg }} />
 
               {/* Secondary actions grouped near bottom */}
               <View style={styles.secondarySections}>
-                {/* Action section 1: Prep station */}
-                <View style={styles.actionSection}>
-                  <View style={styles.sectionTitleWrap}>
-                    <Text style={[styles.subheadingText, { marginTop: 0, marginBottom: SPACING.xs }]}>{''}</Text>
-                  </View>
-                  <View style={[styles.quickList, { marginBottom: SPACING.xs }]}> 
-                    <TouchableOpacity
-                      style={styles.quickPill}
-                      onPress={() => router.push('/tabs/mise')}
-                    >
-                      <Text style={styles.quickPillText}>Shop & cook in your Prep Station</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* Action section 2: Saved recipes */}
-                <View style={styles.actionSection}>
-                  <View style={styles.sectionTitleWrap}>
-                    <Text style={[styles.subheadingText, { marginTop: 0, marginBottom: SPACING.xs }]}>{''}</Text>
-                  </View>
-                  <View style={[styles.quickList, { marginBottom: SPACING.xs }]}> 
-                    <TouchableOpacity
-                      style={styles.quickPill}
-                      onPress={() => router.push({ pathname: '/tabs/library', params: { tab: 'saved' } })}
-                    >
-                        <Text style={styles.quickPillText}>Save & organize your Cookbooks</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
                   {/* Action section 3: Explore */}
                   <View style={styles.actionSection}>
                     <View style={styles.sectionTitleWrap}>
@@ -825,6 +813,12 @@ export default function HomeScreen() {
                       >
                         <Text style={styles.quickPillText}>Discover new dishes</Text>
                       </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.quickPill}
+                        onPress={() => router.push('/tabs/mise')}
+                      >
+                        <Text style={styles.quickPillText}>Use your prep station</Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
               </View>
@@ -832,6 +826,13 @@ export default function HomeScreen() {
           </ScrollView>
         </Animated.View>
       </TouchableWithoutFeedback>
+      {/* Bottom callout above tabs */}
+      <View style={styles.bottomCallout}>
+        <Text style={styles.inlineText}>New to Meez?</Text>
+        <TouchableOpacity onPress={() => router.push('/onboarding')}>
+          <Text style={styles.inlineLink}>Take a quick tour</Text>
+        </TouchableOpacity>
+      </View>
       
       {/* Hidden uploader anchor for image/PDF selection (driven by modal actions) */}
       <RecipePDFImageUploader
@@ -861,6 +862,7 @@ export default function HomeScreen() {
         onBrowseFiles={handleBrowseFiles}
         />
       )}
+
     </SafeAreaView>
   );
 }
@@ -906,8 +908,8 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   heroHeading: {
-    fontFamily: FONT.family.heading,
-    fontSize: FONT.size.screenTitle,
+    fontFamily: FONT.family.body,
+    fontSize: FONT.size.sectionHeader,
     fontWeight: '600',
     color: COLORS.textDark,
     textAlign: 'center',
@@ -929,7 +931,7 @@ const styles = StyleSheet.create({
     ...SHADOWS.small, // subtle shadow (~2px blur equivalent)
   },
   importCardTitle: {
-    fontFamily: FONT.family.heading,
+    fontFamily: FONT.family.body,
     fontSize: FONT.size.sectionHeader,
     fontWeight: '700',
     color: COLORS.textDark,
@@ -1144,10 +1146,20 @@ const styles = StyleSheet.create({
     color: COLORS.white,
   },
   inlineLink: {
-    marginTop: SPACING.xs,
-    alignSelf: 'center',
     color: COLORS.primary,
-    textDecorationLine: 'underline',
+    textDecorationLine: 'none',
     ...captionText,
+  },
+  inlineText: {
+    ...captionText,
+    color: COLORS.textMuted,
+  },
+  bottomCallout: {
+    width: '100%',
+    paddingVertical: SPACING.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    columnGap: 4,
   },
 });

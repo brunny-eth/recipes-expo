@@ -83,7 +83,7 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
 
           {/* Button container */}
           <View style={{ width: '100%', alignItems: 'center' }}>
-            <Animated.View entering={FadeIn.duration(1000).delay(3000)} style={{ width: '100%', alignItems: 'center', marginTop: 0, marginBottom: 140 }}>
+            <Animated.View entering={FadeIn.duration(1000).delay(1000)} style={{ width: '100%', alignItems: 'center', marginTop: 0, marginBottom: 140 }}>
               <TouchableOpacity 
                 style={{
                   backgroundColor: COLORS.primary,

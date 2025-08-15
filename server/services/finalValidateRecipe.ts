@@ -53,6 +53,7 @@ export function finalValidateRecipe(recipe: CombinedParsedRecipe | null, request
           'Repetitive ingredient patterns detected',
           'Too many generic ingredients detected',
           'Placeholder ingredients detected',
+          'Unrealistic ingredient combinations detected',
         ]);
 
         const fatalIngredientSigns = hallucinationSigns.filter(sign => !nonFatalIngredientSigns.has(sign));
@@ -92,7 +93,8 @@ export function finalValidateRecipe(recipe: CombinedParsedRecipe | null, request
       // Treat certain instruction anomalies as non-fatal (do not fail validation)
       const nonFatalInstructionSigns = new Set([
         'Placeholder instructions detected',
-        'Vague instructions detected'
+        'Vague instructions detected',
+        'Too many generic instructions detected'
       ]);
 
       const fatalInstructionSigns = instructionHallucinationSigns.filter(sign => !nonFatalInstructionSigns.has(sign));
@@ -136,12 +138,12 @@ export function finalValidateRecipe(recipe: CombinedParsedRecipe | null, request
   // Check for reasonable cooking times and yields
   const timeYieldSigns = checkForUnreasonableTimesAndYields(recipe);
   if (timeYieldSigns.length > 0) {
-    logger.warn({ 
+    logger.info({ 
       requestId, 
       timeYieldSigns,
       title: recipe.title 
-    }, 'Final validation: Unreasonable cooking times or yields detected');
-    reasons.push(...timeYieldSigns);
+    }, 'Final validation: Unreasonable cooking times or yields detected (non-fatal)');
+    // Intentionally not pushing to reasons - yield validation is now non-fatal
   }
 
   // Check for overly perfect/unrealistic recipes (sign of hallucination)
@@ -365,13 +367,10 @@ function checkForTitleHallucination(title: string): string[] {
 }
 
 /**
- * Checks for unreasonable cooking times and yields
+ * Checks for unreasonable yields
  */
 function checkForUnreasonableTimesAndYields(recipe: CombinedParsedRecipe): string[] {
   const signs: string[] = [];
-  // Time sanity checks are intentionally disabled per product decision
-  // (e.g., braises, stock, or smoking can legitimately exceed many hours).
-  // Keeping only the yield sanity check below.
   
   // Check for unreasonable yields
   if (recipe.recipeYield) {

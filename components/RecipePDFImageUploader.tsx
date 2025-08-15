@@ -230,19 +230,30 @@ const RecipePDFImageUploader = React.forwardRef<any, Props>(({ onUploadComplete,
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
+        allowsEditing: false, // Disable editing to allow multiple selection
+        allowsMultipleSelection: true, // Enable multiple selection
         quality: 0.8,
       });
 
-      if (!result.canceled && result.assets[0]) {
-        // Navigate to loading screen for image processing
-        onUploadComplete({
-          success: true,
-          navigateToLoading: true,
-          imageUri: result.assets[0].uri,
-          inputType: 'image'
-        } as any);
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        if (result.assets.length === 1) {
+          // Single image - use existing flow
+          onUploadComplete({
+            success: true,
+            navigateToLoading: true,
+            imageUri: result.assets[0].uri,
+            inputType: 'image'
+          } as any);
+        } else {
+          // Multiple images - use multi-image flow
+          const imageUris = result.assets.map(asset => asset.uri);
+          onUploadComplete({
+            success: true,
+            navigateToLoading: true,
+            imageUris: imageUris,
+            inputType: 'images'
+          } as any);
+        }
       }
     } catch (error) {
       console.error('Image picker error:', error);

@@ -120,13 +120,30 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
 
   // Helper function to process backend error responses
   const processBackendError = (errorResponse: any): string => {
+    if (__DEV__) {
+      console.log('[processBackendError] Processing error response:', errorResponse);
+      console.log('[processBackendError] Input type:', inputType);
+    }
     try {
       // Check if it's a structured error response with ParseErrorCode
       if (errorResponse && typeof errorResponse === 'object') {
         if (errorResponse.error && errorResponse.error.code) {
           const code = errorResponse.error.code as ParseErrorCode;
-          const inputType = recipeInput.startsWith('http') ? 'url' : 'text';
-          return getErrorMessage(code, inputType);
+          // Determine context based on actual input type, not just URL detection
+          let context: string;
+          if (inputType === 'image') {
+            context = 'image';
+          } else if (inputType === 'images') {
+            context = 'images';
+          } else if (recipeInput.startsWith('http')) {
+            context = 'url';
+          } else {
+            context = 'text';
+          }
+          if (__DEV__) {
+            console.log('[processBackendError] Using getErrorMessage with code:', code, 'context:', context);
+          }
+          return getErrorMessage(code, context);
         }
         
         // Check for error message in response
@@ -139,24 +156,40 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
         }
       }
       
-      // Handle string responses
-      if (typeof errorResponse === 'string') {
-        try {
-          const parsed = JSON.parse(errorResponse);
-          if (parsed.error && parsed.error.code) {
-            const code = parsed.error.code as ParseErrorCode;
-            const inputType = recipeInput.startsWith('http') ? 'url' : 'text';
-            return getErrorMessage(code, inputType);
-          }
+              // Handle string responses
+        if (typeof errorResponse === 'string') {
+          try {
+            const parsed = JSON.parse(errorResponse);
+            if (parsed.error && parsed.error.code) {
+              const code = parsed.error.code as ParseErrorCode;
+              // Use same context logic as above
+              let context: string;
+              if (inputType === 'image') {
+                context = 'image';
+              } else if (inputType === 'images') {
+                context = 'images';
+              } else if (recipeInput.startsWith('http')) {
+                context = 'url';
+              } else {
+                context = 'text';
+              }
+              return getErrorMessage(code, context);
+            }
         } catch {
           // Not JSON, treat as plain string
           return getNetworkErrorMessage(errorResponse);
         }
       }
       
+      if (__DEV__) {
+        console.log('[processBackendError] Falling back to getNetworkErrorMessage for unknown error');
+      }
       return getNetworkErrorMessage('Unknown error');
     } catch (error) {
       console.error('[LoadingExperienceScreen] Error processing backend error:', error);
+      if (__DEV__) {
+        console.log('[processBackendError] Exception occurred, using fallback message');
+      }
       return "We're having trouble processing your recipe. Please try again.";
     }
   };
@@ -320,11 +353,27 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
       } else {
         try {
           const errorResponse = await response.json();
+          if (__DEV__) {
+            console.log('[parseRecipe] Error response structure:', JSON.stringify(errorResponse, null, 2));
+            console.log('[parseRecipe] Error response type:', typeof errorResponse);
+            console.log('[parseRecipe] Has error property:', !!errorResponse.error);
+            console.log('[parseRecipe] Error code:', errorResponse.error?.code);
+          }
           if (isMountedRef.current) {
+            const processedMessage = processBackendError(errorResponse);
+            // Don't pass stage or statusCode if we have a properly processed error message
+            // to avoid normalizeAppError overriding it with generic messages
+            const isRecipeSpecificError = processedMessage.includes('images') || 
+                                        processedMessage.includes('recipe') ||
+                                        processedMessage.includes('ingredients');
+            const errorOptions = isRecipeSpecificError 
+              ? { context: 'image_processing' } // Use context instead of stage
+              : { stage: 'parsing', statusCode: response.status };
+            
             handleError(
-              'Oops!',
-              processBackendError(errorResponse),
-              { stage: 'parsing', statusCode: response.status },
+              'Recipe Processing Error',
+              processedMessage,
+              errorOptions,
               { onDismissCallback: handleBack }
             );
           }

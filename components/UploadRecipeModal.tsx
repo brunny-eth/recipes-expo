@@ -105,7 +105,7 @@ export default function UploadRecipeModal({
                 />
               </View>
               <View style={styles.optionContent}>
-                <Text style={styles.optionTitle}>Choose Image</Text>
+                <Text style={styles.optionTitle}>Choose Images</Text>
               </View>
               <MaterialCommunityIcons
                 name="chevron-right"
