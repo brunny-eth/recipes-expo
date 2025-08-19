@@ -1585,13 +1585,13 @@ export default function RecipeSummaryScreen() {
               userId: session.user.id,
               modifiedRecipeData,
               appliedChanges: appliedChangesData,
-              folderId: params.folderId ? parseInt(params.folderId) : undefined, // Preserve folder association
+              folderId, // Use the folder ID passed from the folder picker
             }),
           });
 
           console.log('[DEBUG] Save modified API call with folderId:', {
-            folderId: params.folderId,
-            parsedFolderId: params.folderId ? parseInt(params.folderId) : undefined,
+            folderId,
+            fromFolderPicker: true,
           });
 
           const saveResult = await saveResponse.json();
@@ -1625,7 +1625,7 @@ export default function RecipeSummaryScreen() {
                 }),
                 entryPoint: 'saved',
                 from: '/saved',
-                folderId: params.folderId, // Preserve folder association
+                folderId: folderId.toString(), // Use the folder ID from folder picker
                 isModified: 'true',
               },
             });
@@ -1635,7 +1635,7 @@ export default function RecipeSummaryScreen() {
 
         // Navigate to the specific folder that the recipe was saved to
         // For forked recipes, this creates a new saved recipe. For patched recipes, the existing saved recipe is updated.
-        router.replace(`/saved/folder-detail?folderId=${params.folderId}` as any);
+        router.replace(`/saved/folder-detail?folderId=${folderId}` as any);
 
       } catch (error: any) {
         setIsSavingForLater(false);
@@ -1646,7 +1646,7 @@ export default function RecipeSummaryScreen() {
       // No modifications, save original recipe (instant - no loading state needed)
       try {
         const { saveRecipe } = require('@/lib/savedRecipes');
-        const result = await saveRecipe(recipe.id, params.folderId ? parseInt(params.folderId) : undefined);
+        const result = await saveRecipe(recipe.id, folderId);
         if (result.success) {
           // Track recipe saved event
           console.log('[POSTHOG] Tracking event: recipe_saved', { 
@@ -1659,7 +1659,7 @@ export default function RecipeSummaryScreen() {
           });
           
           // Navigate to the specific folder that the recipe was saved to
-          router.replace(`/saved/folder-detail?folderId=${params.folderId}` as any);
+          router.replace(`/saved/folder-detail?folderId=${folderId}` as any);
         } else if (result.alreadySaved) {
           handleError('Already Saved', 'This recipe is already saved. Make modifications if you want to save a different variation.');
         } else {
