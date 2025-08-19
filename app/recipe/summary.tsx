@@ -47,6 +47,7 @@ import {
 } from '@/utils/ingredientHelpers';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import { useHandleError } from '@/hooks/useHandleError';
+import { useSuccessModal } from '@/context/SuccessModalContext';
 import InlineErrorBanner from '@/components/InlineErrorBanner';
 import {
   sectionHeaderText,
@@ -242,6 +243,7 @@ export default function RecipeSummaryScreen() {
   const router = useRouter();
   const { showError, hideError } = useErrorModal();
   const handleError = useHandleError();
+  const { showSuccess } = useSuccessModal();
   const { session } = useAuth();
   const { track } = useAnalytics();
   const insets = useSafeAreaInsets();
@@ -329,6 +331,8 @@ export default function RecipeSummaryScreen() {
 
   // Track the baseline state when screen loads (for mise entry point)
   const [baselineScaleFactor, setBaselineScaleFactor] = useState<number>(1);
+  // baselineScaleFactor should always be 1.0 (original recipe scale)
+  // selectedScaleFactor represents the current user-selected scale
   const [baselineAppliedChanges, setBaselineAppliedChanges] = useState<AppliedChange[]>([]);
 
   const scaledIngredientGroups = React.useMemo<IngredientGroup[]>(() => {
@@ -660,7 +664,7 @@ export default function RecipeSummaryScreen() {
               setCurrentUnsavedChanges([]); // No unsaved changes initially
               // Set baseline for both mise and saved entrypoints
               setBaselineScaleFactor(1.0);
-              setBaselineAppliedChanges([]);
+              setBaselineAppliedChanges(convertedChanges);
             }
             
             // Calculate the actual scale factor from original recipe
@@ -695,7 +699,8 @@ export default function RecipeSummaryScreen() {
             
             setSelectedScaleFactor(finalScaleFactor);
             // Set baseline for both mise and saved entrypoints
-            setBaselineScaleFactor(finalScaleFactor);
+            // Baseline should always be 1.0 (original recipe scale), not the saved scale factor
+            setBaselineScaleFactor(1.0);
           } catch (appliedChangesError: any) {
             console.error('[DEBUG] Error parsing applied changes:', appliedChangesError);
             setSelectedScaleFactor(1.0);
@@ -2221,6 +2226,21 @@ export default function RecipeSummaryScreen() {
       // Reset modifications state after successful save
       setHasModifications(false);
       setCurrentUnsavedChanges([]);
+      
+      // Update persistedChanges to include the changes we just saved
+      const newPersistedChanges = [...persistedChanges, ...currentUnsavedChanges];
+      setPersistedChanges(newPersistedChanges);
+      
+      // Update baseline values to reflect the new saved state
+      // Note: baselineScaleFactor should always remain 1.0 (original recipe scale)
+      setBaselineAppliedChanges(newPersistedChanges);
+      
+      // Show success message
+      showSuccess(
+        'Changes Saved!',
+        'Your recipe modifications have been saved successfully.',
+        3000 // Show for 3 seconds
+      );
       
       console.log('[Summary] ✅ Successfully saved changes');
 
