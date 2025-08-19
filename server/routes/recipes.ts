@@ -558,6 +558,7 @@ router.post('/save-modified', async (req: Request<any, any, SaveModifiedRecipeRe
         folder_id: folderId, // Save to selected folder
         title_override: modifiedRecipeData.title, // Use the (potentially LLM-suggested) title
         applied_changes: appliedChanges, // Store the explicit changes metadata
+        // display_order can be NULL since we sort by created_at DESC for chronological order
         // notes: null, // As per plan, leave notes as null unless user input is added
       })
       .select('id')

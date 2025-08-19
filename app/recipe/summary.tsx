@@ -724,12 +724,24 @@ export default function RecipeSummaryScreen() {
                 console.log('[DEBUG] Calculated actual scale factor:', { currentYieldNum, originalYieldNum, actualScaleFactor });
                 finalScaleFactor = actualScaleFactor;
               } else {
-                console.log('[DEBUG] Could not calculate yield-based scale factor, using saved factor:', savedAppliedChanges.scalingFactor);
-                finalScaleFactor = savedAppliedChanges.scalingFactor;
+                // For saved recipes, ignore the old scaling factor since the saved data is already scaled
+                if (entryPoint === 'saved') {
+                  console.log('[DEBUG] Saved recipe: could not calculate yield-based factor, using 1.0 as fresh baseline');
+                  finalScaleFactor = 1.0;
+                } else {
+                  console.log('[DEBUG] Could not calculate yield-based scale factor, using saved factor:', savedAppliedChanges.scalingFactor);
+                  finalScaleFactor = savedAppliedChanges.scalingFactor;
+                }
               }
             } else if (savedAppliedChanges.scalingFactor) {
-              console.log('[DEBUG] Using scaling factor from saved changes:', savedAppliedChanges.scalingFactor);
-              finalScaleFactor = savedAppliedChanges.scalingFactor;
+              // For saved recipes, ignore the old scaling factor since the saved data is already scaled
+              if (entryPoint === 'saved') {
+                console.log('[DEBUG] Saved recipe: ignoring old scaling factor, using 1.0 as fresh baseline');
+                finalScaleFactor = 1.0;
+              } else {
+                console.log('[DEBUG] Using scaling factor from saved changes:', savedAppliedChanges.scalingFactor);
+                finalScaleFactor = savedAppliedChanges.scalingFactor;
+              }
             } else {
               console.log('[DEBUG] No scaling factor in saved changes, defaulting to 1.0');
               finalScaleFactor = 1.0;

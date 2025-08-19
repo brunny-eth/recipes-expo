@@ -146,7 +146,6 @@ router.get('/folders/:id/recipes', async (req: Request, res: Response) => {
       `)
       .eq('user_id', userId)
       .eq('folder_id', id)
-      .order('display_order', { ascending: true })
       .order('created_at', { ascending: false }); // Most recently created first
       // TODO: Add updated_at column to user_saved_recipes table for better sorting
       // ALTER TABLE user_saved_recipes ADD COLUMN updated_at timestamptz DEFAULT now();
@@ -427,7 +426,6 @@ router.get('/recipes', async (req: Request, res: Response) => {
     }
 
     const { data, error: fetchError } = await query
-      .order('display_order', { ascending: true })
       .order('created_at', { ascending: false }); // Most recently created first
 
     if (fetchError) {
