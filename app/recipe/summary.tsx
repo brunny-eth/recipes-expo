@@ -1534,23 +1534,11 @@ export default function RecipeSummaryScreen() {
         });
 
         // Save the modified recipe
-        // Branch: If viewing an original recipe, fork it. If viewing a fork, patch it in place.
-        // Use robust detection: check if this is a fork (has parent_recipe_id) rather than relying on string param
-        const isUserModifiedRecipe = recipe.parent_recipe_id || 
-                                   (params.isModified === 'true') || 
-                                   (recipe.source_type === 'user_modified');
+        // NEW/EXPLORE ENTRYPOINT: Always fork when saving modifications (never patch)
+        console.log('[DEBUG] 🔧 New/Explore entrypoint - always creating fork for modified recipe:', recipe.id);
         
-        console.log('[DEBUG] 🔍 Recipe modification detection:', {
-          recipeId: recipe.id,
-          parent_recipe_id: recipe.parent_recipe_id,
-          paramsIsModified: params.isModified,
-          source_type: recipe.source_type,
-          isUserModifiedRecipe,
-          willUsePatch: isUserModifiedRecipe,
-          willUseFork: !isUserModifiedRecipe,
-        });
-        
-        if (isUserModifiedRecipe) {
+        // Always create fork for new/explore entrypoint
+        if (false) {
           // UPDATE THE EXISTING FORK
           console.log('[DEBUG] 🔧 Patching existing fork:', recipe.id, 'parent_recipe_id:', recipe.parent_recipe_id);
           
@@ -1991,7 +1979,7 @@ export default function RecipeSummaryScreen() {
     }
   };
 
-  // Handle saving changes on saved recipes (fork vs patch logic)
+  // Handle saving changes on saved recipes (single source of truth architecture)
   const handleSaveChanges = async () => {
     if (!recipe || !session?.user) {
       handleError('Authentication Required', 'You need an account to save changes.');
@@ -2097,126 +2085,156 @@ export default function RecipeSummaryScreen() {
         scalingFactor: selectedScaleFactor,
       };
 
-      // Branch: If viewing an original recipe, fork it. If viewing a fork, patch it in place.
-      const isUserModifiedRecipe = recipe.parent_recipe_id || 
-                                   (params.isModified === 'true') || 
-                                   (recipe.source_type === 'user_modified');
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL!;
       
-      console.log('[DEBUG] 🔍 Recipe modification detection:', {
-        recipeId: recipe.id,
-        parent_recipe_id: recipe.parent_recipe_id,
-        paramsIsModified: params.isModified,
-        source_type: recipe.source_type,
-        isUserModifiedRecipe,
-        willUsePatch: isUserModifiedRecipe,
-        willUseFork: !isUserModifiedRecipe,
-      });
-      
-      if (isUserModifiedRecipe) {
-        // UPDATE THE EXISTING FORK
-        console.log('[DEBUG] 🔧 Patching existing fork for save changes:', recipe.id);
+      if (entryPoint === 'saved') {
+        // SAVED ENTRYPOINT: Use base_recipe_id from joined data to determine fork vs patch
+        console.log('[DEBUG] 🔍 Saved entrypoint - determining fork vs patch based on base_recipe_id');
         
-        if (!recipe.id) {
-          throw new Error('Recipe ID is required for patching');
-        }
+        // The recipe.id we have is the base_recipe_id from the joined data
+        // Check if it's a fork by looking at is_user_modified or source_type
+        const isUserModifiedRecipe = recipe.source_type === 'user_modified' || 
+                                     recipe.parent_recipe_id ||
+                                     (params.isModified === 'true');
         
-        // Instead of PATCHing processed_recipes_cache, PATCH the saved recipe
-        // This keeps user modifications in user_saved_recipes where they belong
-        const backendUrl = process.env.EXPO_PUBLIC_API_URL!;
+        console.log('[DEBUG] 🔍 Saved recipe analysis:', {
+          baseRecipeId: recipe.id,
+          source_type: recipe.source_type,
+          parent_recipe_id: recipe.parent_recipe_id,
+          paramsIsModified: params.isModified,
+          isUserModifiedRecipe,
+          willUsePatch: isUserModifiedRecipe,
+          willUseFork: !isUserModifiedRecipe,
+        });
         
-        // First, we need to find the saved recipe ID for this user
-        const savedRecipeResponse = await fetch(`${backendUrl}/api/saved/recipes?userId=${session.user.id}&baseRecipeId=${recipe.id}`);
-        if (!savedRecipeResponse.ok) {
-          throw new Error('Failed to find saved recipe');
-        }
-        
-        const savedRecipes = await savedRecipeResponse.json();
-        const savedRecipe = savedRecipes.recipes?.find((r: any) => r.base_recipe_id === recipe.id);
-        
-        if (!savedRecipe) {
-          throw new Error('Saved recipe not found');
-        }
-        
-        console.log('[DEBUG] 🔧 Found saved recipe to patch:', savedRecipe.id);
-        
-        // PATCH the saved recipe with the new modifications
-        const patchResponse = await fetch(`${backendUrl}/api/saved/recipes/${savedRecipe.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: session.user.id,
-            patch: {
-              applied_changes: appliedChangesData,
-              title_override: newTitle || recipe.title,
+        if (isUserModifiedRecipe) {
+          // PATCH the existing fork
+          console.log('[DEBUG] 🔧 Patching existing fork (base_recipe_id):', recipe.id);
+          
+          const patchResponse = await fetch(`${backendUrl}/api/recipes/${recipe.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              patch: {
+                title: newTitle || recipe.title,
+                recipeYield: getScaledYieldText(originalRecipe?.recipeYield || recipe?.recipeYield, selectedScaleFactor),
+                instructions: finalInstructions,
+                ingredientGroups: scaledIngredientGroups,
+              },
+            }),
+          });
+
+          if (!patchResponse.ok) {
+            const patchResult = await patchResponse.json();
+            throw new Error(patchResult.error || 'Failed to update recipe');
+          }
+
+          console.log('[DEBUG] ✅ Successfully patched existing fork');
+          
+        } else {
+          // CREATE A FORK and update the saved recipe pointer
+          console.log('[DEBUG] 🔧 Creating fork from original (base_recipe_id):', recipe.id);
+          
+          // Find the existing saved recipe to get the saved_id
+          const savedRecipeResponse = await fetch(`${backendUrl}/api/saved/recipes?userId=${session.user.id}&baseRecipeId=${recipe.id}`);
+          if (!savedRecipeResponse.ok) {
+            throw new Error('Failed to find saved recipe');
+          }
+          
+          const savedRecipes = await savedRecipeResponse.json();
+          const savedRecipe = savedRecipes.recipes?.find((r: any) => r.base_recipe_id === recipe.id);
+          
+          if (!savedRecipe) {
+            throw new Error('Saved recipe not found - this should not happen for saved entrypoint');
+          }
+          
+          console.log('[DEBUG] 🔧 Found saved recipe to update:', savedRecipe.id);
+          
+          // Create fork and update saved recipe pointer
+          const forkResponse = await fetch(`${backendUrl}/api/recipes/save-modified`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              originalRecipeId: recipe.id,
+              originalRecipeData: originalRecipe || recipe,
+              userId: session.user.id,
+              modifiedRecipeData,
+              appliedChanges: appliedChangesData,
+              folderId: params.folderId ? parseInt(params.folderId) : undefined,
+              saved_id: savedRecipe.id, // Update existing saved recipe to point to new fork
+            }),
+          });
+
+          if (!forkResponse.ok) {
+            const forkResult = await forkResponse.json();
+            throw new Error(forkResult.error || 'Failed to create fork');
+          }
+
+          const forkData = await forkResponse.json();
+          console.log('[DEBUG] ✅ Successfully created fork and updated saved recipe pointer:', forkData.newRecipeId);
+          
+          // Navigate to the new fork so subsequent edits hit the PATCH path
+          router.replace({
+            pathname: '/recipe/summary',
+            params: {
+              recipeData: JSON.stringify({
+                ...modifiedRecipeData,
+                id: forkData.newRecipeId,
+                parent_recipe_id: recipe.id,
+                source_type: 'user_modified',
+              }),
+              entryPoint: 'saved',
+              folderId: params.folderId,
+              isModified: 'true',
             },
-          }),
-        });
-
-        if (!patchResponse.ok) {
-          const patchResult = await patchResponse.json();
-          throw new Error(patchResult.error || 'Failed to update saved recipe');
+          });
         }
-
-        console.log('[DEBUG] ✅ Successfully patched saved recipe for save changes');
         
-        // Track recipe updated event
-        await track('recipe_updated', { 
-          recipeId: recipe.id.toString(), 
-          inputType: entryPoint 
-        });
-
       } else {
-        // FIRST EDIT → CREATE A FORK
-        console.log('[DEBUG] 🔧 Creating new fork for save changes from original recipe:', recipe.id);
+        // NEW/EXPLORE ENTRYPOINT: Always fork when saving modifications
+        console.log('[DEBUG] 🔧 New/Explore entrypoint - creating fork for modified recipe:', recipe.id);
         
-        if (!recipe.id) {
-          throw new Error('Recipe ID is required for creating fork');
-        }
-        
-        // Instead of creating a fork in processed_recipes_cache, 
-        // we should update the existing saved recipe with new modifications
-        // This keeps user modifications in user_saved_recipes where they belong
-        
-        console.log('[DEBUG] 🔧 Updating existing saved recipe with new modifications');
-        
-        // Find the existing saved recipe for this user
-        const backendUrl = process.env.EXPO_PUBLIC_API_URL!;
-        const savedRecipeResponse = await fetch(`${backendUrl}/api/saved/recipes?userId=${session.user.id}&baseRecipeId=${recipe.id}`);
-        
-        if (!savedRecipeResponse.ok) {
-          throw new Error('Failed to find saved recipe');
-        }
-        
-        const savedRecipes = await savedRecipeResponse.json();
-        const savedRecipe = savedRecipes.recipes?.find((r: any) => r.base_recipe_id === recipe.id);
-        
-        if (!savedRecipe) {
-          throw new Error('Saved recipe not found - this should not happen for saved entrypoint');
-        }
-        
-        console.log('[DEBUG] 🔧 Found saved recipe to update:', savedRecipe.id);
-        
-        // Update the existing saved recipe with new modifications
-        const updateResponse = await fetch(`${backendUrl}/api/saved/recipes/${savedRecipe.id}`, {
-          method: 'PATCH',
+        const forkResponse = await fetch(`${backendUrl}/api/recipes/save-modified`, {
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            originalRecipeId: recipe.id,
+            originalRecipeData: originalRecipe || recipe,
             userId: session.user.id,
-            patch: {
-              applied_changes: appliedChangesData,
-              title_override: newTitle || recipe.title,
-            },
+            modifiedRecipeData,
+            appliedChanges: appliedChangesData,
+            folderId: params.folderId ? parseInt(params.folderId) : undefined,
+            // No saved_id for new/explore - this creates a new saved recipe
           }),
         });
 
-        if (!updateResponse.ok) {
-          const updateResult = await updateResponse.json();
-          throw new Error(updateResult.error || 'Failed to update saved recipe');
+        if (!forkResponse.ok) {
+          const forkResult = await forkResponse.json();
+          throw new Error(forkResult.error || 'Failed to create fork');
         }
 
-        console.log('[DEBUG] ✅ Successfully updated existing saved recipe');
+        const forkData = await forkResponse.json();
+        console.log('[DEBUG] ✅ Successfully created fork for new/explore:', forkData.newRecipeId);
         
-        // Track recipe updated event
+        // Navigate to the new fork
+        router.replace({
+          pathname: '/recipe/summary',
+          params: {
+            recipeData: JSON.stringify({
+              ...modifiedRecipeData,
+              id: forkData.newRecipeId,
+              parent_recipe_id: recipe.id,
+              source_type: 'user_modified',
+            }),
+            entryPoint: 'saved', // Now it's saved
+            folderId: params.folderId,
+            isModified: 'true',
+          },
+        });
+      }
+      
+      // Track recipe updated event
+      if (recipe.id) {
         await track('recipe_updated', { 
           recipeId: recipe.id.toString(), 
           inputType: entryPoint 

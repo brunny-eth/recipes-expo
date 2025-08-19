@@ -26,6 +26,7 @@ interface SaveModifiedRecipeRequestBody {
     scalingFactor: number;
   };
   folderId: number; // Add folder support
+  saved_id?: string; // Optional saved recipe ID to update instead of creating new
 }
 
 const router = Router()
@@ -446,7 +447,7 @@ router.post('/save-modified', async (req: Request<any, any, SaveModifiedRecipeRe
   const requestId = (req as any).id;
 
   try {
-    const { originalRecipeId, originalRecipeData, userId, modifiedRecipeData, appliedChanges, folderId } = req.body;
+    const { originalRecipeId, originalRecipeData, userId, modifiedRecipeData, appliedChanges, folderId, saved_id } = req.body;
 
     logger.info({ 
       requestId, 
@@ -557,7 +558,6 @@ router.post('/save-modified', async (req: Request<any, any, SaveModifiedRecipeRe
         folder_id: folderId, // Save to selected folder
         title_override: modifiedRecipeData.title, // Use the (potentially LLM-suggested) title
         applied_changes: appliedChanges, // Store the explicit changes metadata
-        original_recipe_data: originalRecipe.recipe_data, // Store original recipe data
         // notes: null, // As per plan, leave notes as null unless user input is added
       })
       .select('id')
@@ -574,7 +574,27 @@ router.post('/save-modified', async (req: Request<any, any, SaveModifiedRecipeRe
 
     logger.info({ requestId, userSavedEntryId: userSavedEntry.id }, 'User saved recipe entry created.');
 
-    // --- 5. Send Success Response ---
+    // --- 5. Handle saved_id parameter (update existing saved recipe to point to new fork) ---
+    if (saved_id) {
+      const { error: updateSavedError } = await supabaseAdmin
+        .from('user_saved_recipes')
+        .update({
+          base_recipe_id: newModifiedRecipeId, // Point to the new fork
+          title_override: modifiedRecipeData.title,
+          applied_changes: appliedChanges,
+        })
+        .eq('id', saved_id)
+        .eq('user_id', userId); // Ensure user owns this saved recipe
+
+      if (updateSavedError) {
+        logger.warn({ requestId, saved_id, err: updateSavedError }, 'Failed to update existing saved recipe, but fork was created successfully');
+        // Continue - the fork was created successfully, this is just an optimization
+      } else {
+        logger.info({ requestId, saved_id, newForkedRecipeId: newModifiedRecipeId }, 'Updated existing saved recipe to point to new fork');
+      }
+    }
+
+    // --- 6. Send Success Response ---
     res.status(201).json({
       message: 'Modified recipe saved successfully!',
       newRecipeId: newModifiedRecipeId,

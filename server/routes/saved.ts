@@ -135,7 +135,6 @@ router.get('/folders/:id/recipes', async (req: Request, res: Response) => {
         base_recipe_id,
         title_override,
         applied_changes,
-        original_recipe_data,
         display_order,
         created_at,
         processed_recipes_cache (
@@ -331,7 +330,7 @@ router.patch('/recipes/:id', async (req: Request, res: Response) => {
     // Get the current saved recipe to verify ownership
     const { data: currentSavedRecipe, error: fetchError } = await supabaseAdmin
       .from('user_saved_recipes')
-      .select('id, user_id, applied_changes, original_recipe_data')
+      .select('id, user_id, applied_changes')
       .eq('id', id)
       .single();
 
@@ -411,7 +410,6 @@ router.get('/recipes', async (req: Request, res: Response) => {
         base_recipe_id,
         title_override,
         applied_changes,
-        original_recipe_data,
         display_order,
         created_at,
         processed_recipes_cache (
