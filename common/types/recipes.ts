@@ -36,6 +36,9 @@ export type CombinedParsedRecipe = {
   tips?: string | null;
   created_at?: string;
   last_processed_at?: string;
+  // Database metadata for fork vs patch logic
+  parent_recipe_id?: number | null;
+  source_type?: string | null;
 };
 
 export type SubstitutionSuggestion = {

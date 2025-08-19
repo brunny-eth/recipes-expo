@@ -634,7 +634,21 @@ router.patch('/:id(\\d+)', async (req: Request, res: Response) => {
       .from('processed_recipes_cache')
       .update({
         recipe_data: updatedRecipeData,
-        last_processed_at: new Date().toISOString(),
+        // Don't update last_processed_at - that's for pipeline processing, not user edits
+        // The updated_at field will be automatically updated by the database trigger
+        // 
+        // TODO: Add this database schema change:
+        // ALTER TABLE processed_recipes_cache ADD COLUMN updated_at timestamptz DEFAULT now();
+        // CREATE OR REPLACE FUNCTION update_updated_at_column()
+        // RETURNS TRIGGER AS $$
+        // BEGIN
+        //   NEW.updated_at = now();
+        //   RETURN NEW;
+        // END;
+        // $$ language 'plpgsql';
+        // CREATE TRIGGER update_processed_recipes_cache_updated_at 
+        //   BEFORE UPDATE ON processed_recipes_cache 
+        //   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
       })
       .eq('id', id)
       .select('id, recipe_data')

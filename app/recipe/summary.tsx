@@ -1515,9 +1515,14 @@ export default function RecipeSummaryScreen() {
 
         // Save the modified recipe
         // Branch: If viewing an original recipe, fork it. If viewing a fork, patch it in place.
-        if (params.isModified === 'true') {
+        // Use robust detection: check if this is a fork (has parent_recipe_id) rather than relying on string param
+        const isUserModifiedRecipe = recipe.parent_recipe_id || 
+                                   (params.isModified === 'true') || 
+                                   (recipe.source_type === 'user_modified');
+        
+        if (isUserModifiedRecipe) {
           // UPDATE THE EXISTING FORK
-          console.log('[DEBUG] 🔧 Patching existing fork:', recipe.id);
+          console.log('[DEBUG] 🔧 Patching existing fork:', recipe.id, 'parent_recipe_id:', recipe.parent_recipe_id);
           
           const patchResponse = await fetch(`${backendUrl}/api/recipes/${recipe.id}`, {
             method: 'PATCH',
@@ -1580,6 +1585,29 @@ export default function RecipeSummaryScreen() {
             recipeId: recipe.id.toString(), 
             inputType: entryPoint 
           });
+
+          // CRITICAL: Navigate to the fork so subsequent edits hit PATCH path automatically
+          // This prevents the "keep forking" problem by ensuring the screen shows the forked recipe
+          if (saveResult.newRecipeId) {
+            console.log('[DEBUG] 🔄 Navigating to fork to enable PATCH path:', saveResult.newRecipeId);
+            // Navigate to the fork with isModified=true so future edits use PATCH
+            router.replace({
+              pathname: '/recipe/summary',
+              params: {
+                recipeData: JSON.stringify({
+                  ...modifiedRecipeData,
+                  id: saveResult.newRecipeId,
+                  parent_recipe_id: recipe.id, // Mark as fork
+                  source_type: 'user_modified',
+                }),
+                entryPoint: 'saved',
+                from: '/saved',
+                isModified: 'true',
+                folderId: folderId?.toString(),
+              },
+            });
+            return; // Exit early since we're navigating
+          }
         }
 
         // Navigate to the specific folder that the recipe was saved to

@@ -295,6 +295,9 @@ export default function SavedFolderDetailScreen() {
     const recipeWithId = {
       ...recipe_data,
       id: item.processed_recipes_cache.id,
+      // Add database metadata for proper fork vs patch logic
+      parent_recipe_id: item.processed_recipes_cache.parent_recipe_id,
+      source_type: item.processed_recipes_cache.source_type,
       ...(isModified && item.title_override && { title: item.title_override }),
     };
 
