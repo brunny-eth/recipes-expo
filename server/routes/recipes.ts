@@ -589,4 +589,74 @@ router.post('/save-modified', async (req: Request<any, any, SaveModifiedRecipeRe
   }
 });
 
+// PATCH /api/recipes/:id - Update an existing recipe (typically a user-modified fork)
+router.patch('/:id(\\d+)', async (req: Request, res: Response) => {
+  const requestId = (req as any).id;
+  
+  try {
+    const { id } = req.params;
+    const { patch } = req.body;
+
+    if (!patch || typeof patch !== 'object') {
+      return res.status(400).json({ error: 'Missing or invalid patch data' });
+    }
+
+    logger.info({ requestId, recipeId: id, patchFields: Object.keys(patch) }, 'Patching recipe');
+
+    // Get the current recipe to verify it exists and is user-modified
+    const { data: currentRecipe, error: fetchError } = await supabaseAdmin
+      .from('processed_recipes_cache')
+      .select('recipe_data, is_user_modified')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !currentRecipe) {
+      logger.error({ requestId, recipeId: id, err: fetchError }, 'Recipe not found');
+      return res.status(404).json({ error: 'Recipe not found' });
+    }
+
+    // Only allow PATCHing user-modified recipes (forks)
+    if (!currentRecipe.is_user_modified) {
+      logger.warn({ requestId, recipeId: id }, 'Attempted to PATCH non-user-modified recipe');
+      return res.status(403).json({ error: 'Can only update user-modified recipes' });
+    }
+
+    // Merge the patch with existing recipe data
+    const updatedRecipeData = {
+      ...currentRecipe.recipe_data,
+      ...patch,
+      // Ensure the ID field matches the row ID
+      id: parseInt(id),
+    };
+
+    // Update the recipe_data column
+    const { data: updatedRecipe, error: updateError } = await supabaseAdmin
+      .from('processed_recipes_cache')
+      .update({
+        recipe_data: updatedRecipeData,
+        last_processed_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select('id, recipe_data')
+      .single();
+
+    if (updateError) {
+      logger.error({ requestId, recipeId: id, err: updateError }, 'Failed to update recipe');
+      return res.status(500).json({ error: 'Failed to update recipe' });
+    }
+
+    logger.info({ requestId, recipeId: id }, 'Successfully patched recipe');
+
+    res.json({
+      message: 'Recipe updated successfully',
+      recipe: updatedRecipe,
+    });
+
+  } catch (err) {
+    const error = err as Error;
+    logger.error({ requestId, err: error, route: req.originalUrl, method: req.method, params: req.params }, 'Error in PATCH /:id route');
+    res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+});
+
 export const recipeRouter = router;

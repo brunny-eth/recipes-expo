@@ -1514,33 +1514,76 @@ export default function RecipeSummaryScreen() {
         });
 
         // Save the modified recipe
-        const saveResponse = await fetch(`${backendUrl}/api/recipes/save-modified`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            originalRecipeId: recipe.id,
-            originalRecipeData: originalRecipe || recipe, // Pass original recipe data directly
-            userId: session.user.id,
-            modifiedRecipeData,
-            appliedChanges: appliedChangesData,
-            folderId: folderId, // Add folder selection support
-          }),
-        });
+        // Branch: If viewing an original recipe, fork it. If viewing a fork, patch it in place.
+        if (params.isModified === 'true') {
+          // UPDATE THE EXISTING FORK
+          console.log('[DEBUG] 🔧 Patching existing fork:', recipe.id);
+          
+          const patchResponse = await fetch(`${backendUrl}/api/recipes/${recipe.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              patch: {
+                title: newTitle || recipe.title,
+                recipeYield: getScaledYieldText(originalRecipe?.recipeYield || recipe?.recipeYield, selectedScaleFactor),
+                instructions: finalInstructions,
+                ingredientGroups: scaledIngredientGroups,
+              },
+            }),
+          });
 
-        const saveResult = await saveResponse.json();
-        if (!saveResponse.ok) throw new Error(saveResult.error || 'Failed to save modified recipe');
+          if (!patchResponse.ok) {
+            const patchResult = await patchResponse.json();
+            throw new Error(patchResult.error || 'Failed to update recipe');
+          }
 
-        // Track recipe saved event
-        console.log('[POSTHOG] Tracking event: recipe_saved', { 
-          recipeId: recipe.id.toString(), 
-          inputType: entryPoint 
-        });
-        await track('recipe_saved', { 
-          recipeId: recipe.id.toString(), 
-          inputType: entryPoint 
-        });
+          console.log('[DEBUG] ✅ Successfully patched existing fork');
+          
+          // Track recipe updated event
+          console.log('[POSTHOG] Tracking event: recipe_updated', { 
+            recipeId: recipe.id.toString(), 
+            inputType: entryPoint 
+          });
+          await track('recipe_updated', { 
+            recipeId: recipe.id.toString(), 
+            inputType: entryPoint 
+          });
+
+        } else {
+          // FIRST EDIT → CREATE A FORK (existing flow)
+          console.log('[DEBUG] 🔧 Creating new fork from original recipe:', recipe.id);
+          
+          const saveResponse = await fetch(`${backendUrl}/api/recipes/save-modified`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              originalRecipeId: recipe.id,
+              originalRecipeData: originalRecipe || recipe, // Pass original recipe data directly
+              userId: session.user.id,
+              modifiedRecipeData,
+              appliedChanges: appliedChangesData,
+              folderId: folderId, // Add folder selection support
+            }),
+          });
+
+          const saveResult = await saveResponse.json();
+          if (!saveResponse.ok) throw new Error(saveResult.error || 'Failed to save modified recipe');
+
+          console.log('[DEBUG] ✅ Successfully created new fork');
+          
+          // Track recipe saved event
+          console.log('[POSTHOG] Tracking event: recipe_saved', { 
+            recipeId: recipe.id.toString(), 
+            inputType: entryPoint 
+          });
+          await track('recipe_saved', { 
+            recipeId: recipe.id.toString(), 
+            inputType: entryPoint 
+          });
+        }
 
         // Navigate to the specific folder that the recipe was saved to
+        // For forked recipes, this creates a new saved recipe. For patched recipes, the existing saved recipe is updated.
         router.replace(`/saved/folder-detail?folderId=${folderId}` as any);
 
       } catch (error: any) {
