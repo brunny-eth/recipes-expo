@@ -147,7 +147,7 @@ router.get('/folders/:id/recipes', async (req: Request, res: Response) => {
       .eq('user_id', userId)
       .eq('folder_id', id)
       .order('display_order', { ascending: true })
-      .order('created_at', { ascending: true }); // Changed from DESC to ASC as requested
+      .order('updated_at', { ascending: false }); // Most recently updated first
 
     if (fetchError) {
       logger.error({ requestId, err: fetchError }, 'Failed to fetch folder recipes');
@@ -268,7 +268,7 @@ router.put('/folders/:id', async (req: Request, res: Response) => {
   }
 });
 
-// DELETE /api/saved/recipes/:id - Delete a saved recipe
+// DELETE /api/saved/recipes/:id - Remove recipe from saved folder
 router.delete('/recipes/:id', async (req: Request, res: Response) => {
   const requestId = (req as any).id;
   
@@ -280,28 +280,173 @@ router.delete('/recipes/:id', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Missing userId' });
     }
 
-    logger.info({ requestId, recipeId: id, userId }, 'Deleting saved recipe');
+    logger.info({ requestId, savedRecipeId: id, userId }, 'Removing recipe from saved folder');
 
     const { error: deleteError } = await supabaseAdmin
       .from('user_saved_recipes')
       .delete()
-      .eq('user_id', userId)
-      .eq('base_recipe_id', id);
+      .eq('id', id)
+      .eq('user_id', userId);
 
     if (deleteError) {
-      logger.error({ requestId, err: deleteError }, 'Failed to delete saved recipe');
-      return res.status(500).json({ error: 'Failed to delete recipe' });
+      logger.error({ requestId, err: deleteError }, 'Failed to remove saved recipe');
+      return res.status(500).json({ error: 'Failed to remove recipe' });
     }
 
-    logger.info({ requestId, recipeId: id }, 'Successfully deleted saved recipe');
+    logger.info({ requestId, savedRecipeId: id }, 'Successfully removed saved recipe');
 
     res.json({
-      message: 'Recipe deleted successfully'
+      message: 'Recipe removed from saved folder successfully'
     });
 
   } catch (err) {
     const error = err as Error;
     logger.error({ requestId, err: error }, 'Error in /recipes/:id DELETE route');
+    res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+});
+
+// PATCH /api/saved/recipes/:id - Update saved recipe modifications
+router.patch('/recipes/:id', async (req: Request, res: Response) => {
+  const requestId = (req as any).id;
+  
+  try {
+    const { id } = req.params;
+    const { userId, patch } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'Missing userId' });
+    }
+
+    if (!patch || typeof patch !== 'object') {
+      return res.status(400).json({ error: 'Missing or invalid patch data' });
+    }
+
+    logger.info({ requestId, savedRecipeId: id, userId, patchFields: Object.keys(patch) }, 'Patching saved recipe');
+
+    // Get the current saved recipe to verify ownership
+    const { data: currentSavedRecipe, error: fetchError } = await supabaseAdmin
+      .from('user_saved_recipes')
+      .select('id, user_id, applied_changes, original_recipe_data')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !currentSavedRecipe) {
+      logger.error({ requestId, savedRecipeId: id, err: fetchError }, 'Saved recipe not found');
+      return res.status(404).json({ error: 'Saved recipe not found' });
+    }
+
+    // Verify user owns this saved recipe
+    if (currentSavedRecipe.user_id !== userId) {
+      logger.warn({ requestId, savedRecipeId: id, userId }, 'User does not own this saved recipe');
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Prepare the update data
+    const updateData: any = {};
+
+    // Update applied_changes if provided
+    if (patch.applied_changes) {
+      updateData.applied_changes = patch.applied_changes;
+    }
+
+    // Update title_override if provided
+    if (patch.title_override !== undefined) {
+      updateData.title_override = patch.title_override;
+    }
+
+    // Update notes if provided
+    if (patch.notes !== undefined) {
+      updateData.notes = patch.notes;
+    }
+
+    // Update the saved recipe
+    const { data: updatedSavedRecipe, error: updateError } = await supabaseAdmin
+      .from('user_saved_recipes')
+      .update(updateData)
+      .eq('id', id)
+      .select('id, applied_changes, title_override, notes')
+      .single();
+
+    if (updateError) {
+      logger.error({ requestId, savedRecipeId: id, err: updateError }, 'Failed to update saved recipe');
+      return res.status(500).json({ error: 'Failed to update saved recipe' });
+    }
+
+    logger.info({ requestId, savedRecipeId: id }, 'Successfully patched saved recipe');
+
+    res.json({
+      message: 'Saved recipe updated successfully',
+      savedRecipe: updatedSavedRecipe,
+    });
+
+  } catch (err) {
+    const error = err as Error;
+    logger.error({ requestId, err: error }, 'Error in PATCH /recipes/:id route');
+    res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+});
+
+// GET /api/saved/recipes - Get user's saved recipes
+router.get('/recipes', async (req: Request, res: Response) => {
+  const requestId = (req as any).id;
+  
+  try {
+    const { userId, baseRecipeId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'Missing userId parameter' });
+    }
+
+    logger.info({ requestId, userId, baseRecipeId }, 'Fetching saved recipes');
+
+    let query = supabaseAdmin
+      .from('user_saved_recipes')
+      .select(`
+        id,
+        base_recipe_id,
+        title_override,
+        applied_changes,
+        original_recipe_data,
+        display_order,
+        created_at,
+        updated_at,
+        processed_recipes_cache (
+          id,
+          recipe_data,
+          source_type,
+          parent_recipe_id
+        )
+      `)
+      .eq('user_id', userId);
+
+    // If baseRecipeId is provided, filter by it
+    if (baseRecipeId) {
+      query = query.eq('base_recipe_id', baseRecipeId);
+    }
+
+    const { data, error: fetchError } = await query
+      .order('display_order', { ascending: true })
+      .order('updated_at', { ascending: false }); // Most recently updated first
+
+    if (fetchError) {
+      logger.error({ requestId, err: fetchError }, 'Failed to fetch saved recipes');
+      return res.status(500).json({ error: 'Failed to fetch saved recipes' });
+    }
+
+    const validRecipes = ((data as any[])?.filter(
+      (r) => r.processed_recipes_cache?.recipe_data,
+    )) || [];
+
+    logger.info({ requestId, count: validRecipes.length }, 'Successfully fetched saved recipes');
+
+    res.json({
+      recipes: validRecipes
+    });
+
+  } catch (err) {
+    const error = err as Error;
+    logger.error({ requestId, err: error }, 'Error in /recipes GET route');
     res.status(500).json({ error: error.message || 'Internal server error' });
   }
 });
