@@ -147,7 +147,7 @@ router.get('/folders/:id/recipes', async (req: Request, res: Response) => {
       .eq('user_id', userId)
       .eq('folder_id', id)
       .order('display_order', { ascending: true })
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: true }); // Changed from DESC to ASC as requested
 
     if (fetchError) {
       logger.error({ requestId, err: fetchError }, 'Failed to fetch folder recipes');

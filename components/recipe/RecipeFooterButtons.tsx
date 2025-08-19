@@ -21,9 +21,11 @@ type RecipeFooterButtonsProps = {
   handleRemoveFromSaved: () => void;
   handleSaveModifications: () => void;
   handleCookNow: () => void;
+  handleSaveChanges?: () => void; // New prop for saving changes on saved recipes
   isSavingForLater?: boolean;
   isSavingModifications?: boolean;
   isCookingNow?: boolean;
+  isSavingChanges?: boolean; // New loading state for save changes
   entryPoint: string;
   hasModifications?: boolean;
   isAlreadyInMise?: boolean;
@@ -37,9 +39,11 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
   handleRemoveFromSaved,
   handleSaveModifications,
   handleCookNow,
+  handleSaveChanges, // New prop
   isSavingForLater = false,
   isSavingModifications = false,
   isCookingNow = false,
+  isSavingChanges = false, // New loading state
   entryPoint,
   hasModifications = false,
   isAlreadyInMise = false,
@@ -97,7 +101,34 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
   const getSecondaryButton = () => {
     switch (entryPoint) {
       case 'saved':
-        return null; // Only one primary button for saved entrypoint
+        // Show Save Changes button only when there are modifications
+        if (hasModifications && handleSaveChanges) {
+          return (
+            <TouchableOpacity
+              style={[
+                styles.saveButton,
+                isSavingChanges && styles.saveButtonDisabled
+              ]}
+              onPress={handleSaveChanges}
+              disabled={isSavingChanges}
+            >
+              {isSavingChanges && (
+                <ActivityIndicator
+                  size="small"
+                  color={COLORS.primary}
+                  style={{ marginRight: 8 }}
+                />
+              )}
+              <Text style={[
+                styles.saveButtonText,
+                isSavingChanges && styles.saveButtonTextDisabled
+              ]}>
+                {isSavingChanges ? 'Saving changes...' : 'Save changes'}
+              </Text>
+            </TouchableOpacity>
+          );
+        }
+        return null; // No secondary button for saved entrypoint without modifications
       case 'mise':
         return null; // Don't show the modifications button for mise entrypoint
       default:

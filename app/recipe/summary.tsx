@@ -270,6 +270,8 @@ export default function RecipeSummaryScreen() {
   const [isSavingForLater, setIsSavingForLater] = useState(false);
   // Track loading state for saving modifications in mise entry point
   const [isSavingModifications, setIsSavingModifications] = useState(false);
+  // Track loading state for saving changes on saved recipes
+  const [isSavingChanges, setIsSavingChanges] = useState(false);
   // Track loading state for cook now button
   const [isCookingNow, setIsCookingNow] = useState(false);
   const [isHelpModalVisible, setIsHelpModalVisible] = useState(false);
@@ -1956,6 +1958,213 @@ export default function RecipeSummaryScreen() {
     }
   };
 
+  // Handle saving changes on saved recipes (fork vs patch logic)
+  const handleSaveChanges = async () => {
+    if (!recipe || !session?.user) {
+      handleError('Authentication Required', 'You need an account to save changes.');
+      return;
+    }
+
+    if (!hasModifications) {
+      console.log('[Summary] No modifications to save');
+      return;
+    }
+
+    setIsSavingChanges(true);
+
+    try {
+      // Check if we have modifications that need LLM processing
+      const needsSubstitution = currentUnsavedChanges.length > 0;
+      const needsScaling = selectedScaleFactor !== 1;
+      
+      let finalInstructions = recipe.instructions || [];
+      let newTitle: string | null = null;
+
+      // Process modifications with LLM if needed
+      if (needsSubstitution || needsScaling) {
+        console.log('[Summary] Processing modifications with LLM before saving changes...');
+        
+        // Use the recipe data directly (local modifications removed)
+        const baseRecipe = recipe;
+
+        // Flatten all ingredients from ingredient groups for scaling
+        const allIngredients: StructuredIngredient[] = [];
+        if (baseRecipe.ingredientGroups) {
+          baseRecipe.ingredientGroups.forEach(group => {
+            if (group.ingredients && Array.isArray(group.ingredients)) {
+              allIngredients.push(...group.ingredients);
+            }
+          });
+        }
+
+        // Call modify-instructions API to process changes
+        const backendUrl = process.env.EXPO_PUBLIC_API_URL!;
+        const response = await fetch(`${backendUrl}/api/recipes/modify-instructions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            originalInstructions: baseRecipe.instructions || [],
+            substitutions: currentUnsavedChanges.map((change) => ({
+              from: change.from,
+              to: change.to ? change.to.name : null,
+            })),
+            originalIngredients: allIngredients,
+            scaledIngredients: scaledIngredients || [],
+            scalingFactor: selectedScaleFactor,
+            skipTitleUpdate: !!params.titleOverride,
+          }),
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.error || `Modification processing failed (Status: ${response.status})`);
+        }
+        if (!result.modifiedInstructions) {
+          throw new Error('Invalid format for modified instructions.');
+        }
+
+        finalInstructions = result.modifiedInstructions;
+        
+        // Capture new title if suggested by LLM
+        if (result.newTitle && result.newTitle.trim() !== '') {
+          newTitle = result.newTitle;
+        }
+
+        console.log('[Summary] ✅ LLM processing completed for save changes');
+      }
+
+      // Create modified recipe data
+      const modifiedRecipeData = {
+        ...recipe,
+        title: newTitle || recipe.title,
+        recipeYield: getScaledYieldText(originalRecipe?.recipeYield || recipe?.recipeYield, selectedScaleFactor),
+        instructions: finalInstructions,
+        ingredientGroups: scaledIngredientGroups,
+      };
+
+      // Combine all changes for saving
+      const allChangesToSave = [...persistedChanges, ...currentUnsavedChanges];
+      const appliedChangesData = {
+        ingredientChanges: allChangesToSave.map((change) => ({
+          from: change.from,
+          to: change.to ? {
+            name: change.to.name,
+            amount: change.to.amount,
+            unit: change.to.unit,
+            preparation: change.to.preparation,
+          } : null,
+        })),
+        scalingFactor: selectedScaleFactor,
+      };
+
+      // Branch: If viewing an original recipe, fork it. If viewing a fork, patch it in place.
+      const isUserModifiedRecipe = recipe.parent_recipe_id || 
+                                   (params.isModified === 'true') || 
+                                   (recipe.source_type === 'user_modified');
+      
+      if (isUserModifiedRecipe) {
+        // UPDATE THE EXISTING FORK
+        console.log('[DEBUG] 🔧 Patching existing fork for save changes:', recipe.id);
+        
+        if (!recipe.id) {
+          throw new Error('Recipe ID is required for patching');
+        }
+        
+        const backendUrl = process.env.EXPO_PUBLIC_API_URL!;
+        const patchResponse = await fetch(`${backendUrl}/api/recipes/${recipe.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patch: {
+              title: newTitle || recipe.title,
+              recipeYield: getScaledYieldText(originalRecipe?.recipeYield || recipe?.recipeYield, selectedScaleFactor),
+              instructions: finalInstructions,
+              ingredientGroups: scaledIngredientGroups,
+            },
+          }),
+        });
+
+        if (!patchResponse.ok) {
+          const patchResult = await patchResponse.json();
+          throw new Error(patchResult.error || 'Failed to update recipe');
+        }
+
+        console.log('[DEBUG] ✅ Successfully patched existing fork for save changes');
+        
+        // Track recipe updated event
+        await track('recipe_updated', { 
+          recipeId: recipe.id.toString(), 
+          inputType: entryPoint 
+        });
+
+      } else {
+        // FIRST EDIT → CREATE A FORK
+        console.log('[DEBUG] 🔧 Creating new fork for save changes from original recipe:', recipe.id);
+        
+        if (!recipe.id) {
+          throw new Error('Recipe ID is required for creating fork');
+        }
+        
+        const backendUrl = process.env.EXPO_PUBLIC_API_URL!;
+        const saveResponse = await fetch(`${backendUrl}/api/recipes/save-modified`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            originalRecipeId: recipe.id,
+            originalRecipeData: originalRecipe || recipe,
+            userId: session.user.id,
+            modifiedRecipeData,
+            appliedChanges: appliedChangesData,
+            folderId: undefined, // Don't save to a specific folder when just saving changes
+          }),
+        });
+
+        const saveResult = await saveResponse.json();
+        if (!saveResponse.ok) throw new Error(saveResult.error || 'Failed to save modified recipe');
+
+        console.log('[DEBUG] ✅ Successfully created new fork for save changes');
+        
+        // Track recipe saved event
+        await track('recipe_saved', { 
+          recipeId: recipe.id.toString(), 
+          inputType: entryPoint 
+        });
+
+        // CRITICAL: Navigate to the fork so subsequent edits hit PATCH path automatically
+        if (saveResult.newRecipeId) {
+          console.log('[DEBUG] 🔄 Navigating to fork after save changes:', saveResult.newRecipeId);
+          router.replace({
+            pathname: '/recipe/summary',
+            params: {
+              recipeData: JSON.stringify({
+                ...modifiedRecipeData,
+                id: saveResult.newRecipeId,
+                parent_recipe_id: recipe.id,
+                source_type: 'user_modified',
+              }),
+              entryPoint: 'saved',
+              from: '/saved',
+              isModified: 'true',
+            },
+          });
+          return; // Exit early since we're navigating
+        }
+      }
+
+      // Reset modifications state after successful save
+      setHasModifications(false);
+      setCurrentUnsavedChanges([]);
+      
+      console.log('[Summary] ✅ Successfully saved changes');
+
+    } catch (error: any) {
+      console.error('Error saving changes:', error);
+      handleError('Save Failed', error);
+    } finally {
+      setIsSavingChanges(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.centeredStatusContainer}>
@@ -2192,8 +2401,10 @@ export default function RecipeSummaryScreen() {
         handleRemoveFromSaved={handleRemoveFromSaved}
         handleSaveModifications={handleSaveModifications}
         handleCookNow={handleCookNow}
+        handleSaveChanges={handleSaveChanges}
         isSavingForLater={isSavingForLater}
         isSavingModifications={isSavingModifications}
+        isSavingChanges={isSavingChanges}
         isCookingNow={isCookingNow}
         entryPoint={entryPoint}
         hasModifications={hasModifications}

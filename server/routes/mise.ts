@@ -416,8 +416,8 @@ router.get('/recipes', async (req: Request, res: Response) => {
       `)
       .eq('user_id', userId)
       .eq('is_completed', false) // Only active recipes
-      .order('display_order', { ascending: true })
-      .order('created_at', { ascending: false }); // Newest first within same order
+      .order('planned_date', { ascending: true, nullsFirst: true }) // NULLS FIRST as requested
+      .order('display_order', { ascending: true }); // ASC as requested
 
     if (fetchError) {
       logger.error({ requestId, err: fetchError }, 'Failed to fetch mise recipes');
