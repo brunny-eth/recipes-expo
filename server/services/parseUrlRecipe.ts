@@ -226,13 +226,16 @@ export async function parseUrlRecipe(
             try {
                 console.log('[parseUrlRecipe] attempting insert with cacheKey:', cacheKey);
                 
-                // First, do the insert without trying to get the ID back
+                // A) Strip any incoming id field to prevent ID pollution from LLM outputs
+                const { id: _jsonIdDrop, ...cleanFinalRecipeData } = finalRecipeData ?? {};
+                
+                // B) Insert without ID field to ensure clean data
                 const { error: insertError } = await supabase
                     .from('processed_recipes_cache')
                     .insert({
                         url: trimmedInput, // Store original URL for reference
                         normalized_url: cacheKey, // Store normalized URL for cache lookups
-                        recipe_data: finalRecipeData,
+                        recipe_data: cleanFinalRecipeData, // Store WITHOUT any ID field
                         source_type: inputType
                     });
                 
@@ -258,6 +261,20 @@ export async function parseUrlRecipe(
                         insertedId = queryData.id;
                         logger.info({ requestId, cacheKey, id: insertedId, dbInsertMs: Date.now() - dbInsertStartTime }, `Successfully cached new recipe.`);
                         console.log('[parseUrlRecipe] Found inserted recipe with ID:', insertedId);
+
+                        // C) Force JSON id to equal the row id (belt-and-suspenders)
+                        const { error: updateError } = await supabase
+                            .from('processed_recipes_cache')
+                            .update({
+                                recipe_data: { ...cleanFinalRecipeData, id: insertedId },
+                            })
+                            .eq('id', insertedId);
+
+                        if (updateError) {
+                            logger.warn({ requestId, insertedId, err: updateError }, 'Failed to update recipe_data.id with row ID, but insert succeeded');
+                        } else {
+                            logger.info({ requestId, insertedId }, 'Successfully updated recipe_data.id to match row ID');
+                        }
 
                         if (insertedId && process.env.ENABLE_EMBEDDING === 'true') {
                             logger.info({ recipeId: insertedId }, 'Embedding queued after successful URL parse');

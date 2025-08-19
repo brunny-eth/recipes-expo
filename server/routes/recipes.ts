@@ -488,12 +488,15 @@ router.post('/save-modified', async (req: Request<any, any, SaveModifiedRecipeRe
     const newRecipeUrl = uuidv4(); // Generates a Version 4 UUID
 
     // --- 2. Insert the modified recipe into processed_recipes_cache ---
-    // The 'recipe_data' column is jsonb, so we can directly store the CombinedParsedRecipe object.
+    // A) Strip any incoming id field to prevent parent ID pollution
+    const { id: _jsonIdDrop, ...cleanModified } = modifiedRecipeData ?? {};
+    
+    // B) Insert without ID field to ensure clean data
     const { data: newModifiedRecipeRows, error: insertRecipeError } = await supabaseAdmin
       .from('processed_recipes_cache')
       .insert({
         url: newRecipeUrl,
-        recipe_data: modifiedRecipeData, // Store the full reconstructed recipe here
+        recipe_data: cleanModified, // Store the recipe WITHOUT any ID field
         parent_recipe_id: originalRecipeId,
         source_type: 'user_modified', // Add a source type to distinguish modified recipes
         is_user_modified: true, // Explicitly set the boolean flag for modified recipes
@@ -508,6 +511,21 @@ router.post('/save-modified', async (req: Request<any, any, SaveModifiedRecipeRe
 
     const newModifiedRecipeId = newModifiedRecipeRows.id;
     const savedRecipeUrl = newModifiedRecipeRows.url;
+
+    // C) Force JSON id to equal the row id (belt-and-suspenders)
+    const { error: updateError } = await supabaseAdmin
+      .from('processed_recipes_cache')
+      .update({
+        recipe_data: { ...cleanModified, id: newModifiedRecipeId },
+      })
+      .eq('id', newModifiedRecipeId);
+
+    if (updateError) {
+      logger.warn({ requestId, newModifiedRecipeId, err: updateError }, 'Failed to update recipe_data.id with row ID, but insert succeeded');
+      // Continue execution since the main insert succeeded
+    } else {
+      logger.info({ requestId, newModifiedRecipeId }, 'Successfully updated recipe_data.id to match row ID');
+    }
 
     logger.info({ 
       requestId, 

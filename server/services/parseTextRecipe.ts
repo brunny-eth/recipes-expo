@@ -355,11 +355,15 @@ export async function parseTextRecipe(
             let insertData: { id: number; created_at: string; last_processed_at: string } | null = null;
             const dbInsertStartTime = Date.now();
             try {
+                // A) Strip any incoming id field to prevent ID pollution from LLM outputs
+                const { id: _jsonIdDrop, ...cleanFinalRecipeData } = finalRecipeData ?? {};
+                
+                // B) Insert without ID field to ensure clean data
                 const { error: insertError } = await supabase
                     .from('processed_recipes_cache')
                     .insert({
                         url: cacheKey,
-                        recipe_data: finalRecipeData,
+                        recipe_data: cleanFinalRecipeData, // Store WITHOUT any ID field
                         source_type: inputType
                     });
 
@@ -377,6 +381,20 @@ export async function parseTextRecipe(
                     if (queryData && queryData.id) {
                         insertedId = queryData.id;
                         logger.info({ requestId, cacheKey, id: insertedId, dbInsertMs: Date.now() - dbInsertStartTime }, `Successfully cached new recipe from raw text.`);
+                        
+                        // C) Force JSON id to equal the row id (belt-and-suspenders)
+                        const { error: updateError } = await supabase
+                            .from('processed_recipes_cache')
+                            .update({
+                                recipe_data: { ...cleanFinalRecipeData, id: insertedId },
+                            })
+                            .eq('id', insertedId);
+
+                        if (updateError) {
+                            logger.warn({ requestId, insertedId, err: updateError }, 'Failed to update recipe_data.id with row ID, but insert succeeded');
+                        } else {
+                            logger.info({ requestId, insertedId }, 'Successfully updated recipe_data.id to match row ID');
+                        }
                     } else {
                         logger.warn({ requestId, cacheKey, queryError }, `Could not retrieve inserted recipe ID from text parse.`);
                     }

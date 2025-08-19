@@ -470,12 +470,16 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
         console.time(`[${requestId}] supabase_insert`);
         const dbInsertStartTime = Date.now();
         try {
+          // A) Strip any incoming id field to prevent ID pollution from LLM outputs
+          const { id: _jsonIdDrop, ...cleanParsedRecipe } = parsedRecipe ?? {};
+          
+          // B) Insert without ID field to ensure clean data
           const { data: insertData, error: insertError } = await supabase
             .from('processed_recipes_cache')
             .insert({
               url: videoUrl,
               normalized_url: normalizedUrl,
-              recipe_data: parsedRecipe,
+              recipe_data: cleanParsedRecipe, // Store WITHOUT any ID field
               source_type: inputType,
             })
             .select('id')
@@ -487,6 +491,21 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
             logger.error({ requestId, cacheKey, err: insertError }, 'Error saving video recipe to cache.');
           } else if (insertData) {
             insertedId = insertData.id;
+            
+            // C) Force JSON id to equal the row id (belt-and-suspenders)
+            const { error: updateError } = await supabase
+              .from('processed_recipes_cache')
+              .update({
+                recipe_data: { ...cleanParsedRecipe, id: insertedId },
+              })
+              .eq('id', insertedId);
+
+            if (updateError) {
+              logger.warn({ requestId, insertedId, err: updateError }, 'Failed to update recipe_data.id with row ID, but insert succeeded');
+            } else {
+              logger.info({ requestId, insertedId }, 'Successfully updated recipe_data.id to match row ID');
+            }
+            
             (parsedRecipe as any).id = insertedId;
             logger.info({ requestId, cacheKey, dbInsertMs: overallTimings.dbInsert, insertedId }, 'Successfully saved video recipe to cache.');
             

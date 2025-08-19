@@ -1304,15 +1304,66 @@ export default function MiseScreen() {
       if (miseRecipes.length === 0) {
         return (
           <View style={styles.emptyContainer}>
-            <MaterialCommunityIcons
-              name="chef-hat"
-              size={48}
-              color={COLORS.lightGray}
-            />
-            <Text style={styles.emptyText}>No recipes in prep station</Text>
-            <Text style={styles.emptySubtext}>
-              Prepare a recipe to add it to your prep station.
-            </Text>
+            {/* Hero Section */}
+            <View style={styles.heroSection}>
+              <MaterialCommunityIcons
+                name="chef-hat"
+                size={56}
+                color={COLORS.primary}
+              />
+              <Text style={styles.heroTitle}>Get Ready to Cook</Text>
+              <Text style={styles.heroSubtitle}>
+                This is where you turn recipes into action. Add recipes here to:
+              </Text>
+            </View>
+            
+            {/* Benefits Section */}
+            <View style={styles.benefitsSection}>
+              <View style={styles.benefitsList}>
+                <View style={styles.benefitItem}>
+                  <MaterialCommunityIcons
+                    name="cart-outline"
+                    size={20}
+                    color={COLORS.primary}
+                  />
+                  <Text style={styles.benefitText}>
+                    Build a single grocery list with all your ingredients
+                  </Text>
+                </View>
+                
+                <View style={styles.benefitItem}>
+                  <MaterialCommunityIcons
+                    name="chef-hat"
+                    size={20}
+                    color={COLORS.primary}
+                  />
+                  <Text style={styles.benefitText}>
+                    Follow step-by-step cooking instructions and timers
+                  </Text>
+                </View>
+                
+                <View style={styles.benefitItem}>
+                  <MaterialCommunityIcons
+                    name="format-list-checks"
+                    size={20}
+                    color={COLORS.primary}
+                  />
+                  <Text style={styles.benefitText}>
+                    Keep your current cooking session organized
+                  </Text>
+                </View>
+              </View>
+            </View>
+            
+            {/* CTA Section */}
+            <View style={styles.ctaSection}>
+              <TouchableOpacity 
+                style={styles.ctaButton}
+                onPress={() => router.push('/explore')}
+              >
+                <Text style={styles.ctaButtonText}>Add your first recipe</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         );
       }
@@ -1513,13 +1564,83 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   } as ViewStyle,
   emptyContainer: {
-    flexGrow: 1,
+    flex: 1,
     justifyContent: 'flex-start',
     alignItems: 'center',
     paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.xl,
-    paddingTop: '30%', // Move content higher up on the screen
+    paddingTop: SPACING.xxl,
+    paddingBottom: SPACING.xl,
   } as ViewStyle,
+  heroSection: {
+    alignItems: 'center',
+    marginBottom: SPACING.xl,
+  } as ViewStyle,
+  heroTitle: {
+    ...bodyStrongText,
+    fontSize: FONT.size.screenTitle,
+    color: COLORS.textDark,
+    marginTop: SPACING.lg,
+    marginBottom: SPACING.md,
+    textAlign: 'center',
+  } as TextStyle,
+  heroSubtitle: {
+    ...bodyText,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    lineHeight: 22,
+    paddingHorizontal: SPACING.lg,
+    fontSize: FONT.size.body,
+  } as TextStyle,
+  benefitsSection: {
+    width: '100%',
+    marginBottom: SPACING.xl,
+  } as ViewStyle,
+  sectionTitle: {
+    ...bodyStrongText,
+    color: COLORS.textDark,
+    fontSize: FONT.size.body,
+    marginBottom: SPACING.lg,
+    textAlign: 'center',
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.5,
+  } as TextStyle,
+  benefitsList: {
+    paddingHorizontal: SPACING.md,
+  } as ViewStyle,
+  benefitItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.lg,
+    paddingHorizontal: SPACING.md,
+  } as ViewStyle,
+  benefitText: {
+    ...bodyText,
+    color: COLORS.textDark,
+    marginLeft: SPACING.sm,
+    flex: 1,
+    lineHeight: 22,
+    fontSize: FONT.size.body,
+  } as TextStyle,
+  ctaSection: {
+    width: '100%',
+    alignItems: 'center',
+  } as ViewStyle,
+  ctaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.xl,
+    borderRadius: RADIUS.sm,
+    ...SHADOWS.small,
+  } as ViewStyle,
+  ctaButtonText: {
+    ...bodyStrongText,
+    color: COLORS.white,
+    fontSize: FONT.size.body,
+  } as TextStyle,
+
   emptyText: {
             fontFamily: FONT.family.heading,
     fontSize: 18,
@@ -1531,7 +1652,8 @@ const styles = StyleSheet.create({
     ...bodyText,
     color: COLORS.darkGray,
     textAlign: 'center',
-    marginTop: SPACING.xs,
+    marginTop: SPACING.sm,
+    fontStyle: 'italic',
   } as TextStyle,
   retryButton: {
     marginTop: SPACING.lg,
