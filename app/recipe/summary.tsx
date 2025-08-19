@@ -334,9 +334,17 @@ export default function RecipeSummaryScreen() {
   // baselineScaleFactor should always be 1.0 (original recipe scale)
   // selectedScaleFactor represents the current user-selected scale
   const [baselineAppliedChanges, setBaselineAppliedChanges] = useState<AppliedChange[]>([]);
+  
+  // Store the unscaled ingredient groups to use as baseline for scaling calculations
+  const [unscaledIngredientGroups, setUnscaledIngredientGroups] = useState<IngredientGroup[]>([]);
 
   const scaledIngredientGroups = React.useMemo<IngredientGroup[]>(() => {
-    if (!originalRecipe?.ingredientGroups) return [];
+    // Use unscaledIngredientGroups as baseline if available, otherwise fall back to originalRecipe
+    const sourceIngredientGroups = unscaledIngredientGroups.length > 0 
+      ? unscaledIngredientGroups 
+      : originalRecipe?.ingredientGroups || [];
+    
+    if (sourceIngredientGroups.length === 0) return [];
     
     // Combine persisted and current changes for processing
     const allAppliedChanges = [...persistedChanges, ...currentUnsavedChanges];
@@ -351,11 +359,11 @@ export default function RecipeSummaryScreen() {
         allAppliedChangesCount: allAppliedChanges.length,
         allAppliedChanges,
         isViewingSavedRecipe,
-        originalRecipeTitle: originalRecipe.title,
+        originalRecipeTitle: originalRecipe?.title,
       });
     }
     
-    const result = originalRecipe.ingredientGroups.map((group) => {
+    const result = sourceIngredientGroups.map((group) => {
       if (!group.ingredients || !Array.isArray(group.ingredients)) {
         return { ...group, ingredients: [] };
       }
@@ -544,7 +552,7 @@ export default function RecipeSummaryScreen() {
       console.log('[DEBUG] ===== END SCALING INGREDIENTS =====');
     }
     return result;
-  }, [originalRecipe, selectedScaleFactor, persistedChanges, currentUnsavedChanges, isViewingSavedRecipe]);
+  }, [originalRecipe, selectedScaleFactor, persistedChanges, currentUnsavedChanges, isViewingSavedRecipe, unscaledIngredientGroups]);
 
   // Keep scaledIngredients as a flat array for backward compatibility with existing code
   const scaledIngredients = React.useMemo<StructuredIngredient[]>(() => {
@@ -608,11 +616,41 @@ export default function RecipeSummaryScreen() {
             const yieldNum = parseServingsValue(parsed.recipeYield);
             setOriginalYieldValue(yieldNum);
           }
+          
+          // Set fresh scaling baseline for saved/forked recipes
+          const isSavedEntrypoint = entryPoint === 'saved';
+          if (isSavedEntrypoint) {
+            console.log('[DEBUG] Setting fresh scaling baseline for saved recipe (with originalRecipeData)');
+            // Treat current server values as the unscaled baseline (1×) for this screen load
+            setUnscaledIngredientGroups(parsed.ingredientGroups ? [...parsed.ingredientGroups] : []);
+            setBaselineScaleFactor(1);
+            setSelectedScaleFactor(1);
+            console.log('[DEBUG] Fresh baseline set:', {
+              unscaledGroupsCount: parsed.ingredientGroups?.length || 0,
+              baselineScaleFactor: 1,
+              selectedScaleFactor: 1,
+            });
+          }
         } else {
           // For new recipes or when original data is not available, use current recipe as original
           setOriginalRecipe(parsed);
           const yieldNum = parseServingsValue(parsed.recipeYield);
           setOriginalYieldValue(yieldNum);
+        }
+
+        // Set fresh scaling baseline for saved/forked recipes
+        const isSavedEntrypoint = entryPoint === 'saved';
+        if (isSavedEntrypoint) {
+          console.log('[DEBUG] Setting fresh scaling baseline for saved recipe');
+          // Treat current server values as the unscaled baseline (1×) for this screen load
+          setUnscaledIngredientGroups(parsed.ingredientGroups ? [...parsed.ingredientGroups] : []);
+          setBaselineScaleFactor(1);
+          setSelectedScaleFactor(1);
+          console.log('[DEBUG] Fresh baseline set:', {
+            unscaledGroupsCount: parsed.ingredientGroups?.length || 0,
+            baselineScaleFactor: 1,
+            selectedScaleFactor: 1,
+          });
         }
         
         // Check if this is a saved recipe with existing applied changes
@@ -2241,17 +2279,37 @@ export default function RecipeSummaryScreen() {
         });
       }
 
+      // Update local recipe state with the newly saved data
+      const updatedRecipeData = {
+        ...recipe,
+        title: newTitle || recipe.title,
+        recipeYield: getScaledYieldText(originalRecipe?.recipeYield || recipe?.recipeYield, selectedScaleFactor),
+        instructions: finalInstructions,
+        ingredientGroups: scaledIngredientGroups,
+      };
+      setRecipe(updatedRecipeData);
+      
+      // Reset all baselines to 1× after successful save
+      // Treat the newly saved data as the new 1× baseline to prevent double-scaling
+      setUnscaledIngredientGroups(updatedRecipeData.ingredientGroups ? [...updatedRecipeData.ingredientGroups] : []);
+      setBaselineScaleFactor(1);
+      setSelectedScaleFactor(1);
+      
       // Reset modifications state after successful save
       setHasModifications(false);
       setCurrentUnsavedChanges([]);
       
-      // Update persistedChanges to include the changes we just saved
+      // Update persistedChanges and baseline applied changes
       const newPersistedChanges = [...persistedChanges, ...currentUnsavedChanges];
       setPersistedChanges(newPersistedChanges);
-      
-      // Update baseline values to reflect the new saved state
-      setBaselineScaleFactor(selectedScaleFactor); // Reset baseline to current scale
       setBaselineAppliedChanges(newPersistedChanges);
+      
+      console.log('[DEBUG] ✅ All baselines reset after save:', {
+        unscaledGroupsCount: updatedRecipeData.ingredientGroups?.length || 0,
+        baselineScaleFactor: 1,
+        selectedScaleFactor: 1,
+        baselineAppliedChangesScaling: 1,
+      });
       
       // Show success message
       showSuccess(
