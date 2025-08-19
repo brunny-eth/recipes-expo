@@ -137,6 +137,7 @@ router.get('/folders/:id/recipes', async (req: Request, res: Response) => {
         applied_changes,
         original_recipe_data,
         display_order,
+        created_at,
         processed_recipes_cache (
           id,
           recipe_data,
@@ -147,7 +148,10 @@ router.get('/folders/:id/recipes', async (req: Request, res: Response) => {
       .eq('user_id', userId)
       .eq('folder_id', id)
       .order('display_order', { ascending: true })
-      .order('updated_at', { ascending: false }); // Most recently updated first
+      .order('created_at', { ascending: false }); // Most recently created first
+      // TODO: Add updated_at column to user_saved_recipes table for better sorting
+      // ALTER TABLE user_saved_recipes ADD COLUMN updated_at timestamptz DEFAULT now();
+      // CREATE TRIGGER update_user_saved_recipes_updated_at BEFORE UPDATE ON user_saved_recipes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
     if (fetchError) {
       logger.error({ requestId, err: fetchError }, 'Failed to fetch folder recipes');
@@ -410,7 +414,6 @@ router.get('/recipes', async (req: Request, res: Response) => {
         original_recipe_data,
         display_order,
         created_at,
-        updated_at,
         processed_recipes_cache (
           id,
           recipe_data,
@@ -427,7 +430,7 @@ router.get('/recipes', async (req: Request, res: Response) => {
 
     const { data, error: fetchError } = await query
       .order('display_order', { ascending: true })
-      .order('updated_at', { ascending: false }); // Most recently updated first
+      .order('created_at', { ascending: false }); // Most recently created first
 
     if (fetchError) {
       logger.error({ requestId, err: fetchError }, 'Failed to fetch saved recipes');
