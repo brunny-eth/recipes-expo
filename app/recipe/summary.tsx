@@ -1585,19 +1585,19 @@ export default function RecipeSummaryScreen() {
 
         // Save the modified recipe
         // NEW/EXPLORE ENTRYPOINT: Always fork when saving modifications (never patch)
-        console.log('[DEBUG] 🔧 New/Explore entrypoint - always creating fork for modified recipe:', recipe.id);
+        console.log('[DEBUG] 🔧 New/Explore entrypoint - always creating fork for modified recipe:', recipe?.id);
         
         // Always create fork for new/explore entrypoint
         if (false) {
           // UPDATE THE EXISTING FORK
-          console.log('[DEBUG] 🔧 Patching existing fork:', recipe.id, 'parent_recipe_id:', recipe.parent_recipe_id);
+          console.log('[DEBUG] 🔧 Patching existing fork:', recipe?.id, 'parent_recipe_id:', recipe?.parent_recipe_id);
           
-          const patchResponse = await fetch(`${backendUrl}/api/recipes/${recipe.id}`, {
+          const patchResponse = await fetch(`${backendUrl}/api/recipes/${recipe?.id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               patch: {
-                title: newTitle || recipe.title,
+                title: newTitle || recipe?.title,
                 recipeYield: getScaledYieldText(originalRecipe?.recipeYield || recipe?.recipeYield, selectedScaleFactor),
                 instructions: finalInstructions,
                 ingredientGroups: scaledIngredientGroups,
@@ -1614,23 +1614,23 @@ export default function RecipeSummaryScreen() {
           
           // Track recipe updated event
           console.log('[POSTHOG] Tracking event: recipe_updated', { 
-            recipeId: recipe.id.toString(), 
+            recipeId: recipe?.id?.toString(), 
             inputType: entryPoint 
           });
           await track('recipe_updated', { 
-            recipeId: recipe.id.toString(), 
+            recipeId: recipe?.id?.toString(), 
             inputType: entryPoint 
           });
 
         } else {
           // FIRST EDIT → CREATE A FORK (existing flow)
-          console.log('[DEBUG] 🔧 Creating new fork from original recipe:', recipe.id);
+          console.log('[DEBUG] 🔧 Creating new fork from original recipe:', recipe?.id);
           
           const saveResponse = await fetch(`${backendUrl}/api/recipes/save-modified`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              originalRecipeId: recipe.id,
+              originalRecipeId: recipe?.id,
               originalRecipeData: originalRecipe || recipe, // Pass original recipe data directly
               userId: session.user.id,
               modifiedRecipeData,

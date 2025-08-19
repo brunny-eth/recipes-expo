@@ -1308,60 +1308,29 @@ export default function MiseScreen() {
             <View style={styles.heroSection}>
               <MaterialCommunityIcons
                 name="chef-hat"
-                size={56}
+                size={64}
                 color={COLORS.primary}
               />
-              <Text style={styles.heroTitle}>Get Ready to Cook</Text>
+              <Text style={styles.heroTitle}>Your Prep Area</Text>
               <Text style={styles.heroSubtitle}>
-                This is where you turn recipes into action. Add recipes here to:
+                Add recipes here to make a shopping list and follow multiple recipes at once
               </Text>
-            </View>
-            
-            {/* Benefits Section */}
-            <View style={styles.benefitsSection}>
-              <View style={styles.benefitsList}>
-                <View style={styles.benefitItem}>
-                  <MaterialCommunityIcons
-                    name="cart-outline"
-                    size={20}
-                    color={COLORS.primary}
-                  />
-                  <Text style={styles.benefitText}>
-                    Build a single grocery list with all your ingredients
-                  </Text>
-                </View>
-                
-                <View style={styles.benefitItem}>
-                  <MaterialCommunityIcons
-                    name="chef-hat"
-                    size={20}
-                    color={COLORS.primary}
-                  />
-                  <Text style={styles.benefitText}>
-                    Follow step-by-step cooking instructions and timers
-                  </Text>
-                </View>
-                
-                <View style={styles.benefitItem}>
-                  <MaterialCommunityIcons
-                    name="format-list-checks"
-                    size={20}
-                    color={COLORS.primary}
-                  />
-                  <Text style={styles.benefitText}>
-                    Keep your current cooking session organized
-                  </Text>
-                </View>
-              </View>
             </View>
             
             {/* CTA Section */}
             <View style={styles.ctaSection}>
               <TouchableOpacity 
-                style={styles.ctaButton}
+                style={styles.primaryButton}
                 onPress={() => router.push('/explore')}
               >
-                <Text style={styles.ctaButtonText}>Add your first recipe</Text>
+                <Text style={styles.primaryButtonText}>Find recipes</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.secondaryButton}
+                onPress={() => router.push('/tabs/library')}
+              >
+                <Text style={styles.secondaryButtonText}>My recipes</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1565,21 +1534,20 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   emptyContainer: {
     flex: 1,
-    justifyContent: 'flex-start',
+    justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: SPACING.xl,
-    paddingTop: SPACING.xxl,
-    paddingBottom: SPACING.xl,
+    paddingBottom: SPACING.xxl,
   } as ViewStyle,
   heroSection: {
     alignItems: 'center',
-    marginBottom: SPACING.xl,
+    marginBottom: SPACING.xxl,
   } as ViewStyle,
   heroTitle: {
     ...bodyStrongText,
     fontSize: FONT.size.screenTitle,
     color: COLORS.textDark,
-    marginTop: SPACING.lg,
+    marginTop: SPACING.xl,
     marginBottom: SPACING.md,
     textAlign: 'center',
   } as TextStyle,
@@ -1587,58 +1555,47 @@ const styles = StyleSheet.create({
     ...bodyText,
     color: COLORS.textMuted,
     textAlign: 'center',
-    lineHeight: 22,
-    paddingHorizontal: SPACING.lg,
+    lineHeight: 24,
     fontSize: FONT.size.body,
+    maxWidth: 320,
   } as TextStyle,
-  benefitsSection: {
-    width: '100%',
-    marginBottom: SPACING.xl,
-  } as ViewStyle,
-  sectionTitle: {
-    ...bodyStrongText,
-    color: COLORS.textDark,
-    fontSize: FONT.size.body,
-    marginBottom: SPACING.lg,
-    textAlign: 'center',
-    textTransform: 'uppercase' as const,
-    letterSpacing: 0.5,
-  } as TextStyle,
-  benefitsList: {
-    paddingHorizontal: SPACING.md,
-  } as ViewStyle,
-  benefitItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.lg,
-    paddingHorizontal: SPACING.md,
-  } as ViewStyle,
-  benefitText: {
-    ...bodyText,
-    color: COLORS.textDark,
-    marginLeft: SPACING.sm,
-    flex: 1,
-    lineHeight: 22,
-    fontSize: FONT.size.body,
-  } as TextStyle,
+
   ctaSection: {
     width: '100%',
     alignItems: 'center',
+    gap: SPACING.sm,
   } as ViewStyle,
-  ctaButton: {
+  primaryButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.primary,
     paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.xl,
+    paddingHorizontal: SPACING.pageHorizontal,
     borderRadius: RADIUS.sm,
-    ...SHADOWS.small,
+    width: '100%',
+    maxWidth: 280,
   } as ViewStyle,
-  ctaButtonText: {
+  primaryButtonText: {
     ...bodyStrongText,
     color: COLORS.white,
-    fontSize: FONT.size.body,
+  } as TextStyle,
+  secondaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.sm,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    width: '100%',
+    maxWidth: 280,
+  } as ViewStyle,
+  secondaryButtonText: {
+    ...bodyStrongText,
+    color: COLORS.primary,
   } as TextStyle,
 
   emptyText: {
