@@ -2250,7 +2250,7 @@ export default function RecipeSummaryScreen() {
       setPersistedChanges(newPersistedChanges);
       
       // Update baseline values to reflect the new saved state
-      // Note: baselineScaleFactor should always remain 1.0 (original recipe scale)
+      setBaselineScaleFactor(selectedScaleFactor); // Reset baseline to current scale
       setBaselineAppliedChanges(newPersistedChanges);
       
       // Show success message
