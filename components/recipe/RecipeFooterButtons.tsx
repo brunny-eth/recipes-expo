@@ -99,10 +99,19 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
   const buttonDisabled = isMainButtonDisabled();
 
   const getSecondaryButton = () => {
+    // Debug logging to see what's happening
+    console.log('[DEBUG] RecipeFooterButtons getSecondaryButton:', {
+      entryPoint,
+      hasModifications,
+      handleSaveChanges: !!handleSaveChanges,
+      shouldShowSaveChanges: entryPoint === 'saved' && hasModifications && !!handleSaveChanges,
+    });
+
     switch (entryPoint) {
       case 'saved':
         // Show Save Changes button only when there are modifications
         if (hasModifications && handleSaveChanges) {
+          console.log('[DEBUG] ✅ Showing Save Changes button for saved entrypoint');
           return (
             <TouchableOpacity
               style={[
@@ -128,6 +137,10 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
             </TouchableOpacity>
           );
         }
+        console.log('[DEBUG] ❌ Not showing Save Changes button:', {
+          hasModifications,
+          handleSaveChanges: !!handleSaveChanges,
+        });
         return null; // No secondary button for saved entrypoint without modifications
       case 'mise':
         return null; // Don't show the modifications button for mise entrypoint

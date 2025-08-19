@@ -226,7 +226,19 @@ const buttonWidth = (availableWidth - buttonTotalGap) / numButtons;
 // --- End Types ---
 
 export default function RecipeSummaryScreen() {
-  const params = useLocalSearchParams<{ recipeData?: string; from?: string; appliedChanges?: string; isModified?: string; entryPoint?: string; miseRecipeId?: string; finalYield?: string; originalRecipeData?: string; titleOverride?: string; inputType?: string }>();
+  const params = useLocalSearchParams<{ 
+    recipeData?: string; 
+    from?: string; 
+    appliedChanges?: string; 
+    isModified?: string; 
+    entryPoint?: string; 
+    miseRecipeId?: string; 
+    finalYield?: string; 
+    originalRecipeData?: string; 
+    titleOverride?: string; 
+    inputType?: string;
+    folderId?: string; // Add folderId for saved recipes
+  }>();
   const router = useRouter();
   const { showError, hideError } = useErrorModal();
   const handleError = useHandleError();
@@ -639,10 +651,9 @@ export default function RecipeSummaryScreen() {
               // These are changes loaded from the database, so they are persisted
               setPersistedChanges(convertedChanges);
               setCurrentUnsavedChanges([]); // No unsaved changes initially
-              // Set baseline for mise entry point
-              if (entryPoint === 'mise') {
-                setBaselineAppliedChanges(convertedChanges);
-              }
+              // Set baseline for both mise and saved entrypoints
+              setBaselineScaleFactor(1.0);
+              setBaselineAppliedChanges([]);
             }
             
             // Calculate the actual scale factor from original recipe
@@ -676,10 +687,8 @@ export default function RecipeSummaryScreen() {
             }
             
             setSelectedScaleFactor(finalScaleFactor);
-            // Set baseline for mise entry point
-            if (entryPoint === 'mise') {
-              setBaselineScaleFactor(finalScaleFactor);
-            }
+            // Set baseline for both mise and saved entrypoints
+            setBaselineScaleFactor(finalScaleFactor);
           } catch (appliedChangesError: any) {
             console.error('[DEBUG] Error parsing applied changes:', appliedChangesError);
             setSelectedScaleFactor(1.0);
@@ -698,11 +707,9 @@ export default function RecipeSummaryScreen() {
             currentUnsavedChanges: [],
             recipeTitle: parsed.title,
           });
-          // Set baseline for mise entry point
-          if (entryPoint === 'mise') {
-            setBaselineScaleFactor(1.0);
-            setBaselineAppliedChanges([]);
-          }
+          // Set baseline for both mise and saved entrypoints
+          setBaselineScaleFactor(1.0);
+          setBaselineAppliedChanges([]);
         }
         
 
@@ -717,32 +724,31 @@ export default function RecipeSummaryScreen() {
 
   // Update hasModifications when scaling factor or applied changes change
   useEffect(() => {
-    if (entryPoint === 'mise') {
-      // Compare current state against baseline to detect NEW modifications
-      const hasScaleChanges = selectedScaleFactor !== baselineScaleFactor;
-      const hasIngredientChanges = currentUnsavedChanges.length > 0 || 
-        persistedChanges.length !== baselineAppliedChanges.length || 
-        !persistedChanges.every((change, index) => {
-          const baselineChange = baselineAppliedChanges[index];
-          return baselineChange && 
-            change.from === baselineChange.from && 
-            JSON.stringify(change.to) === JSON.stringify(baselineChange.to);
-        });
-      
-      const newHasModifications = hasScaleChanges || hasIngredientChanges;
-      console.log('[DEBUG] hasModifications calculation (baseline comparison):', {
-        selectedScaleFactor,
-        baselineScaleFactor,
-        hasScaleChanges,
-        currentUnsavedChangesCount: currentUnsavedChanges.length,
-        persistedChangesCount: persistedChanges.length,
-        baselineAppliedChangesCount: baselineAppliedChanges.length,
-        hasIngredientChanges,
-        newHasModifications,
+    // Calculate hasModifications for both mise and saved entrypoints
+    const hasScaleChanges = selectedScaleFactor !== baselineScaleFactor;
+    const hasIngredientChanges = currentUnsavedChanges.length > 0 || 
+      persistedChanges.length !== baselineAppliedChanges.length || 
+      !persistedChanges.every((change, index) => {
+        const baselineChange = baselineAppliedChanges[index];
+        return baselineChange && 
+          change.from === baselineChange.from && 
+          JSON.stringify(change.to) === JSON.stringify(baselineChange.to);
       });
-      
-      setHasModifications(newHasModifications);
-    }
+    
+    const newHasModifications = hasScaleChanges || hasIngredientChanges;
+    console.log('[DEBUG] hasModifications calculation (baseline comparison):', {
+      entryPoint,
+      selectedScaleFactor,
+      baselineScaleFactor,
+      hasScaleChanges,
+      currentUnsavedChangesCount: currentUnsavedChanges.length,
+      persistedChangesCount: persistedChanges.length,
+      baselineAppliedChangesCount: baselineAppliedChanges.length,
+      hasIngredientChanges,
+      newHasModifications,
+    });
+    
+    setHasModifications(newHasModifications);
   }, [selectedScaleFactor, currentUnsavedChanges, persistedChanges, entryPoint, baselineScaleFactor, baselineAppliedChanges]);
 
   // Reset isAlreadyInMise when user makes modifications that would change the recipe
@@ -1569,8 +1575,13 @@ export default function RecipeSummaryScreen() {
               userId: session.user.id,
               modifiedRecipeData,
               appliedChanges: appliedChangesData,
-              folderId: folderId, // Add folder selection support
+              folderId: params.folderId ? parseInt(params.folderId) : undefined, // Preserve folder association
             }),
+          });
+
+          console.log('[DEBUG] Save modified API call with folderId:', {
+            folderId: params.folderId,
+            parsedFolderId: params.folderId ? parseInt(params.folderId) : undefined,
           });
 
           const saveResult = await saveResponse.json();
@@ -1604,8 +1615,8 @@ export default function RecipeSummaryScreen() {
                 }),
                 entryPoint: 'saved',
                 from: '/saved',
+                folderId: params.folderId, // Preserve folder association
                 isModified: 'true',
-                folderId: folderId?.toString(),
               },
             });
             return; // Exit early since we're navigating
@@ -1614,7 +1625,7 @@ export default function RecipeSummaryScreen() {
 
         // Navigate to the specific folder that the recipe was saved to
         // For forked recipes, this creates a new saved recipe. For patched recipes, the existing saved recipe is updated.
-        router.replace(`/saved/folder-detail?folderId=${folderId}` as any);
+        router.replace(`/saved/folder-detail?folderId=${params.folderId}` as any);
 
       } catch (error: any) {
         setIsSavingForLater(false);
@@ -1625,7 +1636,7 @@ export default function RecipeSummaryScreen() {
       // No modifications, save original recipe (instant - no loading state needed)
       try {
         const { saveRecipe } = require('@/lib/savedRecipes');
-        const result = await saveRecipe(recipe.id, folderId);
+        const result = await saveRecipe(recipe.id, params.folderId ? parseInt(params.folderId) : undefined);
         if (result.success) {
           // Track recipe saved event
           console.log('[POSTHOG] Tracking event: recipe_saved', { 
@@ -1638,7 +1649,7 @@ export default function RecipeSummaryScreen() {
           });
           
           // Navigate to the specific folder that the recipe was saved to
-          router.replace(`/saved/folder-detail?folderId=${folderId}` as any);
+          router.replace(`/saved/folder-detail?folderId=${params.folderId}` as any);
         } else if (result.alreadySaved) {
           handleError('Already Saved', 'This recipe is already saved. Make modifications if you want to save a different variation.');
         } else {
@@ -1970,6 +1981,13 @@ export default function RecipeSummaryScreen() {
       return;
     }
 
+    console.log('[DEBUG] handleSaveChanges called with:', {
+      entryPoint,
+      folderId: params.folderId,
+      recipeId: recipe.id,
+      hasModifications,
+    });
+
     setIsSavingChanges(true);
 
     try {
@@ -2115,8 +2133,13 @@ export default function RecipeSummaryScreen() {
             userId: session.user.id,
             modifiedRecipeData,
             appliedChanges: appliedChangesData,
-            folderId: undefined, // Don't save to a specific folder when just saving changes
+            folderId: params.folderId ? parseInt(params.folderId) : undefined, // Preserve folder association
           }),
+        });
+
+        console.log('[DEBUG] Save modified API call with folderId:', {
+          folderId: params.folderId,
+          parsedFolderId: params.folderId ? parseInt(params.folderId) : undefined,
         });
 
         const saveResult = await saveResponse.json();
@@ -2144,6 +2167,7 @@ export default function RecipeSummaryScreen() {
               }),
               entryPoint: 'saved',
               from: '/saved',
+              folderId: params.folderId, // Preserve folder association
               isModified: 'true',
             },
           });

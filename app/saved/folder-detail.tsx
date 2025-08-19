@@ -309,6 +309,7 @@ export default function SavedFolderDetailScreen() {
         recipeData: JSON.stringify(recipeWithId), 
         entryPoint: 'saved',
         from: '/saved',
+        folderId: folderId?.toString(), // Add folderId so it can be used for saving changes
         isModified: isModified.toString(),
         ...(item.title_override && {
           titleOverride: item.title_override
@@ -321,7 +322,7 @@ export default function SavedFolderDetailScreen() {
         }),
       },
     });
-  }, [router, isSelectionMode]);
+  }, [router, isSelectionMode, folderId]);
 
   // Handle delete recipe
   const handleDeleteRecipe = useCallback((baseRecipeId: number) => {
