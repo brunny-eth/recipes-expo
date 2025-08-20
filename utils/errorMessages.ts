@@ -108,17 +108,36 @@ export function getSubmissionErrorMessage(stage: string, error: Error | string):
     case 'validation':
       return "Please enter a valid recipe URL or recipe text.";
       
+    case 'authentication':
+      return "Authentication issue. Please try logging in again.";
+      
     case 'cache_check':
       return "Having trouble checking saved recipes, but we'll still process your recipe.";
+      
+    case 'analytics_tracking':
+      return "There was a tracking issue, but we'll still process your recipe.";
+      
+    case 'recipe_submission':
+      if (errorMessage.includes('timeout')) {
+        return "Recipe processing is taking longer than usual. Please try again.";
+      }
+      if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
+        return "Network issue while submitting recipe. Please check your connection and try again.";
+      }
+      return "We're having trouble processing that recipe. Please try again or paste the recipe text directly.";
+      
+    case 'result_processing':
+      return "There was an issue processing the recipe results. Please try again.";
+      
+    case 'navigation_routing':
+    case 'navigation':
+      return "There was an issue during the submission process. The recipe was not processed. Please try submitting again.";
       
     case 'parsing':
       if (errorMessage.includes('timeout')) {
         return "Recipe processing is taking longer than usual. Please try again.";
       }
       return "We're having trouble processing that recipe. Please try again or paste the recipe text directly.";
-      
-    case 'navigation':
-      return "Recipe processed successfully, but there was a navigation issue. Please try submitting again.";
       
     default:
       return getNetworkErrorMessage(error);

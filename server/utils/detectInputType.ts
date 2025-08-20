@@ -21,14 +21,7 @@ export function detectInputType(input: string): InputType {
     return 'invalid';
   }
 
-  // More permissive alphanumeric check - require mostly letters for recipe searches
-  // This allows inputs like "lasagna", "pasta", "curry", "7-layer dip" while rejecting pure numbers
-  const letterRatio = (trimmed.match(/[a-zA-Z]/g) || []).length / trimmed.length;
-  if (letterRatio < 0.65) {
-    console.log(`[detectInputType] Classification result: 'invalid' for input: '${input}' (insufficient letters: ${letterRatio})`);
-    return 'invalid';
-  }
-
+  // First, check if this looks like a URL - URLs should be validated by URL parsing, not letter ratio
   // Attempt to create a URL object. This is the most reliable way to validate a URL.
   // Prepend 'https://' if no protocol is present, to help the URL constructor.
   let potentialUrl = trimmed;
@@ -69,16 +62,20 @@ export function detectInputType(input: string): InputType {
       }
   } catch (e) {
       // If the URL constructor throws an error, the string is not a valid URL.
+      // Now check if it's valid text using letter ratio
       const errorMessage = e instanceof Error ? e.message : String(e);
-      console.log(`[detectInputType] URL parsing failed for input '${trimmed}': ${errorMessage}. Classifying as 'raw_text'.`);
-      console.log(`[detectInputType] Classification result: 'raw_text' for input: '${input}' (URL parsing failed)`);
-      return 'raw_text';
+      console.log(`[detectInputType] URL parsing failed for input '${trimmed}': ${errorMessage}. Checking letter ratio for text classification.`);
   }
 
-  // If it didn't pass as a URL, and already passed basic text checks, classify as raw_text.
-  // This part of the code is only reached if the input is definitely not a URL and is not invalid
-  // according to the initial checks (length, alphanumeric content).
-  // Note: This line should never be reached due to the URL constructor logic above, but kept for safety.
-  console.log(`[detectInputType] Classification result: 'raw_text' for input: '${input}' (fallback)`);
+  // If it's not a valid URL, apply letter ratio check for text inputs
+  // This allows inputs like "lasagna", "pasta", "curry", "7-layer dip" while rejecting pure numbers
+  const letterRatio = (trimmed.match(/[a-zA-Z]/g) || []).length / trimmed.length;
+  if (letterRatio < 0.65) {
+    console.log(`[detectInputType] Classification result: 'invalid' for input: '${input}' (insufficient letters: ${letterRatio})`);
+    return 'invalid';
+  }
+
+  // If it passed the letter ratio test but isn't a URL, it's raw text
+  console.log(`[detectInputType] Classification result: 'raw_text' for input: '${input}' (valid text, letter ratio: ${letterRatio})`);
   return 'raw_text';
 } 

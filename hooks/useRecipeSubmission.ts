@@ -189,6 +189,9 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
           throw new Error('Backend URL not configured');
         }
 
+        console.log('[useRecipeSubmission] Making backend request to:', `${backendUrl}/api/recipes/parse`);
+        console.log('[useRecipeSubmission] Request payload:', { input: normalizedInput });
+        
         const response = await fetch(`${backendUrl}/api/recipes/parse`, {
           method: 'POST',
           headers: {
@@ -196,6 +199,9 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
           },
           body: JSON.stringify({ input: normalizedInput }),
         });
+        
+        console.log('[useRecipeSubmission] Backend response status:', response.status);
+        console.log('[useRecipeSubmission] Backend response ok:', response.ok);
 
         if (!response.ok) {
           const errorMessage = getNetworkErrorMessage(`HTTP ${response.status}`, response.status);
@@ -205,12 +211,13 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
         const parseResult = await response.json();
         
         // Debug logging to understand what the backend returns
-        console.log('[useRecipeSubmission] Parse result:', {
+        console.log('[useRecipeSubmission] Backend request successful - parse result:', {
           hasRecipe: !!parseResult.recipe,
           hasCachedMatches: !!parseResult.cachedMatches,
           cachedMatchesLength: parseResult.cachedMatches?.length || 0,
           fromCache: parseResult.fromCache,
-          fetchMethodUsed: parseResult.fetchMethodUsed
+          fetchMethodUsed: parseResult.fetchMethodUsed,
+          hasError: !!parseResult.error
         });
         
         // Handle error responses
