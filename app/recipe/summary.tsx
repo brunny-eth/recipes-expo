@@ -2164,11 +2164,7 @@ export default function RecipeSummaryScreen() {
   const handleCookNow = async () => {
     console.log('[Summary] Cook now button pressed');
     
-    // Only allow from saved entrypoint
-    if (entryPoint !== 'saved') {
-      console.log('[Summary] Cook now only available from saved entrypoint');
-      return;
-    }
+    // Cook now available from all entry points now that we use unified mise flow
     
     if (!recipe || !scaledIngredients) {
       console.error('[Summary] Cannot cook now, essential data is missing.');
