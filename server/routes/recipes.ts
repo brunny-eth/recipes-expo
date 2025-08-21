@@ -18,14 +18,13 @@ import { ImageData } from '../services/parseImageRecipe';
 
 interface SaveModifiedRecipeRequestBody {
   originalRecipeId: number;
-  originalRecipeData: CombinedParsedRecipe;
   userId: string;
   modifiedRecipeData: CombinedParsedRecipe;
   appliedChanges: { // Ensure this matches the exact structure from frontend
     ingredientChanges: IngredientChange[];
     scalingFactor: number;
   };
-  folderId: number; // Add folder support
+  folderId?: number; // Optional folder support - if not provided, skip creating new user_saved_recipes entry
   saved_id?: string; // Optional saved recipe ID to update instead of creating new
 }
 
@@ -447,7 +446,12 @@ router.post('/save-modified', async (req: Request<any, any, SaveModifiedRecipeRe
   const requestId = (req as any).id;
 
   try {
-    const { originalRecipeId, originalRecipeData, userId, modifiedRecipeData, appliedChanges, folderId, saved_id } = req.body;
+    // Guard against original_recipe_data being sent
+    if ('original_recipe_data' in req.body || 'originalRecipeData' in req.body) {
+      return res.status(400).json({ error: 'original_recipe_data is not allowed' });
+    }
+
+    const { originalRecipeId, userId, modifiedRecipeData, appliedChanges, folderId, saved_id } = req.body;
 
     logger.info({ 
       requestId, 
@@ -460,30 +464,31 @@ router.post('/save-modified', async (req: Request<any, any, SaveModifiedRecipeRe
     }, 'Received request to save modified recipe');
 
     // --- Data Validation (basic, extend as needed) ---
-    if (!originalRecipeId || !originalRecipeData || !userId || !modifiedRecipeData || !appliedChanges || !folderId) {
+    if (!originalRecipeId || !userId || !modifiedRecipeData || !appliedChanges) {
       logger.error({ requestId, body: req.body }, 'Missing required fields for saving modified recipe.');
       return res.status(400).json({ error: 'Missing required fields.' });
     }
 
-    // Verify folder exists and belongs to user
-    const { data: folder, error: folderError } = await supabaseAdmin
-      .from('user_saved_folders')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('id', folderId)
-      .single();
+    // Verify folder exists and belongs to user (only if folderId is provided)
+    let folder = null;
+    if (folderId) {
+      const { data: folderData, error: folderError } = await supabaseAdmin
+        .from('user_saved_folders')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('id', folderId)
+        .single();
 
-    if (folderError || !folder) {
-      logger.error({ requestId, userId, folderId, folderError }, 'Invalid folder or folder does not exist.');
-      return res.status(400).json({ error: 'Invalid folder selected.' });
+      if (folderError || !folderData) {
+        logger.error({ requestId, userId, folderId, folderError }, 'Invalid folder or folder does not exist.');
+        return res.status(400).json({ error: 'Invalid folder selected.' });
+      }
+      folder = folderData;
     }
     if (!modifiedRecipeData.title || !modifiedRecipeData.instructions || modifiedRecipeData.instructions.length === 0 || !modifiedRecipeData.ingredientGroups || modifiedRecipeData.ingredientGroups.length === 0) {
         logger.error({ requestId, modifiedRecipeData }, 'Modified recipe data is incomplete or invalid.');
         return res.status(400).json({ error: 'Incomplete modified recipe data provided.' });
     }
-
-    // Use the original recipe data passed directly from the client
-    const originalRecipe = { recipe_data: originalRecipeData };
 
     // --- 1. Generate a new unique URL (UUID) for the modified recipe ---
     const newRecipeUrl = uuidv4(); // Generates a Version 4 UUID
@@ -502,7 +507,7 @@ router.post('/save-modified', async (req: Request<any, any, SaveModifiedRecipeRe
         source_type: 'user_modified', // Add a source type to distinguish modified recipes
         is_user_modified: true, // Explicitly set the boolean flag for modified recipes
       })
-      .select('id, url') // Select the new id and url to return them
+      .select('*') // Select all fields to return the full recipe
       .single(); // Expect a single row back
 
     if (insertRecipeError || !newModifiedRecipeRows) {
@@ -548,35 +553,42 @@ router.post('/save-modified', async (req: Request<any, any, SaveModifiedRecipeRe
       reason: 'Skipping embedding generation for user-modified recipe'
     }, 'User-modified recipe - embedding generation skipped.');
 
-    // --- 4. Insert into user_saved_recipes ---
-    // This links the user to their newly saved modified recipe in the cache
-    const { data: userSavedEntry, error: insertUserSavedError } = await supabaseAdmin
-      .from('user_saved_recipes')
-      .insert({
-        user_id: userId,
-        base_recipe_id: newModifiedRecipeId, // Link to the newly created modified recipe
-        folder_id: folderId, // Save to selected folder
-        title_override: modifiedRecipeData.title, // Use the (potentially LLM-suggested) title
-        applied_changes: appliedChanges, // Store the explicit changes metadata
-        // display_order can be NULL since we sort by created_at DESC for chronological order
-        // notes: null, // As per plan, leave notes as null unless user input is added
-      })
-      .select('id')
-      .single(); // Expect a single row back
+    // --- 4. Insert into user_saved_recipes (only if folderId is provided) ---
+    let userSavedEntry = null;
+    if (folderId) {
+      // This links the user to their newly saved modified recipe in the cache
+      const { data: userSavedEntryData, error: insertUserSavedError } = await supabaseAdmin
+        .from('user_saved_recipes')
+        .insert({
+          user_id: userId,
+          base_recipe_id: newModifiedRecipeId, // Link to the newly created modified recipe
+          folder_id: folderId, // Save to selected folder
+          title_override: modifiedRecipeData.title, // Use the (potentially LLM-suggested) title
+          applied_changes: appliedChanges, // Store the explicit changes metadata
+          // display_order can be NULL since we sort by created_at DESC for chronological order
+          // notes: null, // As per plan, leave notes as null unless user input is added
+        })
+        .select('id')
+        .single(); // Expect a single row back
 
-    if (insertUserSavedError || !userSavedEntry) {
-      // IMPORTANT: If this fails, consider rolling back the processed_recipes_cache insert
-      // For now, we'll log an error. A transaction would be ideal here if supported directly.
-      logger.error({ requestId, newModifiedRecipeId, userId, err: insertUserSavedError }, 'Failed to insert into user_saved_recipes.');
-      // You might want to delete the entry from processed_recipes_cache here
-      // await supabaseAdmin.from('processed_recipes_cache').delete().eq('id', newModifiedRecipeId);
-      return res.status(500).json({ error: 'Failed to record saved recipe for user.' });
+      if (insertUserSavedError || !userSavedEntryData) {
+        // IMPORTANT: If this fails, consider rolling back the processed_recipes_cache insert
+        // For now, we'll log an error. A transaction would be ideal here if supported directly.
+        logger.error({ requestId, newModifiedRecipeId, userId, err: insertUserSavedError }, 'Failed to insert into user_saved_recipes.');
+        // You might want to delete the entry from processed_recipes_cache here
+        // await supabaseAdmin.from('processed_recipes_cache').delete().eq('id', newModifiedRecipeId);
+        return res.status(500).json({ error: 'Failed to record saved recipe for user.' });
+      }
+
+      userSavedEntry = userSavedEntryData;
+      logger.info({ requestId, userSavedEntryId: userSavedEntry.id }, 'User saved recipe entry created.');
+    } else {
+      logger.info({ requestId, newModifiedRecipeId }, '[SaveModified] Skipping saved pointer creation (no folderId provided)');
     }
-
-    logger.info({ requestId, userSavedEntryId: userSavedEntry.id }, 'User saved recipe entry created.');
 
     // --- 5. Handle saved_id parameter (update existing saved recipe to point to new fork) ---
     if (saved_id) {
+      logger.info({ requestId, saved_id, newModifiedRecipeId }, '[SaveModified] Attempting to repoint saved_id=:saved_id to base_recipe_id=:newModifiedRecipeId');
       const { error: updateSavedError } = await supabaseAdmin
         .from('user_saved_recipes')
         .update({
@@ -591,16 +603,20 @@ router.post('/save-modified', async (req: Request<any, any, SaveModifiedRecipeRe
         logger.warn({ requestId, saved_id, err: updateSavedError }, 'Failed to update existing saved recipe, but fork was created successfully');
         // Continue - the fork was created successfully, this is just an optimization
       } else {
-        logger.info({ requestId, saved_id, newForkedRecipeId: newModifiedRecipeId }, 'Updated existing saved recipe to point to new fork');
+        logger.info({ requestId, saved_id, newModifiedRecipeId }, '[SaveModified] Repointed saved_id=:saved_id to base_recipe_id=:newModifiedRecipeId');
       }
     }
 
-    // --- 6. Send Success Response ---
+    // --- 6. Send Success Response with full recipe data ---
     res.status(201).json({
       message: 'Modified recipe saved successfully!',
-      newRecipeId: newModifiedRecipeId,
-      newRecipeUrl: savedRecipeUrl,
-      userSavedRecordId: userSavedEntry.id,
+      recipe: {
+        id: newModifiedRecipeRows.id,
+        is_user_modified: newModifiedRecipeRows.is_user_modified,
+        parent_recipe_id: newModifiedRecipeRows.parent_recipe_id,
+        recipe_data: newModifiedRecipeRows.recipe_data
+      },
+      userSavedRecordId: userSavedEntry?.id || null,
     });
 
   } catch (err) {
@@ -610,7 +626,7 @@ router.post('/save-modified', async (req: Request<any, any, SaveModifiedRecipeRe
   }
 });
 
-// PATCH /api/recipes/:id - Update an existing recipe (typically a user-modified fork)
+// PATCH /api/recipes/:id - Update an existing recipe (numeric ID for processed_recipes_cache only)
 router.patch('/:id(\\d+)', async (req: Request, res: Response) => {
   const requestId = (req as any).id;
   
@@ -624,55 +640,66 @@ router.patch('/:id(\\d+)', async (req: Request, res: Response) => {
 
     logger.info({ requestId, recipeId: id, patchFields: Object.keys(patch) }, 'Patching recipe');
 
-    // Get the current recipe to verify it exists and is user-modified
+    // Get the current recipe from processed_recipes_cache only
     const { data: currentRecipe, error: fetchError } = await supabaseAdmin
       .from('processed_recipes_cache')
-      .select('recipe_data, is_user_modified')
+      .select('*')
       .eq('id', id)
       .single();
 
     if (fetchError || !currentRecipe) {
-      logger.error({ requestId, recipeId: id, err: fetchError }, 'Recipe not found');
+      logger.error({ requestId, recipeId: id, err: fetchError }, 'Recipe not found in processed_recipes_cache');
       return res.status(404).json({ error: 'Recipe not found' });
     }
 
     // Only allow PATCHing user-modified recipes (forks)
     if (!currentRecipe.is_user_modified) {
       logger.warn({ requestId, recipeId: id }, 'Attempted to PATCH non-user-modified recipe');
-      return res.status(403).json({ error: 'Can only update user-modified recipes' });
+      return res.status(400).json({ 
+        error: 'Cannot modify original recipe. Please fork first.',
+        code: 'NEEDS_FORK' 
+      });
+    }
+
+    // Validate instructions if present
+    if (patch.instructions) {
+      if (!Array.isArray(patch.instructions)) {
+        return res.status(400).json({ error: 'instructions must be an array' });
+      }
+
+      for (const s of patch.instructions) {
+        if (!s || typeof s !== 'object' || typeof s.id !== 'string' || typeof s.text !== 'string') {
+          return res.status(400).json({ error: 'each step must have {id: string, text: string}' });
+        }
+        if (s.note && (typeof s.note !== 'string' || s.note.length > 100)) {
+          return res.status(400).json({ error: 'step.note must be ≤ 100 chars' });
+        }
+      }
     }
 
     // Merge the patch with existing recipe data
-    const updatedRecipeData = {
+    const merged = {
       ...currentRecipe.recipe_data,
       ...patch,
-      // Ensure the ID field matches the row ID
-      id: parseInt(id),
     };
 
-    // Update the recipe_data column
+    // Special handling for instructions - replace wholesale if present
+    if (patch.instructions) {
+      merged.instructions = patch.instructions;
+    }
+
+    // Belt & suspenders - re-enforce recipe_data.id = row.id after merge
+    const idNum = parseInt(id);
+    merged.id = idNum;
+
+    // Update the recipe in processed_recipes_cache
     const { data: updatedRecipe, error: updateError } = await supabaseAdmin
       .from('processed_recipes_cache')
-      .update({
-        recipe_data: updatedRecipeData,
-        // Don't update last_processed_at - that's for pipeline processing, not user edits
-        // The updated_at field will be automatically updated by the database trigger
-        // 
-        // TODO: Add this database schema change:
-        // ALTER TABLE processed_recipes_cache ADD COLUMN updated_at timestamptz DEFAULT now();
-        // CREATE OR REPLACE FUNCTION update_updated_at_column()
-        // RETURNS TRIGGER AS $$
-        // BEGIN
-        //   NEW.updated_at = now();
-        //   RETURN NEW;
-        // END;
-        // $$ language 'plpgsql';
-        // CREATE TRIGGER update_processed_recipes_cache_updated_at 
-        //   BEFORE UPDATE ON processed_recipes_cache 
-        //   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+      .update({ 
+        recipe_data: merged 
       })
       .eq('id', id)
-      .select('id, recipe_data')
+      .select('*')
       .single();
 
     if (updateError) {
@@ -682,9 +709,15 @@ router.patch('/:id(\\d+)', async (req: Request, res: Response) => {
 
     logger.info({ requestId, recipeId: id }, 'Successfully patched recipe');
 
+    // Return the full updated canonical recipe row
     res.json({
       message: 'Recipe updated successfully',
-      recipe: updatedRecipe,
+      recipe: {
+        id: updatedRecipe.id,
+        is_user_modified: updatedRecipe.is_user_modified,
+        parent_recipe_id: updatedRecipe.parent_recipe_id,
+        recipe_data: updatedRecipe.recipe_data
+      }
     });
 
   } catch (err) {

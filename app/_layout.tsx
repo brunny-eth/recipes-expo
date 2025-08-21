@@ -291,14 +291,17 @@ export default function RootLayout() {
   // RootLayout now always renders context providers and RootLayoutNav
   // This ensures the root of the application tree remains stable
   
+  const posthogApiKey = process.env.EXPO_PUBLIC_POSTHOG_API_KEY;
+  
   return (
     <PostHogProvider
-      apiKey={process.env.EXPO_PUBLIC_POSTHOG_API_KEY!}
+      apiKey={posthogApiKey || 'dummy-key'}
       options={{
         host: process.env.EXPO_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com',
         enableSessionReplay: true,
+        disabled: !posthogApiKey, // Disable PostHog if no API key is provided
       }}
-      autocapture
+      autocapture={!!posthogApiKey} // Only enable autocapture if API key is available
     >
       <GestureHandlerRootView style={{ flex: 1 }}>
         <ErrorModalProvider>

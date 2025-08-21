@@ -169,10 +169,14 @@ router.post('/save-recipe', async (req: Request, res: Response) => {
   const requestId = (req as any).id;
   
   try {
+    // Guard against original_recipe_data being sent
+    if ('original_recipe_data' in req.body || 'originalRecipeData' in req.body) {
+      return res.status(400).json({ error: 'original_recipe_data is not allowed' });
+    }
+
     const { 
       userId, 
       originalRecipeId, 
-      originalRecipeData,
       preparedRecipeData, 
       appliedChanges, 
       finalYield,
@@ -196,21 +200,16 @@ router.post('/save-recipe', async (req: Request, res: Response) => {
         hasUnitData: change.to && typeof change.to === 'object' && !!change.to.unit,
       })) || [],
       recipeTitle: preparedRecipeData?.title,
-      originalRecipeTitle: originalRecipeData?.title,
       preparedYield: preparedRecipeData?.recipeYield,
-      originalYield: originalRecipeData?.recipeYield,
       ingredientGroupsCount: preparedRecipeData?.ingredientGroups?.length || 0,
       instructionsCount: preparedRecipeData?.instructions?.length || 0,
     }, 'Saving recipe to mise with detailed modifications');
 
     // Validation
-    if (!userId || !originalRecipeId || !originalRecipeData || !preparedRecipeData || !appliedChanges) {
+    if (!userId || !originalRecipeId || !preparedRecipeData || !appliedChanges) {
       logger.error({ requestId, body: req.body }, 'Missing required fields for saving mise recipe');
       return res.status(400).json({ error: 'Missing required fields' });
     }
-
-    // Use the original recipe data passed directly from the client
-    const originalRecipe = { recipe_data: originalRecipeData };
 
     // Check for duplicate recipe in mise (same user, same original recipe, same modifications, not completed)
     const { data: existingRecipe, error: duplicateCheckError } = await supabaseAdmin
@@ -245,7 +244,6 @@ router.post('/save-recipe', async (req: Request, res: Response) => {
         title_override: titleOverride || null,
         planned_date: plannedDate || null,
         prepared_recipe_data: preparedRecipeData,
-        original_recipe_data: originalRecipe.recipe_data,
         final_yield: finalYield || null,
         applied_changes: appliedChanges,
         display_order: 0, // New recipes go to top
@@ -407,7 +405,7 @@ router.get('/recipes', async (req: Request, res: Response) => {
         planned_date,
         display_order,
         prepared_recipe_data,
-        original_recipe_data,
+
         final_yield,
         applied_changes,
         is_completed,
@@ -460,7 +458,7 @@ router.get('/recipes/:id', async (req: Request, res: Response) => {
         planned_date,
         display_order,
         prepared_recipe_data,
-        original_recipe_data,
+
         final_yield,
         applied_changes,
         is_completed,
@@ -481,10 +479,32 @@ router.get('/recipes/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Recipe not found' });
     }
 
-    logger.info({ requestId, miseRecipeId: id }, 'Successfully fetched mise recipe');
+    // Fetch the canonical recipe from processed_recipes_cache
+    const { data: canonicalRecipe, error: canonicalError } = await supabaseAdmin
+      .from('processed_recipes_cache')
+      .select('id, recipe_data, is_user_modified, parent_recipe_id, source_type')
+      .eq('id', miseRecipe.original_recipe_id)
+      .single();
+
+    if (canonicalError || !canonicalRecipe) {
+      logger.error({ requestId, miseRecipeId: id, originalRecipeId: miseRecipe.original_recipe_id, err: canonicalError }, 'Failed to fetch canonical recipe');
+      return res.status(500).json({ error: 'Failed to fetch canonical recipe' });
+    }
+
+    // Use canonical recipe data directly (no more merging from saved original_recipe_data)
+    let recipeData = canonicalRecipe.recipe_data;
+
+    logger.info({ requestId, miseRecipeId: id, canonicalRecipeId: canonicalRecipe.id }, 'Successfully fetched mise recipe with canonical data');
 
     res.json({
-      recipe: miseRecipe
+      mise: miseRecipe,
+      recipe: {
+        id: canonicalRecipe.id,
+        is_user_modified: canonicalRecipe.is_user_modified,
+        parent_recipe_id: canonicalRecipe.parent_recipe_id,
+        source_type: canonicalRecipe.source_type,
+        ...recipeData
+      }
     });
 
   } catch (err) {
@@ -500,7 +520,7 @@ router.put('/recipes/:id', async (req: Request, res: Response) => {
   
   try {
     const { id } = req.params;
-    const { userId, titleOverride, plannedDate, displayOrder, isCompleted, preparedRecipeData, appliedChanges, finalYield } = req.body;
+    const { userId, titleOverride, plannedDate, displayOrder, isCompleted, preparedRecipeData, appliedChanges, finalYield, originalRecipeId } = req.body;
 
     if (!userId) {
       return res.status(400).json({ error: 'Missing userId' });
@@ -542,6 +562,7 @@ router.put('/recipes/:id', async (req: Request, res: Response) => {
     if (preparedRecipeData !== undefined) updates.prepared_recipe_data = preparedRecipeData;
     if (appliedChanges !== undefined) updates.applied_changes = appliedChanges;
     if (finalYield !== undefined) updates.final_yield = finalYield;
+    if (originalRecipeId !== undefined) updates.original_recipe_id = originalRecipeId;
 
     const { data: updatedRecipe, error: updateError } = await supabaseAdmin
       .from('user_mise_recipes')

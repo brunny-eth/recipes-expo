@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  SafeAreaView,
   ActivityIndicator,
   Dimensions,
   Linking,
@@ -13,6 +12,9 @@ import {
   TextStyle,
   ImageStyle,
   InteractionManager,
+  TextInput,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import FastImage from '@d11/react-native-fast-image';
@@ -57,6 +59,7 @@ import {
   captionText,
   FONT,
   metaText,
+  screenTitleText,
 } from '@/constants/typography';
 import { useAuth } from '@/context/AuthContext';
 import IngredientSubstitutionModal from '@/app/recipe/IngredientSubstitutionModal';
@@ -65,12 +68,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import CollapsibleSection from '@/components/CollapsibleSection';
 import IngredientList from '@/components/recipe/IngredientList';
 import ServingScaler from '@/components/recipe/ServingScaler';
+import FolderPickerModal from '@/components/FolderPickerModal';
 import RecipeFooterButtons from '@/components/recipe/RecipeFooterButtons';
 
 import RecipeStepsHeader from '@/components/recipe/RecipeStepsHeader';
 import ScreenHeader from '@/components/ScreenHeader';
-import { Modal, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useCooking } from '@/context/CookingContext';
 
 // Type for a change (substitution or removal)
 type AppliedChange = {
@@ -227,7 +231,9 @@ const buttonWidth = (availableWidth - buttonTotalGap) / numButtons;
 // --- End Types ---
 
 export default function RecipeSummaryScreen() {
-  const params = useLocalSearchParams<{ 
+  console.log('[Summary] 🎬 Component render started');
+  
+  const params = useLocalSearchParams<{
     recipeData?: string; 
     from?: string; 
     appliedChanges?: string; 
@@ -239,19 +245,42 @@ export default function RecipeSummaryScreen() {
     titleOverride?: string; 
     inputType?: string;
     folderId?: string; // Add folderId for saved recipes
+    recipeId?: string; // Add recipeId for ID-based loading
   }>();
   const router = useRouter();
-  const { showError, hideError } = useErrorModal();
-  const handleError = useHandleError();
-  const { showSuccess } = useSuccessModal();
   const { session } = useAuth();
+  const { showError, hideError } = useErrorModal();
+  const { showSuccess } = useSuccessModal();
+  const handleError = useHandleError();
   const { track } = useAnalytics();
   const insets = useSafeAreaInsets();
+  const cookingContext = useCooking();
 
-  // Extract and validate entryPoint with logging
+  // ✅ FIX: Extract recipeId from params and convert to numeric
+  const recipeId = params.recipeId;
   const entryPoint = params.entryPoint || 'new'; // Default to 'new' for backward compatibility
   const miseRecipeId = params.miseRecipeId; // Store the mise recipe ID for modifications
-
+  const folderId = params.folderId; // Store folderId for saved recipes
+  const appliedChanges = params.appliedChanges; // Store appliedChanges
+  const originalRecipeData = params.originalRecipeData; // Store originalRecipeData
+  const titleOverride = params.titleOverride; // Store titleOverride
+  const inputType = params.inputType; // Store inputType
+  const from = params.from; // Store from
+  const isModified = params.isModified; // Store isModified
+  const finalYield = params.finalYield; // Store finalYield
+  const numericId = Number(recipeId);
+  
+  // Extract and validate entryPoint with logging
+  const entryPointValue = entryPoint || 'new'; // Default to 'new' for backward compatibility
+  const miseRecipeIdValue = miseRecipeId; // Store the mise recipe ID for modifications
+  const folderIdValue = folderId; // Store folderId for saved recipes
+  const appliedChangesValue = appliedChanges; // Store appliedChanges
+  const originalRecipeDataValue = originalRecipeData; // Store originalRecipeData
+  const titleOverrideValue = titleOverride; // Store titleOverride
+  const inputTypeValue = inputType; // Store inputType
+  const fromValue = from; // Store from
+  const isModifiedValue = isModified; // Store isModified
+  const finalYieldValue = finalYield; // Store finalYield
 
   const [recipe, setRecipe] = useState<ParsedRecipe | null>(null);
   const [originalRecipe, setOriginalRecipe] = useState<ParsedRecipe | null>(null);
@@ -264,6 +293,28 @@ export default function RecipeSummaryScreen() {
   const [isDescriptionTextExpanded, setIsDescriptionTextExpanded] = useState(false);
   // State to track if image failed to load
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
+  
+  // Title editing state
+  const [title, setTitle] = useState('');
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [isSavingTitle, setIsSavingTitle] = useState(false);
+  const originalTitleRef = useRef('');
+
+  // Folder picker state for title editing
+  const [isFolderPickerVisible, setIsFolderPickerVisible] = useState(false);
+  const [pendingTitleSave, setPendingTitleSave] = useState<{
+    cleanTitle: string;
+    recipeId: number;
+    userId: string;
+  } | null>(null);
+
+  console.log('[Summary] 📊 Current state:', {
+    hasRecipe: !!recipe,
+    recipeId: recipe?.id,
+    title: title,
+    isEditingTitle,
+    isLoading,
+  });
   const [isIngredientsExpanded, setIsIngredientsExpanded] = useState(false);
 
   const [originalYieldValue, setOriginalYieldValue] = useState<number | null>(
@@ -565,62 +616,141 @@ export default function RecipeSummaryScreen() {
     return allIngredients;
   }, [scaledIngredientGroups]);
 
+  // ✅ FIX: Function to fetch canonical recipe by ID
+  const fetchCanonicalById = useCallback(async (id: number) => {
+    if (!session?.access_token) {
+      console.log('[Summary] No session, cannot fetch recipe');
+      return null;
+    }
+    try {
+      console.log('[Summary] Loading by id:', id);
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+      if (!backendUrl) {
+        console.error('[Summary] No backend URL configured');
+        return null;
+      }
+
+      const response = await fetch(`${backendUrl}/api/recipes/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!response.ok) {
+        console.error('[Summary] Failed to fetch recipe:', response.status);
+        return null;
+      }
+
+      const data = await response.json();
+      console.log('[Summary] Successfully fetched recipe by ID:', data?.id);
+      console.log('[Summary] Full server response structure:', {
+        hasData: !!data,
+        dataKeys: Object.keys(data || {}),
+        recipeId: data?.id,
+        recipeDataId: data?.recipe_data?.id,
+        hasRecipeData: !!data?.recipe_data,
+        recipeDataKeys: data?.recipe_data ? Object.keys(data.recipe_data) : [],
+      });
+      
+      // Extract the actual recipe data from the response
+      const recipeData = data?.recipe_data;
+      if (!recipeData) {
+        console.error('[Summary] No recipe_data found in response');
+        return null;
+      }
+      
+      // Update cooking context with the fetched recipe
+      if (cookingContext.updateRecipe && data?.id) {
+        cookingContext.updateRecipe(data.id.toString(), recipeData);
+      }
+      
+      return recipeData; // Return the actual recipe content, not the wrapper
+    } catch (error) {
+      console.error('[Summary] Error fetching recipe by ID:', error);
+      return null;
+    }
+  }, [session?.access_token]); // Removed cookingContext dependency
+
+  // ✅ FIX: Modified useEffect to fetch by ID when recipeData is missing
   useEffect(() => {
-    if (params.recipeData) {
-      try {
-        const parsed = JSON.parse(params.recipeData as string);
-        if (!parsed || typeof parsed !== 'object' || Object.keys(parsed).length === 0) {
-          handleError('Error Loading Summary', 'Recipe data is invalid.');
-          setIsLoading(false);
-          return;
-        }
-        
-        // Debug: Log the recipe structure to see if sourceUrl exists
-        if (__DEV__) {
-          console.log('[DEBUG] Recipe data structure:', {
-            hasRecipe: !!parsed,
-            keys: Object.keys(parsed),
-            sourceUrl: parsed.sourceUrl,
-            hasSourceUrl: !!parsed.sourceUrl,
-            recipePreview: {
-              title: parsed.title,
+    const loadRecipe = async () => {
+      if (params.recipeData) {
+        // Legacy path: parse recipeData from params
+        try {
+          const parsed = JSON.parse(params.recipeData as string);
+          if (!parsed || typeof parsed !== 'object' || Object.keys(parsed).length === 0) {
+            handleError('Error Loading Summary', 'Recipe data is invalid.');
+            setIsLoading(false);
+            return;
+          }
+          
+          // Debug: Log the recipe structure to see if sourceUrl exists
+          if (__DEV__) {
+            console.log('[DEBUG] Recipe data structure:', {
+              hasRecipe: !!parsed,
+              keys: Object.keys(parsed),
               sourceUrl: parsed.sourceUrl,
-              image: parsed.image,
-            },
-            // Add metadata debugging for fork detection
-            metadata: {
-              id: parsed.id,
-              parent_recipe_id: parsed.parent_recipe_id,
-              source_type: parsed.source_type,
-              isUserModified: !!(parsed.parent_recipe_id || parsed.source_type === 'user_modified'),
+              hasSourceUrl: !!parsed.sourceUrl,
+              recipePreview: {
+                title: parsed.title,
+                sourceUrl: parsed.sourceUrl,
+                image: parsed.image,
+              },
+              // Add metadata debugging for fork detection
+              metadata: {
+                id: parsed.id,
+                parent_recipe_id: parsed.parent_recipe_id,
+                source_type: parsed.source_type,
+                isUserModified: !!(parsed.parent_recipe_id || parsed.source_type === 'user_modified'),
+              }
+            });
+          }
+          
+          setRecipe(parsed);
+          
+          // Reset image load failure state when new recipe is loaded
+          setImageLoadFailed(false);
+          
+          // Set original recipe data if available (for consistent scaling)
+          if (params.originalRecipeData) {
+            try {
+              const originalParsed = JSON.parse(params.originalRecipeData as string);
+              setOriginalRecipe(originalParsed);
+              const yieldNum = parseServingsValue(originalParsed.recipeYield);
+              setOriginalYieldValue(yieldNum);
+            } catch (originalError) {
+              console.error('[DEBUG] Error parsing original recipe data:', originalError);
+              // Fall back to using the current recipe as original
+              setOriginalRecipe(parsed);
+              const yieldNum = parseServingsValue(parsed.recipeYield);
+              setOriginalYieldValue(yieldNum);
             }
-          });
-        }
-        
-        setRecipe(parsed);
-        
-        // Reset image load failure state when new recipe is loaded
-        setImageLoadFailed(false);
-        
-        // Set original recipe data if available (for consistent scaling)
-        if (params.originalRecipeData) {
-          try {
-            const originalParsed = JSON.parse(params.originalRecipeData as string);
-            setOriginalRecipe(originalParsed);
-            const yieldNum = parseServingsValue(originalParsed.recipeYield);
-            setOriginalYieldValue(yieldNum);
-          } catch (originalError) {
-            console.error('[DEBUG] Error parsing original recipe data:', originalError);
-            // Fall back to using the current recipe as original
+            
+            // Set fresh scaling baseline for saved/forked recipes
+            const isSavedEntrypoint = entryPoint === 'saved';
+            if (isSavedEntrypoint) {
+              console.log('[DEBUG] Setting fresh scaling baseline for saved recipe (with originalRecipeData)');
+              // Treat current server values as the unscaled baseline (1×) for this screen load
+              setUnscaledIngredientGroups(parsed.ingredientGroups ? [...parsed.ingredientGroups] : []);
+              setBaselineScaleFactor(1);
+              setSelectedScaleFactor(1);
+              console.log('[DEBUG] Fresh baseline set:', {
+                unscaledGroupsCount: parsed.ingredientGroups?.length || 0,
+                baselineScaleFactor: 1,
+                selectedScaleFactor: 1,
+              });
+            }
+          } else {
+            // For new recipes or when original data is not available, use current recipe as original
             setOriginalRecipe(parsed);
             const yieldNum = parseServingsValue(parsed.recipeYield);
             setOriginalYieldValue(yieldNum);
           }
-          
+
           // Set fresh scaling baseline for saved/forked recipes
           const isSavedEntrypoint = entryPoint === 'saved';
           if (isSavedEntrypoint) {
-            console.log('[DEBUG] Setting fresh scaling baseline for saved recipe (with originalRecipeData)');
+            console.log('[DEBUG] Setting fresh scaling baseline for saved recipe');
             // Treat current server values as the unscaled baseline (1×) for this screen load
             setUnscaledIngredientGroups(parsed.ingredientGroups ? [...parsed.ingredientGroups] : []);
             setBaselineScaleFactor(1);
@@ -631,58 +761,37 @@ export default function RecipeSummaryScreen() {
               selectedScaleFactor: 1,
             });
           }
-        } else {
-          // For new recipes or when original data is not available, use current recipe as original
-          setOriginalRecipe(parsed);
-          const yieldNum = parseServingsValue(parsed.recipeYield);
-          setOriginalYieldValue(yieldNum);
-        }
-
-        // Set fresh scaling baseline for saved/forked recipes
-        const isSavedEntrypoint = entryPoint === 'saved';
-        if (isSavedEntrypoint) {
-          console.log('[DEBUG] Setting fresh scaling baseline for saved recipe');
-          // Treat current server values as the unscaled baseline (1×) for this screen load
-          setUnscaledIngredientGroups(parsed.ingredientGroups ? [...parsed.ingredientGroups] : []);
-          setBaselineScaleFactor(1);
-          setSelectedScaleFactor(1);
-          console.log('[DEBUG] Fresh baseline set:', {
-            unscaledGroupsCount: parsed.ingredientGroups?.length || 0,
-            baselineScaleFactor: 1,
-            selectedScaleFactor: 1,
-          });
-        }
-        
-        // Check if this is a saved recipe with existing applied changes
-        if (params.appliedChanges) {
-          if (__DEV__) {
-            console.log('[DEBUG] Found appliedChanges URL param:', params.appliedChanges);
-          }
-          try {
-            const savedAppliedChanges = JSON.parse(params.appliedChanges as string);
-                          if (__DEV__) {
+          
+          // Check if this is a saved recipe with existing applied changes
+          if (params.appliedChanges) {
+            if (__DEV__) {
+              console.log('[DEBUG] Found appliedChanges URL param:', params.appliedChanges);
+            }
+            try {
+              const savedAppliedChanges = JSON.parse(params.appliedChanges as string);
+              if (__DEV__) {
                 console.log('[DEBUG] Parsed appliedChanges from URL:', savedAppliedChanges);
               }
-            
-            // Convert saved format to internal format
-            if (savedAppliedChanges.ingredientChanges) {
-                              if (__DEV__) {
+              
+              // Convert saved format to internal format
+              if (savedAppliedChanges.ingredientChanges) {
+                if (__DEV__) {
                   console.log('[DEBUG] Converting ingredientChanges to internal format:', savedAppliedChanges.ingredientChanges);
                 }
               
-              const convertedChanges: AppliedChange[] = savedAppliedChanges.ingredientChanges.map((change: any) => ({
-                from: change.from,
-                to: change.to ? {
-                  // Handle both old format (string) and new format (object)
-                  name: typeof change.to === 'string' ? change.to : change.to.name,
-                  amount: typeof change.to === 'string' ? null : change.to.amount,
-                  unit: typeof change.to === 'string' ? null : change.to.unit,
-                  preparation: typeof change.to === 'string' ? null : change.to.preparation,
-                  suggested_substitutions: null,
-                } : null,
-              }));
+                const convertedChanges: AppliedChange[] = savedAppliedChanges.ingredientChanges.map((change: any) => ({
+                  from: change.from,
+                  to: change.to ? {
+                    // Handle both old format (string) and new format (object)
+                    name: typeof change.to === 'string' ? change.to : change.to.name,
+                    amount: typeof change.to === 'string' ? null : change.to.amount,
+                    unit: typeof change.to === 'string' ? null : change.to.unit,
+                    preparation: typeof change.to === 'string' ? null : change.to.preparation,
+                    suggested_substitutions: null,
+                  } : null,
+                }));
               
-                              if (__DEV__) {
+                if (__DEV__) {
                   console.log('[DEBUG] Converted appliedChanges:', {
                     original: savedAppliedChanges.ingredientChanges,
                     converted: convertedChanges,
@@ -697,92 +806,531 @@ export default function RecipeSummaryScreen() {
                   });
                 }
               
-              // These are changes loaded from the database, so they are persisted
-              setPersistedChanges(convertedChanges);
-              setCurrentUnsavedChanges([]); // No unsaved changes initially
-              // Set baseline for both mise and saved entrypoints
-              setBaselineScaleFactor(1.0);
-              setBaselineAppliedChanges(convertedChanges);
-            }
-            
-            // Calculate the actual scale factor from original recipe
-            let finalScaleFactor = 1.0;
-            if (savedAppliedChanges.scalingFactor && params.originalRecipeData) {
-              // For saved/mise recipes, calculate the current scale factor based on the current recipe yield vs original yield
-              const currentYieldNum = parseServingsValue(parsed.recipeYield);
-              let originalYieldNum = null;
-              
-              try {
-                const originalParsed = JSON.parse(params.originalRecipeData as string);
-                originalYieldNum = parseServingsValue(originalParsed?.recipeYield);
-              } catch (originalError) {
-                console.error('[DEBUG] Error parsing original recipe for yield calculation:', originalError);
+                // These are changes loaded from the database, so they are persisted
+                setPersistedChanges(convertedChanges);
+                setCurrentUnsavedChanges([]); // No unsaved changes initially
+                // Set baseline for both mise and saved entrypoints
+                setBaselineScaleFactor(1.0);
+                setBaselineAppliedChanges(convertedChanges);
               }
               
-              if (currentYieldNum && originalYieldNum) {
-                const actualScaleFactor = currentYieldNum / originalYieldNum;
-                console.log('[DEBUG] Calculated actual scale factor:', { currentYieldNum, originalYieldNum, actualScaleFactor });
-                finalScaleFactor = actualScaleFactor;
-              } else {
+              // Calculate the actual scale factor from original recipe
+              let finalScaleFactor = 1.0;
+              if (savedAppliedChanges.scalingFactor && params.originalRecipeData) {
+                // For saved/mise recipes, calculate the current scale factor based on the current recipe yield vs original yield
+                const currentYieldNum = parseServingsValue(parsed.recipeYield);
+                let originalYieldNum = null;
+                
+                try {
+                  const originalParsed = JSON.parse(params.originalRecipeData as string);
+                  originalYieldNum = parseServingsValue(originalParsed?.recipeYield);
+                } catch (originalError) {
+                  console.error('[DEBUG] Error parsing original recipe for yield calculation:', originalError);
+                }
+                
+                if (currentYieldNum && originalYieldNum) {
+                  const actualScaleFactor = currentYieldNum / originalYieldNum;
+                  console.log('[DEBUG] Calculated actual scale factor:', { currentYieldNum, originalYieldNum, actualScaleFactor });
+                  finalScaleFactor = actualScaleFactor;
+                } else {
+                  // For saved recipes, ignore the old scaling factor since the saved data is already scaled
+                  if (entryPoint === 'saved') {
+                    console.log('[DEBUG] Saved recipe: could not calculate yield-based factor, using 1.0 as fresh baseline');
+                    finalScaleFactor = 1.0;
+                  } else {
+                    console.log('[DEBUG] Could not calculate yield-based scale factor, using saved factor:', savedAppliedChanges.scalingFactor);
+                    finalScaleFactor = savedAppliedChanges.scalingFactor;
+                  }
+                }
+              } else if (savedAppliedChanges.scalingFactor) {
                 // For saved recipes, ignore the old scaling factor since the saved data is already scaled
                 if (entryPoint === 'saved') {
-                  console.log('[DEBUG] Saved recipe: could not calculate yield-based factor, using 1.0 as fresh baseline');
+                  console.log('[DEBUG] Saved recipe: ignoring old scaling factor, using 1.0 as fresh baseline');
                   finalScaleFactor = 1.0;
                 } else {
-                  console.log('[DEBUG] Could not calculate yield-based scale factor, using saved factor:', savedAppliedChanges.scalingFactor);
+                  console.log('[DEBUG] Using scaling factor from saved changes:', savedAppliedChanges.scalingFactor);
                   finalScaleFactor = savedAppliedChanges.scalingFactor;
                 }
-              }
-            } else if (savedAppliedChanges.scalingFactor) {
-              // For saved recipes, ignore the old scaling factor since the saved data is already scaled
-              if (entryPoint === 'saved') {
-                console.log('[DEBUG] Saved recipe: ignoring old scaling factor, using 1.0 as fresh baseline');
-                finalScaleFactor = 1.0;
               } else {
-                console.log('[DEBUG] Using scaling factor from saved changes:', savedAppliedChanges.scalingFactor);
-                finalScaleFactor = savedAppliedChanges.scalingFactor;
+                console.log('[DEBUG] No scaling factor in saved changes, defaulting to 1.0');
+                finalScaleFactor = 1.0;
               }
-            } else {
-              console.log('[DEBUG] No scaling factor in saved changes, defaulting to 1.0');
-              finalScaleFactor = 1.0;
+              
+              setSelectedScaleFactor(finalScaleFactor);
+              // Set baseline for both mise and saved entrypoints
+              // Baseline should always be 1.0 (original recipe scale), not the saved scale factor
+              setBaselineScaleFactor(1.0);
+            } catch (appliedChangesError: any) {
+              console.error('[DEBUG] Error parsing applied changes:', appliedChangesError);
+              setSelectedScaleFactor(1.0);
+              setPersistedChanges([]);
+              setCurrentUnsavedChanges([]);
             }
-            
-            setSelectedScaleFactor(finalScaleFactor);
-            // Set baseline for both mise and saved entrypoints
-            // Baseline should always be 1.0 (original recipe scale), not the saved scale factor
-            setBaselineScaleFactor(1.0);
-          } catch (appliedChangesError: any) {
-            console.error('[DEBUG] Error parsing applied changes:', appliedChangesError);
+          } else {
+            console.log('[DEBUG] No appliedChanges URL param, defaulting to new recipe state');
+            // New recipe, no existing changes
             setSelectedScaleFactor(1.0);
             setPersistedChanges([]);
             setCurrentUnsavedChanges([]);
+            console.log('[INGREDIENT_LOCKING] New recipe initialized:', {
+              entryPoint,
+              persistedChanges: [],
+              currentUnsavedChanges: [],
+              recipeTitle: parsed.title,
+            });
+            // Set baseline for both mise and saved entrypoints
+            setBaselineScaleFactor(1.0);
+            setBaselineAppliedChanges([]);
           }
+        } catch (e: any) {
+          handleError('Error Loading Summary', e);
+        }
+      } else if (numericId && !isNaN(numericId)) {
+        // ✅ FIX: New path: fetch recipe by ID
+        console.log('[Summary] No recipeData, fetching by ID:', numericId);
+        const fetchedRecipe = await fetchCanonicalById(numericId);
+        
+        if (fetchedRecipe) {
+          setRecipe(fetchedRecipe);
+          setOriginalRecipe(fetchedRecipe);
+          const yieldNum = parseServingsValue(fetchedRecipe.recipeYield);
+          setOriginalYieldValue(yieldNum);
+          
+          // Set fresh scaling baseline for saved recipes
+          if (entryPoint === 'saved') {
+            console.log('[DEBUG] Setting fresh scaling baseline for fetched saved recipe');
+            setUnscaledIngredientGroups(fetchedRecipe.ingredientGroups ? [...fetchedRecipe.ingredientGroups] : []);
+            setBaselineScaleFactor(1);
+            setSelectedScaleFactor(1);
+          }
+          
+          // Reset image load failure state
+          setImageLoadFailed(false);
         } else {
-          console.log('[DEBUG] No appliedChanges URL param, defaulting to new recipe state');
-          // New recipe, no existing changes
-          setSelectedScaleFactor(1.0);
-          setPersistedChanges([]);
-          setCurrentUnsavedChanges([]);
-          console.log('[INGREDIENT_LOCKING] New recipe initialized:', {
-            entryPoint,
-            persistedChanges: [],
-            currentUnsavedChanges: [],
-            recipeTitle: parsed.title,
-          });
-          // Set baseline for both mise and saved entrypoints
-          setBaselineScaleFactor(1.0);
-          setBaselineAppliedChanges([]);
+          handleError('Error Loading Summary', 'Failed to fetch recipe from server.');
+        }
+      } else {
+        // ✅ FIX: Show friendly error instead of throwing
+        console.error('[Summary] Missing recipeId param');
+        handleError('Missing Recipe ID', 'Please provide a valid recipe ID to view this recipe.');
+      }
+      setIsLoading(false);
+    };
+
+    // ✅ FIX: Call the async function and handle errors properly
+    loadRecipe().catch((error) => {
+      console.error('[Summary] Error in loadRecipe:', error);
+      handleError('Error Loading Summary', error);
+      setIsLoading(false);
+    });
+  }, [params.recipeData, params.appliedChanges, numericId, entryPoint]); // Removed fetchCanonicalById and handleError dependencies
+
+  // Initialize title state when recipe is loaded
+  useEffect(() => {
+    if (recipe) {
+      const initialTitle = recipe.title || '';
+      setTitle(initialTitle);
+      originalTitleRef.current = initialTitle;
+      console.log('[Summary] 🏷️ Title state initialized:', { initialTitle, recipeId: recipe.id });
+    }
+  }, [recipe]);
+
+  // Add layout debugging
+  const onHeaderLayout = (event: any) => {
+    const { height, y } = event.nativeEvent.layout;
+    console.log('[Summary] 📐 Header layout:', { height, y });
+  };
+
+  const onScrollViewLayout = (event: any) => {
+    const { height, y } = event.nativeEvent.layout;
+    console.log('[Summary] 📐 ScrollView layout:', { height, y });
+  };
+
+  // Folder picker handlers for title editing (will be defined after API helpers)
+  const handleFolderPickerClose = useCallback(() => {
+    setIsFolderPickerVisible(false);
+    setPendingTitleSave(null);
+    setIsSavingTitle(false);
+    setIsEditingTitle(false);
+  }, []);
+
+  // API helper functions for title editing
+  const patchRecipeTitle = useCallback(async (recipeId: number, newTitle: string) => {
+    console.log('[Summary] 📡 PATCH request details:', {
+      recipeId,
+      newTitle,
+      endpoint: `/api/recipes/${recipeId}`,
+      hasAuthToken: !!session?.access_token,
+    });
+
+    const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+    if (!backendUrl) {
+      throw new Error('Backend API URL is not configured.');
+    }
+
+    const requestBody = { patch: { title: newTitle } };
+    console.log('[Summary] 📤 Request body:', requestBody);
+
+    const response = await fetch(`${backendUrl}/api/recipes/${recipeId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${session?.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    console.log('[Summary] 📥 PATCH response status:', response.status);
+
+    if (!response.ok) {
+      let errorData;
+      try {
+        errorData = await response.json();
+      } catch (parseError) {
+        console.error('[Summary] Failed to parse error response:', parseError);
+        throw new Error(`Failed to update title (Status: ${response.status})`);
+      }
+      console.error('[Summary] ❌ PATCH error response:', errorData);
+      throw new Error(errorData.error || `Failed to update title (Status: ${response.status})`);
+    }
+
+    const responseData = await response.json();
+    console.log('[Summary] ✅ PATCH success response:', {
+      hasData: !!responseData,
+      responseKeys: Object.keys(responseData || {}),
+      updatedTitle: responseData?.recipe?.title || responseData?.title,
+    });
+    return responseData;
+  }, [session?.access_token]);
+
+  const getSavedRecipes = useCallback(async (userId: string, baseRecipeId: number) => {
+    const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+    if (!backendUrl) {
+      throw new Error('Backend API URL is not configured.');
+    }
+
+    const response = await fetch(`${backendUrl}/api/saved/recipes?userId=${userId}&baseRecipeId=${baseRecipeId}`, {
+      headers: {
+        'Authorization': `Bearer ${session?.access_token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get saved recipes (Status: ${response.status})`);
+    }
+
+    return await response.json();
+  }, [session?.access_token]);
+
+  const saveModifiedRecipe = useCallback(async (data: {
+    originalRecipeId: number;
+    modifiedRecipeData: any;
+    userId: string;
+    appliedChanges?: any;
+    folderId?: number;
+    saved_id?: string;
+  }) => {
+    const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+    if (!backendUrl) {
+      throw new Error('Backend API URL is not configured.');
+    }
+
+    const response = await fetch(`${backendUrl}/api/recipes/save-modified`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session?.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Failed to save modified recipe (Status: ${response.status})`);
+    }
+
+    return await response.json();
+  }, [session?.access_token]);
+
+
+
+  // Helper function to get current applied changes
+  const getCurrentAppliedChanges = useCallback(() => {
+    return {
+      ingredientChanges: [...persistedChanges, ...currentUnsavedChanges],
+      scalingFactor: selectedScaleFactor,
+    };
+  }, [persistedChanges, currentUnsavedChanges, selectedScaleFactor]);
+
+  // Helper functions for recipe updates
+  const applyRecipeUpdate = useCallback((patchResponse: any) => {
+    // PATCH response has same structure as save-modified: { recipe: { id, is_user_modified, parent_recipe_id, recipe_data } }
+    const patchMetadata = patchResponse.recipe || patchResponse;
+    const patchRecipeData = patchMetadata.recipe_data || patchMetadata;
+    
+    const mergedRecipe = {
+      ...patchRecipeData,
+      id: patchMetadata.id,
+      is_user_modified: patchMetadata.is_user_modified,
+      parent_recipe_id: patchMetadata.parent_recipe_id,
+      source_type: 'user_modified',
+    };
+    
+    console.log('[Summary] 🔄 Applying recipe update:', {
+      recipeId: mergedRecipe.id,
+      title: mergedRecipe.title,
+      hasImage: !!mergedRecipe.image,
+      isUserModified: mergedRecipe.is_user_modified,
+    });
+    
+    setRecipe(mergedRecipe);
+    // Update cooking context if available
+    if (cookingContext.updateRecipe && mergedRecipe.id) {
+      cookingContext.updateRecipe(mergedRecipe.id.toString(), mergedRecipe);
+    }
+  }, [cookingContext]);
+
+  const replaceSummaryRecipeWith = useCallback((forkResponse: any) => {
+    // The server returns { recipe: { id, is_user_modified, parent_recipe_id, recipe_data } }
+    // We need to merge the metadata with the recipe_data
+    const forkMetadata = forkResponse.recipe || forkResponse;
+    const forkRecipeData = forkMetadata.recipe_data || forkMetadata;
+    
+    const mergedRecipe = {
+      ...forkRecipeData,
+      id: forkMetadata.id,
+      is_user_modified: forkMetadata.is_user_modified,
+      parent_recipe_id: forkMetadata.parent_recipe_id,
+      source_type: 'user_modified',
+    };
+    
+    console.log('[Summary] 🔀 Replacing recipe with fork:', {
+      forkId: mergedRecipe.id,
+      title: mergedRecipe.title,
+      hasImage: !!mergedRecipe.image,
+      isUserModified: mergedRecipe.is_user_modified,
+    });
+    
+    setRecipe(mergedRecipe);
+    // Update cooking context if available
+    if (cookingContext.updateRecipe && mergedRecipe.id) {
+      cookingContext.updateRecipe(mergedRecipe.id.toString(), mergedRecipe);
+    }
+  }, [cookingContext]);
+
+  // Folder picker handler for title editing (defined after API helpers)
+  const handleFolderSelected = useCallback(async (selectedFolderId: number) => {
+    if (!pendingTitleSave) {
+      console.error('[Summary] No pending title save data');
+      return;
+    }
+
+    const { cleanTitle, recipeId, userId } = pendingTitleSave;
+
+    try {
+      console.log('[Summary] 📁 Creating fork with folder selection:', {
+        recipeId,
+        cleanTitle,
+        selectedFolderId,
+      });
+
+      const forkResponse = await saveModifiedRecipe({
+        originalRecipeId: recipeId,
+        modifiedRecipeData: { ...recipe, title: cleanTitle },
+        userId,
+        appliedChanges: getCurrentAppliedChanges(),
+        folderId: selectedFolderId,
+      });
+
+      replaceSummaryRecipeWith(forkResponse);
+      originalTitleRef.current = cleanTitle;
+      showSuccess('Title saved', 'Recipe saved to folder with new title!');
+      console.log('[Summary] ✅ Fork created and saved to folder:', { selectedFolderId });
+
+    } catch (error: any) {
+      console.error('[Summary] ❌ Failed to save fork to folder:', error);
+      handleError('Could not save title', error.message || error);
+    } finally {
+      setIsFolderPickerVisible(false);
+      setPendingTitleSave(null);
+      setIsSavingTitle(false);
+      setIsEditingTitle(false);
+    }
+  }, [pendingTitleSave, recipe, saveModifiedRecipe, getCurrentAppliedChanges, replaceSummaryRecipeWith, showSuccess, handleError]);
+
+  // Main title save handler
+  const handleSaveTitle = useCallback(async () => {
+    const cleanTitle = title.trim();
+    const originalTitle = (originalTitleRef.current || '').trim();
+    const userId = session?.user?.id;
+    const recipeId = recipe?.id;
+    const isFork = (recipe as any)?.is_user_modified || recipe?.source_type === 'user_modified' || !!recipe?.parent_recipe_id;
+    
+    // For entryPoint 'new' or 'library', always treat as original (needs fork+save) even if technically a fork,
+    // because the user hasn't saved it anywhere yet
+    const shouldTreatAsOriginal = (entryPoint === 'new' || entryPoint === 'library') || !isFork;
+    const parentRecipeId = recipe?.parent_recipe_id;
+
+    console.log('[Summary] 🏷️ Title save attempt:', {
+      cleanTitle,
+      originalTitle,
+      recipeId,
+      userId: userId ? 'present' : 'missing',
+      hasChanged: cleanTitle !== originalTitle,
+      isFork,
+      shouldTreatAsOriginal,
+      entryPoint,
+      parentRecipeId,
+      recipeSourceType: recipe?.source_type,
+    });
+    
+    if (!cleanTitle || cleanTitle === originalTitle) {
+      console.log('[Summary] Title unchanged, skipping save');
+      setIsEditingTitle(false);
+      return;
+    }
+
+    if (!recipe || !session?.user?.id) {
+      console.error('[Summary] Missing recipe or user data for title save');
+      return;
+    }
+
+    // Prevent double execution
+    if (isSavingTitle) {
+      console.log('[Summary] Title save already in progress, skipping');
+      return;
+    }
+
+    // Use the variables declared above
+
+    if (!recipeId) {
+      console.error('[Summary] Missing recipe ID for title save');
+      return;
+    }
+
+    console.log('[Summary] Starting title save:', { recipeId, cleanTitle, isFork });
+    setIsSavingTitle(true);
+
+    try {
+      if (!shouldTreatAsOriginal) {
+        // PATCH in place for saved user forks (entryPoint 'saved' only)
+        console.log('[Summary] 🔀 PATCH title on saved fork:', { 
+          recipeId, 
+          cleanTitle,
+          currentTitle: recipe.title,
+          isUserModified: (recipe as any).is_user_modified,
+          sourceType: recipe.source_type,
+          parentRecipeId: recipe.parent_recipe_id,
+        });
+        const patchResponse = await patchRecipeTitle(recipeId, cleanTitle);
+        const updatedRecipe = patchResponse.recipe || patchResponse;
+        
+        console.log('[Summary] 📥 PATCH response:', {
+          hasRecipe: !!updatedRecipe,
+          updatedTitle: updatedRecipe?.title,
+          updatedId: updatedRecipe?.id,
+        });
+        
+        applyRecipeUpdate(updatedRecipe);
+        originalTitleRef.current = cleanTitle;
+        showSuccess('Title saved', 'Recipe title updated successfully');
+        console.log('[Summary] ✅ Fork title updated successfully');
+        return;
+      }
+
+      // Original recipe OR entryPoint 'new'/'library' - check if it's already saved
+      console.log('[Summary] Title edited on original; checking saved state', { recipeId, userId });
+      if (!userId) {
+        throw new Error('User ID is required for title save');
+      }
+      const savedResponse = await getSavedRecipes(userId, recipeId);
+      const savedRecipes = Array.isArray(savedResponse.recipes) ? savedResponse.recipes : [];
+      const hasSaved = savedRecipes.length > 0;
+
+      if (!hasSaved) {
+        // Original not saved → fork and maybe prompt for folder
+        console.log('[Summary] Original not saved; forking with new title');
+        
+        if (!userId) {
+          throw new Error('User ID is required for fork creation');
         }
         
+        const forkData = {
+          originalRecipeId: recipeId,
+          modifiedRecipeData: { ...recipe, title: cleanTitle },
+          userId,
+          appliedChanges: getCurrentAppliedChanges(),
+          // Include folderId if we know the folder context from params
+          ...(folderId && { folderId: Number(folderId) }),
+        };
 
-      } catch (e: any) {
-        handleError('Error Loading Summary', e);
+        // If no folder context, show folder picker
+        if (!folderId) {
+          console.log('[Summary] 📁 No folder context - showing folder picker');
+          setPendingTitleSave({ cleanTitle, recipeId, userId });
+          setIsFolderPickerVisible(true);
+          return; // Don't reset isSavingTitle yet - will be handled by folder picker
+        }
+
+        // Has folder context - save directly
+        const forkResponse = await saveModifiedRecipe(forkData);
+        replaceSummaryRecipeWith(forkResponse);
+        originalTitleRef.current = cleanTitle;
+        showSuccess('Title saved', 'Recipe forked with new title');
+        console.log('[Summary] ✅ Original forked with new title and saved to folder');
+        return;
       }
-    } else {
-      handleError('Error Loading Summary', 'Recipe data not provided.');
+
+      // Already saved → fork with saved_id to automatically retarget the saved row
+      console.log('[Summary] Original saved; forking with saved_id to retarget saved row');
+      const savedRow = savedRecipes[0];
+      
+      if (!userId) {
+        throw new Error('User ID is required for fork creation');
+      }
+      
+      const forkResponse = await saveModifiedRecipe({
+        originalRecipeId: recipeId,
+        modifiedRecipeData: { ...recipe, title: cleanTitle },
+        userId,
+        appliedChanges: getCurrentAppliedChanges(),
+        saved_id: savedRow.id, // This tells the backend to update the existing saved row
+      });
+
+      replaceSummaryRecipeWith(forkResponse);
+      originalTitleRef.current = cleanTitle;
+      showSuccess('Title saved', 'Recipe updated with new title');
+      console.log('[Summary] ✅ Original forked and saved row retargeted:', { 
+        savedRowId: savedRow.id 
+      });
+
+    } catch (error: any) {
+      console.error('[Summary] ❌ Title save failed:', {
+        error: error.message || error,
+        recipeId,
+        isFork,
+        cleanTitle,
+        errorStack: error.stack,
+      });
+      handleError('Could not save title', error.message || error);
+    } finally {
+      setIsSavingTitle(false);
+      setIsEditingTitle(false);
     }
-    setIsLoading(false);
-  }, [params.recipeData, params.appliedChanges, showError]);
+  }, [
+    title, 
+    recipe, 
+    session?.user?.id, 
+    folderId, 
+    patchRecipeTitle, 
+    getSavedRecipes, 
+    saveModifiedRecipe, 
+    getCurrentAppliedChanges, 
+    applyRecipeUpdate, 
+    replaceSummaryRecipeWith, 
+    showSuccess, 
+    handleError
+  ]);
 
   // Update hasModifications when scaling factor or applied changes change
   useEffect(() => {
@@ -1081,117 +1629,8 @@ export default function RecipeSummaryScreen() {
     }
   };
 
-  const navigateToNextScreen = React.useCallback(async () => {
-    // If we're coming from mise, we still need to apply any new modifications before going to steps
-    if (entryPoint === 'mise' && miseRecipeId) {
-      
-      
-      if (!recipe) {
-        console.error('[Summary] No recipe data available for navigation');
-        handleError('Navigation Error', 'Recipe data is missing.');
-        return;
-      }
-
-      const needsSubstitution = currentUnsavedChanges.length > 0;
-    const needsScaling = selectedScaleFactor !== 1;
-
-      // Use the recipe data directly (local modifications removed)
-      const baseRecipe = recipe;
-      
-      // If there are new modifications on this screen, apply them
-      if (needsSubstitution || needsScaling) {
-        
-        
-        try {
-      setIsRewriting(true);
-          
-          let finalInstructions = baseRecipe.instructions || [];
-          let newTitle: string | null = null;
-          
-        const backendUrl = process.env.EXPO_PUBLIC_API_URL!;
-          
-          // Flatten all ingredients from ingredient groups for scaling
-          const allIngredients: StructuredIngredient[] = [];
-          if (baseRecipe.ingredientGroups) {
-            baseRecipe.ingredientGroups.forEach(group => {
-              if (group.ingredients && Array.isArray(group.ingredients)) {
-                allIngredients.push(...group.ingredients);
-              }
-            });
-          }
-
-          const response = await fetch(`${backendUrl}/api/recipes/modify-instructions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-              originalInstructions: baseRecipe.instructions || [],
-            substitutions: currentUnsavedChanges.map((change) => ({
-              from: change.from,
-              to: change.to ? change.to.name : null,
-            })),
-              originalIngredients: allIngredients,
-              scaledIngredients: scaledIngredients || [],
-              scalingFactor: selectedScaleFactor,
-              skipTitleUpdate: !!params.titleOverride, // Skip title suggestions if title override exists
-          }),
-        });
-          
-        const result = await response.json();
-          if (!response.ok) throw new Error(result.error || `Modification failed (Status: ${response.status})`);
-          if (!result.modifiedInstructions) throw new Error('Invalid format for modified instructions.');
-          
-          finalInstructions = result.modifiedInstructions;
-        
-        // Capture new title if suggested by LLM
-        if (result.newTitle && result.newTitle.trim() !== '') {
-          newTitle = result.newTitle;
-        }
-
-          // Create the modified recipe for steps
-                  const modifiedRecipe = {
-          ...baseRecipe,
-          title: newTitle || baseRecipe.title,
-          recipeYield: getScaledYieldText(originalRecipe?.recipeYield || baseRecipe.recipeYield, selectedScaleFactor),
-          instructions: finalInstructions,
-          ingredientGroups: scaledIngredientGroups,
-        };
-
-        setIsRewriting(false);
-
-          router.push({
-            pathname: '/recipe/steps',
-            params: {
-              recipeData: JSON.stringify(modifiedRecipe),
-              miseRecipeId: miseRecipeId,
-              // Pass title_override if available
-              ...(params.titleOverride && {
-                titleOverride: params.titleOverride
-              }),
-            },
-          });
-          return;
-
-        } catch (modificationError: any) {
-          setIsRewriting(false);
-          handleError('Update Failed', modificationError);
-          return;
-        }
-      } else {
-        // No new modifications, use base recipe
-        router.push({
-          pathname: '/recipe/steps',
-          params: {
-            recipeData: JSON.stringify(baseRecipe),
-            miseRecipeId: miseRecipeId,
-            // Pass title_override if available
-            ...(params.titleOverride && {
-              titleOverride: params.titleOverride
-            }),
-          },
-        });
-        return;
-      }
-    }
+  const navigateToMise = React.useCallback(async () => {
+    // All cooking now goes through mise - no more steps routing
 
     // Regular flow for new/saved recipes
     const removalCount = [...persistedChanges, ...currentUnsavedChanges].filter((c) => !c.to).length;
@@ -1368,7 +1807,6 @@ export default function RecipeSummaryScreen() {
         body: JSON.stringify({
           userId: session?.user?.id,
           originalRecipeId: recipe.id,
-          originalRecipeData: originalRecipe || recipe, // Pass original recipe data directly
           preparedRecipeData: finalRecipeData,
           appliedChanges: appliedChangesData,
           finalYield: getScaledYieldText(originalRecipe?.recipeYield || recipe?.recipeYield, selectedScaleFactor),
@@ -1421,33 +1859,9 @@ export default function RecipeSummaryScreen() {
     }
   }, [recipe, scaledIngredients, scaledIngredientGroups, persistedChanges, currentUnsavedChanges, router, showError, selectedScaleFactor, session, entryPoint, miseRecipeId]);
 
-  const handleGoToSteps = () => InteractionManager.runAfterInteractions(navigateToNextScreen);
+  const handleGoToSteps = () => InteractionManager.runAfterInteractions(navigateToMise);
 
-  const handleGoToRecipeSteps = () => {
-    if (!preparedRecipeData) return;
-    
-    router.push({
-      pathname: '/recipe/steps',
-      params: {
-        originalId: recipe?.id?.toString() || '',
-        recipeData: JSON.stringify(preparedRecipeData),
-        editedInstructions: JSON.stringify(preparedRecipeData.instructions || []),
-        editedIngredients: JSON.stringify(preparedRecipeData.ingredientGroups || []),
-        newTitle: 'null', // Title is already in preparedRecipeData
-        appliedChanges: JSON.stringify({
-          ingredientChanges: [...persistedChanges, ...currentUnsavedChanges].map((change) => ({
-            from: change.from,
-            to: change.to ? change.to.name : null,
-          })),
-          scalingFactor: selectedScaleFactor,
-        }),
-        // Pass title_override if available
-        ...(params.titleOverride && {
-          titleOverride: params.titleOverride
-        }),
-      },
-    });
-  };
+  // Removed handleGoToRecipeSteps - no longer needed
 
   const handleGoToMise = () => {
     router.replace('/tabs/mise' as any);
@@ -1592,6 +2006,10 @@ export default function RecipeSummaryScreen() {
           // UPDATE THE EXISTING FORK
           console.log('[DEBUG] 🔧 Patching existing fork:', recipe?.id, 'parent_recipe_id:', recipe?.parent_recipe_id);
           
+          // Convert finalInstructions (string[]) to InstructionStep[] format for PATCH
+          const { normalizeInstructionsToSteps } = require('@/utils/recipeUtils');
+          const normalizedInstructions = normalizeInstructionsToSteps(finalInstructions);
+
           const patchResponse = await fetch(`${backendUrl}/api/recipes/${recipe?.id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -1599,7 +2017,7 @@ export default function RecipeSummaryScreen() {
               patch: {
                 title: newTitle || recipe?.title,
                 recipeYield: getScaledYieldText(originalRecipe?.recipeYield || recipe?.recipeYield, selectedScaleFactor),
-                instructions: finalInstructions,
+                instructions: normalizedInstructions,
                 ingredientGroups: scaledIngredientGroups,
               },
             }),
@@ -1631,16 +2049,15 @@ export default function RecipeSummaryScreen() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               originalRecipeId: recipe?.id,
-              originalRecipeData: originalRecipe || recipe, // Pass original recipe data directly
               userId: session.user.id,
               modifiedRecipeData,
               appliedChanges: appliedChangesData,
-              folderId, // Use the folder ID passed from the folder picker
+              folderId: folderId, // Use the folder ID passed from the folder picker
             }),
           });
 
           console.log('[DEBUG] Save modified API call with folderId:', {
-            folderId,
+            folderId: folderId,
             fromFolderPicker: true,
           });
 
@@ -1675,7 +2092,7 @@ export default function RecipeSummaryScreen() {
                 }),
                 entryPoint: 'saved',
                 from: '/saved',
-                folderId: folderId.toString(), // Use the folder ID from folder picker
+                folderId: folderId, // Use the folder ID from folder picker
                 isModified: 'true',
               },
             });
@@ -1833,8 +2250,8 @@ export default function RecipeSummaryScreen() {
         console.log('[Summary] Successfully modified instructions for cook now');
       }
 
-      // Create the recipe for steps
-      const recipeForSteps = {
+      // Create the recipe for mise and steps
+      const preparedRecipeData = {
         ...recipe,
         title: newTitle || recipe.title,
         recipeYield: getScaledYieldText(recipe.recipeYield, selectedScaleFactor),
@@ -1842,23 +2259,63 @@ export default function RecipeSummaryScreen() {
         ingredientGroups: scaledIngredientGroups,
       };
 
-      console.log('[Summary] Navigating to steps with recipe data:', {
-        title: recipeForSteps.title,
+      // Prepare applied changes for mise
+      const appliedChanges = {
+        ingredientChanges: currentUnsavedChanges.map((change) => ({
+          from: change.from,
+          to: change.to ? {
+            name: change.to.name,
+            amount: change.to.amount,
+            unit: change.to.unit,
+          } : null,
+        })),
+        scalingFactor: selectedScaleFactor,
+      };
+
+      console.log('[Summary] 🚀 Adding recipe to mise before cooking:', {
+        title: preparedRecipeData.title,
         hasModifications,
         instructionsCount: finalInstructions.length,
+        scalingFactor: selectedScaleFactor,
+        changesCount: currentUnsavedChanges.length,
       });
 
-      // Navigate to steps
-      router.push({
-        pathname: '/recipe/steps',
-        params: {
-          recipeData: JSON.stringify(recipeForSteps),
-          // Pass title_override if available
-          ...(params.titleOverride && {
-            titleOverride: params.titleOverride
-          }),
+      // Add recipe to mise first
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+      if (!backendUrl) {
+        throw new Error('Backend API URL is not configured.');
+      }
+
+      const miseResponse = await fetch(`${backendUrl}/api/mise/save-recipe`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          userId: session?.user?.id,
+          originalRecipeId: numericId,
+          preparedRecipeData,
+          appliedChanges,
+          finalYield: preparedRecipeData.recipeYield,
+          titleOverride: newTitle || params.titleOverride || null,
+        }),
       });
+
+      const miseResult = await miseResponse.json();
+      if (!miseResponse.ok) {
+        throw new Error(miseResult.error || miseResult.message || `Failed to add to mise (Status: ${miseResponse.status})`);
+      }
+
+      const miseRecipeId = miseResult.miseRecipe?.id;
+      console.log('[Summary] ✅ Successfully added to mise:', {
+        miseRecipeId,
+        recipeTitle: preparedRecipeData.title,
+      });
+
+      // Navigate to mise tab to show the recipe was added
+      showSuccess('Added to mise', 'Recipe ready for cooking!', 2000);
+      router.push('/tabs/mise');
 
     } catch (error: any) {
       console.error('[Summary] Error in cook now:', error);
@@ -2161,6 +2618,10 @@ export default function RecipeSummaryScreen() {
           // PATCH the existing fork
           console.log('[DEBUG] 🔧 Patching existing fork (base_recipe_id):', recipe.id);
           
+          // Convert finalInstructions (string[]) to InstructionStep[] format for PATCH
+          const { normalizeInstructionsToSteps } = require('@/utils/recipeUtils');
+          const normalizedInstructions = normalizeInstructionsToSteps(finalInstructions);
+          
           const patchResponse = await fetch(`${backendUrl}/api/recipes/${recipe.id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -2168,7 +2629,7 @@ export default function RecipeSummaryScreen() {
               patch: {
                 title: newTitle || recipe.title,
                 recipeYield: getScaledYieldText(originalRecipe?.recipeYield || recipe?.recipeYield, selectedScaleFactor),
-                instructions: finalInstructions,
+                instructions: normalizedInstructions,
                 ingredientGroups: scaledIngredientGroups,
               },
             }),
@@ -2179,7 +2640,17 @@ export default function RecipeSummaryScreen() {
             throw new Error(patchResult.error || 'Failed to update recipe');
           }
 
+          const patchData = await patchResponse.json();
           console.log('[DEBUG] ✅ Successfully patched existing fork');
+          
+          // ✅ FIX: Refresh local recipe state with server response
+          const updatedRecipeFromServer = patchData.recipe.recipe_data;
+          setRecipe(updatedRecipeFromServer);
+          
+          // ✅ FIX: Update cookingContext with the patched recipe
+          if (cookingContext.updateRecipe && recipe.id) {
+            cookingContext.updateRecipe(recipe.id.toString(), updatedRecipeFromServer);
+          }
           
         } else {
           // CREATE A FORK and update the saved recipe pointer
@@ -2206,11 +2677,10 @@ export default function RecipeSummaryScreen() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               originalRecipeId: recipe.id,
-              originalRecipeData: originalRecipe || recipe,
               userId: session.user.id,
               modifiedRecipeData,
               appliedChanges: appliedChangesData,
-              folderId: params.folderId ? parseInt(params.folderId) : undefined,
+              folderId: folderId, // Use the folder ID passed from the folder picker
               saved_id: savedRecipe.id, // Update existing saved recipe to point to new fork
             }),
           });
@@ -2223,18 +2693,22 @@ export default function RecipeSummaryScreen() {
           const forkData = await forkResponse.json();
           console.log('[DEBUG] ✅ Successfully created fork and updated saved recipe pointer:', forkData.newRecipeId);
           
-          // Navigate to the new fork so subsequent edits hit the PATCH path
+          // ✅ FIX: Refresh local recipe state with server response
+          const newRecipeFromServer = forkData.recipe.recipe_data;
+          setRecipe(newRecipeFromServer);
+          
+          // ✅ FIX: Update cookingContext with the new fork
+          if (cookingContext.updateRecipe && recipe.id) {
+            cookingContext.updateRecipe(recipe.id.toString(), newRecipeFromServer);
+          }
+          
+          // ✅ FIX: Navigate to the new fork using router.replace with fork ID
           router.replace({
             pathname: '/recipe/summary',
             params: {
-              recipeData: JSON.stringify({
-                ...modifiedRecipeData,
-                id: forkData.newRecipeId,
-                parent_recipe_id: recipe.id,
-                source_type: 'user_modified',
-              }),
+              recipeId: forkData.recipe.id.toString(), // Use the fork ID from server response
               entryPoint: 'saved',
-              folderId: params.folderId,
+              folderId: folderId,
               isModified: 'true',
             },
           });
@@ -2249,11 +2723,10 @@ export default function RecipeSummaryScreen() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             originalRecipeId: recipe.id,
-            originalRecipeData: originalRecipe || recipe,
             userId: session.user.id,
             modifiedRecipeData,
             appliedChanges: appliedChangesData,
-            folderId: params.folderId ? parseInt(params.folderId) : undefined,
+            folderId: folderId, // Use the folder ID passed from the folder picker
             // No saved_id for new/explore - this creates a new saved recipe
           }),
         });
@@ -2266,18 +2739,22 @@ export default function RecipeSummaryScreen() {
         const forkData = await forkResponse.json();
         console.log('[DEBUG] ✅ Successfully created fork for new/explore:', forkData.newRecipeId);
         
-        // Navigate to the new fork
+        // ✅ FIX: Refresh local recipe state with server response
+        const newRecipeFromServer = forkData.recipe.recipe_data;
+        setRecipe(newRecipeFromServer);
+        
+        // ✅ FIX: Update cookingContext with the new fork
+        if (cookingContext.updateRecipe && recipe.id) {
+          cookingContext.updateRecipe(recipe.id.toString(), newRecipeFromServer);
+        }
+        
+        // ✅ FIX: Navigate to the new fork using router.replace with fork ID
         router.replace({
           pathname: '/recipe/summary',
           params: {
-            recipeData: JSON.stringify({
-              ...modifiedRecipeData,
-              id: forkData.newRecipeId,
-              parent_recipe_id: recipe.id,
-              source_type: 'user_modified',
-            }),
+            recipeId: forkData.recipe.id.toString(), // Use the fork ID from server response
             entryPoint: 'saved', // Now it's saved
-            folderId: params.folderId,
+            folderId: folderId,
             isModified: 'true',
           },
         });
@@ -2291,19 +2768,12 @@ export default function RecipeSummaryScreen() {
         });
       }
 
-      // Update local recipe state with the newly saved data
-      const updatedRecipeData = {
-        ...recipe,
-        title: newTitle || recipe.title,
-        recipeYield: getScaledYieldText(originalRecipe?.recipeYield || recipe?.recipeYield, selectedScaleFactor),
-        instructions: finalInstructions,
-        ingredientGroups: scaledIngredientGroups,
-      };
-      setRecipe(updatedRecipeData);
+      // ✅ FIX: Local state is now updated above with server response data
+      // No need to manually construct updatedRecipeData here
       
       // Reset all baselines to 1× after successful save
       // Treat the newly saved data as the new 1× baseline to prevent double-scaling
-      setUnscaledIngredientGroups(updatedRecipeData.ingredientGroups ? [...updatedRecipeData.ingredientGroups] : []);
+      setUnscaledIngredientGroups(recipe?.ingredientGroups ? [...recipe.ingredientGroups] : []);
       setBaselineScaleFactor(1);
       setSelectedScaleFactor(1);
       
@@ -2317,7 +2787,7 @@ export default function RecipeSummaryScreen() {
       setBaselineAppliedChanges(newPersistedChanges);
       
       console.log('[DEBUG] ✅ All baselines reset after save:', {
-        unscaledGroupsCount: updatedRecipeData.ingredientGroups?.length || 0,
+        unscaledGroupsCount: recipe?.ingredientGroups?.length || 0,
         baselineScaleFactor: 1,
         selectedScaleFactor: 1,
         baselineAppliedChangesScaling: 1,
@@ -2341,24 +2811,32 @@ export default function RecipeSummaryScreen() {
   };
 
   if (isLoading) {
+    console.log('[Summary] ⏳ Showing loading screen');
     return (
-      <SafeAreaView style={styles.centeredStatusContainer}>
+      <View style={[styles.centeredStatusContainer, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color={COLORS.primary} />
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (!recipe) {
+    console.log('[Summary] ❌ No recipe data, showing error');
     return (
-      <SafeAreaView style={styles.centeredStatusContainer}>
+      <View style={[styles.centeredStatusContainer, { paddingTop: insets.top }]}>
       <InlineErrorBanner message="We couldn't load the recipe summary." showGoBackButton />
-      </SafeAreaView>
+      </View>
     );
   }
 
+  console.log('[Summary] 🎨 Rendering main UI with recipe:', {
+    id: recipe.id,
+    title: recipe.title,
+    hasImage: !!recipe.image,
+  });
+
   return (
     <PanGestureHandler onHandlerStateChange={onSwipeGesture}>
-      <SafeAreaView style={styles.container}>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Modals */}
       {substitutionModalVisible && selectedIngredientOriginalData && (
         <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }} pointerEvents="box-none">
@@ -2371,12 +2849,80 @@ export default function RecipeSummaryScreen() {
           />
         </View>
       )}
-      
-      <ScreenHeader 
-        title={cleanTitle || 'Recipe'} 
-        showBack={true} 
-        onTitlePress={() => setIsTitleModalVisible(true)}
+
+      {/* Folder Picker Modal for title editing */}
+      <FolderPickerModal
+        visible={isFolderPickerVisible}
+        onClose={handleFolderPickerClose}
+        onSelectFolder={handleFolderSelected}
+        isLoading={false}
       />
+      
+      {/* Custom Header with Editable Title */}
+      <View style={styles.customHeader} onLayout={onHeaderLayout}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textDark} />
+        </TouchableOpacity>
+        {isEditingTitle ? (
+          <TextInput
+            style={[styles.headerTitle, styles.headerTitleInput]}
+            value={title}
+            onChangeText={setTitle}
+            editable={!isSavingTitle}
+            maxLength={100}
+            returnKeyType="done"
+            onSubmitEditing={handleSaveTitle}
+            onBlur={() => {
+              // Only save on blur if not already saving
+              if (!isSavingTitle) {
+                handleSaveTitle();
+              }
+            }}
+            autoFocus={true}
+            multiline={false}
+            numberOfLines={1}
+          />
+        ) : (
+          <TouchableOpacity
+            style={styles.headerTitleTouchable}
+            onPress={() => setIsEditingTitle(true)}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.headerTitle} numberOfLines={2} ellipsizeMode="tail">
+              {title || 'Recipe'}
+            </Text>
+          </TouchableOpacity>
+        )}
+        <View style={styles.headerRight}>
+          {isEditingTitle && (
+            <TouchableOpacity
+              style={styles.headerActionButton}
+              onPress={handleSaveTitle}
+              disabled={isSavingTitle || title.trim() === originalTitleRef.current.trim()}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              {isSavingTitle ? (
+                <ActivityIndicator size="small" color={COLORS.primary} />
+              ) : (
+                <MaterialCommunityIcons
+                  name="check"
+                  size={24}
+                  color={
+                    title.trim() === originalTitleRef.current.trim() 
+                      ? COLORS.textMuted 
+                      : COLORS.primary
+                  }
+                />
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
 
       {/* Sharp divider to separate title from content */}
       <View style={styles.titleDivider} />
@@ -2384,6 +2930,7 @@ export default function RecipeSummaryScreen() {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        onLayout={onScrollViewLayout}
       >
         {/* Recipe image - only render if image exists */}
         {(() => {
@@ -2586,12 +3133,56 @@ export default function RecipeSummaryScreen() {
         isAlreadyInMise={isAlreadyInMise}
       />
       
-    </SafeAreaView>
+    </View>
     </PanGestureHandler>
   );
 }
 
 const styles = StyleSheet.create({
+  customHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.pageHorizontal,
+    paddingTop: SPACING.pageHorizontal, // Use paddingTop instead of marginTop for consistent spacing
+    paddingBottom: SPACING.md,
+    minHeight: 44 + SPACING.md,
+  } as ViewStyle,
+  backButton: {
+    padding: SPACING.xs,
+    width: 44,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  } as ViewStyle,
+  headerTitle: {
+    ...screenTitleText,
+    color: COLORS.textDark,
+    flex: 1,
+    textAlign: 'center',
+  } as TextStyle,
+  headerTitleInput: {
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+    borderRadius: RADIUS.sm,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  } as TextStyle,
+  headerTitleTouchable: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  } as ViewStyle,
+  headerRight: {
+    width: 44,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  } as ViewStyle,
+  headerActionButton: {
+    padding: SPACING.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
+  } as ViewStyle,
   container: { flex: 1, backgroundColor: COLORS.background },
   scrollContent: {
     paddingHorizontal: SPACING.pageHorizontal,

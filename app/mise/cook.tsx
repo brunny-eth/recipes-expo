@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import FolderPickerModal from '@/components/FolderPickerModal';
 import {
   View,
   Text,
@@ -14,6 +15,7 @@ import {
   FlatList,
   NativeSyntheticEvent, // Import this for type safety for onScroll event
   NativeScrollEvent, // Import this for type safety for onScroll event
+  TextInput,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -21,10 +23,14 @@ import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useKeepAwake } from 'expo-keep-awake';
+import uuid from 'react-native-uuid';
+import isEqual from 'fast-deep-equal';
+import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
 
 import { useCooking } from '@/context/CookingContext';
 import { useAuth } from '@/context/AuthContext';
 import { useErrorModal } from '@/context/ErrorModalContext';
+import { useSuccessModal } from '@/context/SuccessModalContext';
 import { useAnalytics } from '@/utils/analytics';
 import { createLogger } from '@/utils/logger';
 import { COLORS, SPACING, RADIUS, OVERLAYS, SHADOWS, BORDER_WIDTH } from '@/constants/theme';
@@ -44,14 +50,23 @@ import {
   autoScrollToNextStep 
 } from '@/utils/stepUtils';
 import { abbreviateUnit } from '@/utils/format';
+import { isUserFork, normalizeInstructionsToSteps, InstructionStep } from '@/utils/recipeUtils';
+
+type LocalStep = InstructionStep;
 
 export default function CookScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { session } = useAuth();
+  
+  // ✅ INSTRUMENTATION: Log route params immediately
+  console.log('[COOK] params', { miseId: params.miseId, recipeId: params.recipeId });
+  
   // Access the entire context objects
   const cookingContext = useCooking();
+  const { selectedMiseId } = cookingContext;
   const errorModalContext = useErrorModal();
+  const successModalContext = useSuccessModal();
   const { track } = useAnalytics();
   const logger = createLogger('CookScreen');
 
@@ -61,6 +76,7 @@ export default function CookScreen() {
   // This is a key change to potentially avoid stale closures in production builds.
   const { state, initializeSessions, endSession, endAllSessions, hasResumableSession, completeStep, uncompleteStep } = cookingContext;
   const { showError } = errorModalContext;
+  const { showSuccess } = successModalContext;
 
 
   // Removed debug logging - production ready
@@ -69,6 +85,7 @@ export default function CookScreen() {
   const [recipes, setRecipes] = useState<CombinedParsedRecipe[]>([]);
   const appState = useRef(AppState.currentState);
   const scrollViewRef = useRef<ScrollView>(null);
+  const flatListRef = useRef<any>(null);
 
   // --- Ingredient Tooltip State ---
   const [selectedIngredient, setSelectedIngredient] = useState<StructuredIngredient | null>(null);
@@ -97,6 +114,151 @@ export default function CookScreen() {
   // Add scroll position throttling
   const scrollPositionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // --- Step Management State ---
+  const [steps, setSteps] = useState<LocalStep[]>([]);
+  const [baselineSteps, setBaselineSteps] = useState<LocalStep[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [initializedFromCanonical, setInitializedFromCanonical] = useState(false);
+  // --- End Step Management State ---
+
+  // --- Step Note Modal State ---
+  const [noteModalVisible, setNoteModalVisible] = useState(false);
+  const [editingStepId, setEditingStepId] = useState<string | null>(null);
+  const [tempNoteText, setTempNoteText] = useState('');
+  // --- End Step Note Modal State ---
+
+  // --- Mise Context State ---
+  const [canonicalRecipeData, setCanonicalRecipeData] = useState<CombinedParsedRecipe | null>(null);
+  
+  // Use selectedMiseId from cooking context as the miseId
+  const miseId = selectedMiseId;
+  const [folderPickerVisible, setFolderPickerVisible] = useState(false);
+  const [reloadVersion, setReloadVersion] = useState(0); // ✅ FIX: Force re-fetch after save operations
+  
+  // Track last saved recipe info to avoid re-querying
+  const [lastSaved, setLastSaved] = useState<{savedId: string, baseRecipeId: number} | null>(null);
+
+  // Debug: Log state changes
+  
+  useEffect(() => {
+    console.log('[DEBUG] 🔍 canonicalRecipeData changed to:', canonicalRecipeData?.id);
+  }, [canonicalRecipeData]);
+  
+  useEffect(() => {
+    console.log('[DEBUG] 🔍 reloadVersion changed to:', reloadVersion);
+  }, [reloadVersion]);
+
+  // Selection change logging
+  useEffect(() => {
+    console.log('[COOK] selection change', { selectedMiseId });
+  }, [selectedMiseId]);
+
+  useEffect(() => {
+    console.log('[COOK] canonicalRecipeData change', { id: canonicalRecipeData?.id });
+  }, [canonicalRecipeData?.id]);
+  // --- End Mise Context State ---
+
+  // Fetch canonical recipe from mise pointer (stale-response safe)
+  const lastRequestRef = useRef<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const fetchCanonicalRecipeFromMise = useCallback(async (miseId: string, accessToken: string) => {
+    console.log('[COOK] fetchCanonicalFromMise', { miseId });
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const requestKey = `${miseId}-${Date.now()}`;
+    lastRequestRef.current = requestKey;
+    const start = Date.now();
+    try {
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+      if (!backendUrl) {
+        console.error('[DEBUG] ❌ API configuration error: EXPO_PUBLIC_API_URL is not defined.');
+        return;
+      }
+
+      console.log('[DEBUG] 🔍 Fetching canonical recipe for mise:', miseId);
+      
+      const response = await fetch(`${backendUrl}/api/mise/recipes/${miseId}?userId=${session?.user.id}`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        console.error('[DEBUG] ❌ Failed to fetch canonical recipe:', response.status, response.statusText);
+        return;
+      }
+
+      const data = await response.json();
+      const end = Date.now();
+      const isLatest = lastRequestRef.current === requestKey;
+      console.log('[Cook] canonical loaded', {
+        id: data.recipe?.id,
+        hasInstructions: Array.isArray(data.recipe?.instructions),
+        length: Array.isArray(data.recipe?.instructions) ? data.recipe.instructions.length : null,
+        ms: end - start,
+        applied: isLatest,
+      });
+      
+      // Store canonical recipe data for use in save operations
+      if (isLatest && data.recipe) setCanonicalRecipeData(data.recipe);
+    } catch (error) {
+      console.error('[DEBUG] ❌ Error fetching canonical recipe:', error);
+    }
+  }, [session?.user.id, session?.access_token, session?.user?.id]);
+
+  // Drive fetch by selectedMiseId only
+  useFocusEffect(
+    useCallback(() => {
+      if (!selectedMiseId || !session?.access_token) return;
+      console.log('[COOK] fetchCanonicalFromMise', { miseId: selectedMiseId });
+      fetchCanonicalRecipeFromMise(selectedMiseId, session.access_token);
+    }, [selectedMiseId, session?.access_token])
+  );
+
+  // ✅ FIX: Fetch canonical recipe by ID (for direct access from saved recipes)
+  const fetchCanonicalRecipeById = useCallback(async (recipeId: string, accessToken: string) => {
+    console.log('[COOK] fetchCanonicalById', { id: recipeId });
+    try {
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+      if (!backendUrl) {
+        console.error('[DEBUG] ❌ API configuration error: EXPO_PUBLIC_API_URL is not defined.');
+        return;
+      }
+
+      console.log('[DEBUG] 🔍 Fetching canonical recipe by ID:', recipeId);
+      
+      const response = await fetch(`${backendUrl}/api/recipes/${recipeId}`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        console.error('[DEBUG] ❌ Failed to fetch canonical recipe by ID:', response.status, response.statusText);
+        return;
+      }
+
+      const data = await response.json();
+      console.log('[Cook] canonical loaded', {
+        id: data?.id,
+        hasInstructions: Array.isArray(data?.instructions),
+        length: Array.isArray(data?.instructions) ? data.instructions.length : null,
+      });
+      
+      // Store canonical recipe data for use in save operations
+      setCanonicalRecipeData(data);
+    } catch (error) {
+      console.error('[DEBUG] ❌ Error fetching canonical recipe by ID:', error);
+    }
+  }, []);
+
   // NEW: handleScroll function for onScroll prop - tracks current scroll position in state
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const scrollY = event.nativeEvent.contentOffset.y;
@@ -122,6 +284,42 @@ export default function CookScreen() {
   // Keep screen awake while cooking
   useKeepAwake();
 
+  // Get the current recipe from the context state
+  const currentRecipeSession = useMemo(() => 
+    cookingContext.state.activeRecipes.find(
+      recipe => recipe.recipeId === cookingContext.state.activeRecipeId
+    ), [cookingContext.state.activeRecipes, cookingContext.state.activeRecipeId]
+  );
+  const currentRecipeData = useMemo(() => 
+    currentRecipeSession?.recipe, [currentRecipeSession]
+  ); // Get the actual CombinedParsedRecipe object
+
+  // Initialize steps when canonical recipe data changes (only once per recipe ID)
+  // Reset init and clear steps when canonical changes
+  useEffect(() => {
+    console.log('[COOK] canonicalRecipeData change', { id: canonicalRecipeData?.id });
+    setInitializedFromCanonical(false);
+    setSteps([]);
+    setBaselineSteps([]);
+  }, [canonicalRecipeData?.id]);
+
+  // Initialize steps once per recipe id
+  useEffect(() => {
+    console.log('[COOK] init steps check', { initializedFromCanonical, id: canonicalRecipeData?.id, stepsLen: steps.length });
+    if (!canonicalRecipeData?.id) return;
+    if (initializedFromCanonical || steps.length > 0) return;
+    const norm = normalizeInstructionsToSteps(canonicalRecipeData.instructions);
+    console.log('[COOK] initializing steps for', canonicalRecipeData.id, { normLen: norm.length });
+    setSteps(norm);
+    setBaselineSteps(norm);
+    setInitializedFromCanonical(true);
+  }, [canonicalRecipeData?.id, initializedFromCanonical, steps.length]);
+
+  // Reset initialization flag when recipe ID changes
+  useEffect(() => {
+    setInitializedFromCanonical(false);
+  }, [canonicalRecipeData?.id]);
+
   // Timer and scroll cleanup - only on component unmount
   useEffect(() => {
     return () => {
@@ -138,12 +336,11 @@ export default function CookScreen() {
     };
   }, []); // Empty dependency array = only runs on unmount
 
-  // Main data fetching and session initialization logic
+  // Load sessions only - canonical fetching is now driven by selectedMiseId
   useFocusEffect(
     useCallback(() => {
       const loadAndInitializeRecipes = async () => {
         setIsLoading(true);
-        const initialRecipeIdFromParams = params.recipeId ? String(params.recipeId) : undefined;
 
         try {
           // Check if we already have active sessions - if so, don't clear them
@@ -286,7 +483,7 @@ export default function CookScreen() {
               // DEFENSIVE: Extract context function to local constant to prevent minification issues
               const initializeSessionsFn = cookingContext.initializeSessions;
               if (typeof initializeSessionsFn === 'function') {
-                initializeSessionsFn(miseRecipes, initialRecipeIdFromParams); // Pass initialActiveRecipeId
+                initializeSessionsFn(miseRecipes); // No initial recipe needed - auto-selected by context
               } else {
                 logger.error('initializeSessions function is undefined', {
                   contextFunctionType: typeof cookingContext.initializeSessions,
@@ -298,8 +495,7 @@ export default function CookScreen() {
                 errorType: typeof error,
                 errorMessage: error instanceof Error ? error.message : String(error),
                 errorStack: error instanceof Error ? error.stack : 'No stack trace',
-                miseRecipesCount: miseRecipes.length,
-                initialRecipeId: initialRecipeIdFromParams
+                miseRecipesCount: miseRecipes.length
               });
               
               // Continue without sessions rather than crashing the app
@@ -329,8 +525,8 @@ export default function CookScreen() {
       return () => {
         // Cleanup function
       };
-    }, [session?.user?.id, session?.access_token, params.recipeId, errorModalContext])
-      ); // Always fetch fresh data - no context dependencies needed
+    }, [cookingContext.state.activeRecipes.length, session?.access_token, session?.user?.id])
+  );
 
   // Handle app state changes for timer management
   useEffect(() => {
@@ -354,7 +550,7 @@ export default function CookScreen() {
         });
       }
     };
-  }, []);
+  }, [logger]);
 
   // REMOVED: Dummy function no longer needed - using real context function with defensive checks
 
@@ -364,17 +560,20 @@ export default function CookScreen() {
       // Extract context functions to local constants to prevent minification issues
       const setScrollPositionFn = cookingContext.setScrollPosition;
       const switchRecipeFn = cookingContext.switchRecipe;
+      const selectMiseRecipeFn = (cookingContext as any).selectMiseRecipe as (id: string)=>void;
       const getCurrentScrollPositionFn = cookingContext.getCurrentScrollPosition;
       const showErrorFn = errorModalContext.showError;
 
       // Defensive checks - if any context function is undefined, bail out
       if (typeof setScrollPositionFn !== 'function' || 
           typeof switchRecipeFn !== 'function' || 
+          typeof selectMiseRecipeFn !== 'function' || 
           typeof getCurrentScrollPositionFn !== 'function' || 
           typeof showErrorFn !== 'function') {
         logger.error('Context functions are undefined, aborting recipe switch', {
           setScrollPositionType: typeof setScrollPositionFn,
           switchRecipeType: typeof switchRecipeFn,
+          selectMiseRecipeType: typeof selectMiseRecipeFn,
           getCurrentScrollPositionType: typeof getCurrentScrollPositionFn,
           showErrorType: typeof showErrorFn,
           targetRecipeId: recipeId
@@ -390,8 +589,10 @@ export default function CookScreen() {
         setScrollPositionFn(prevId, scrollYToSave);
       }
 
-      // Switch to the new recipe
+      // Switch to the new recipe and drive selection
       switchRecipeFn(recipeId);
+      console.log('[COOK] tab selected', { recipeId });
+      selectMiseRecipeFn(recipeId);
 
       // Scroll to the new recipe's saved position
       const newScrollY = getCurrentScrollPositionFn(recipeId);
@@ -415,8 +616,428 @@ export default function CookScreen() {
         showErrorFn('Recipe Switch Error', 'Failed to switch recipe. Please try again.');
       }
     }
-  }, [cookingContext, errorModalContext, currentScrollY]);
+  }, [cookingContext, errorModalContext, currentScrollY, logger, session?.user?.id]);
 
+
+  // Check if steps have changed from baseline using useMemo for performance
+  const hasChanges = useMemo(() => {
+    const changed = !isEqual(steps, baselineSteps);
+    if (changed) {
+      console.log('🔍 DEBUG: hasChanges =', changed);
+      console.log('🔍 Recipe analysis:', {
+        recipeId: currentRecipeData?.id,
+        isUserFork: currentRecipeData ? isUserFork(currentRecipeData) : false,
+        sourceType: currentRecipeData?.source_type,
+        parentRecipeId: currentRecipeData?.parent_recipe_id
+      });
+    }
+    return changed;
+  }, [steps, baselineSteps, currentRecipeData]);
+
+  // Save modified steps to backend
+  const handleSaveSteps = useCallback(async () => {
+    // Use canonical recipe data if available, otherwise fall back to currentRecipeData
+    const canonicalId = canonicalRecipeData?.id || currentRecipeData?.id;
+    const recipeToSave = canonicalRecipeData || currentRecipeData;
+    
+    if (!recipeToSave || !canonicalId || !session?.access_token || !hasChanges) {
+      return;
+    }
+
+    setIsSaving(true);
+    
+    try {
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+      if (!backendUrl) {
+        throw new Error('API configuration error: EXPO_PUBLIC_API_URL is not defined.');
+      }
+
+      const headers = {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      };
+
+      // 1. If recipe is a fork (is_user_modified === true): PATCH the fork
+      if (isUserFork(recipeToSave)) {
+        console.log('[Cook] PATCHing fork id=', canonicalId);
+        
+        const patchResponse = await fetch(`${backendUrl}/api/recipes/${canonicalId}`, {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify({
+            patch: {
+              instructions: steps
+            }
+          }),
+        });
+
+        if (!patchResponse.ok) {
+          const errorData = await patchResponse.json();
+          throw new Error(errorData.error || `Failed to patch recipe: ${patchResponse.statusText}`);
+        }
+
+        const patchData = await patchResponse.json();
+        
+        // Optimistic save: only update baseline, keep current steps as-is
+        if (patchData.recipe?.recipe_data) {
+          const updatedRecipeFromServer = patchData.recipe.recipe_data;
+          const norm = normalizeInstructionsToSteps(updatedRecipeFromServer.instructions);
+          setBaselineSteps(norm);
+          // Keep current 'steps' as-is (they match what we just saved)
+          
+          // CRITICAL: Update cooking context with the patched recipe data
+          if (cookingContext.updateRecipe && currentRecipeData?.id) {
+            cookingContext.updateRecipe(currentRecipeData.id.toString(), updatedRecipeFromServer);
+            console.log('[Cook] Updated cooking context with patched fork data');
+          }
+        }
+        
+        // Show success toast
+        showSuccess('Saved', 'Recipe changes saved successfully', 2000);
+        
+      } else {
+        // 2. If recipe is original: Determine if it came from a saved recipe or is truly unsaved
+        
+        // Check if this recipe came from mise and originated from a saved recipe
+        const currentMiseRecipe = currentRecipeSession;
+        const isFromMise = !!miseId && !!currentMiseRecipe;
+        
+        console.log('[Cook] Recipe context:', {
+          canonicalId,
+          isFromMise,
+          miseId,
+          currentRecipeId: currentRecipeData?.id,
+          originalRecipeId: (currentRecipeData as any)?.originalRecipeId
+        });
+        
+        // Check for existing saved recipe entry
+        let savedId = null;
+        try {
+          const response = await fetch(`${backendUrl}/api/saved/recipes?userId=${session.user.id}&baseRecipeId=${canonicalId}`);
+          
+          if (response.ok) {
+            const data = await response.json();
+            const recipesArray = data.recipes || [];
+            const existingSavedRecipe = recipesArray.find((r: any) => 
+              String(r.base_recipe_id) === String(canonicalId)
+            );
+            
+            if (existingSavedRecipe) {
+              savedId = existingSavedRecipe.id;
+            }
+          }
+        } catch (error) {
+          console.warn('[Cook] Failed to check for existing saved recipe:', error);
+          // Continue without saved_id
+        }
+        
+        console.log('[COOK] save decision', { 
+          canonicalId, 
+          lastSavedBaseId: lastSaved?.baseRecipeId, 
+          willPatch: isUserFork(recipeToSave), 
+          willPromptFolder: !savedId && !lastSaved 
+        });
+        
+        // Check if we already know this recipe is saved (avoid re-querying)
+        const isKnownSaved = lastSaved && lastSaved.baseRecipeId === canonicalId;
+        
+        if (savedId || isKnownSaved) {
+          // Recipe has an existing saved entry - update it to point to new fork
+          console.log('[Cook] Recipe already saved, updating existing saved entry');
+          
+          const saveResponse = await fetch(`${backendUrl}/api/recipes/save-modified`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              originalRecipeId: canonicalId,
+              userId: session.user.id,
+              modifiedRecipeData: {
+                ...recipeToSave,
+                instructions: steps
+              },
+              appliedChanges: {
+                ingredientChanges: [],
+                scalingFactor: 1
+              },
+              saved_id: savedId || lastSaved?.savedId, // Use known saved ID if available
+            }),
+          });
+
+          if (!saveResponse.ok) {
+            const errorData = await saveResponse.json();
+            throw new Error(errorData.error || `Failed to create fork: ${saveResponse.statusText}`);
+          }
+
+          const saveResult = await saveResponse.json();
+          const newRecipeId = saveResult.recipe?.id;
+          const savedRecordId = saveResult.userSavedRecordId;
+          
+          console.log('[COOK] fork success', { 
+            forkId: newRecipeId, 
+            savedId: savedRecordId || savedId || lastSaved?.savedId, 
+            replacingOriginal: canonicalId 
+          });
+          
+          // CRITICAL: Promote fork to canonical and update saved info
+          if (saveResult.recipe?.recipe_data) {
+            const updatedRecipeFromServer = {
+              ...saveResult.recipe.recipe_data,
+              id: newRecipeId // CRITICAL: Add the fork ID to the recipe data
+            };
+            
+            // Update canonical recipe data to the fork
+            setCanonicalRecipeData(updatedRecipeFromServer);
+            
+            // Update baseline steps
+            const norm = normalizeInstructionsToSteps(updatedRecipeFromServer.instructions);
+            setBaselineSteps(norm);
+            
+            // Update saved info cache
+            if (newRecipeId) {
+              setLastSaved({ 
+                savedId: savedRecordId || savedId || lastSaved?.savedId || '', 
+                baseRecipeId: newRecipeId 
+              });
+            }
+            
+            // Update cooking context with the new fork data
+            if (cookingContext.updateRecipe && currentRecipeData?.id) {
+              cookingContext.updateRecipe(currentRecipeData.id.toString(), updatedRecipeFromServer);
+              console.log('[Cook] Updated cooking context with new fork data');
+            }
+          }
+          
+          // Show success toast
+          showSuccess('Saved', 'Recipe changes saved successfully', 2000);
+          
+          // If we're in a mise context, update the mise pointer to point to the new fork
+          if (miseId && newRecipeId) {
+            try {
+              const updateMiseResponse = await fetch(`${backendUrl}/api/mise/recipes/${miseId}`, {
+                method: 'PUT',
+                headers,
+                body: JSON.stringify({
+                  userId: session.user.id,
+                  originalRecipeId: newRecipeId, // Point to the new fork
+                }),
+              });
+              
+              if (!updateMiseResponse.ok) {
+                console.warn('[Cook] Failed to update mise pointer, but fork was created successfully');
+              } else {
+                console.log('[CTX] updateMiseRecipe', { miseId, newOriginalRecipeId: newRecipeId });
+              }
+            } catch (error) {
+              console.warn('[Cook] Error updating mise pointer:', error);
+            }
+          }
+        } else {
+          // Recipe has no saved entry - prompt user for folder selection
+          console.log('[Cook] Recipe is unsaved, prompting for folder selection');
+          setFolderPickerVisible(true);
+          return; // Exit early - the actual save will happen in the folder picker callback
+        }
+      }
+
+    } catch (error) {
+      logger.error('Error saving recipe steps', {
+        errorMessage: error instanceof Error ? error.message : String(error),
+        recipeId: canonicalId
+      });
+      
+      if (typeof errorModalContext.showError === 'function') {
+        errorModalContext.showError('Save Error', 'Failed to save changes. Please try again.');
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  }, [canonicalRecipeData, currentRecipeData, session?.access_token, hasChanges, errorModalContext, successModalContext, steps, miseId, showSuccess]);
+
+  // Note modal functions
+  const openNoteModal = (stepId: string) => {
+    const step = steps.find(s => s.id === stepId);
+    setEditingStepId(stepId);
+    setTempNoteText(step?.note || '');
+    setNoteModalVisible(true);
+  };
+
+  const closeNoteModal = () => {
+    setNoteModalVisible(false);
+    setEditingStepId(null);
+    setTempNoteText('');
+  };
+
+  const saveNote = () => {
+    if (editingStepId) {
+      setSteps(prev => prev.map(s => 
+        s.id === editingStepId 
+          ? { ...s, note: tempNoteText.trim() || undefined }
+          : s
+      ));
+    }
+    closeNoteModal();
+  };
+
+  const toggleStepCompleted = async (recipeId: string, stepIndex: number) => {
+    // Find the current recipe and toggle the step
+    const currentRecipeSession = cookingContext.state.activeRecipes.find(r => r.recipeId === recipeId);
+    if (!currentRecipeSession || !currentRecipeSession.recipe) {
+      await track('step_toggle_failed', { 
+        reason: 'no_recipe_session',
+        recipeId,
+        stepIndex,
+        hasCurrentRecipeSession: !!currentRecipeSession,
+        hasRecipeData: !!currentRecipeSession?.recipe
+      });
+      return;
+    }
+
+    // DEFENSIVE: Extract context functions to local constants to prevent minification issues
+    const completeStepFn = cookingContext.completeStep;
+    const uncompleteStepFn = cookingContext.uncompleteStep;
+
+    if (typeof completeStepFn !== 'function' || typeof uncompleteStepFn !== 'function') {
+      logger.error('Context step functions are undefined', {
+        completeStepType: typeof completeStepFn,
+        uncompleteStepType: typeof uncompleteStepFn,
+        recipeId,
+        stepIndex
+      });
+      return;
+    }
+
+    const stepId = String(stepIndex); // Ensure stepId is a string
+    const isCompleted = currentRecipeSession.completedSteps.includes(stepId);
+    
+    // Convert completedSteps array to StepCompletionState object for utilities
+    const completedStepsState: StepCompletionState = {};
+    currentRecipeSession.completedSteps.forEach(sId => {
+      completedStepsState[parseInt(sId)] = true;
+    });
+    
+    if (isCompleted) {
+      // Remove from completed steps
+      uncompleteStepFn(recipeId, stepId);
+    } else {
+      // Add to completed steps
+      completeStepFn(recipeId, stepId);
+      
+      // Auto-scroll to next uncompleted step
+      if (steps.length > 0 && flatListRef.current) {
+        const nextUncompletedIndex = steps.findIndex(
+          (_, sIndex) => sIndex > stepIndex && !completedStepsState[sIndex]
+        );
+        
+        if (nextUncompletedIndex !== -1) {
+          setTimeout(() => {
+            flatListRef.current?.scrollToIndex({
+              index: nextUncompletedIndex,
+              animated: true,
+              viewPosition: 0.3, // Show the step in upper third of screen
+            });
+          }, 300);
+        }
+      }
+    }
+  };
+
+  // Render function for draggable steps
+  const renderStepItem = useCallback(({ item, drag, isActive }: RenderItemParams<LocalStep>) => {
+    // Convert completedSteps array to StepCompletionState object
+    const completedStepsState: StepCompletionState = {};
+    if (currentRecipeSession?.completedSteps) {
+      currentRecipeSession.completedSteps.forEach(stepId => {
+        completedStepsState[parseInt(stepId)] = true;
+      });
+    }
+    
+    const stepIndex = steps.findIndex(s => s.id === item.id);
+    const stepIsCompleted = isStepCompleted(stepIndex, completedStepsState);
+    const stepIsActive = isStepActive(stepIndex, steps.map(s => s.text), completedStepsState);
+    
+    // Flatten ingredients from ingredient groups for highlighting
+    const flatIngredients: StructuredIngredient[] = [];
+    if (currentRecipeData?.ingredientGroups) {
+      currentRecipeData.ingredientGroups.forEach(group => {
+        if (group.ingredients && Array.isArray(group.ingredients)) {
+          flatIngredients.push(...group.ingredients);
+        }
+      });
+    }
+
+    return (
+      <View 
+        style={[
+          styles.stepItemContainer,
+          isActive && styles.stepItemActive
+        ]}
+      >
+        <View style={styles.stepContent}>
+          {/* Clickable step text container */}
+          <TouchableOpacity 
+            style={styles.stepTextContainer}
+            onPress={() => toggleStepCompleted(currentRecipeSession?.recipeId || '', stepIndex)}
+            activeOpacity={0.7}
+          >
+            <Text style={[
+              styles.stepText,
+              stepIsCompleted && styles.stepTextCompleted
+            ]}>
+              {item.text}
+            </Text>
+
+            {/* Show note preview if exists */}
+            {item.note && (
+              <View style={styles.notePreview}>
+                <MaterialCommunityIcons 
+                  name="note-text" 
+                  size={14} 
+                  color={COLORS.primary} 
+                  style={styles.notePreviewIcon}
+                />
+                <Text style={styles.notePreviewText} numberOfLines={1}>
+                  {item.note}
+                </Text>
+              </View>
+            )}
+
+            {/* Timers UI will be placed here in section 3 */}
+          </TouchableOpacity>
+
+          {/* Right side controls */}
+          <View style={styles.stepControls}>
+            {/* Note icon */}
+            <TouchableOpacity
+              style={[
+                styles.noteButton,
+                item.note && styles.noteButtonActive
+              ]}
+              onPress={() => openNoteModal(item.id)}
+            >
+              <MaterialCommunityIcons 
+                name={item.note ? "note-text" : "note-plus"} 
+                size={16} 
+                color={item.note ? COLORS.primary : COLORS.textMuted} 
+              />
+            </TouchableOpacity>
+
+            {/* Drag handle */}
+            <TouchableOpacity 
+              style={styles.dragHandle}
+              onLongPress={drag}
+              disabled={isActive}
+            >
+              <MaterialCommunityIcons 
+                name="drag-vertical" 
+                size={20} 
+                color={COLORS.textMuted} 
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
+  }, [steps, currentRecipeSession, currentRecipeData, toggleStepCompleted, openNoteModal]);
 
   const handleSwipeGesture = async (event: any) => {
     if (event.nativeEvent.state === State.END) {
@@ -478,62 +1099,6 @@ export default function CookScreen() {
             errorModalContext.showError('Navigation Error', 'Failed to navigate back. Please try again.');
           }
         }
-      }
-    }
-  };
-
-  const toggleStepCompleted = async (recipeId: string, stepIndex: number) => {
-    // Find the current recipe and toggle the step
-    const currentRecipeSession = cookingContext.state.activeRecipes.find(r => r.recipeId === recipeId);
-    if (!currentRecipeSession || !currentRecipeSession.recipe) {
-      await track('step_toggle_failed', { 
-        reason: 'no_recipe_session',
-        recipeId,
-        stepIndex,
-        hasCurrentRecipeSession: !!currentRecipeSession,
-        hasRecipeData: !!currentRecipeSession?.recipe
-      });
-      return;
-    }
-
-    // DEFENSIVE: Extract context functions to local constants to prevent minification issues
-    const completeStepFn = cookingContext.completeStep;
-    const uncompleteStepFn = cookingContext.uncompleteStep;
-
-    if (typeof completeStepFn !== 'function' || typeof uncompleteStepFn !== 'function') {
-      logger.error('Context step functions are undefined', {
-        completeStepType: typeof completeStepFn,
-        uncompleteStepType: typeof uncompleteStepFn,
-        recipeId,
-        stepIndex
-      });
-      return;
-    }
-
-    const stepId = String(stepIndex); // Ensure stepId is a string
-    const isCompleted = currentRecipeSession.completedSteps.includes(stepId);
-    
-    // Convert completedSteps array to StepCompletionState object for utilities
-    const completedStepsState: StepCompletionState = {};
-    currentRecipeSession.completedSteps.forEach(sId => {
-      completedStepsState[parseInt(sId)] = true;
-    });
-    
-    if (isCompleted) {
-      // Remove from completed steps
-      uncompleteStepFn(recipeId, stepId);
-    } else {
-      // Add to completed steps
-      completeStepFn(recipeId, stepId);
-      
-      // Auto-scroll to next step if recipe has instructions
-      if (currentRecipeSession.recipe.instructions) {
-        autoScrollToNextStep(
-          stepIndex,
-          currentRecipeSession.recipe.instructions,
-          completedStepsState,
-          scrollViewRef
-        );
       }
     }
   };
@@ -684,12 +1249,6 @@ export default function CookScreen() {
   };
   // --- End Recipe Tips Functions ---
 
-  // Get the current recipe from the context state
-  const currentRecipeSession = cookingContext.state.activeRecipes.find(
-    recipe => recipe.recipeId === cookingContext.state.activeRecipeId
-  );
-  const currentRecipeData = currentRecipeSession?.recipe; // Get the actual CombinedParsedRecipe object
-
   if (isLoading) {
     return (
       <SafeAreaView style={styles.centeredStatusContainer}>
@@ -737,13 +1296,7 @@ export default function CookScreen() {
         </View>
 
         {/* Current Recipe Content */}
-        <ScrollView 
-          ref={scrollViewRef}
-          style={styles.content} 
-          showsVerticalScrollIndicator={false}
-          onScroll={handleScroll}
-          scrollEventThrottle={16}
-        >
+        <View style={styles.content}>
         {currentRecipeData ? ( // Use currentRecipeData for rendering the steps
           <View style={styles.recipeContainer}>
             {currentRecipeSession?.isLoading ? ( // Check isLoading from session if needed
@@ -752,51 +1305,33 @@ export default function CookScreen() {
               </View>
             ) : (
               <>
-                {/* Recipe Steps with steps.tsx styling */}
-                {currentRecipeData.instructions && currentRecipeData.instructions.length > 0 ? (
-                  currentRecipeData.instructions.map((step, index) => {
-                    // Convert completedSteps array to StepCompletionState object
-                    const completedStepsState: StepCompletionState = {};
-                    if (currentRecipeSession?.completedSteps) {
-                      currentRecipeSession.completedSteps.forEach(stepId => {
-                        completedStepsState[parseInt(stepId)] = true;
-                      });
-                    }
-                    
-                    const stepIsCompleted = isStepCompleted(index, completedStepsState);
-                    const stepIsActive = isStepActive(index, currentRecipeData.instructions || [], completedStepsState);
-                    
-                    // Flatten ingredients from ingredient groups for highlighting
-                    const flatIngredients: StructuredIngredient[] = [];
-                    if (currentRecipeData.ingredientGroups) {
-                      currentRecipeData.ingredientGroups.forEach(group => {
-                        if (group.ingredients && Array.isArray(group.ingredients)) {
-                          flatIngredients.push(...group.ingredients);
-                        }
-                      });
-                    }
-
-                    return (
-                      <StepItem
-                        key={`step-${index}`}
-                        step={step}
-                        stepIndex={index}
-                        isCompleted={stepIsCompleted}
-                        isActive={stepIsActive}
-                        onStepPress={(stepIndex) => toggleStepCompleted(currentRecipeSession.recipeId, stepIndex)}
-                        ingredients={flatIngredients}
-                        onIngredientPress={handleIngredientPress}
-                      />
-                    );
-                  })
+                {/* Draggable Recipe Steps */}
+                {steps.length > 0 ? (
+                  <DraggableFlatList
+                    key={canonicalRecipeData?.id ?? 'no-recipe'}
+                    ref={flatListRef}
+                    data={steps}
+                    keyExtractor={(item) => item.id}
+                    onDragEnd={({ data }) => setSteps(data)}
+                    renderItem={renderStepItem}
+                    containerStyle={styles.stepsContainer}
+                    contentContainerStyle={{ paddingBottom: 100 }}
+                    onScrollToIndexFailed={(info) => {
+                      // Handle scroll to index failure gracefully
+                      setTimeout(() => {
+                        flatListRef.current?.scrollToIndex({
+                          index: Math.min(info.index, steps.length - 1),
+                          animated: true,
+                          viewPosition: 0.3,
+                        });
+                      }, 100);
+                    }}
+                  />
                 ) : (
                   <View style={styles.noRecipeContainer}>
                     <Text style={styles.noRecipeText}>No recipe steps available</Text>
                   </View>
                 )}
-
-                {/* Add some bottom padding */}
-                <View style={{ height: 100 }} />
               </>
             )}
           </View>
@@ -805,7 +1340,7 @@ export default function CookScreen() {
             <Text style={styles.noRecipeText}>Select a recipe to start cooking</Text>
           </View>
         )}
-        </ScrollView>
+        </View>
 
         {/* Ingredient Tooltip Modal */}
         <Modal
@@ -841,12 +1376,74 @@ export default function CookScreen() {
           </Pressable>
         </Modal>
 
+        {/* Note Editing Modal */}
+        <Modal
+          visible={noteModalVisible}
+          animationType="fade"
+          transparent={true}
+          onRequestClose={closeNoteModal}
+        >
+          <Pressable
+            style={styles.noteModalOverlay}
+            onPress={closeNoteModal}
+          >
+            <Pressable style={styles.noteModalContent}>
+              <View style={styles.noteModalHeader}>
+                <Text style={styles.noteModalTitle}>
+                  {steps.find(s => s.id === editingStepId)?.note ? 'Edit Note' : 'Add Note'}
+                </Text>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={closeNoteModal}
+                >
+                  <MaterialCommunityIcons
+                    name="close"
+                    size={24}
+                    color={COLORS.textMuted}
+                  />
+                </TouchableOpacity>
+              </View>
+              
+              <TextInput
+                style={styles.noteModalInput}
+                value={tempNoteText}
+                onChangeText={setTempNoteText}
+                placeholder="Add a personal note for this cooking step"
+                maxLength={100}
+                multiline
+                autoFocus
+              />
+              
+              <View style={styles.noteModalActions}>
+                <TouchableOpacity
+                  style={styles.noteModalCancelButton}
+                  onPress={closeNoteModal}
+                >
+                  <Text style={styles.noteModalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={styles.noteModalSaveButton}
+                  onPress={saveNote}
+                >
+                  <Text style={styles.noteModalSaveText}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+
+
         {/* Footer Buttons */}
         <StepsFooterButtons
           onTimersPress={handleTimersPress}
           onRecipeTipsPress={handleRecipeTipsPress}
           hasRecipeTips={!!currentRecipeData?.tips}
           onEndCookingSessions={handleEndCookingSessions}
+          hasChanges={hasChanges}
+          isSaving={isSaving}
+          onSavePress={handleSaveSteps}
         />
 
         {/* Tools Modal */}
@@ -926,6 +1523,149 @@ export default function CookScreen() {
             </Pressable>
           </Pressable>
         </Modal>
+
+        {/* Folder Picker Modal for saving modified recipes */}
+        <FolderPickerModal
+          visible={folderPickerVisible}
+          onClose={() => setFolderPickerVisible(false)}
+          onSelectFolder={async (folderId: number) => {
+            console.log('[DEBUG] 🔧 User selected folder:', folderId, 'for recipe:', currentRecipeData?.id);
+            
+            // Close the modal
+            setFolderPickerVisible(false);
+            
+            // Create new fork using save-modified endpoint with folder selection
+            try {
+              const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+              if (!backendUrl) {
+                throw new Error('API configuration error: EXPO_PUBLIC_API_URL is not defined.');
+              }
+
+              // Use canonical recipe data if available, otherwise fall back to currentRecipeData
+              const canonicalId = canonicalRecipeData?.id || currentRecipeData?.id;
+              const recipeToSave = canonicalRecipeData || currentRecipeData;
+              
+              if (!recipeToSave || !canonicalId || !session?.access_token) {
+                throw new Error('Missing required data for saving recipe');
+              }
+
+              console.log('[Cook] Creating fork with folder selection - id=', canonicalId, 'folder=', folderId);
+
+              const headers = {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+              };
+
+              const saveResponse = await fetch(`${backendUrl}/api/recipes/save-modified`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                  originalRecipeId: canonicalId,
+                  userId: session.user.id,
+                  modifiedRecipeData: {
+                    ...recipeToSave,
+                    instructions: steps
+                  },
+                  appliedChanges: {
+                    ingredientChanges: [],
+                    scalingFactor: 1
+                  },
+                  folderId: folderId // Include folder selection
+                }),
+              });
+
+              if (!saveResponse.ok) {
+                const errorData = await saveResponse.json();
+                throw new Error(errorData.error || `Failed to create fork: ${saveResponse.statusText}`);
+              }
+
+              const saveResult = await saveResponse.json();
+              const newRecipeId = saveResult.recipe?.id;
+              const savedRecordId = saveResult.userSavedRecordId;
+              
+              console.log('[COOK] fork success', { 
+                forkId: newRecipeId, 
+                savedId: savedRecordId, 
+                replacingOriginal: canonicalId 
+              });
+              
+              // CRITICAL: Promote fork to canonical - this is the key fix
+              console.log('[DEBUG] Server response structure:', {
+                hasRecipe: !!saveResult.recipe,
+                hasRecipeData: !!saveResult.recipe?.recipe_data,
+                recipeKeys: saveResult.recipe ? Object.keys(saveResult.recipe) : [],
+                recipeDataKeys: saveResult.recipe?.recipe_data ? Object.keys(saveResult.recipe.recipe_data) : []
+              });
+              
+              if (saveResult.recipe?.recipe_data) {
+                const updatedRecipeFromServer = {
+                  ...saveResult.recipe.recipe_data,
+                  id: newRecipeId // CRITICAL: Add the fork ID to the recipe data
+                };
+                
+                console.log('[DEBUG] Fork recipe data:', {
+                  id: updatedRecipeFromServer.id,
+                  title: updatedRecipeFromServer.title,
+                  hasInstructions: !!updatedRecipeFromServer.instructions,
+                  instructionsCount: updatedRecipeFromServer.instructions?.length,
+                  isUserModified: updatedRecipeFromServer.is_user_modified
+                });
+                
+                // 1. Update canonical recipe data to the fork
+                setCanonicalRecipeData(updatedRecipeFromServer);
+                
+                // 2. Update baseline steps and re-initialize
+                const norm = normalizeInstructionsToSteps(updatedRecipeFromServer.instructions);
+                setBaselineSteps(norm);
+                setInitializedFromCanonical(false); // Force re-init on next effect
+                
+                // 3. Cache the saved pointer info
+                if (savedRecordId && newRecipeId) {
+                  setLastSaved({ savedId: savedRecordId, baseRecipeId: newRecipeId });
+                }
+                
+                // 4. Update cooking context with the new fork data
+                if (cookingContext.updateRecipe && currentRecipeData?.id) {
+                  cookingContext.updateRecipe(currentRecipeData.id.toString(), updatedRecipeFromServer);
+                  console.log('[Cook] Updated cooking context with new fork data after folder selection');
+                }
+              } else {
+                console.error('[DEBUG] No recipe_data in server response:', saveResult);
+              }
+              
+              // Show success toast
+              showSuccess('Saved', 'Recipe saved to folder successfully', 2000);
+              
+              // If we're in a mise context, update the mise pointer to point to the new fork
+              if (miseId && newRecipeId) {
+                try {
+                  const updateMiseResponse = await fetch(`${backendUrl}/api/mise/recipes/${miseId}`, {
+                    method: 'PUT',
+                    headers,
+                    body: JSON.stringify({
+                      userId: session.user.id,
+                      originalRecipeId: newRecipeId, // Point to the new fork
+                    }),
+                  });
+                  
+                  if (!updateMiseResponse.ok) {
+                    console.warn('[Cook] Failed to update mise pointer, but fork was created successfully');
+                  } else {
+                    console.log('[CTX] updateMiseRecipe', { miseId, newOriginalRecipeId: newRecipeId });
+                  }
+                } catch (error) {
+                  console.warn('[Cook] Error updating mise pointer:', error);
+                }
+              }
+              
+            } catch (error) {
+              console.error('[ERROR][CookScreen] Error forking recipe after folder selection:', error);
+              if (typeof errorModalContext.showError === 'function') {
+                errorModalContext.showError('Save Error', 'Failed to save recipe to folder. Please try again.');
+              }
+            }
+          }}
+        />
 
       </SafeAreaView>
     </PanGestureHandler>
@@ -1115,6 +1855,155 @@ const styles = StyleSheet.create({
     color: COLORS.textDark,
     lineHeight: 24,
     fontSize: 16,
+  },
+
+  // --- Draggable Steps Styles ---
+  stepsContainer: {
+    flex: 1,
+  },
+  stepItemContainer: {
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.sm,
+    padding: SPACING.md,
+    ...SHADOWS.small,
+  },
+  stepItemActive: {
+    backgroundColor: COLORS.primaryLight,
+    ...SHADOWS.medium,
+  },
+  stepContent: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SPACING.sm,
+  },
+  stepToggle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  stepToggleCompleted: {
+    backgroundColor: COLORS.primary,
+  },
+  stepTextContainer: {
+    flex: 1,
+    paddingVertical: SPACING.xs,
+    paddingLeft: SPACING.sm,
+  },
+  stepText: {
+    ...bodyText,
+    marginBottom: SPACING.xs,
+  },
+  stepTextCompleted: {
+    textDecorationLine: 'line-through',
+    color: COLORS.textMuted,
+  },
+  notePreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: SPACING.xs,
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.sm,
+    backgroundColor: COLORS.primaryLight,
+    borderRadius: RADIUS.sm,
+  },
+  notePreviewIcon: {
+    marginRight: SPACING.xs,
+  },
+  notePreviewText: {
+    ...captionText,
+    color: COLORS.primary,
+    flex: 1,
+  },
+  stepControls: {
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  noteButton: {
+    padding: SPACING.sm,
+    borderRadius: RADIUS.sm,
+    backgroundColor: COLORS.surface,
+  },
+  noteButtonActive: {
+    backgroundColor: COLORS.primaryLight,
+  },
+  dragHandle: {
+    padding: SPACING.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+
+
+  // --- Note Modal Styles ---
+  noteModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.pageHorizontal,
+  },
+  noteModalContent: {
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.lg,
+    width: '100%',
+    maxWidth: 400,
+    ...SHADOWS.large,
+  },
+  noteModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    borderBottomWidth: BORDER_WIDTH.hairline,
+    borderBottomColor: COLORS.divider,
+  },
+  noteModalTitle: {
+    ...bodyStrongText,
+    color: COLORS.textDark,
+    fontSize: 18,
+  },
+  noteModalInput: {
+    ...bodyText,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+    borderRadius: RADIUS.sm,
+    padding: SPACING.md,
+    margin: SPACING.lg,
+    minHeight: 80,
+    maxHeight: 120,
+    textAlignVertical: 'top',
+  },
+  noteModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+  },
+  noteModalCancelButton: {
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+  },
+  noteModalCancelText: {
+    ...bodyText,
+    color: COLORS.textMuted,
+  },
+  noteModalSaveButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.md,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+  },
+  noteModalSaveText: {
+    ...bodyStrongText,
+    color: COLORS.white,
   },
 
 

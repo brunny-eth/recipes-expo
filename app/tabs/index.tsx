@@ -336,14 +336,14 @@ export default function HomeScreen() {
       // Validate input
       if (localRecipeInput.length === 0) {
         showError(
-          'Input Required',
+          'Add a recipe to get started',
           'Add a recipe to get started.\n\nLooking for ideas? Head to the Explore tab.',
           undefined,
-          'Go to Explore',
           () => {
             hideError();
             router.push('/tabs/library');
-          }
+          },
+          'Go to Explore'
         );
         // Clear the active input for better UX
         if (importMode === 'url') setRecipeUrl('');
@@ -351,13 +351,19 @@ export default function HomeScreen() {
         return;
       }
 
-      // Name mode: require a minimal amount of descriptive letters
+      // Name mode: require a minimal amount of descriptive letters (align with backend validation)
       if (importMode === 'name') {
         const letterCount = (localRecipeInput.match(/[a-zA-Z]/g) || []).length;
-        if (letterCount < 6) {
+        if (letterCount < 3) {
           showError(
             'Please enter more detail',
-            'Please be a bit more descriptive about the dish you want to cook.'
+            'Please be a bit more descriptive about the dish you want to cook.',
+            undefined,
+            () => {
+              hideError();
+              router.push('/tabs/library');
+            },
+            'Go to Explore'
           );
           setRecipeName('');
           return;
@@ -370,11 +376,11 @@ export default function HomeScreen() {
           'Input Not Recognized',
           'Please enter a real dish name (like "chicken soup" or "tomato pasta") or a recipe link',
           undefined,
-          'Go to Explore',
           () => {
             hideError();
             router.push('/tabs/library');
-          }
+          },
+          'Go to Explore'
         );
         if (importMode === 'url') setRecipeUrl('');
         if (importMode === 'name') setRecipeName('');
@@ -478,13 +484,13 @@ export default function HomeScreen() {
         try { await track('recipe_matches_found', { match_count: result.matches.length, submissionId: localSubmissionId, userId: session?.user?.id }); } catch {}
       } else if (result.action === 'navigate_to_summary' && result.recipe) {
         console.log('[HomeScreen] Navigating to summary with recipe:', { 
-          recipeId: result.recipe.id, 
-          recipeTitle: result.recipe.title,
+          recipeId: result.recipe?.id, 
+          recipeTitle: result.recipe?.title,
           submissionId: localSubmissionId
         });
-        try { await track('navigation_to_recipe_summary', { recipeId: result.recipe.id, entryPoint: 'new', submissionId: localSubmissionId, userId: session?.user?.id }); } catch {}
+        try { await track('navigation_to_recipe_summary', { recipeId: result.recipe?.id, entryPoint: 'new', submissionId: localSubmissionId, userId: session?.user?.id }); } catch {}
         InteractionManager.runAfterInteractions(() => {
-          router.push({ pathname: '/recipe/summary', params: { recipeData: JSON.stringify(result.recipe), entryPoint: 'new', from: '/tabs', inputType: result.inputType || detectInputType(localRecipeInput) } });
+          router.push({ pathname: '/recipe/summary', params: { recipeId: result.recipe?.id?.toString(), entryPoint: 'new', from: '/tabs', inputType: result.inputType || detectInputType(localRecipeInput) } });
         });
       } else if (result.action === 'navigate_to_loading' && result.normalizedUrl) {
         console.log('[HomeScreen] Navigating to loading screen with URL:', { 

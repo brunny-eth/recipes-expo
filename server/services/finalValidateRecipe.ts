@@ -88,7 +88,11 @@ export function finalValidateRecipe(recipe: CombinedParsedRecipe | null, request
     reasons.push('Missing or too few instructions');
   } else {
     // Check for hallucinated instructions (too generic, vague, or placeholder-like)
-    const instructionHallucinationSigns = checkForInstructionHallucination(recipe.instructions);
+    // Extract text from instructions (handle both string[] and InstructionStep[])
+    const instructionTexts = Array.isArray(recipe.instructions) 
+      ? recipe.instructions.map(inst => typeof inst === 'string' ? inst : inst.text)
+      : [];
+    const instructionHallucinationSigns = checkForInstructionHallucination(instructionTexts);
     if (instructionHallucinationSigns.length > 0) {
       // Treat certain instruction anomalies as non-fatal (do not fail validation)
       const nonFatalInstructionSigns = new Set([

@@ -42,7 +42,7 @@ export interface Database {
           folder_id: number | null;
           title_override: string | null;
           applied_changes: Json | null;
-          original_recipe_data: Json | null;
+          // original_recipe_data: DEPRECATED - removed to prevent recipe data bloat
           display_order: number;
           created_at: string;
           updated_at?: string;
@@ -53,14 +53,14 @@ export interface Database {
           folder_id?: number | null;
           title_override?: string | null;
           applied_changes?: Json | null;
-          original_recipe_data?: Json | null;
+          // original_recipe_data: DEPRECATED - removed to prevent recipe data bloat
           display_order?: number;
         };
         Update: {
           folder_id?: number | null;
           title_override?: string | null;
           applied_changes?: Json | null;
-          original_recipe_data?: Json | null;
+          // original_recipe_data: DEPRECATED - removed to prevent recipe data bloat
           display_order?: number;
         };
       };

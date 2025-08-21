@@ -334,7 +334,7 @@ export default function LibraryScreen() {
     router.push({
       pathname: '/recipe/summary',
       params: {
-        recipeData: JSON.stringify(recipe),
+        recipeId: recipe.id?.toString(),
         entryPoint: 'library',
       },
     });

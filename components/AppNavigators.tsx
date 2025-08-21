@@ -20,10 +20,7 @@ const AppNavigators = React.memo(() => {
           headerShown: false,
         }}
       />
-      <Stack.Screen
-        name="recipe/steps"
-        options={{ presentation: 'card', headerShown: false }}
-      />
+      {/* Removed recipe/steps - all cooking now goes through mise */}
       <Stack.Screen
         name="mise/cook"
         options={{ presentation: 'card', headerShown: false }}

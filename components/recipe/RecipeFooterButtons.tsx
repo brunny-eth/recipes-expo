@@ -63,6 +63,7 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
   const getMainButtonText = () => {
     if (isRewriting || isSavingModifications) return 'Processing modifications...';
     if (isScalingInstructions) return 'Making sure everything lines up...';
+    if (isCookingNow) return 'Adding to mise...';
     
     if (isAlreadyInMise) return 'Already in prep station';
     
@@ -78,15 +79,17 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
 
   const getMainButtonHandler = () => {
     switch (entryPoint) {
+      case 'saved':
+        return handleCookNow;
       case 'mise':
         return handleSaveModifications;
       default:
-        return handleGoToSteps;
+        return handleCookNow; // All entry points now use mise-based cooking
     }
   };
 
   const isMainButtonDisabled = () => {
-    if (isRewriting || isScalingInstructions || isSavingModifications || isAlreadyInMise) return true;
+    if (isRewriting || isScalingInstructions || isSavingModifications || isCookingNow || isAlreadyInMise) return true;
     
     // For mise entry point, disable if no modifications
     if (entryPoint === 'mise' && !hasModifications) {
@@ -183,7 +186,7 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
           onPress={getMainButtonHandler()}
           disabled={buttonDisabled}
         >
-          {(isRewriting || isScalingInstructions || isSavingModifications) && (
+          {(isRewriting || isScalingInstructions || isSavingModifications || isCookingNow) && (
             <ActivityIndicator
               size="small"
               color={COLORS.white}

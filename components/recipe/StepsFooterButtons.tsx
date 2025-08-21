@@ -15,6 +15,10 @@ type StepsFooterButtonsProps = {
   onRecipeTipsPress: () => void;
   hasRecipeTips?: boolean;
   onEndCookingSessions?: () => void;
+  // Save button props
+  hasChanges?: boolean;
+  isSaving?: boolean;
+  onSavePress?: () => void;
 };
 
 const StepsFooterButtons: React.FC<StepsFooterButtonsProps> = ({
@@ -22,9 +26,30 @@ const StepsFooterButtons: React.FC<StepsFooterButtonsProps> = ({
   onRecipeTipsPress,
   hasRecipeTips = false,
   onEndCookingSessions,
+  hasChanges = false,
+  isSaving = false,
+  onSavePress,
 }) => {
   return (
     <View style={styles.footer}>
+      {/* Save Button - Conditional */}
+      {hasChanges && onSavePress && (
+        <View style={styles.buttonRow}>
+          <TouchableOpacity
+            style={[
+              styles.saveButton,
+              isSaving && styles.saveButtonDisabled
+            ]}
+            onPress={onSavePress}
+            disabled={isSaving}
+          >
+            <Text style={styles.saveButtonText}>
+              {isSaving ? 'Saving...' : 'Save Changes'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      
       <View style={styles.buttonRow}>
         <TouchableOpacity
           style={styles.timerButton}
@@ -127,6 +152,25 @@ const styles = StyleSheet.create({
     ...bodyStrongText,
     color: COLORS.error || '#FF4444',
     fontSize: 14,
+  } as TextStyle,
+  // Save button styles
+  saveButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.primary,
+  } as ViewStyle,
+  saveButtonDisabled: {
+    backgroundColor: COLORS.textMuted,
+  } as ViewStyle,
+  saveButtonText: {
+    ...bodyStrongText,
+    color: COLORS.white,
+    fontSize: 16,
   } as TextStyle,
 });
 

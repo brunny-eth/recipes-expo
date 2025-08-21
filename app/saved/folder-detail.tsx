@@ -33,6 +33,7 @@ import FolderPickerModal from '@/components/FolderPickerModal';
 import ConfirmationModal from '@/components/ConfirmationModal';
 
 type SavedRecipe = {
+  id: string; // UUID primary key from user_saved_recipes table
   base_recipe_id: number;
   title_override: string | null;
   applied_changes: any | null;
@@ -102,7 +103,7 @@ export default function SavedFolderDetailScreen() {
   // Confirmation modals state
   const [showDeleteFolderModal, setShowDeleteFolderModal] = useState(false);
   const [showDeleteRecipeModal, setShowDeleteRecipeModal] = useState(false);
-  const [recipeToDelete, setRecipeToDelete] = useState<number | null>(null);
+  const [recipeToDelete, setRecipeToDelete] = useState<string | null>(null);
 
   const folderId = params.folderId ? parseInt(params.folderId) : null;
 
@@ -306,7 +307,7 @@ export default function SavedFolderDetailScreen() {
     router.push({
       pathname: '/recipe/summary',
       params: {
-        recipeData: JSON.stringify(recipeWithId), 
+        recipeId: item.processed_recipes_cache?.id?.toString(), 
         entryPoint: 'saved',
         from: '/saved',
         folderId: folderId?.toString(), // Add folderId so it can be used for saving changes
@@ -317,21 +318,18 @@ export default function SavedFolderDetailScreen() {
         ...(isModified && item.applied_changes && {
           appliedChanges: JSON.stringify(item.applied_changes)
         }),
-        ...(item.original_recipe_data && {
-          originalRecipeData: JSON.stringify(item.original_recipe_data)
-        }),
       },
     });
   }, [router, isSelectionMode, folderId]);
 
   // Handle delete recipe
-  const handleDeleteRecipe = useCallback((baseRecipeId: number) => {
+  const handleDeleteRecipe = useCallback((savedRecipeId: string) => {
     if (!session?.user) {
       console.warn('[SavedFolderDetailScreen] No user session found. Cannot delete recipe.');
       return;
     }
 
-    setRecipeToDelete(baseRecipeId);
+    setRecipeToDelete(savedRecipeId);
     setShowDeleteRecipeModal(true);
   }, [session?.user]);
 
@@ -354,7 +352,7 @@ export default function SavedFolderDetailScreen() {
         setError('Failed to remove recipe. Please try again.');
       } else {
         console.log(`[SavedFolderDetailScreen] Recipe ${recipeToDelete} removed.`);
-        setSavedRecipes(prev => prev.filter(recipe => recipe.base_recipe_id !== recipeToDelete));
+        setSavedRecipes(prev => prev.filter(recipe => recipe.id !== recipeToDelete));
       }
     } catch (error) {
       console.error('[SavedFolderDetailScreen] Unexpected error deleting recipe:', error);
@@ -501,7 +499,7 @@ export default function SavedFolderDetailScreen() {
         {!isSelectionMode && (
           <TouchableOpacity 
             style={styles.deleteButton} 
-            onPress={() => handleDeleteRecipe(item.base_recipe_id)}
+            onPress={() => handleDeleteRecipe(item.id)}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <MaterialCommunityIcons name="trash-can" size={16} color={COLORS.textMuted} />

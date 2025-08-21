@@ -32,6 +32,9 @@ type CookingContextType = {
   endSession: (recipeId: string) => void;
   endAllSessions: () => void;
   switchRecipe: (recipeId: string) => void;
+  // New selection state for Mise-driven selection
+  selectedMiseId: string | null;
+  selectMiseRecipe: (id: string | number) => void;
   completeStep: (recipeId: string, stepId: string) => void;
   uncompleteStep: (recipeId: string, stepId: string) => void;
   startTimer: (recipeId: string, stepId: string, duration: number) => void;
@@ -42,6 +45,7 @@ type CookingContextType = {
   getCurrentScrollPosition: (recipeId: string) => number;
   hasResumableSession: () => boolean;
   invalidateSession: () => void;
+  updateRecipe: (recipeId: string, updatedRecipe: CombinedParsedRecipe) => void;
 };
 
 const initialState: CookingState = {
@@ -61,6 +65,8 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
   const [activeRecipes, setActiveRecipes] = useState<RecipeSession[]>(initialState.activeRecipes);
   const [activeRecipeId, setActiveRecipeId] = useState<string | null>(initialState.activeRecipeId);
   const [sessionStartTime, setSessionStartTime] = useState<number | undefined>(initialState.sessionStartTime);
+  // New: Selected mise recipe id used to drive canonical selection in Cook
+  const [selectedMiseId, setSelectedMiseId] = useState<string | null>(null);
 
 
   
@@ -225,6 +231,13 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
           setActiveRecipeId(targetActiveRecipeId);
         }
 
+        // Auto-select first mise recipe if none selected yet (optional behavior)
+        if (!selectedMiseId && newActiveRecipes.length > 0) {
+          const firstId = String(newActiveRecipes[0].recipeId);
+          console.log('[CTX] autoSelectMiseRecipe', { firstId });
+          setSelectedMiseId(firstId);
+        }
+
         // Always set session start time on initialization
         const newSessionStartTime = Date.now();
         if (sessionStartTime !== newSessionStartTime) {
@@ -239,7 +252,7 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
         setSessionStartTime(undefined);
       }
     },
-    [activeRecipes, activeRecipeId, sessionStartTime] // Dependencies for useCallback to ensure comparison works with current state
+    [activeRecipes, activeRecipeId, sessionStartTime, selectedMiseId] // Dependencies for useCallback to ensure comparison works with current state
   );
 
   // All other functions refactored to use useState setters
@@ -267,6 +280,7 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
     setActiveRecipes([]);
     setActiveRecipeId(null);
     setSessionStartTime(undefined);
+    setSelectedMiseId(null);
 
     AsyncStorage.removeItem('meez.cookingSession').catch(error => {
       console.error('[CookingContext] 💥 Error clearing AsyncStorage:', error);
@@ -435,12 +449,30 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
     setActiveRecipes([]);
     setActiveRecipeId(null);
     setSessionStartTime(undefined);
+    setSelectedMiseId(null);
     
     // Also clear AsyncStorage
     AsyncStorage.removeItem('meez.cookingSession').catch(error => {
       console.warn('[CookingContext] Warning: Failed to clear AsyncStorage during invalidation:', error);
     });
   }, [activeRecipes, activeRecipeId, sessionStartTime]);
+
+  const updateRecipe = useCallback((recipeId: string, updatedRecipe: CombinedParsedRecipe) => {
+    setActiveRecipes(prevRecipes => 
+      prevRecipes.map(recipe => 
+        recipe.recipeId === recipeId
+          ? { ...recipe, recipe: updatedRecipe }
+          : recipe
+      )
+    );
+  }, []);
+
+  // Select a mise recipe (single source of truth for Cook)
+  const selectMiseRecipe = useCallback((id: string | number) => {
+    const next = String(id);
+    console.log('[CTX] selectMiseRecipe', { next });
+    setSelectedMiseId(next);
+  }, []);
 
   // Construct the state object for the context value
   const state = useMemo(() => ({
@@ -457,6 +489,8 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
       endSession,
       endAllSessions,
       switchRecipe,
+      selectedMiseId,
+      selectMiseRecipe,
       completeStep,
       uncompleteStep,
       startTimer,
@@ -467,6 +501,7 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
       getCurrentScrollPosition,
       hasResumableSession,
       invalidateSession,
+      updateRecipe,
     }),
     [
       state,
@@ -484,6 +519,7 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
       getCurrentScrollPosition,
       hasResumableSession,
       invalidateSession,
+      updateRecipe,
     ]
   );
 

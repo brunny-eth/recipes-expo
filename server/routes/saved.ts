@@ -132,6 +132,7 @@ router.get('/folders/:id/recipes', async (req: Request, res: Response) => {
     const { data, error: fetchError } = await supabaseAdmin
       .from('user_saved_recipes')
       .select(`
+        id,
         base_recipe_id,
         title_override,
         applied_changes,
@@ -270,8 +271,8 @@ router.put('/folders/:id', async (req: Request, res: Response) => {
   }
 });
 
-// DELETE /api/saved/recipes/:id - Remove recipe from saved folder
-router.delete('/recipes/:id', async (req: Request, res: Response) => {
+// DELETE /api/saved/recipes/:id - Remove recipe from saved folder (UUID format)
+router.delete('/recipes/:id([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', async (req: Request, res: Response) => {
   const requestId = (req as any).id;
   
   try {
@@ -308,8 +309,8 @@ router.delete('/recipes/:id', async (req: Request, res: Response) => {
   }
 });
 
-// PATCH /api/saved/recipes/:id - Update saved recipe modifications
-router.patch('/recipes/:id', async (req: Request, res: Response) => {
+// PATCH /api/saved/recipes/:id - Update saved recipe modifications (UUID format)
+router.patch('/recipes/:id([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})', async (req: Request, res: Response) => {
   const requestId = (req as any).id;
   
   try {

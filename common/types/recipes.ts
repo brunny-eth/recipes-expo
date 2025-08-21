@@ -1,5 +1,11 @@
 import { Database } from './database.types';
 
+export type InstructionStep = {
+  id: string;        // stable UUID per step
+  text: string;      // the instruction
+  note?: string;     // ≤100 chars, optional
+};
+
 export type StructuredIngredient = {
   name: string;
   amount: string | null;
@@ -22,7 +28,7 @@ export type CombinedParsedRecipe = {
   thumbnailUrl?: string | null;
   sourceUrl?: string | null;
   ingredientGroups: IngredientGroup[] | null;
-  instructions: string[] | null;
+  instructions: InstructionStep[] | string[] | null; // back-compat
   substitutions_text: string | null;
   recipeYield?: string | null;
   prepTime?: string | null;

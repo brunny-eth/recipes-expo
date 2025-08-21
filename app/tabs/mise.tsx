@@ -312,7 +312,7 @@ export default function MiseScreen() {
   const { showError } = useErrorModal();
   const handleError = useHandleError();
   const { track } = useAnalytics();
-  const { hasResumableSession, state: cookingState, invalidateSession } = useCooking();
+  const { hasResumableSession, state: cookingState, invalidateSession, initializeSessions, selectMiseRecipe } = useCooking();
   const [miseRecipes, setMiseRecipes] = useState<MiseRecipe[]>([]);
   const [groceryList, setGroceryList] = useState<GroceryCategory[]>([]);
   const [manualItems, setManualItems] = useState<ManualGroceryItem[]>([]);
@@ -491,6 +491,7 @@ export default function MiseScreen() {
       if (cookingState.activeRecipes.length > 0) {
         const currentRecipeIds = cookingState.activeRecipes.map((r: any) => r.recipeId).sort();
         const freshRecipeIds = fetchedRecipes.map((r: any) => String(r.id)).sort();
+        console.log('[CTX] Checking for recipe changes:', { currentRecipeIds, freshRecipeIds });
         
         // Check if recipe IDs changed (added/removed recipes)  
         const lengthChanged = currentRecipeIds.length !== freshRecipeIds.length;
@@ -581,6 +582,7 @@ export default function MiseScreen() {
             freshRecipesCount: freshRecipeIds.length,
             userId: session?.user?.id,
           });
+          console.log('[CTX] Invalidating cooking session due to recipe changes');
           invalidateSession();
         }
       }
@@ -1058,32 +1060,9 @@ export default function MiseScreen() {
 
     return (
       <View style={[styles.card, styles.cardWithMinHeight]}>
-        <TouchableOpacity
+        <View
           style={styles.cardContent}
-          onPress={() => {
-            // Navigate to recipe summary with the prepared recipe data and mise entry point
-            router.push({
-              pathname: '/recipe/summary',
-              params: {
-                recipeData: JSON.stringify(item.prepared_recipe_data),
-                entryPoint: 'mise',
-                miseRecipeId: item.id, // Pass the mise recipe ID for future reference
-                finalYield: item.final_yield.toString(),
-                // Pass title_override for correct title display
-                ...(item.title_override && {
-                  titleOverride: item.title_override
-                }),
-                // Pass applied changes so the summary can restore the correct scaling factor
-                ...(item.applied_changes && {
-                  appliedChanges: JSON.stringify(item.applied_changes)
-                }),
-                // Pass original recipe data for consistent scaling
-                ...(item.original_recipe_data && {
-                  originalRecipeData: JSON.stringify(item.original_recipe_data)
-                }),
-              },
-            });
-          }}
+          // DISABLED: Recipe cards temporarily not clickable to prevent summary navigation from mise
         >
           <View style={styles.cardTextContainer}>
             <Text style={styles.cardTitle} numberOfLines={2}>
@@ -1096,7 +1075,7 @@ export default function MiseScreen() {
               ) : null;
             })()}
           </View>
-        </TouchableOpacity>
+        </View>
         
         {/* Trash icon */}
         <TouchableOpacity
@@ -1377,6 +1356,26 @@ export default function MiseScreen() {
     }
   };
 
+  // Handle cooking session start
+  const handleCookMyRecipes = useCallback(() => {
+    if (miseRecipes.length === 0) {
+      return; // No recipes to cook
+    }
+
+    console.log('[MiseScreen] Starting cooking session with recipes:', miseRecipes.map(r => ({ 
+      id: r.id, 
+      title: r.title_override || r.prepared_recipe_data?.title || 'Untitled Recipe' 
+    })));
+
+    // 1) Seed cooking context with the selected mise items
+    // The initializeSessions method will convert mise recipes to proper recipe objects
+    console.log('[CTX] initializeSessions with miseRecipes:', miseRecipes.map(r => ({ id: r.id, title: r.title_override || r.prepared_recipe_data?.title })));
+    initializeSessions(miseRecipes);
+
+    // 2) Navigate to cook screen (no params needed - context will bootstrap)
+    router.push('/mise/cook');
+  }, [miseRecipes, initializeSessions, router]);
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
         <ScreenHeader title="Prep station" showBack={false} />
@@ -1460,7 +1459,7 @@ export default function MiseScreen() {
       {selectedTab === 'recipes' && miseRecipes.length > 0 && (
         <TouchableOpacity
           style={styles.cookingSessionButton}
-          onPress={() => router.navigate('/mise/cook')}
+          onPress={handleCookMyRecipes}
         >
           <Text style={styles.cookingSessionButtonText}>
             Cook your recipes

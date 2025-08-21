@@ -9,8 +9,12 @@ export const useAnalytics = () => {
     event: string,
     props: Record<string, any> = {}
   ) => {
-    console.log('[POSTHOG] capture called with:', { event, props, posthogExists: !!posthog });
-    posthog?.capture(event, props);
+    if (!posthog) {
+      console.log('[POSTHOG] PostHog not available, skipping event:', { event, props });
+      return;
+    }
+    console.log('[POSTHOG] capture called with:', { event, props });
+    posthog.capture(event, props);
   };
 
   const maybeIdentifyUser = (user: User | null) => {

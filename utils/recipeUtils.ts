@@ -1,5 +1,6 @@
 // Import the StructuredIngredient type from the shared types file
 import { StructuredIngredient } from '../common/types';
+import uuid from 'react-native-uuid';
 
 // --- Fraction Handling ---
 // Helper to convert fraction string ("1/2", "3/4") to number
@@ -356,4 +357,38 @@ export function formatRecipeYield(yieldStr: string | null | undefined): string |
 
   // For any other format, return as is (covers edge cases)
   return trimmed;
+} 
+
+/**
+ * Determines if a recipe is a user-modified fork
+ * @param recipe - The recipe object to check
+ * @returns boolean indicating if this is a user fork
+ */
+export function isUserFork(recipe: any): boolean {
+  return (
+    recipe?.source_type === 'user_modified' ||
+    !!recipe?.parent_recipe_id ||
+    recipe?.is_user_modified === true
+  );
+}
+
+// Normalize instructions to the new InstructionStep format
+export type InstructionStep = { id: string; text: string; note?: string };
+
+export function normalizeInstructionsToSteps(raw: any): InstructionStep[] {
+  if (!raw) return [];
+  
+  if (Array.isArray(raw) && raw.length && typeof raw[0] === 'string') {
+    // Convert string[] to InstructionStep[]
+    return (raw as string[]).map(s => ({ id: uuid.v4() as string, text: s }));
+  }
+  if (Array.isArray(raw)) {
+    // Already InstructionStep[] or convert object[] to InstructionStep[]
+    return (raw as any[]).map(s => ({ 
+      id: s.id ?? uuid.v4() as string, 
+      text: s.text ?? '', 
+      note: s.note 
+    }));
+  }
+  return [];
 } 

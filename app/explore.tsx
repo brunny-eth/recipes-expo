@@ -83,7 +83,7 @@ export default function ExploreScreen() {
 
   const navigateToRecipe = useCallback(async (recipe: ParsedRecipe) => {
     try { await track('input_mode_selected', { inputType: 'explore' }); } catch {}
-    router.push({ pathname: '/recipe/summary', params: { recipeData: JSON.stringify(recipe), entryPoint: 'library' } });
+    router.push({ pathname: '/recipe/summary', params: { recipeId: recipe.id?.toString(), entryPoint: 'library' } });
   }, [router, track]);
 
   const renderItem = useCallback(({ item }: { item: ParsedRecipe }) => {

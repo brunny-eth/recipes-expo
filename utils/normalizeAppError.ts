@@ -150,6 +150,17 @@ export function normalizeAppError(error: unknown, opts: NormalizeAppErrorOptions
     };
   }
 
+  // Mise recipe conflict
+  if (/already in your mise en place|Recipe already in mise/i.test(rawMessage)) {
+    return {
+      code: 'MISE_RECIPE_EXISTS',
+      title: 'Oops',
+      message: rawMessage,
+      severity: 'info',
+      retryable: false,
+    };
+  }
+
   // Limits / validation cues
   if (/limit|too many|exceeded|only.*ingredients|validation/i.test(rawMessage)) {
     return {
