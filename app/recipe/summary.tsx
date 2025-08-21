@@ -270,6 +270,15 @@ export default function RecipeSummaryScreen() {
   const finalYield = params.finalYield; // Store finalYield
   const numericId = Number(recipeId);
   
+  // Get the actual recipe ID (from param or recipe object)
+  const getRecipeId = () => {
+    if (recipeId && !isNaN(numericId)) {
+      return numericId;
+    }
+    // If recipeId param is not available, get it from the recipe object
+    return recipe?.id || null;
+  };
+  
   // Extract and validate entryPoint with logging
   const entryPointValue = entryPoint || 'new'; // Default to 'new' for backward compatibility
   const miseRecipeIdValue = miseRecipeId; // Store the mise recipe ID for modifications
@@ -2181,6 +2190,10 @@ export default function RecipeSummaryScreen() {
       hasModifications,
       scaleFactor: selectedScaleFactor,
       changesCount: currentUnsavedChanges.length,
+      recipeId: getRecipeId(),
+      recipeTitle: recipe?.title,
+      hasRecipe: !!recipe,
+      hasScaledIngredients: !!scaledIngredients,
     });
 
     setIsCookingNow(true);
@@ -2290,7 +2303,7 @@ export default function RecipeSummaryScreen() {
         },
         body: JSON.stringify({
           userId: session?.user?.id,
-          originalRecipeId: numericId,
+          originalRecipeId: getRecipeId(),
           preparedRecipeData,
           appliedChanges,
           finalYield: preparedRecipeData.recipeYield,
