@@ -2259,13 +2259,31 @@ export default function RecipeSummaryScreen() {
         console.log('[Summary] Successfully modified instructions for cook now');
       }
 
+      // Filter out removed ingredients before sending to mise
+      const filteredIngredientGroups = scaledIngredientGroups.map(group => ({
+        ...group,
+        ingredients: group.ingredients?.filter(ingredient => {
+          // Skip ingredients marked as removed
+          if (ingredient.name.includes('(removed)')) return false;
+          
+          // Skip ingredients with null/undefined amounts
+          if (ingredient.amount === null || ingredient.amount === undefined) return false;
+          
+          // Skip ingredients with zero amounts (handle both string and number)
+          if (typeof ingredient.amount === 'number' && ingredient.amount === 0) return false;
+          if (typeof ingredient.amount === 'string' && ingredient.amount === '0') return false;
+          
+          return true;
+        }) || []
+      }));
+
       // Create the recipe for mise and steps
       const preparedRecipeData = {
         ...recipe,
         title: newTitle || recipe.title,
         recipeYield: getScaledYieldText(recipe.recipeYield, selectedScaleFactor),
         instructions: finalInstructions,
-        ingredientGroups: scaledIngredientGroups,
+        ingredientGroups: filteredIngredientGroups,
       };
 
       // Prepare applied changes for mise

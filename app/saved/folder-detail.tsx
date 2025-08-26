@@ -702,7 +702,7 @@ export default function SavedFolderDetailScreen() {
           style={styles.searchInput}
           value={searchQuery}
           onChangeText={setSearchQuery}
-          placeholder="Search by title or ingredient"
+          placeholder="Search inside this folder"
           placeholderTextColor={COLORS.textMuted}
           returnKeyType="search"
           autoCorrect={false}
@@ -859,7 +859,7 @@ const styles = StyleSheet.create({
     color: COLORS.textDark,
     paddingVertical: 0,
     height: '100%',
-    lineHeight: FONT.size.body,
+    textAlignVertical: 'center',
   },
   clearButton: {
     padding: 4,

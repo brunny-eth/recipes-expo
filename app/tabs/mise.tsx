@@ -13,6 +13,7 @@ import {
   TextInput,
   Share,
   Modal,
+  RefreshControl,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
@@ -329,15 +330,22 @@ export default function MiseScreen() {
 
   // Removed caching strategy - always fetch fresh data for consistency
 
-
-
-
+  // Flag to prevent reloading manual items after clearing them
+  const [manualItemsCleared, setManualItemsCleared] = useState(false);
 
   // Load manual items from storage on component mount
   const loadManualItemsFromStorage = useCallback(async () => {
+    // Don't reload if we just cleared them
+    if (manualItemsCleared) {
+      console.log('[MiseScreen] 🚫 Blocked loading manual items - flag is set');
+      return;
+    }
+    
+    console.log('[MiseScreen] 📖 Loading manual items from storage...');
     try {
       const items = await loadManualItems();
       setManualItems(items);
+      console.log('[MiseScreen] ✅ Loaded', items.length, 'manual items');
     } catch (error) {
       // Track error without causing re-renders
       if (session?.user?.id) {
@@ -349,8 +357,9 @@ export default function MiseScreen() {
       }
       // Don't show error to user for manual items - graceful degradation
       setManualItems([]);
+      console.log('[MiseScreen] ❌ Error loading manual items, set to empty');
     }
-  }, []); // Remove dependencies to prevent infinite re-renders
+  }, [manualItemsCleared]); // Add manualItemsCleared dependency
 
   // Load sort mode preference from storage (deprecated; always category)
   const loadSortModeFromStorage = useCallback(async () => {
@@ -421,8 +430,8 @@ export default function MiseScreen() {
   // Keep screen awake only when on grocery tab to prevent battery drain
   useEffect(() => {
     if (selectedTab === 'grocery') {
-      const { activateKeepAwake, deactivateKeepAwake } = require('expo-keep-awake');
-      activateKeepAwake();
+      const { activateKeepAwakeAsync, deactivateKeepAwake } = require('expo-keep-awake');
+      activateKeepAwakeAsync();
       return () => deactivateKeepAwake();
     }
   }, [selectedTab]);
@@ -486,6 +495,23 @@ export default function MiseScreen() {
 
       setMiseRecipes(fetchedRecipes);
       setGroceryList(mergedGroceryList);
+
+      // Clear manual items if no recipes are left in mise
+      if (fetchedRecipes.length === 0 && manualItems.length > 0) {
+        console.log('[MiseScreen] 🧹 No recipes left in mise, clearing manual items');
+        clearAllManualItems();
+        setManualItems([]);
+        setManualItemsCleared(true); // Set flag to prevent re-loading
+        console.log('[MiseScreen] 🚫 Set manualItemsCleared flag to true');
+        // Update grocery list to only show empty state
+        setGroceryList([]);
+      } else if (fetchedRecipes.length > 0) {
+        // Reset flag if recipes are present, allowing manual items to be loaded
+        if (manualItemsCleared) {
+          console.log('[MiseScreen] ✅ Recipes present, resetting manualItemsCleared flag');
+        }
+        setManualItemsCleared(false);
+      }
 
       // Check if cooking session needs invalidation due to recipe changes or modifications
       if (cookingState.activeRecipes.length > 0) {
@@ -659,6 +685,12 @@ export default function MiseScreen() {
       // Previous optimization skipped API calls from cook screen, but this prevented
       // deletion detection when users deleted recipes and returned to cook
       fetchMiseData();
+      
+      // Also refresh grocery list to catch ingredient changes from recipe modifications
+      if (session?.user?.id && session.access_token) {
+        console.log('[MiseScreen] 🔄 Refreshing grocery list on focus to catch ingredient changes');
+        refreshGroceryListOnly();
+      }
     }, []) // Remove dependencies to prevent infinite re-renders
   );
 
@@ -900,6 +932,9 @@ export default function MiseScreen() {
     try {
       const newItem = await addManualItem(category, itemText);
       
+      // Reset the cleared flag since we're adding items again
+      setManualItemsCleared(false);
+      
       // Update local state
       setManualItems(prev => [...prev, newItem]);
       
@@ -969,6 +1004,7 @@ export default function MiseScreen() {
       
       // Update local state
       setManualItems([]);
+      setManualItemsCleared(true); // Set flag to prevent re-loading
       
       // Re-merge grocery list without manual items
       const recipeCategorizedList = convertToGroceryCategories(groceryList.flatMap(cat => 
@@ -1300,9 +1336,9 @@ export default function MiseScreen() {
             <View style={styles.ctaSection}>
               <TouchableOpacity 
                 style={styles.primaryButton}
-                onPress={() => router.push('/explore')}
+                onPress={() => router.push('/tabs')}
               >
-                <Text style={styles.primaryButtonText}>Find recipes</Text>
+                <Text style={styles.primaryButtonText}>Import Recipes</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
@@ -1350,6 +1386,19 @@ export default function MiseScreen() {
             keyExtractor={(item) => `category-${item.name}-${item.items.length}`}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={false}
+                onRefresh={() => {
+                  if (session?.user?.id && session.access_token) {
+                    console.log('[MiseScreen] 🔄 Manual grocery list refresh');
+                    refreshGroceryListOnly();
+                  }
+                }}
+                colors={[COLORS.primary]}
+                tintColor={COLORS.primary}
+              />
+            }
           />
         </View>
       );
@@ -1396,7 +1445,14 @@ export default function MiseScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.tabButton}
-          onPress={() => setSelectedTab('grocery')}
+          onPress={() => {
+            setSelectedTab('grocery');
+            // Refresh grocery list when switching to grocery tab to catch ingredient changes
+            if (session?.user?.id && session.access_token) {
+              console.log('[MiseScreen] 🔄 Refreshing grocery list on tab switch');
+              refreshGroceryListOnly();
+            }
+          }}
         >
           <Text style={[
             styles.tabButtonText,

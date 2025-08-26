@@ -1317,6 +1317,18 @@ export function formatIngredientsForGroceryList(
           }
         }
         
+        // Skip ingredients that are marked as removed or have no amount
+        if (ingredient.name.includes('(removed)') || amount === null || amount === 0) {
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`[groceryHelpers] ⏭️ Skipping removed/empty ingredient:`, {
+              name: ingredient.name,
+              amount: ingredient.amount,
+              parsedAmount: amount
+            });
+          }
+          continue; // Skip to next ingredient
+        }
+
         // Create grocery list item from final ingredient
         // Include descriptive size in the item name if present, but not if it's a unit
         let finalItemName = parsedName.baseName;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -41,6 +41,22 @@ type SavedFolder = {
   recipe_count: number;
 };
 
+// Types for saved recipes
+type SavedRecipe = {
+  id: string;
+  base_recipe_id: number;
+  title_override: string | null;
+  applied_changes: any | null;
+  original_recipe_data: ParsedRecipe | null;
+  processed_recipes_cache: {
+    id: number;
+    recipe_data: ParsedRecipe;
+    source_type: string | null;
+    parent_recipe_id: number | null;
+  } | null;
+  display_order: number;
+};
+
 // Predefined folder colors (8 choices in 4x2 grid)
 const FOLDER_COLORS = [
   '#109DF0', // Primary blue
@@ -52,6 +68,30 @@ const FOLDER_COLORS = [
   '#FF6B6B', // Coral
   '#DDA0DD', // Plum
 ];
+
+// Helpers for client-side search (same as in folder-detail.tsx)
+function normalizeForSearch(text: string): string {
+  return text
+    ? text
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/\s+/g, ' ') // collapse whitespace
+        .trim()
+    : '';
+}
+
+function buildSearchBlob(item: SavedRecipe): string {
+  const data = item.processed_recipes_cache?.recipe_data;
+  if (!data) return '';
+
+  const title = item.title_override || data.title || '';
+  const ingredientNames = (data.ingredientGroups || []).flatMap((group) =>
+    (group.ingredients || []).map((ing) => [ing.name, ing.preparation].filter(Boolean).join(' ')),
+  );
+
+  return normalizeForSearch([title, ...ingredientNames].join(' '));
+}
 
 export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
@@ -89,6 +129,12 @@ export default function LibraryScreen() {
   const [isSavedLoading, setIsSavedLoading] = useState(true);
   const [savedError, setSavedError] = useState<string | null>(null);
   
+  // Search state for saved recipes
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('');
+  const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>([]);
+  const [isSearchingRecipes, setIsSearchingRecipes] = useState(false);
+  
   // Add new folder modal state
   const [showAddFolderModal, setShowAddFolderModal] = useState(false);
   
@@ -100,6 +146,27 @@ export default function LibraryScreen() {
   const [showColorPickerModal, setShowColorPickerModal] = useState(false);
   const [folderToEdit, setFolderToEdit] = useState<SavedFolder | null>(null);
   const [isUpdatingColor, setIsUpdatingColor] = useState(false);
+
+  // Debounce search input (200ms)
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 200);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Build indexed list for search
+  const indexedRecipes = useMemo(() => {
+    return savedRecipes.map((r) => ({ recipe: r, blob: buildSearchBlob(r) }));
+  }, [savedRecipes]);
+
+  // Filtered recipes based on query
+  const filteredRecipes = useMemo(() => {
+    const q = normalizeForSearch(debouncedSearchQuery);
+    if (!q) return savedRecipes;
+    const tokens = q.split(' ').filter(Boolean);
+    return indexedRecipes
+      .filter((ir) => tokens.every((t) => ir.blob.includes(t)))
+      .map((ir) => ir.recipe);
+  }, [debouncedSearchQuery, savedRecipes, indexedRecipes]);
 
   // Update folder color
   const updateFolderColor = useCallback(async (folderId: number, newColor: string) => {
@@ -293,11 +360,40 @@ export default function LibraryScreen() {
     }
   }, [session?.user]);
 
+  // Fetch all saved recipes for search functionality
+  const fetchAllSavedRecipes = useCallback(async () => {
+    if (!session?.user) {
+      setSavedRecipes([]);
+      return;
+    }
+
+    setIsSearchingRecipes(true);
+    try {
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+      const response = await fetch(`${backendUrl}/api/saved/recipes?userId=${session.user.id}`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const { recipes } = await response.json();
+      const validRecipes = (recipes as SavedRecipe[]) || [];
+      setSavedRecipes(validRecipes);
+      
+    } catch (err) {
+      console.error('[LibraryScreen] Error fetching saved recipes for search:', err);
+      // Don't show error to user for search functionality
+    } finally {
+      setIsSearchingRecipes(false);
+    }
+  }, [session?.user]);
+
   // Load data on focus (Saved only)
   useFocusEffect(
     useCallback(() => {
       fetchSavedFolders();
-    }, [fetchSavedFolders])
+      fetchAllSavedRecipes(); // Also fetch recipes for search
+    }, [fetchSavedFolders, fetchAllSavedRecipes])
   );
 
   // Handle refresh
@@ -491,6 +587,47 @@ export default function LibraryScreen() {
     </TouchableOpacity>
   ), [navigateToFolder, handleDeleteFolder]);
 
+  // Render search result item
+  const renderSearchResultItem = useCallback(({ item }: { item: SavedRecipe }) => {
+    const data = item.processed_recipes_cache?.recipe_data;
+    if (!data) return null;
+
+    const imageUrl = data.image || data.thumbnailUrl;
+    const itemId = item.processed_recipes_cache?.id.toString() || item.base_recipe_id.toString();
+    const hasImageError = imageErrors[itemId];
+
+    return (
+      <TouchableOpacity
+        style={styles.exploreCard}
+        onPress={() => navigateToRecipe(data)}
+      >
+        {/* Left half - Image */}
+        <View style={styles.imageContainer}>
+          {imageUrl && !hasImageError ? (
+            <FastImage
+              source={{ uri: imageUrl }}
+              style={styles.exploreCardImage}
+              onLoad={() => {}}
+              onError={() => handleImageError(item.processed_recipes_cache?.id || item.base_recipe_id)}
+            />
+          ) : (
+            <FastImage
+              source={require('@/assets/images/meezblue_underline.webp')}
+              style={styles.exploreCardImage}
+            />
+          )}
+        </View>
+        
+        {/* Right half - Recipe title */}
+        <View style={styles.titleContainer}>
+          <Text style={styles.exploreCardTitle} numberOfLines={3}>
+            {item.title_override || data.title || 'Untitled Recipe'}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  }, [navigateToRecipe, handleImageError, imageErrors]);
+
   // Render explore content
   const renderExploreContent = () => {
     if (isExploreLoading) {
@@ -610,38 +747,91 @@ export default function LibraryScreen() {
 
     return (
       <View style={styles.savedContent}>
-        <FlatList
-          data={savedFolders}
-          renderItem={renderFolderItem}
-          keyExtractor={(item) => (item.id as number).toString()}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              colors={[COLORS.primary]}
-              tintColor={COLORS.primary}
-            />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No folders yet</Text>
-              <Text style={styles.emptySubtext}>
-                Create your first folder to organize your saved recipes
-              </Text>
-            </View>
-          }
-        />
-
-        {/* Add New Folder Button at Bottom */}
-        <View style={styles.bottomButtonContainer}>
-          <TouchableOpacity
-            style={styles.addFolderButton}
-            onPress={() => setShowAddFolderModal(true)}
-          >
-            <Text style={styles.addFolderText}>Add new folder</Text>
-          </TouchableOpacity>
+        {/* Search bar */}
+        <View style={styles.searchContainer}>
+          <MaterialCommunityIcons name="magnify" size={20} color={COLORS.textMuted} style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search all your saved recipes"
+            placeholderTextColor={COLORS.textMuted}
+            returnKeyType="search"
+            autoCorrect={false}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setSearchQuery('')}
+              style={styles.clearButton}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <MaterialCommunityIcons name="close" size={18} color={COLORS.textMuted} />
+            </TouchableOpacity>
+          )}
         </View>
+
+        {/* Show search results if searching */}
+        {searchQuery.length > 0 && (
+          <View style={styles.searchResultsContainer}>
+            <Text style={styles.searchResultsHeader}>
+              Search results ({filteredRecipes.length})
+            </Text>
+            {filteredRecipes.length > 0 ? (
+              <FlatList
+                data={filteredRecipes}
+                renderItem={renderSearchResultItem}
+                keyExtractor={(item) => item.processed_recipes_cache?.id.toString() || item.base_recipe_id.toString()}
+                contentContainerStyle={styles.searchResultsList}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled={true}
+              />
+            ) : (
+              <View style={styles.noSearchResults}>
+                <MaterialCommunityIcons name="magnify" size={48} color={COLORS.lightGray} />
+                <Text style={styles.emptyText}>No matches</Text>
+                <Text style={styles.emptySubtext}>Try a different search term.</Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Show folders when not searching or when search has no results */}
+        {(!searchQuery || filteredRecipes.length === 0) && (
+          <>
+            <FlatList
+              data={savedFolders}
+              renderItem={renderFolderItem}
+              keyExtractor={(item) => (item.id as number).toString()}
+              contentContainerStyle={styles.listContent}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={handleRefresh}
+                  colors={[COLORS.primary]}
+                  tintColor={COLORS.primary}
+                />
+              }
+              ListEmptyComponent={
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>No folders yet</Text>
+                  <Text style={styles.emptySubtext}>
+                    Create your first folder to organize your saved recipes
+                  </Text>
+                </View>
+              }
+            />
+
+            {/* Add New Folder Button at Bottom */}
+            <View style={styles.bottomButtonContainer}>
+              <TouchableOpacity
+                style={styles.addFolderButton}
+                onPress={() => setShowAddFolderModal(true)}
+              >
+                <Text style={styles.addFolderText}>Add new folder</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
       </View>
     );
   };
@@ -1019,4 +1209,53 @@ const styles = StyleSheet.create({
      ...bodyStrongText,
      color: COLORS.white,
    },
+  // New styles for search
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+    paddingHorizontal: SPACING.sm,
+    // Fix height so it doesn't change between placeholder and typed text
+    height: 40,
+    marginBottom: SPACING.sm,
+  } as ViewStyle,
+  searchIcon: {
+    marginRight: SPACING.xs,
+  },
+  searchInput: {
+    // Avoid inheriting bodyText lineHeight which can misalign TextInput vertically
+    fontFamily: FONT.family.body,
+    fontSize: FONT.size.body,
+    flex: 1,
+    color: COLORS.textDark,
+    paddingVertical: 0,
+    height: '100%',
+    textAlignVertical: 'center',
+  },
+  clearButton: {
+    padding: 4,
+  },
+  searchResultsContainer: {
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+    ...SHADOWS.small,
+  } as ViewStyle,
+  searchResultsHeader: {
+    ...bodyStrongText,
+    fontSize: FONT.size.body,
+    color: COLORS.textDark,
+    marginBottom: SPACING.sm,
+  },
+  searchResultsList: {
+    paddingBottom: SPACING.md,
+  },
+  noSearchResults: {
+    alignItems: 'center',
+    paddingVertical: SPACING.xl,
+  },
 }); 

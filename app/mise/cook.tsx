@@ -1344,7 +1344,9 @@ export default function CookScreen() {
                     onDragEnd={({ data }) => setSteps(data)}
                     renderItem={renderStepItem}
                     containerStyle={styles.stepsContainer}
-                    contentContainerStyle={{ paddingBottom: 100 }}
+                    contentContainerStyle={{ 
+                      paddingBottom: currentRecipeData?.tips ? 180 : 140 
+                    }}
                     onScrollToIndexFailed={(info) => {
                       // Handle scroll to index failure gracefully
                       setTimeout(() => {

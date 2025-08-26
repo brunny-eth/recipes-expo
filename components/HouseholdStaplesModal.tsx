@@ -14,26 +14,69 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, BORDER_WIDTH, OVERLAYS } from '@/constants/theme';
 import { bodyStrongText, bodyText, sectionHeaderText, FONT } from '@/constants/typography';
 
-// Predefined list of common household staples
-const HOUSEHOLD_STAPLES = [
-  'salt',
-  'black pepper',
-  'ground pepper', 
-  'all purpose flour',
-  'nonstick cooking spray',
-  'granulated sugar',
-  'brown sugar',
-  'olive oil',
-  'vegetable oil',
-  'butter',
-  'eggs',
-  'milk',
-  'onion',
-  'garlic',
-  'baking soda',
-  'baking powder',
-  'vanilla extract',
-];
+// Predefined list of common household staples organized by category
+const HOUSEHOLD_STAPLES_BY_CATEGORY = {
+  'Baking': [
+    'all purpose flour',
+    'baking soda',
+    'baking powder',
+    'granulated sugar',
+    'brown sugar',
+    'powdered sugar',
+    'sugar',
+    'vanilla extract',
+    'cocoa powder',
+    'chocolate chips',
+    'yeast',
+    'cornstarch',
+  ],
+  'Oils & Fats': [
+    'olive oil',
+    'vegetable oil',
+    'canola oil',
+    'butter',
+    'coconut oil',
+    'sesame oil',
+    'nonstick cooking spray',
+  ],
+  'Spices & Seasonings': [
+    'salt',
+    'black pepper',
+    'ground pepper',
+    'garlic powder',
+    'onion powder',
+    'paprika',
+    'cinnamon',
+    'oregano',
+    'basil',
+    'thyme',
+    'cumin',
+    'chili powder',
+  ],
+  'Dairy & Eggs': [
+    'milk',
+    'eggs',
+    'heavy cream',
+    'sour cream',
+    'cream cheese',
+    'parmesan cheese',
+  ],
+  'Pantry Basics': [
+    'onion',
+    'garlic',
+    'potatoes',
+    'rice',
+    'pasta',
+    'beans',
+    'tomato paste',
+    'chicken broth',
+    'soy sauce',
+    'vinegar',
+  ],
+};
+
+// Flatten the categorized staples for the select all functionality
+const ALL_STAPLES = Object.values(HOUSEHOLD_STAPLES_BY_CATEGORY).flat();
 
 interface HouseholdStaplesModalProps {
   visible: boolean;
@@ -57,9 +100,9 @@ export default function HouseholdStaplesModal({
   // Sync with props when modal opens
   useEffect(() => {
     if (visible) {
-      // If no staples are selected, default to salt and pepper
+      // If no staples are selected, default to some common basics
       if (selectedStaples.length === 0) {
-        const defaultStaples = ['salt', 'black pepper', 'ground pepper'];
+        const defaultStaples = ['salt', 'black pepper', 'all purpose flour', 'olive oil', 'eggs'];
         setLocalSelected(defaultStaples);
         console.log('[HouseholdStaplesModal] 🏠 Setting default staples:', defaultStaples);
       } else {
@@ -77,10 +120,10 @@ export default function HouseholdStaplesModal({
   };
 
   const handleToggleAll = () => {
-    if (localSelected.length === HOUSEHOLD_STAPLES.length) {
+    if (localSelected.length === ALL_STAPLES.length) {
       setLocalSelected([]); // If all selected, select none
     } else {
-      setLocalSelected(HOUSEHOLD_STAPLES); // Otherwise, select all
+      setLocalSelected(ALL_STAPLES); // Otherwise, select all
     }
   };
 
@@ -115,28 +158,39 @@ export default function HouseholdStaplesModal({
               {/* Toggle removed from modal; handled on main grocery list */}
 
               <View style={styles.scrollWrapper}>
-                <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={true}>
-                  {HOUSEHOLD_STAPLES.map((staple) => (
-                  <TouchableOpacity
-                    key={staple}
-                    style={styles.stapleItem}
-                    onPress={() => handleToggleStaple(staple)}
+                <View style={styles.scrollContainerWrapper}>
+                  <ScrollView 
+                    style={styles.scrollContainer} 
+                    showsVerticalScrollIndicator={true}
+                    indicatorStyle="black"
                   >
-                    <MaterialCommunityIcons
-                      name={localSelected.includes(staple) ? "checkbox-marked" : "checkbox-blank-outline"}
-                      size={24}
-                      color={localSelected.includes(staple) ? COLORS.primary : COLORS.secondary}
-                    />
-                    <Text style={styles.stapleText}>{staple}</Text>
-                  </TouchableOpacity>
-                                  ))}
-                </ScrollView>
+                    {Object.entries(HOUSEHOLD_STAPLES_BY_CATEGORY).map(([category, staples]) => (
+                      <View key={category} style={styles.categorySection}>
+                        <Text style={styles.categoryHeader}>{category}</Text>
+                        {staples.map((staple) => (
+                          <TouchableOpacity
+                            key={staple}
+                            style={styles.stapleItem}
+                            onPress={() => handleToggleStaple(staple)}
+                          >
+                            <MaterialCommunityIcons
+                              name={localSelected.includes(staple) ? "checkbox-marked" : "checkbox-blank-outline"}
+                              size={24}
+                              color={localSelected.includes(staple) ? COLORS.primary : COLORS.secondary}
+                            />
+                            <Text style={styles.stapleText}>{staple}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    ))}
+                  </ScrollView>
+                </View>
               </View>
 
               <View style={styles.buttonRow}>
                 <TouchableOpacity onPress={handleToggleAll} style={styles.selectButton}>
                   <Text style={styles.selectButtonText}>
-                    {localSelected.length === HOUSEHOLD_STAPLES.length ? 'Clear all' : 'Select all'}
+                    {localSelected.length === ALL_STAPLES.length ? 'Clear all' : 'Select all'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -171,7 +225,7 @@ const styles = StyleSheet.create({
     padding: SPACING.xl,
     width: '100%',
     maxWidth: 420,
-    maxHeight: '80%',
+    maxHeight: '85%', // Increased height to accommodate more content
   } as ViewStyle,
   header: {
     marginBottom: SPACING.md,
@@ -233,14 +287,35 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: SPACING.sm,
   } as TextStyle,
+  scrollContainerWrapper: {
+    position: 'relative', // Needed for absolute positioning of gradient
+  } as ViewStyle,
   scrollContainer: {
-    maxHeight: 300,
-    borderWidth: BORDER_WIDTH.hairline,
+    maxHeight: 350, // Increased height to show more content
+    borderWidth: 2, // Thicker border to make it more obvious
     borderColor: COLORS.primaryLight,
     borderRadius: RADIUS.sm,
     paddingHorizontal: SPACING.sm,
     backgroundColor: COLORS.white,
+    // Add shadow to make the container stand out
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   } as ViewStyle,
+  categorySection: {
+    marginBottom: SPACING.md,
+  } as ViewStyle,
+  categoryHeader: {
+    ...bodyStrongText,
+    fontSize: FONT.size.caption,
+    color: COLORS.textMuted,
+    marginBottom: SPACING.xs,
+    paddingBottom: SPACING.xs,
+    borderBottomWidth: BORDER_WIDTH.hairline,
+    borderBottomColor: COLORS.primaryLight,
+  } as TextStyle,
   stapleItem: {
     flexDirection: 'row',
     alignItems: 'center',
