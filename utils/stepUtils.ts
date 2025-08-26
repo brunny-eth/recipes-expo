@@ -94,6 +94,23 @@ export const debugIngredientSearchTerms = (ingredients: StructuredIngredient[]) 
   return searchTerms;
 };
 
+// Debug function for smart highlighting
+export const debugSmartHighlighting = (
+  text: string,
+  ingredients: StructuredIngredient[]
+) => {
+  console.log('[DEBUG] Smart highlighting for text:', text);
+  console.log('[DEBUG] Ingredients:', ingredients.map(ing => ing.name));
+  
+  const spans = findIngredientSpans(text, ingredients);
+  console.log('[DEBUG] Found spans:', spans);
+  
+  const segments = parseTextSegments(text, spans);
+  console.log('[DEBUG] Text segments:', segments);
+  
+  return { spans, segments };
+};
+
 // Ingredient highlighting logic
 export const escapeRegex = (string: string): string => {
   return string.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
@@ -164,6 +181,263 @@ export const getUniqueSearchTermItems = (searchTermsWithIng: Array<{ ingredient:
     (a, b) => b.searchTerm.length - a.searchTerm.length
   );
   return uniqueSearchTermItems;
+};
+
+// Smart ingredient highlighting system
+export interface IngredientSpan {
+  start: number;
+  end: number;
+  ingredientId: string;
+  occurrenceIndex: number;
+  searchTerm: string;
+}
+
+export interface TextSegment {
+  text: string;
+  isHighlighted: boolean;
+  ingredientId?: string;
+  searchTerm?: string;
+}
+
+// Whitelist of safe single-word ingredients that can be highlighted
+const SAFE_SINGLE_WORD_INGREDIENTS = new Set([
+  'garlic', 'cumin', 'paprika', 'salt', 'pepper', 'sugar', 'flour', 'butter',
+  'eggs', 'milk', 'cream', 'cheese', 'bread', 'rice', 'pasta', 'meat',
+  'fish', 'chicken', 'beef', 'pork', 'lamb', 'shrimp', 'salmon', 'tuna',
+  'onion', 'carrot', 'celery', 'tomato', 'potato', 'lemon', 'lime', 'orange',
+  'apple', 'banana', 'strawberry', 'blueberry', 'raspberry', 'blackberry',
+  'basil', 'oregano', 'thyme', 'rosemary', 'sage', 'mint', 'parsley', 'cilantro',
+  'ginger', 'turmeric', 'cinnamon', 'nutmeg', 'cloves', 'cardamom', 'vanilla',
+  'chocolate', 'cocoa', 'honey', 'syrup', 'vinegar', 'soy', 'mustard', 'ketchup',
+  'orzo', 'penne', 'spaghetti', 'linguine', 'fettuccine', 'rigatoni', 'ziti',
+  'couscous', 'quinoa', 'bulgur', 'barley', 'oatmeal', 'cornmeal', 'semolina',
+  'almond', 'walnut', 'pecan', 'cashew', 'pistachio', 'hazelnut', 'macadamia',
+  'raisin', 'cranberry', 'apricot', 'prune', 'date', 'fig', 'currant',
+  'cucumber', 'zucchini', 'eggplant', 'bell pepper', 'jalapeño', 'serrano',
+  'mushroom', 'spinach', 'kale', 'lettuce', 'arugula', 'watercress', 'endive',
+  'asparagus', 'broccoli', 'cauliflower', 'brussels sprouts', 'cabbage', 'kohlrabi',
+  'turnip', 'rutabaga', 'parsnip', 'beet', 'radish', 'daikon', 'horseradish',
+  'scallion', 'shallot', 'leek', 'chive', 'garlic powder', 'onion powder',
+  'bay leaf', 'tarragon', 'marjoram', 'chervil', 'dill', 'fennel', 'caraway',
+  'allspice', 'star anise', 'saffron', 'sumac', 'za\'atar', 'harissa', 'curry',
+  'chili powder', 'cayenne', 'red pepper flakes', 'black pepper', 'white pepper',
+  'sea salt', 'kosher salt', 'flaky salt', 'himalayan salt', 'celtic salt',
+  'balsamic vinegar', 'red wine vinegar', 'white wine vinegar', 'apple cider vinegar',
+  'rice vinegar', 'sherry vinegar', 'champagne vinegar', 'malt vinegar',
+  'sesame oil', 'avocado oil', 'coconut oil', 'grapeseed oil', 'sunflower oil',
+  'canola oil', 'vegetable oil', 'peanut oil', 'walnut oil', 'hazelnut oil',
+  'parmesan', 'chives', 'peanuts'
+]);
+
+// Stoplist of common descriptors that should never match alone
+const STOPLIST_DESCRIPTORS = new Set([
+  'extra', 'virgin', 'oil', 'fresh', 'chopped', 'large', 'small', 'diced', 'sliced',
+  'minced', 'grated', 'crushed', 'ground', 'whole', 'dried', 'frozen', 'canned',
+  'organic', 'natural', 'pure', 'refined', 'unrefined', 'cold', 'hot', 'warm',
+  'soft', 'hard', 'ripe', 'unripe', 'sweet', 'sour', 'bitter', 'spicy', 'mild'
+]);
+
+// Normalize text for matching (lowercase + strip diacritics)
+const normalizeText = (text: string): string => {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+    .trim();
+};
+
+// Check if a word is a safe single-word ingredient
+const isSafeSingleWord = (word: string): boolean => {
+  const normalized = normalizeText(word);
+  return SAFE_SINGLE_WORD_INGREDIENTS.has(normalized);
+};
+
+// Check if a word is a stoplisted descriptor
+const isStoplisted = (word: string): boolean => {
+  const normalized = normalizeText(word);
+  return STOPLIST_DESCRIPTORS.has(normalized);
+};
+
+// Generate smart aliases for an ingredient
+const generateSmartAliases = (ingredientName: string): string[] => {
+  const aliases = new Set<string>();
+  const words = ingredientName.split(' ').filter(word => word.trim());
+  
+  if (words.length === 0) return [];
+  
+  // Always add the full name as highest priority
+  aliases.add(ingredientName);
+  
+  if (words.length === 1) {
+    // Single word - only add if it's safe
+    if (isSafeSingleWord(words[0])) {
+      aliases.add(words[0]);
+    }
+  } else {
+    // Multi-word ingredients - generate meaningful sub-phrases
+    
+    // Add combinations from the end (most specific to least specific)
+    for (let i = 2; i <= Math.min(words.length, 4); i++) {
+      const subPhrase = words.slice(-i).join(' ');
+      if (subPhrase.length > 3) {
+        aliases.add(subPhrase);
+      }
+    }
+    
+    // For multi-word ingredients, also add the last two words as a common pattern
+    if (words.length >= 2) {
+      const lastTwo = words.slice(-2).join(' ');
+      if (lastTwo.length > 3) {
+        aliases.add(lastTwo);
+      }
+    }
+    
+    // Add individual words only if they're safe and not stoplisted
+    words.forEach(word => {
+      if (word.length > 3 && isSafeSingleWord(word) && !isStoplisted(word)) {
+        aliases.add(word);
+      }
+    });
+  }
+  
+  // Handle singular/plural variations for multi-word phrases
+  const finalAliases = new Set<string>(aliases);
+  aliases.forEach(alias => {
+    if (alias.includes(' ')) {
+      const words = alias.split(' ');
+      const lastWord = words[words.length - 1];
+      
+      if (lastWord.endsWith('s')) {
+        const singular = words.slice(0, -1).concat(lastWord.slice(0, -1)).join(' ');
+        finalAliases.add(singular);
+      } else {
+        const plural = alias + 's';
+        finalAliases.add(plural);
+      }
+    }
+  });
+  
+  return Array.from(finalAliases);
+};
+
+// Find all non-overlapping ingredient spans in text
+export const findIngredientSpans = (
+  text: string,
+  ingredients: StructuredIngredient[]
+): IngredientSpan[] => {
+  const spans: IngredientSpan[] = [];
+  const textLower = normalizeText(text);
+  
+  ingredients.forEach((ingredient, ingredientIndex) => {
+    const aliases = generateSmartAliases(ingredient.name);
+    
+    // Sort aliases by length (longest first) to prioritize longer matches
+    aliases.sort((a, b) => b.length - a.length);
+    
+    aliases.forEach(alias => {
+      const normalizedAlias = normalizeText(alias);
+      let startIndex = 0;
+      let occurrenceIndex = 0;
+      
+      while (true) {
+        const index = textLower.indexOf(normalizedAlias, startIndex);
+        if (index === -1) break;
+        
+        // Check token boundaries (letters, numbers, hyphens, apostrophes)
+        const beforeChar = index > 0 ? text[index - 1] : '';
+        const afterChar = index + normalizedAlias.length < text.length ? text[index + normalizedAlias.length] : '';
+        
+        // More flexible boundary checking for cooking context
+        const isTokenBoundaryBefore = !/[a-zA-Z0-9\-']/.test(beforeChar) || beforeChar === ' ';
+        const isTokenBoundaryAfter = !/[a-zA-Z0-9\-']/.test(afterChar) || afterChar === ' ';
+        
+        // Special case: allow matching at the beginning of text
+        const isAtStart = index === 0;
+        const isAtEnd = index + normalizedAlias.length >= text.length;
+        
+        if ((isTokenBoundaryBefore || isAtStart) && (isTokenBoundaryAfter || isAtEnd)) {
+          // Check for overlaps with existing spans
+          const newSpan: IngredientSpan = {
+            start: index,
+            end: index + normalizedAlias.length,
+            ingredientId: ingredient.name, // Use name as ID for now
+            occurrenceIndex,
+            searchTerm: alias
+          };
+          
+          // Only add if it doesn't overlap with existing spans
+          const hasOverlap = spans.some(span => 
+            (newSpan.start < span.end && newSpan.end > span.start)
+          );
+          
+          if (!hasOverlap) {
+            spans.push(newSpan);
+          }
+        }
+        
+        startIndex = index + 1;
+        occurrenceIndex++;
+      }
+    });
+  });
+  
+  // Sort spans by start position
+  spans.sort((a, b) => a.start - b.start);
+  
+  return spans;
+};
+
+// Parse text into segments for highlighting
+export const parseTextSegments = (
+  text: string,
+  spans: IngredientSpan[]
+): TextSegment[] => {
+  if (spans.length === 0) {
+    return [{ text, isHighlighted: false }];
+  }
+  
+  const segments: TextSegment[] = [];
+  let lastIndex = 0;
+  
+  spans.forEach((span) => {
+    // Add text before the span
+    if (span.start > lastIndex) {
+      segments.push({
+        text: text.slice(lastIndex, span.start),
+        isHighlighted: false
+      });
+    }
+    
+    // Add the highlighted span
+    segments.push({
+      text: text.slice(span.start, span.end),
+      isHighlighted: true,
+      ingredientId: span.ingredientId,
+      searchTerm: span.searchTerm
+    });
+    
+    lastIndex = span.end;
+  });
+  
+  // Add remaining text after the last span
+  if (lastIndex < text.length) {
+    segments.push({
+      text: text.slice(lastIndex),
+      isHighlighted: false
+    });
+  }
+  
+  return segments;
+};
+
+// Render highlighted text with spans
+export const renderHighlightedText = (
+  text: string,
+  segments: TextSegment[],
+  onIngredientPress?: (ingredient: StructuredIngredient) => void,
+  isCompleted?: boolean
+): TextSegment[] => {
+  return segments;
 };
 
 // Step completion actions

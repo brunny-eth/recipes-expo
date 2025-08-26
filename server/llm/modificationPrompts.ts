@@ -137,40 +137,34 @@ You are an expert recipe editor. Rewrite the cooking instructions to reflect the
 
 ${modificationsSection}
 
-**SUBSTITUTION RULES** (if applicable):
-1. For any ingredients marked REMOVE, eliminate all mentions/usages as if never present. Update wording/preparation to reflect the fact that the ingredient is no longer present. Adjust timings/prep if needed.
-2. For any ingredients marked REPLACE, update wording/preparation to use the substitute. Adjust timings/prep if needed to incorporate the new ingredient appropriately.
-3. Output natural instructions without phrases like "omit" or "instead"—just the corrected steps.
+**PREP STEP CONSOLIDATION**:
+1. Move all preparation steps (ingredient prep like chopping, marinating, grating; equipment setup like preheating oven or greasing a pan; advance prep like making a marinade) into a single initial step at the beginning.
+2. Keep the rest of the cooking steps in their original order. Do not include step numbers in the output.
+3. If you consolidated prep steps into the first step, label it as "Prep Step:" at the beginning. If no prep steps were consolidated, do not add this label.
 
-**INGREDIENT GROUP REFERENCE EXPANSION** (if ingredient groups are provided):
-4. When a vague reference (e.g., "mix all marinade ingredients", "add the sauce", "combine dressing ingredients") appears in an instruction, and a matching group is found in the INGREDIENT GROUPS section, rewrite the instruction using the full, comma-separated ingredient list from that group.
-5. Match group names loosely (case-insensitive, partial match is OK). For example, "marinade" should match "Marinade" or "The Marinade".
-6. Replace vague phrases with explicit ingredient names and quantities. For example:
-   - "Mix all dressing ingredients" → "Mix olive oil, red wine vinegar, and mustard"
-   - "Add the marinade" → "Add soy sauce, garlic, and ginger"
-   - "Stir in the sauce" → "Stir in tomatoes, onions, and herbs"
-7. This expansion is CRITICAL for app functionality - users need to see exactly which ingredients to use.
+**INGREDIENT GROUP EXPANSION (CRITICAL)**:
+4. Always expand vague references such as "add the marinade," "mix all dressing ingredients," or "combine the sauce" into full, explicit ingredient lists from the INGREDIENT GROUPS section.
+5. Match group names loosely (case-insensitive, partial match OK).
+6. When expanding, always include ingredient names **with explicit unit amounts whenever available** (e.g., "Mix 1 cup flour, 1 tsp salt, and 1 tsp cumin" rather than "Mix flour, salt, and cumin").
 
-**SCALING RULES** (if applicable):
-8. Update **only** ingredient quantities that are explicitly stated (e.g., "2 cups flour"). Do not modify vague references like "the onion" or "some salt".
-9. Use the exact scaled quantity if numeric.
-10. For whole or indivisible ingredients (e.g. eggs, bay leaves, cinnamon sticks), round sensibly upwards.
-11. Be precise. If the original says "Add 2 tbsp olive oil" and the scaled amount is "1 tbsp", rewrite as "Add 1 tbsp olive oil".
+**SUBSTITUTIONS** (if applicable):
+7. For REMOVE ingredients: eliminate all mentions and adjust prep/cooking steps naturally as if they were never present.
+8. For REPLACE ingredients: use the substitute directly in the instructions with appropriate prep/cook adjustments. Adjust related timings, preparation, or cooking methods as needed.
+9. Do not use phrases like "omit" or "instead" — output clean, natural instructions.
 
-**COMBINED REASONING** (when both substitutions and scaling apply):
-12. Consider both changes holistically. For example, if substituting chicken with tofu AND doubling the recipe, think about how cooking times, temperatures, and preparation methods might need adjustment for both the ingredient change and the quantity change.
-13. Prioritize food safety and proper cooking techniques when combining substitutions with scaling.
+**SCALING** (if applicable):
+10. Update only explicit numeric ingredient quantities (e.g., "2 cups flour" → "1 cup flour").
+11. Do not modify vague references like "the onion" or "some salt".
+12. For whole/indivisible ingredients (e.g., eggs, bay leaves), round sensibly upward.
 
-**GENERAL RULES**:
-14. Preserve step order and DO NOT number the steps.
-${skipTitleUpdate ? 
-`15. Title Rewriting: DO NOT suggest title changes. Keep newTitle as null since the user has already set a custom title.` :
-`15. Title Rewriting: Suggest a newTitle if a primary/key ingredient is significantly substituted or removed. Primary ingredients are typically those that:
-    - Appear in common recipe names (e.g., "chicken" in "chicken quesadillas", "blueberry" in "blueberry muffins")
-    - Are the main protein, featured fruit, or one of the defining characteristics of the dish
-    - When substituted/removed, should change what the dish is called logically.
-    Do NOT suggest title changes for minor/supporting ingredients (e.g., removing carrots from chicken pot pie stays "Chicken Pot Pie") or for scaling alone.
-    Examples: strawberry→blueberry pancakes becomes "Blueberry Pancakes", chicken→tofu quesadillas becomes "Tofu Quesadillas", remove chicken from chicken quesadillas becomes "Quesadillas", remove Sage from a Grilled Cheese Sage Pesto Sandwich becomes "Grilled Cheese Pesto Sandwich".`
+**COMBINED REASONING**:
+13. Apply substitutions and scaling together holistically (e.g., replacing chicken with tofu AND doubling the recipe). Adjust cooking methods, timings, and food safety considerations where needed.
+
+**TITLE REWRITING**${skipTitleUpdate ? 
+`:
+14. DO NOT suggest title changes. Keep newTitle as null.` :
+`:
+14. Suggest a newTitle only if a primary ingredient (main protein, featured fruit, or defining characteristic) is replaced or removed. Otherwise, leave as null. Examples: strawberry→blueberry pancakes → "Blueberry Pancakes", chicken→tofu quesadillas → "Tofu Quesadillas".`
 }
 
 Respond ONLY in valid JSON:

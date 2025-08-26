@@ -47,7 +47,9 @@ import {
   StepCompletionState, 
   isStepCompleted, 
   isStepActive, 
-  autoScrollToNextStep 
+  autoScrollToNextStep,
+  findIngredientSpans,
+  parseTextSegments
 } from '@/utils/stepUtils';
 import { abbreviateUnit } from '@/utils/format';
 import { isUserFork, normalizeInstructionsToSteps, InstructionStep } from '@/utils/recipeUtils';
@@ -937,6 +939,13 @@ export default function CookScreen() {
     }
   };
 
+  // --- Ingredient Tooltip Logic ---
+  const handleIngredientPress = (ingredient: StructuredIngredient) => {
+    setSelectedIngredient(ingredient);
+    setIsTooltipVisible(true);
+  };
+  // --- End Ingredient Tooltip Logic ---
+
   // Render function for draggable steps
   const renderStepItem = useCallback(({ item, drag, isActive }: RenderItemParams<LocalStep>) => {
     // Convert completedSteps array to StepCompletionState object
@@ -961,6 +970,10 @@ export default function CookScreen() {
       });
     }
 
+    // Generate ingredient spans for smart highlighting
+    const ingredientSpans = findIngredientSpans(item.text, flatIngredients);
+    const textSegments = parseTextSegments(item.text, ingredientSpans);
+
     return (
       <View 
         style={[
@@ -975,11 +988,29 @@ export default function CookScreen() {
             onPress={() => toggleStepCompleted(currentRecipeSession?.recipeId || '', stepIndex)}
             activeOpacity={0.7}
           >
+            {/* Render highlighted text with ingredient spans */}
             <Text style={[
               styles.stepText,
               stepIsCompleted && styles.stepTextCompleted
             ]}>
-              {item.text}
+              {textSegments.map((segment, segmentIndex) => (
+                <Text
+                  key={`segment-${segmentIndex}`}
+                  style={segment.isHighlighted ? styles.highlightedText : undefined}
+                  onPress={
+                    segment.isHighlighted && !stepIsCompleted && segment.ingredientId
+                      ? () => {
+                          const ingredient = flatIngredients.find(ing => ing.name === segment.ingredientId);
+                          if (ingredient) {
+                            handleIngredientPress(ingredient);
+                          }
+                        }
+                      : undefined
+                  }
+                >
+                  {segment.text}
+                </Text>
+              ))}
             </Text>
 
             {/* Show note preview if exists */}
@@ -996,8 +1027,6 @@ export default function CookScreen() {
                 </Text>
               </View>
             )}
-
-            {/* Timers UI will be placed here in section 3 */}
           </TouchableOpacity>
 
           {/* Right side controls */}
@@ -1033,7 +1062,7 @@ export default function CookScreen() {
         </View>
       </View>
     );
-  }, [steps, currentRecipeSession, currentRecipeData, toggleStepCompleted, openNoteModal]);
+  }, [steps, currentRecipeSession, currentRecipeData, toggleStepCompleted, openNoteModal, handleIngredientPress]);
 
   const handleSwipeGesture = async (event: any) => {
     if (event.nativeEvent.state === State.END) {
@@ -1098,13 +1127,6 @@ export default function CookScreen() {
       }
     }
   };
-
-  // --- Ingredient Tooltip Logic ---
-  const handleIngredientPress = (ingredient: StructuredIngredient) => {
-    setSelectedIngredient(ingredient);
-    setIsTooltipVisible(true);
-  };
-  // --- End Ingredient Tooltip Logic ---
 
   // --- Timer Functions ---
   const formatTime = (timeInSeconds: number): string => {
@@ -1931,6 +1953,12 @@ const styles = StyleSheet.create({
   stepTextCompleted: {
     textDecorationLine: 'line-through',
     color: COLORS.textMuted,
+  },
+  highlightedText: {
+    fontFamily: 'Inter-SemiBold',
+    color: COLORS.primary,
+    fontSize: 16,
+    lineHeight: 22,
   },
   notePreview: {
     flexDirection: 'row',
