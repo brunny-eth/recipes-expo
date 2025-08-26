@@ -1,35 +1,76 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-// import { Timer } from 'lucide-react-native'; // Removed import
-import { MaterialCommunityIcons } from '@expo/vector-icons'; // Added import
-import { COLORS } from '@/constants/theme';
-import { captionStrongText, FONT } from '@/constants/typography';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { COLORS, SPACING, RADIUS } from '@/constants/theme';
+import { captionStrongText, FONT, metaText } from '@/constants/typography';
+import { Timer } from './TimerTool';
 
 interface MiniTimerDisplayProps {
-  timeRemaining: number;
+  timers: Timer[];
   formatTime: (seconds: number) => string;
   onPress?: () => void;
 }
 
 export default function MiniTimerDisplay({
-  timeRemaining,
+  timers,
   formatTime,
   onPress,
 }: MiniTimerDisplayProps) {
+  if (timers.length === 0) return null;
+
+  // If only one timer, show compact single timer display
+  if (timers.length === 1) {
+    const timer = timers[0];
+    return (
+      <TouchableOpacity
+        style={styles.container}
+        onPress={onPress}
+        activeOpacity={0.7}
+      >
+        <MaterialCommunityIcons
+          name="timer-outline"
+          size={18}
+          color={COLORS.white}
+          style={styles.icon}
+        />
+        <Text style={styles.timerName}>{timer.name}</Text>
+        <Text style={styles.timeText}>{formatTime(timer.timeRemaining)}</Text>
+      </TouchableOpacity>
+    );
+  }
+
+  // Multiple timers - show scrollable list
   return (
     <TouchableOpacity
-      style={styles.container}
+      style={[styles.container, styles.multiTimerContainer]}
       onPress={onPress}
       activeOpacity={0.7}
     >
-      {/* <Timer size={18} color={COLORS.white} style={styles.icon}/> */}
-      <MaterialCommunityIcons
-        name="timer-outline"
-        size={18}
-        color={COLORS.white}
-        style={styles.icon}
-      />
-      <Text style={styles.timeText}>{formatTime(timeRemaining)}</Text>
+      <View style={styles.multiTimerHeader}>
+        <MaterialCommunityIcons
+          name="timer-outline"
+          size={16}
+          color={COLORS.white}
+          style={styles.multiTimerIcon}
+        />
+        <Text style={styles.multiTimerCount}>{timers.length} timers</Text>
+      </View>
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.timersList}
+      >
+        {timers.map((timer, index) => (
+          <View key={timer.id} style={styles.miniTimer}>
+            <Text style={styles.miniTimerName} numberOfLines={1}>
+              {timer.name}
+            </Text>
+            <Text style={styles.miniTimeText}>
+              {formatTime(timer.timeRemaining)}
+            </Text>
+          </View>
+        ))}
+      </ScrollView>
     </TouchableOpacity>
   );
 }
@@ -37,11 +78,11 @@ export default function MiniTimerDisplay({
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 30, // Adjust position as needed
-    right: 20, // Adjust position as needed
+    bottom: 30,
+    right: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)', // Semi-transparent background
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 20,
@@ -53,14 +94,69 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+    maxWidth: 250,
+  },
+  multiTimerContainer: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 12,
   },
   icon: {
     marginRight: 6,
+  },
+  timerName: {
+    ...metaText,
+    color: COLORS.white,
+    fontSize: 10,
+    marginRight: 4,
+    opacity: 0.8,
+    maxWidth: 60,
   },
   timeText: {
     ...captionStrongText,
     color: COLORS.white,
     fontSize: FONT.size.caption,
+    fontVariant: ['tabular-nums'],
+  },
+  
+  // Multiple timer styles
+  multiTimerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  multiTimerIcon: {
+    marginRight: 4,
+  },
+  multiTimerCount: {
+    ...metaText,
+    color: COLORS.white,
+    fontSize: 10,
+    opacity: 0.9,
+  },
+  timersList: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  miniTimer: {
+    alignItems: 'center',
+    minWidth: 50,
+  },
+  miniTimerName: {
+    ...metaText,
+    color: COLORS.white,
+    fontSize: 8,
+    opacity: 0.7,
+    marginBottom: 1,
+    maxWidth: 50,
+    textAlign: 'center',
+  },
+  miniTimeText: {
+    ...captionStrongText,
+    color: COLORS.white,
+    fontSize: 11,
     fontVariant: ['tabular-nums'],
   },
 });

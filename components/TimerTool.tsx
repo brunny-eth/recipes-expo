@@ -1,123 +1,101 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
-import { useHandleError } from '@/hooks/useHandleError';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, Pressable, ScrollView } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, BORDER_WIDTH, SHADOWS } from '@/constants/theme';
-import { screenTitleText, captionStrongText, bodyStrongText, FONT, metaText } from '@/constants/typography';
+import { screenTitleText, captionStrongText, bodyStrongText, FONT, metaText, bodyText } from '@/constants/typography';
 
-// Props expected from the parent (StepsScreen)
-interface TimerToolProps {
+// Timer data structure
+export interface Timer {
+  id: string;
+  name: string;
   timeRemaining: number;
   isActive: boolean;
-  addSeconds: (seconds: number) => void;
-  handleStartPause: () => void;
-  handleReset: () => void;
+  startTimestamp: number | null;
+}
+
+// Props expected from the parent
+interface TimerToolProps {
+  isVisible: boolean;
+  onClose: () => void;
+  timers: Timer[];
+  onAddTimer: (name: string, initialTime?: number, startActive?: boolean) => void;
+  onUpdateTimer: (id: string, updates: Partial<Timer>) => void;
+  onDeleteTimer: (id: string) => void;
   formatTime: (timeInSeconds: number) => string;
-  onClose?: () => void;
 }
 
 export default function TimerTool({
-  timeRemaining,
-  isActive,
-  addSeconds,
-  handleStartPause,
-  handleReset,
-  formatTime,
+  isVisible,
   onClose,
+  timers,
+  onAddTimer,
+  onUpdateTimer,
+  onDeleteTimer,
+  formatTime,
 }: TimerToolProps) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [timeInput, setTimeInput] = useState('');
-  const handleError = useHandleError();
+  const [showWheelPicker, setShowWheelPicker] = useState(false);
+  const [selectedMinutes, setSelectedMinutes] = useState(0);
+  const [selectedSeconds, setSelectedSeconds] = useState(0);
 
-  const handleTimeInputPress = () => {
-    if (isActive) {
-      handleError('Timer Active', 'Please pause the timer before setting a new time.');
-      return;
+  // Show wheel picker if no timers exist, otherwise show summary
+  useEffect(() => {
+    if (isVisible) {
+      setShowWheelPicker(timers.length === 0);
     }
-    setTimeInput(''); // Start with empty input instead of current time
-    setIsEditing(true);
-  };
+  }, [isVisible, timers.length]);
 
-  const formatTimeInput = (input: string) => {
-    // Remove any non-digit characters
-    const digits = input.replace(/\D/g, '');
-    
-    if (digits.length === 0) return '';
-    if (digits.length === 1) return digits;
-    if (digits.length === 2) return `0:${digits}`;
-    if (digits.length === 3) return `${digits[0]}:${digits.slice(1)}`;
-    if (digits.length === 4) return `${digits.slice(0, 2)}:${digits.slice(2)}`;
-    if (digits.length === 5) return `${digits[0]}:${digits.slice(1, 3)}:${digits.slice(3)}`;
-    if (digits.length === 6) return `${digits.slice(0, 2)}:${digits.slice(2, 4)}:${digits.slice(4)}`;
-    
-    // For longer inputs, format as HH:MM:SS
-    return `${digits.slice(0, 2)}:${digits.slice(2, 4)}:${digits.slice(4, 6)}`;
-  };
-
-  const handleTimeInputChange = (text: string) => {
-    const formatted = formatTimeInput(text);
-    setTimeInput(formatted);
-  };
-
-  const handleTimeInputSubmit = () => {
-    const input = timeInput.trim();
-    if (!input) {
-      setIsEditing(false);
-      return;
-    }
-
-    // Parse time input (supports formats like "2:30", "150", "2m30s", etc.)
-    let totalSeconds = 0;
-    
-    if (input.includes(':')) {
-      // Format: "2:30" or "1:30:45"
-      const parts = input.split(':').map(Number);
-      if (parts.length === 2) {
-        totalSeconds = parts[0] * 60 + parts[1];
-      } else if (parts.length === 3) {
-        totalSeconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+  // Auto-remove timers that reach 0
+  useEffect(() => {
+    timers.forEach(timer => {
+      if (timer.timeRemaining <= 0 && !timer.isActive) {
+        onDeleteTimer(timer.id);
       }
-    } else if (input.includes('m') || input.includes('s')) {
-      // Format: "2m30s" or "90s" or "2m"
-      const minutes = input.match(/(\d+)m/);
-      const seconds = input.match(/(\d+)s/);
-      if (minutes) totalSeconds += parseInt(minutes[1]) * 60;
-      if (seconds) totalSeconds += parseInt(seconds[1]);
-    } else {
-      // Format: just seconds "150"
-      totalSeconds = parseInt(input);
-    }
+    });
+  }, [timers, onDeleteTimer]);
 
-    if (totalSeconds > 0 && totalSeconds <= 36000) { // Max 10 hours
-      // Reset current timer and set new time
-      handleReset();
-      addSeconds(totalSeconds);
-      setIsEditing(false);
-    } else {
-      handleError('Invalid Time', 'Please enter a valid time (e.g., "2:30", "150", "2m30s"). Maximum 10 hours.');
-    }
-  };
-
-  const handleTimeInputBlur = () => {
-    setIsEditing(false);
-  };
-
-  const handlePlayButtonPress = () => {
-    handleStartPause();
-    if (onClose) {
+  const handleStartTimer = () => {
+    const totalSeconds = selectedMinutes * 60 + selectedSeconds;
+    if (totalSeconds > 0) {
+      // Create the timer with the selected time and start it immediately
+      onAddTimer('Timer', totalSeconds, true);
+      // Close modal immediately to avoid visual jank
       onClose();
     }
   };
 
-  const formatTimeForInput = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  const handleAddNewTimer = () => {
+    setShowWheelPicker(true);
+  };
+
+  const handleStartPause = (timerId: string) => {
+    const timer = timers.find(t => t.id === timerId);
+    if (!timer) return;
+
+    if (timer.isActive) {
+      // Pause timer
+      onUpdateTimer(timerId, { 
+        isActive: false,
+        startTimestamp: null
+      });
+    } else if (timer.timeRemaining > 0) {
+      // Start timer
+      onUpdateTimer(timerId, { 
+        isActive: true,
+        startTimestamp: Date.now()
+      });
     }
-    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleReset = (timerId: string) => {
+    onUpdateTimer(timerId, { 
+      timeRemaining: 0,
+      isActive: false,
+      startTimestamp: null
+    });
+  };
+
+  const handleDeleteTimer = (timerId: string) => {
+    onDeleteTimer(timerId);
   };
 
   const formatTimeDisplay = (seconds: number) => {
@@ -131,171 +109,372 @@ export default function TimerTool({
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.timerDisplayContainer}>
-        {isEditing ? (
-          <TextInput
-            style={styles.timerDisplayInput}
-            value={timeInput}
-            onChangeText={handleTimeInputChange}
-            onBlur={handleTimeInputBlur}
-            onSubmitEditing={handleTimeInputSubmit}
-            keyboardType="numeric"
-            autoFocus={true}
-            selectTextOnFocus={true}
-            returnKeyType="done"
-            placeholder="0:00"
-            placeholderTextColor={COLORS.textMuted}
-          />
-        ) : (
-          <TouchableOpacity
-            onPress={handleTimeInputPress}
-            disabled={isActive}
+  // Wheel Picker Component
+  const renderWheelPicker = () => (
+    <View style={styles.wheelPickerContainer}>
+      <Text style={styles.wheelPickerTitle}>Set Timer</Text>
+      
+      <View style={styles.wheelsContainer}>
+        {/* Minutes Wheel */}
+        <View style={styles.wheelColumn}>
+          <Text style={styles.wheelLabel}>Minutes</Text>
+          <ScrollView 
+            style={styles.wheel}
+            showsVerticalScrollIndicator={false}
+            snapToInterval={40}
+            decelerationRate="fast"
+            contentContainerStyle={styles.wheelContent}
           >
-            <Text style={styles.timerDisplay}>{formatTimeDisplay(timeRemaining)}</Text>
-            {!isActive && (
-              <Text style={styles.tapToEdit}>Tap to edit</Text>
-            )}
-          </TouchableOpacity>
-        )}
+            {Array.from({ length: 61 }, (_, i) => (
+              <TouchableOpacity
+                key={i}
+                style={[
+                  styles.wheelItem,
+                  selectedMinutes === i && styles.wheelItemSelected
+                ]}
+                onPress={() => setSelectedMinutes(i)}
+              >
+                <Text style={[
+                  styles.wheelItemText,
+                  selectedMinutes === i && styles.wheelItemTextSelected
+                ]}>
+                  {i.toString().padStart(2, '0')}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Seconds Wheel */}
+        <View style={styles.wheelColumn}>
+          <Text style={styles.wheelLabel}>Seconds</Text>
+          <ScrollView 
+            style={styles.wheel}
+            showsVerticalScrollIndicator={false}
+            snapToInterval={40}
+            decelerationRate="fast"
+            contentContainerStyle={styles.wheelContent}
+          >
+            {Array.from({ length: 60 }, (_, i) => (
+              <TouchableOpacity
+                key={i}
+                                 style={[
+                   styles.wheelItem,
+                   selectedSeconds === i && styles.wheelItemSelected
+                 ]}
+                onPress={() => setSelectedSeconds(i)}
+              >
+                <Text style={[
+                  styles.wheelItemText,
+                  selectedSeconds === i && styles.wheelItemTextSelected
+                ]}>
+                  {i.toString().padStart(2, '0')}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
       </View>
 
-      <View style={styles.quickAddContainer}>
-        <TouchableOpacity
-          style={styles.quickAddButton}
-          onPress={() => addSeconds(30)}
-          disabled={isActive}
-        >
-          <Text style={styles.quickAddButtonText}>+30s</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.quickAddButton}
-          onPress={() => addSeconds(60)}
-          disabled={isActive}
-        >
-          <Text style={styles.quickAddButtonText}>+1m</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.quickAddButton}
-          onPress={() => addSeconds(300)}
-          disabled={isActive}
-        >
-          <Text style={styles.quickAddButtonText}>+5m</Text>
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity
+        style={[
+          styles.startButton,
+          (selectedMinutes === 0 && selectedSeconds === 0) && styles.startButtonDisabled
+        ]}
+        onPress={handleStartTimer}
+        disabled={selectedMinutes === 0 && selectedSeconds === 0}
+      >
+        <Text style={styles.startButtonText}>Start</Text>
+      </TouchableOpacity>
+    </View>
+  );
 
-      <View style={styles.controlsContainer}>
-        <TouchableOpacity
-          style={[styles.controlButton, isActive && styles.controlButtonActive]}
-          onPress={handlePlayButtonPress}
-          disabled={timeRemaining === 0 && !isActive}
-        >
-          {isActive ? (
+  // Timer Summary Component
+  const renderTimerSummary = () => (
+    <View style={styles.timerSummaryContainer}>
+      <Text style={styles.timerSummaryTitle}>Timers</Text>
+      
+      <ScrollView style={styles.timersList} showsVerticalScrollIndicator={false}>
+        {timers.map((timer) => (
+          <View key={timer.id} style={styles.timerRow}>
+            <View style={styles.timerInfo}>
+              <Text style={styles.timerName}>{timer.name}</Text>
+              <Text style={styles.timerTime}>
+                {formatTimeDisplay(timer.timeRemaining)}
+              </Text>
+            </View>
+            <View style={styles.timerControls}>
+              <TouchableOpacity
+                style={styles.controlButton}
+                onPress={() => handleStartPause(timer.id)}
+              >
+                <MaterialCommunityIcons
+                  name={timer.isActive ? "pause" : "play"}
+                  size={20}
+                  color={COLORS.primary}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.controlButton} 
+                onPress={() => handleDeleteTimer(timer.id)}
+              >
+                <MaterialCommunityIcons
+                  name="delete"
+                  size={20}
+                  color={COLORS.error || '#ff4444'}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))}
+        
+        {/* Add New Timer Button - show if under limit */}
+        {timers.length < 4 && (
+          <TouchableOpacity
+            style={styles.addTimerButton}
+            onPress={handleAddNewTimer}
+          >
             <MaterialCommunityIcons
-              name="pause"
-              size={28}
+              name="plus"
+              size={20}
               color={COLORS.primary}
             />
-          ) : (
-            <MaterialCommunityIcons
-              name="play"
-              size={28}
-              color={COLORS.white}
-            />
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.controlButton} 
-          onPress={handleReset}
-        >
-          <MaterialCommunityIcons
-            name="replay"
-            size={28}
-            color={COLORS.white}
-          />
-        </TouchableOpacity>
-      </View>
-      
-
+            <Text style={styles.addTimerButtonText}>Add New Timer</Text>
+          </TouchableOpacity>
+        )}
+        
+        {/* Show limit message when at 4 timers */}
+        {timers.length >= 4 && (
+          <View style={styles.limitReachedContainer}>
+            <Text style={styles.limitReachedTitle}>Timer Limit Reached</Text>
+            <Text style={styles.limitReachedText}>
+              You can only have a maximum of 4 timers. Delete a timer to create a new one.
+            </Text>
+          </View>
+        )}
+      </ScrollView>
     </View>
+  );
+
+  return (
+    <Modal
+      visible={isVisible}
+      animationType="fade"
+      transparent={true}
+      onRequestClose={onClose}
+    >
+      <Pressable style={styles.modalOverlay} onPress={onClose}>
+        <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+          {/* Close Button */}
+          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <MaterialCommunityIcons
+              name="close"
+              size={24}
+              color={COLORS.darkGray}
+            />
+          </TouchableOpacity>
+
+          {/* Content */}
+          {showWheelPicker ? renderWheelPicker() : renderTimerSummary()}
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: SPACING.lg,
+    paddingHorizontal: 20,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: COLORS.white,
+    borderRadius: 20,
+    paddingTop: 50,
+    paddingBottom: 30,
+    paddingHorizontal: 30,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    padding: 5,
+    zIndex: 10,
+  },
+
+  // Wheel Picker Styles
+  wheelPickerContainer: {
+    alignItems: 'center',
     width: '100%',
   },
-  timerDisplayContainer: {
-    alignItems: 'center',
+  wheelPickerTitle: {
+    ...bodyStrongText,
+    fontSize: 20,
+    color: COLORS.textDark,
     marginBottom: SPACING.xl,
   },
-  timerDisplay: {
-    ...screenTitleText,
-    fontSize: 64,
-    color: COLORS.textDark,
-    fontVariant: ['tabular-nums'],
-    textAlign: 'center',
-  },
-  timerDisplayInput: {
-    ...screenTitleText,
-    fontSize: 64,
-    color: COLORS.textDark,
-    fontVariant: ['tabular-nums'],
-    textAlign: 'center',
-    borderWidth: BORDER_WIDTH.default,
-    borderColor: COLORS.primary,
-    borderRadius: RADIUS.sm,
-    paddingHorizontal: SPACING.sm,
-    backgroundColor: COLORS.white,
-  },
-  tapToEdit: {
-    ...metaText,
-    color: COLORS.textMuted,
-    marginTop: SPACING.xs,
-    textAlign: 'center',
-  },
-  quickAddContainer: {
+  wheelsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     width: '100%',
     marginBottom: SPACING.xl,
-    paddingHorizontal: SPACING.lg,
   },
-  quickAddButton: {
-    backgroundColor: COLORS.white,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.md,
-    borderRadius: RADIUS.md,
-    borderWidth: BORDER_WIDTH.default,
-    borderColor: COLORS.lightGray,
-    minWidth: 70,
+  wheelColumn: {
     alignItems: 'center',
-    ...SHADOWS.small,
+    flex: 1,
   },
-  quickAddButtonText: {
-    ...captionStrongText,
-    fontSize: FONT.size.caption,
-    color: COLORS.textDark,
+  wheelLabel: {
+    ...metaText,
+    color: COLORS.textMuted,
+    marginBottom: SPACING.sm,
   },
-  controlsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-evenly',
-    width: '60%',
+  wheel: {
+    height: 120,
+    width: 80,
   },
-  controlButton: {
+  wheelContent: {
+    paddingVertical: 40,
+  },
+  wheelItem: {
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: RADIUS.sm,
+  },
+  wheelItemSelected: {
+    backgroundColor: COLORS.primaryLight,
+  },
+  wheelItemText: {
+    ...bodyText,
+    fontSize: 18,
+    color: COLORS.textMuted,
+  },
+  wheelItemTextSelected: {
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
+  startButton: {
     backgroundColor: COLORS.primary,
-    padding: SPACING.md,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.xl,
     borderRadius: RADIUS.pill,
-    marginHorizontal: SPACING.sm,
-    ...SHADOWS.medium,
+    minWidth: 120,
   },
-  controlButtonActive: {
-    backgroundColor: COLORS.white,
-    borderWidth: BORDER_WIDTH.default,
-    borderColor: COLORS.primary,
+  startButtonDisabled: {
+    backgroundColor: COLORS.lightGray,
+  },
+  startButtonText: {
+    ...bodyStrongText,
+    color: COLORS.white,
+    textAlign: 'center',
+    fontSize: 16,
   },
 
+  // Timer Summary Styles
+  timerSummaryContainer: {
+    alignItems: 'center',
+    width: '100%',
+  },
+  timerSummaryTitle: {
+    ...bodyStrongText,
+    fontSize: 20,
+    color: COLORS.textDark,
+    marginBottom: SPACING.lg,
+  },
+  timersList: {
+    width: '100%',
+    maxHeight: 300,
+  },
+  timerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.md,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    marginBottom: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.lightGray,
+  },
+  timerInfo: {
+    flex: 1,
+  },
+  timerName: {
+    ...metaText,
+    color: COLORS.textMuted,
+    fontSize: 12,
+    marginBottom: 2,
+  },
+  timerTime: {
+    ...bodyStrongText,
+    color: COLORS.textDark,
+    fontSize: 18,
+    fontVariant: ['tabular-nums'],
+  },
+  timerControls: {
+    flexDirection: 'row',
+    gap: SPACING.xs,
+  },
+  controlButton: {
+    backgroundColor: COLORS.white,
+    padding: SPACING.xs,
+    borderRadius: RADIUS.sm,
+    ...SHADOWS.small,
+  },
+
+  // Add Timer Button
+  addTimerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.surface,
+    borderWidth: BORDER_WIDTH.default,
+    borderColor: COLORS.primary,
+    borderStyle: 'dashed',
+    borderRadius: RADIUS.md,
+    paddingVertical: SPACING.lg,
+    paddingHorizontal: SPACING.lg,
+    marginTop: SPACING.md,
+    gap: SPACING.sm,
+  },
+  addTimerButtonText: {
+    ...bodyText,
+    color: COLORS.primary,
+  },
+
+  // Limit Reached Styles
+  limitReachedContainer: {
+    alignItems: 'center',
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.xl,
+  },
+  limitReachedTitle: {
+    ...bodyStrongText,
+    fontSize: 18,
+    color: COLORS.textDark,
+    marginBottom: SPACING.md,
+    textAlign: 'center',
+  },
+  limitReachedText: {
+    ...bodyText,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
 });

@@ -38,10 +38,10 @@ import { sectionHeaderText, bodyText, bodyStrongText, bodyTextLoose, captionText
 import { CombinedParsedRecipe, StructuredIngredient } from '@/common/types';
 import RecipeSwitcher from '@/components/recipe/RecipeSwitcher';
 import StepItem from '@/components/recipe/StepItem';
-import ToolsModal from '@/components/ToolsModal';
+
 import MiniTimerDisplay from '@/components/MiniTimerDisplay';
 import StepsFooterButtons from '@/components/recipe/StepsFooterButtons';
-import { ActiveTool } from '@/components/ToolsModal';
+import TimerTool, { Timer } from '@/components/TimerTool';
 
 import { 
   StepCompletionState, 
@@ -59,8 +59,7 @@ export default function CookScreen() {
   const params = useLocalSearchParams();
   const { session } = useAuth();
   
-  // ✅ INSTRUMENTATION: Log route params immediately
-  console.log('[COOK] params', { miseId: params.miseId, recipeId: params.recipeId });
+
   
   // Access the entire context objects
   const cookingContext = useCooking();
@@ -92,17 +91,14 @@ export default function CookScreen() {
   const [isTooltipVisible, setIsTooltipVisible] = useState(false);
   // --- End Ingredient Tooltip State ---
 
-  // --- Timer State (Persistent Across Recipes) ---
-  const [timerTimeRemaining, setTimerTimeRemaining] = useState(0);
-  const [isTimerActive, setIsTimerActive] = useState(false);
-  const [timerStartTimestamp, setTimerStartTimestamp] = useState<number | null>(null);
-  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // --- Timer State (Multiple Timers) ---
+  const [timers, setTimers] = useState<Timer[]>([]);
+  const timerIntervalsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   // --- End Timer State ---
 
-  // --- Tools Modal State ---
-  const [isToolsPanelVisible, setIsToolsPanelVisible] = useState(false);
-  const [initialToolToShow, setInitialToolToShow] = useState<ActiveTool>(null);
-  // --- End Tools Modal State ---
+  // --- Timer Modal State ---
+  const [isTimerModalVisible, setIsTimerModalVisible] = useState(false);
+  // --- End Timer Modal State ---
 
   // --- Recipe Tips Modal State ---
   const [isRecipeTipsModalVisible, setIsRecipeTipsModalVisible] = useState(false);
@@ -323,11 +319,11 @@ export default function CookScreen() {
   // Timer and scroll cleanup - only on component unmount
   useEffect(() => {
     return () => {
-      // Clean up timer
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-      }
-      setTimerStartTimestamp(null);
+      // Clean up all timers
+      timerIntervalsRef.current.forEach((interval) => {
+        clearInterval(interval);
+      });
+      timerIntervalsRef.current.clear();
       
       // Clean up scroll timeout
       if (scrollPositionTimeoutRef.current) {
@@ -1122,89 +1118,122 @@ export default function CookScreen() {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  const handleTimerAddSeconds = (seconds: number) => {
-    setTimerTimeRemaining(prev => prev + seconds);
-  };
-
-  const handleTimerStartPause = () => {
-    // DEFENSIVE: Extract context function to local constant to prevent minification issues
-    const showErrorFn = errorModalContext.showError;
+  const handleAddTimer = (name: string, initialTime?: number, startActive?: boolean) => {
+    const newTimer: Timer = {
+      id: uuid.v4() as string,
+      name,
+      timeRemaining: initialTime || 0,
+      isActive: startActive || false,
+      startTimestamp: startActive ? Date.now() : null,
+    };
+    setTimers(prev => [...prev, newTimer]);
     
-    if (isTimerActive) {
-      // Pause timer
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-        timerIntervalRef.current = null;
-      }
-      setTimerStartTimestamp(null);
-      setIsTimerActive(false);
-    } else {
-      // Start timer
-      if (timerTimeRemaining > 0) {
-        const startTime = Date.now();
-        setTimerStartTimestamp(startTime);
-        setIsTimerActive(true);
-        
-        timerIntervalRef.current = setInterval(() => {
-          const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
-          const newTimeRemaining = Math.max(0, timerTimeRemaining - elapsedSeconds);
-          
-          if (newTimeRemaining <= 0) {
-            // Timer finished
-            setIsTimerActive(false);
-            setTimerStartTimestamp(null);
-            if (timerIntervalRef.current) {
-              clearInterval(timerIntervalRef.current);
-              timerIntervalRef.current = null;
-            }
-            setTimerTimeRemaining(0);
-            
-            // Show notification when timer finishes
-            try {
-              // DEFENSIVE: Extract showError again inside the interval closure
-              const showErrorInternalFn = errorModalContext.showError;
-              if (typeof showErrorInternalFn === 'function') {
-                showErrorInternalFn('Timer', "Time's up!");
-              } else {
-                logger.error('showError is not a function in timer completion', {
-                  showErrorType: typeof showErrorInternalFn,
-                  hasErrorModalContext: !!errorModalContext
-                });
-              }
-            } catch (showErrorError: any) {
-              logger.error('Error calling showError for timer completion', {
-                errorMessage: showErrorError.message,
-                errorStack: showErrorError.stack
-              });
-            }
-          } else {
-            setTimerTimeRemaining(newTimeRemaining);
-          }
-        }, 1000);
-      }
+    // If the timer should start active, trigger the update logic
+    if (startActive && initialTime && initialTime > 0) {
+      // Use setTimeout to ensure the timer is added to state first
+      setTimeout(() => {
+        handleUpdateTimer(newTimer.id, { 
+          isActive: true,
+          startTimestamp: Date.now()
+        });
+      }, 0);
     }
   };
 
-  const handleTimerReset = () => {
-    if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current);
-      timerIntervalRef.current = null;
+  const handleUpdateTimer = useCallback((id: string, updates: Partial<Timer>) => {
+    setTimers(prev => prev.map(timer => {
+      if (timer.id === id) {
+        const updatedTimer = { ...timer, ...updates };
+        
+        // Handle timer start/pause logic
+        if (updates.isActive !== undefined) {
+          const existingInterval = timerIntervalsRef.current.get(id);
+          
+          if (updates.isActive && !existingInterval && updatedTimer.timeRemaining > 0) {
+            // Start timer
+            const startTime = Date.now();
+            updatedTimer.startTimestamp = startTime;
+            
+            const interval = setInterval(() => {
+              setTimers(currentTimers => currentTimers.map(t => {
+                if (t.id === id) {
+                  const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+                  const newTimeRemaining = Math.max(0, updatedTimer.timeRemaining - elapsedSeconds);
+                  
+                  if (newTimeRemaining <= 0) {
+                    // Timer finished
+                    const intervalToClean = timerIntervalsRef.current.get(id);
+                    if (intervalToClean) {
+                      clearInterval(intervalToClean);
+                      timerIntervalsRef.current.delete(id);
+                    }
+                    
+                    // Show notification
+                    try {
+                      const showErrorFn = errorModalContext.showError;
+                      if (typeof showErrorFn === 'function') {
+                        showErrorFn(t.name, "Time's up!");
+                      }
+                    } catch (error) {
+                      logger.error('Error showing timer completion notification', { error });
+                    }
+                    
+                    return {
+                      ...t,
+                      timeRemaining: 0,
+                      isActive: false,
+                      startTimestamp: null,
+                    };
+                  }
+                  
+                  return {
+                    ...t,
+                    timeRemaining: newTimeRemaining,
+                  };
+                }
+                return t;
+              }));
+            }, 1000);
+            
+            timerIntervalsRef.current.set(id, interval);
+          } else if (!updates.isActive && existingInterval) {
+            // Pause timer
+            clearInterval(existingInterval);
+            timerIntervalsRef.current.delete(id);
+            updatedTimer.startTimestamp = null;
+          }
+        }
+        
+        return updatedTimer;
+      }
+      return timer;
+    }));
+  }, [errorModalContext.showError, logger]);
+
+  const handleDeleteTimer = (id: string) => {
+    // Clean up interval if exists
+    const existingInterval = timerIntervalsRef.current.get(id);
+    if (existingInterval) {
+      clearInterval(existingInterval);
+      timerIntervalsRef.current.delete(id);
     }
-    setIsTimerActive(false);
-    setTimerStartTimestamp(null);
-    setTimerTimeRemaining(0);
+    
+    // Remove timer from state
+    setTimers(prev => prev.filter(timer => timer.id !== id));
   };
   // --- End Timer Functions ---
 
-  // --- Tools Modal Functions ---
-  const openToolsModal = (tool: ActiveTool) => {
-    setInitialToolToShow(tool);
-    setIsToolsPanelVisible(true);
+  // --- Timer Modal Functions ---
+  const openTimerModal = () => {
+    // Create initial timer if none exist
+    if (timers.length === 0) {
+      handleAddTimer('Timer', 0, false);
+    }
+    setIsTimerModalVisible(true);
   };
 
-  const closeToolsModal = () => {
-    setIsToolsPanelVisible(false);
-    setInitialToolToShow(null);
+  const closeTimerModal = () => {
+    setIsTimerModalVisible(false);
   };
 
   const handleEndCookingSessions = async () => {
@@ -1212,8 +1241,8 @@ export default function CookScreen() {
       // End all cooking sessions
       await endAllSessions();
       
-      // Close the tools modal
-      closeToolsModal();
+      // Close the timer modal
+      closeTimerModal();
       
       // Navigate back to the mise screen (prep station)
       router.back();
@@ -1224,19 +1253,19 @@ export default function CookScreen() {
         activeRecipesCount: cookingContext.state.activeRecipes.length
       });
       // Still try to navigate back even if there's an error
-      closeToolsModal();
+      closeTimerModal();
       router.back();
     }
   };
 
   const handleTimersPress = () => {
-    openToolsModal('timer');
+    openTimerModal();
   };
 
   const handleMiniTimerPress = () => {
-    openToolsModal('timer');
+    openTimerModal();
   };
-  // --- End Tools Modal Functions ---
+  // --- End Timer Modal Functions ---
 
   // --- Recipe Tips Functions ---
   const handleRecipeTipsPress = () => {
@@ -1446,23 +1475,21 @@ export default function CookScreen() {
           onSavePress={handleSaveSteps}
         />
 
-        {/* Tools Modal */}
-        <ToolsModal
-          isVisible={isToolsPanelVisible}
-          onClose={closeToolsModal}
-          initialTool={initialToolToShow}
-          timerTimeRemaining={timerTimeRemaining}
-          isTimerActive={isTimerActive}
+        {/* Timer Modal */}
+        <TimerTool
+          isVisible={isTimerModalVisible}
+          onClose={closeTimerModal}
+          timers={timers}
+          onAddTimer={handleAddTimer}
+          onUpdateTimer={handleUpdateTimer}
+          onDeleteTimer={handleDeleteTimer}
           formatTime={formatTime}
-          handleTimerAddSeconds={handleTimerAddSeconds}
-          handleTimerStartPause={handleTimerStartPause}
-          handleTimerReset={handleTimerReset}
         />
 
         {/* Mini Timer Display */}
-        {!isToolsPanelVisible && isTimerActive && timerTimeRemaining > 0 && (
+        {!isTimerModalVisible && timers.some(timer => timer.isActive && timer.timeRemaining > 0) && (
           <MiniTimerDisplay
-            timeRemaining={timerTimeRemaining}
+            timers={timers.filter(timer => timer.isActive && timer.timeRemaining > 0)}
             formatTime={formatTime}
             onPress={handleMiniTimerPress}
           />
