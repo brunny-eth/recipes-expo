@@ -17,7 +17,7 @@
                         <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                         <subviews>
                             <imageView id="EXPO-SplashScreen" userLabel="SplashScreenLogo" image="SplashScreenLogo" contentMode="scaleAspectFit" clipsSubviews="true" userInteractionEnabled="false" translatesAutoresizingMaskIntoConstraints="false">
-                                <rect key="frame" x="87" y="306" width="240" height="124"/>
+                                <rect key="frame" x="96.666666666666686" y="314" width="200" height="224"/>
                             </imageView>
                             
                         </subviews>
@@ -25,7 +25,8 @@
                         <constraints>
                             <constraint firstItem="EXPO-SplashScreen" firstAttribute="centerX" secondItem="EXPO-ContainerView" secondAttribute="centerX" id="centerX-EXPO-SplashScreen"/>
                             <constraint firstItem="EXPO-SplashScreen" firstAttribute="centerY" secondItem="EXPO-ContainerView" secondAttribute="centerY" id="centerY-EXPO-SplashScreen"/>
-                            <constraint firstItem="EXPO-SplashScreen" firstAttribute="width" constant="240" id="width-EXPO-SplashScreen"/>
+                            <constraint firstItem="EXPO-SplashScreen" firstAttribute="width" secondItem="EXPO-ContainerView" secondAttribute="width" multiplier="0.7" id="width-EXPO-SplashScreen"/>
+                            <constraint firstItem="EXPO-SplashScreen" firstAttribute="height" secondItem="EXPO-SplashScreen" secondAttribute="width" multiplier="1.12" id="aspect-EXPO-SplashScreen"/>
                         </constraints>
                         <color key="backgroundColor" name="SplashScreenBackground"/>
                     </view>
