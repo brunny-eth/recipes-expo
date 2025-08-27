@@ -718,7 +718,38 @@ export function parseIngredientDisplayName(name: string): {
       const parts = name.split(marker);
       const firstPart = parts[0].trim();
       const secondPart = parts.slice(1).join(marker).trim();
-      
+
+      // Special case: Handle "fresh or frozen" and similar patterns
+      // These are not substitutions but describe equally valid forms of the same ingredient
+      const freshFrozenPatterns = [
+        { first: 'fresh', second: 'frozen' },
+        { first: 'frozen', second: 'fresh' },
+        { first: 'dried', second: 'fresh' },
+        { first: 'fresh', second: 'dried' },
+        { first: 'canned', second: 'fresh' },
+        { first: 'fresh', second: 'canned' }
+      ];
+
+      for (const pattern of freshFrozenPatterns) {
+        if (firstPart.toLowerCase() === pattern.first && secondPart.toLowerCase().startsWith(pattern.second)) {
+          baseName = name; // Keep the full name as-is
+          substitutionText = null;
+          console.log('[ingredientHelpers] 🥬 DEBUG: Preserving compound ingredient name:', {
+            originalName: name,
+            firstPart,
+            secondPart,
+            pattern,
+            result: baseName
+          });
+          break;
+        }
+      }
+
+      // If we found a preserved pattern, break out of the marker loop
+      if (baseName === name && substitutionText === null) {
+        break;
+      }
+
       // Special case: If first part is just "champagne" and second part contains "vinegar",
       // treat this as a compound ingredient name, not a substitution
       if (firstPart.toLowerCase() === 'champagne' && secondPart.toLowerCase().includes('vinegar')) {
@@ -729,7 +760,7 @@ export function parseIngredientDisplayName(name: string): {
         }
         break;
       }
-      
+
       // Special case: If both parts contain "paprika", treat this as a compound ingredient name
       if (firstPart.toLowerCase().includes('paprika') || secondPart.toLowerCase().includes('paprika')) {
         baseName = name; // Keep the full name as-is
@@ -739,7 +770,7 @@ export function parseIngredientDisplayName(name: string): {
         }
         break;
       }
-      
+
       baseName = firstPart;
       substitutionText = secondPart;
       // Remove trailing parenthesis if present

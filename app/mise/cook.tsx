@@ -56,6 +56,30 @@ import { isUserFork, normalizeInstructionsToSteps, InstructionStep } from '@/uti
 
 type LocalStep = InstructionStep;
 
+interface AddStepButtonProps {
+  onPress: () => void;
+}
+
+function AddStepButton({ onPress }: AddStepButtonProps) {
+  return (
+    <TouchableOpacity
+      style={styles.addStepButton}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <View style={styles.addStepContent}>
+        <MaterialCommunityIcons
+          name="plus"
+          size={20}
+          color={COLORS.textMuted}
+          style={styles.addStepIcon}
+        />
+        <Text style={styles.addStepText}>Add new step</Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 export default function CookScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -119,11 +143,11 @@ export default function CookScreen() {
   const [initializedFromCanonical, setInitializedFromCanonical] = useState(false);
   // --- End Step Management State ---
 
-  // --- Step Note Modal State ---
-  const [noteModalVisible, setNoteModalVisible] = useState(false);
+  // --- Step Edit Modal State ---
+  const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
-  const [tempNoteText, setTempNoteText] = useState('');
-  // --- End Step Note Modal State ---
+  const [editingStepText, setEditingStepText] = useState('');
+  // --- End Step Edit Modal State ---
 
   // --- Mise Context State ---
   const [canonicalRecipeData, setCanonicalRecipeData] = useState<CombinedParsedRecipe | null>(null);
@@ -851,30 +875,47 @@ export default function CookScreen() {
     }
   }, [canonicalRecipeData, currentRecipeData, session?.access_token, hasChanges, errorModalContext, successModalContext, steps, miseId, showSuccess]);
 
-  // Note modal functions
-  const openNoteModal = (stepId: string) => {
+
+
+      // Step edit modal functions
+  const openEditModal = (stepId: string) => {
     const step = steps.find(s => s.id === stepId);
     setEditingStepId(stepId);
-    setTempNoteText(step?.note || '');
-    setNoteModalVisible(true);
+    setEditingStepText(step?.text || '');
+    setEditModalVisible(true);
   };
 
-  const closeNoteModal = () => {
-    setNoteModalVisible(false);
+  const closeEditModal = () => {
+    setEditModalVisible(false);
+    // Clear state immediately - the visual jank might be from modal sizing
     setEditingStepId(null);
-    setTempNoteText('');
+    setEditingStepText('');
   };
 
-  const saveNote = () => {
+  const saveStepText = () => {
     if (editingStepId) {
-      setSteps(prev => prev.map(s => 
-        s.id === editingStepId 
-          ? { ...s, note: tempNoteText.trim() || undefined }
+      setSteps(prev => prev.map(s =>
+        s.id === editingStepId
+          ? { ...s, text: editingStepText.trim() || 'New step' }
           : s
       ));
     }
-    closeNoteModal();
+    closeEditModal();
   };
+
+  // Delete step function
+  const deleteStep = useCallback((stepId: string) => {
+    setSteps(prev => prev.filter(s => s.id !== stepId));
+  }, []);
+
+  const addNewStep = useCallback(() => {
+    const newStep: LocalStep = {
+      id: uuid.v4() as string,
+      text: 'New step',
+      note: undefined
+    };
+    setSteps(prev => [...prev, newStep]);
+  }, []);
 
   const toggleStepCompleted = async (recipeId: string, stepIndex: number) => {
     // Find the current recipe and toggle the step
@@ -982,8 +1023,21 @@ export default function CookScreen() {
         ]}
       >
         <View style={styles.stepContent}>
+          {/* Left side drag handle */}
+          <TouchableOpacity
+            style={styles.dragHandleLeft}
+            onLongPress={drag}
+            disabled={isActive}
+          >
+            <MaterialCommunityIcons
+              name="drag-vertical"
+              size={20}
+              color={COLORS.textMuted}
+            />
+          </TouchableOpacity>
+
           {/* Clickable step text container */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.stepTextContainer}
             onPress={() => toggleStepCompleted(currentRecipeSession?.recipeId || '', stepIndex)}
             activeOpacity={0.7}
@@ -1012,57 +1066,38 @@ export default function CookScreen() {
                 </Text>
               ))}
             </Text>
-
-            {/* Show note preview if exists */}
-            {item.note && (
-              <View style={styles.notePreview}>
-                <MaterialCommunityIcons 
-                  name="note-text" 
-                  size={14} 
-                  color={COLORS.primary} 
-                  style={styles.notePreviewIcon}
-                />
-                <Text style={styles.notePreviewText} numberOfLines={1}>
-                  {item.note}
-                </Text>
-              </View>
-            )}
           </TouchableOpacity>
 
           {/* Right side controls */}
           <View style={styles.stepControls}>
-            {/* Note icon */}
+            {/* Edit icon */}
             <TouchableOpacity
-              style={[
-                styles.noteButton,
-                item.note && styles.noteButtonActive
-              ]}
-              onPress={() => openNoteModal(item.id)}
+              style={styles.editButton}
+              onPress={() => openEditModal(item.id)}
             >
-              <MaterialCommunityIcons 
-                name={item.note ? "note-text" : "note-plus"} 
-                size={16} 
-                color={item.note ? COLORS.primary : COLORS.textMuted} 
+              <MaterialCommunityIcons
+                name="pencil"
+                size={16}
+                color={COLORS.textMuted}
               />
             </TouchableOpacity>
 
-            {/* Drag handle */}
-            <TouchableOpacity 
-              style={styles.dragHandle}
-              onLongPress={drag}
-              disabled={isActive}
+            {/* Delete icon */}
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={() => deleteStep(item.id)}
             >
-              <MaterialCommunityIcons 
-                name="drag-vertical" 
-                size={20} 
-                color={COLORS.textMuted} 
+              <MaterialCommunityIcons
+                name="delete"
+                size={16}
+                color={COLORS.textMuted}
               />
             </TouchableOpacity>
           </View>
         </View>
       </View>
     );
-  }, [steps, currentRecipeSession, currentRecipeData, toggleStepCompleted, openNoteModal, handleIngredientPress]);
+  }, [steps, currentRecipeSession, currentRecipeData, toggleStepCompleted, openEditModal, deleteStep, handleIngredientPress]);
 
   const handleSwipeGesture = async (event: any) => {
     if (event.nativeEvent.state === State.END) {
@@ -1365,9 +1400,12 @@ export default function CookScreen() {
                     keyExtractor={(item) => item.id}
                     onDragEnd={({ data }) => setSteps(data)}
                     renderItem={renderStepItem}
+                    ListFooterComponent={() => (
+                      <AddStepButton onPress={addNewStep} />
+                    )}
                     containerStyle={styles.stepsContainer}
-                    contentContainerStyle={{ 
-                      paddingBottom: currentRecipeData?.tips ? 180 : 140 
+                                        contentContainerStyle={{
+                      paddingBottom: currentRecipeData?.tips ? 240 : 200
                     }}
                     onScrollToIndexFailed={(info) => {
                       // Handle scroll to index failure gracefully
@@ -1429,25 +1467,27 @@ export default function CookScreen() {
           </Pressable>
         </Modal>
 
-        {/* Note Editing Modal */}
+
+
+        {/* Step Edit Modal */}
         <Modal
-          visible={noteModalVisible}
+          visible={editModalVisible}
           animationType="fade"
           transparent={true}
-          onRequestClose={closeNoteModal}
+          onRequestClose={closeEditModal}
         >
           <Pressable
-            style={styles.noteModalOverlay}
-            onPress={closeNoteModal}
+            style={styles.editModalOverlay}
+            onPress={closeEditModal}
           >
-            <Pressable style={styles.noteModalContent}>
-              <View style={styles.noteModalHeader}>
-                <Text style={styles.noteModalTitle}>
-                  {steps.find(s => s.id === editingStepId)?.note ? 'Edit Note' : 'Add Note'}
+            <Pressable style={styles.editModalContent}>
+              <View style={styles.editModalHeader}>
+                <Text style={styles.editModalTitle}>
+                  Edit Step
                 </Text>
                 <TouchableOpacity
                   style={styles.closeButton}
-                  onPress={closeNoteModal}
+                  onPress={closeEditModal}
                 >
                   <MaterialCommunityIcons
                     name="close"
@@ -1456,37 +1496,34 @@ export default function CookScreen() {
                   />
                 </TouchableOpacity>
               </View>
-              
+
               <TextInput
-                style={styles.noteModalInput}
-                value={tempNoteText}
-                onChangeText={setTempNoteText}
-                placeholder="Add a personal note for this cooking step"
-                maxLength={100}
+                style={styles.editModalInput}
+                value={editingStepText}
+                onChangeText={setEditingStepText}
+                placeholder="Enter step instructions"
                 multiline
                 autoFocus
               />
-              
-              <View style={styles.noteModalActions}>
+
+              <View style={styles.editModalActions}>
                 <TouchableOpacity
-                  style={styles.noteModalCancelButton}
-                  onPress={closeNoteModal}
+                  style={styles.editModalCancelButton}
+                  onPress={closeEditModal}
                 >
-                  <Text style={styles.noteModalCancelText}>Cancel</Text>
+                  <Text style={styles.editModalCancelText}>Cancel</Text>
                 </TouchableOpacity>
-                
+
                 <TouchableOpacity
-                  style={styles.noteModalSaveButton}
-                  onPress={saveNote}
+                  style={styles.editModalSaveButton}
+                  onPress={saveStepText}
                 >
-                  <Text style={styles.noteModalSaveText}>Save</Text>
+                  <Text style={styles.editModalSaveText}>Save</Text>
                 </TouchableOpacity>
               </View>
             </Pressable>
           </Pressable>
         </Modal>
-
-
 
         {/* Footer Buttons */}
         <StepsFooterButtons
@@ -1960,59 +1997,50 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 22,
   },
-  notePreview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: SPACING.xs,
-    paddingVertical: SPACING.xs,
-    paddingHorizontal: SPACING.sm,
-    backgroundColor: COLORS.primaryLight,
-    borderRadius: RADIUS.sm,
-  },
-  notePreviewIcon: {
-    marginRight: SPACING.xs,
-  },
-  notePreviewText: {
-    ...captionText,
-    color: COLORS.primary,
-    flex: 1,
-  },
+
   stepControls: {
     alignItems: 'center',
     gap: SPACING.sm,
   },
-  noteButton: {
+  editButton: {
     padding: SPACING.sm,
     borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.white,
   },
-  noteButtonActive: {
-    backgroundColor: COLORS.primaryLight,
+  deleteButton: {
+    padding: SPACING.sm,
+    borderRadius: RADIUS.sm,
+    backgroundColor: COLORS.white,
   },
-  dragHandle: {
+  dragHandleLeft: {
     padding: SPACING.xs,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: SPACING.xs,
   },
 
 
 
-  // --- Note Modal Styles ---
-  noteModalOverlay: {
+
+
+
+  // --- Step Edit Modal Styles ---
+  editModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: SPACING.pageHorizontal,
   },
-  noteModalContent: {
+  editModalContent: {
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     width: '100%',
     maxWidth: 400,
+    minHeight: 200, // Prevent resizing during animation
     ...SHADOWS.large,
   },
-  noteModalHeader: {
+  editModalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -2021,12 +2049,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: BORDER_WIDTH.hairline,
     borderBottomColor: COLORS.divider,
   },
-  noteModalTitle: {
+  editModalTitle: {
     ...bodyStrongText,
     color: COLORS.textDark,
     fontSize: 18,
   },
-  noteModalInput: {
+  editModalInput: {
     ...bodyText,
     borderWidth: 1,
     borderColor: COLORS.divider,
@@ -2034,34 +2062,58 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     margin: SPACING.lg,
     minHeight: 80,
-    maxHeight: 120,
+    maxHeight: 150,
     textAlignVertical: 'top',
   },
-  noteModalActions: {
+  editModalActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: SPACING.md,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
   },
-  noteModalCancelButton: {
+  editModalCancelButton: {
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.lg,
   },
-  noteModalCancelText: {
+  editModalCancelText: {
     ...bodyText,
     color: COLORS.textMuted,
   },
-  noteModalSaveButton: {
+  editModalSaveButton: {
     backgroundColor: COLORS.primary,
     borderRadius: RADIUS.md,
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.lg,
   },
-  noteModalSaveText: {
+  editModalSaveText: {
     ...bodyStrongText,
     color: COLORS.white,
   },
 
+  // --- Add Step Button Styles ---
+  addStepButton: {
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.md,
+    marginBottom: SPACING.sm,
+    padding: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.primaryLight,
+    borderStyle: 'dashed',
+  },
+  addStepContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.xs,
+  },
+  addStepIcon: {
+    marginTop: 1, // Slight adjustment for visual alignment
+  },
+  addStepText: {
+    ...bodyText,
+    color: COLORS.textMuted,
+    fontSize: 14,
+  },
 
 });

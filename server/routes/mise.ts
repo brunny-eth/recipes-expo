@@ -281,8 +281,8 @@ router.post('/save-recipe', async (req: Request, res: Response) => {
           preparedRecipeData.ingredientGroups.forEach((group: IngredientGroup, groupIndex: number) => {
             if (group.ingredients) {
               group.ingredients.forEach((ingredient: StructuredIngredient, ingIndex: number) => {
-                logger.info({ 
-                  requestId, 
+                logger.info({
+                  requestId,
                   miseRecipeId: miseRecipe.id,
                   groupIndex,
                   ingIndex,
@@ -294,6 +294,16 @@ router.post('/save-recipe', async (req: Request, res: Response) => {
                     grocery_category: (ingredient as any).grocery_category
                   }
                 }, 'Background: Raw ingredient before grocery formatting');
+
+                // Special debug for corn ingredients
+                if (ingredient.name && ingredient.name.toLowerCase().includes('corn')) {
+                  logger.info({
+                    requestId,
+                    miseRecipeId: miseRecipe.id,
+                    ingredientName: ingredient.name,
+                    fullIngredient: ingredient
+                  }, 'Background: DEBUG - Corn ingredient found');
+                }
               });
             }
           });
@@ -305,8 +315,8 @@ router.post('/save-recipe', async (req: Request, res: Response) => {
           undefined
         );
         
-        logger.info({ 
-          requestId, 
+        logger.info({
+          requestId,
           miseRecipeId: miseRecipe.id,
           formattedItemsCount: groceryItems.length,
           formattedItems: groceryItems.map(item => ({
@@ -315,6 +325,24 @@ router.post('/save-recipe', async (req: Request, res: Response) => {
             grocery_category: item.grocery_category
           }))
         }, 'Background: Formatted grocery items before LLM categorization');
+
+        // Special debug for corn ingredients
+        const cornItems = groceryItems.filter(item =>
+          item.original_ingredient_text.toLowerCase().includes('corn') ||
+          item.item_name.toLowerCase().includes('corn')
+        );
+        if (cornItems.length > 0) {
+          logger.info({
+            requestId,
+            miseRecipeId: miseRecipe.id,
+            cornItems: cornItems.map(item => ({
+              item_name: item.item_name,
+              original_ingredient_text: item.original_ingredient_text,
+              quantity_amount: item.quantity_amount,
+              quantity_unit: item.quantity_unit
+            }))
+          }, 'Background: DEBUG - Corn grocery items created during save');
+        }
         
         // Attempt LLM categorization (with automatic fallback to basic)
         const categorizedItems = await categorizeIngredientsWithServerLLM(groceryItems, requestId);
@@ -694,8 +722,8 @@ router.get('/grocery-list', async (req: Request, res: Response) => {
       allGroceryItems.push(...formattedItems);
     }
 
-    logger.info({ 
-      requestId, 
+    logger.info({
+      requestId,
       totalGroceryItems: allGroceryItems.length,
       allItems: allGroceryItems.map(item => ({
         item_name: item.item_name,
@@ -704,12 +732,30 @@ router.get('/grocery-list', async (req: Request, res: Response) => {
       }))
     }, 'All grocery items before aggregation');
 
+    // Special debug for corn ingredients
+    const cornItemsBeforeAgg = allGroceryItems.filter(item =>
+      item.original_ingredient_text.toLowerCase().includes('corn') ||
+      item.item_name.toLowerCase().includes('corn')
+    );
+    if (cornItemsBeforeAgg.length > 0) {
+      logger.info({
+        requestId,
+        cornItemsBeforeAggregation: cornItemsBeforeAgg.map(item => ({
+          item_name: item.item_name,
+          original_ingredient_text: item.original_ingredient_text,
+          quantity_amount: item.quantity_amount,
+          quantity_unit: item.quantity_unit,
+          recipe_id: item.recipe_id
+        }))
+      }, 'Background: DEBUG - Corn items before aggregation');
+    }
+
     // No server-side filtering - let client handle household staples filtering
     // Aggregate the grocery list directly
     const aggregatedItems = aggregateGroceryList(allGroceryItems);
 
     // Debug specific problematic cases
-    const problematicItems = ['garlic', 'tamari', 'avocado'];
+    const problematicItems = ['garlic', 'tamari', 'avocado', 'corn'];
     problematicItems.forEach(itemName => {
       const matchingItems = aggregatedItems.filter(item => 
         item.item_name.toLowerCase().includes(itemName.toLowerCase())

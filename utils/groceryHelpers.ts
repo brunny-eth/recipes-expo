@@ -186,7 +186,9 @@ const PRESERVED_COMBINATIONS = new Set([
   'chicken broth', 'beef broth', 'vegetable broth',
   'greek yogurt', 'plain yogurt',
   'golden potatoes', 'red potatoes', 'small potatoes', 'baby potatoes', 'fingerling potatoes',
-  'russet potatoes', 'yukon gold potatoes', 'sweet potatoes', 'purple potatoes', 'white potatoes'
+  'russet potatoes', 'yukon gold potatoes', 'sweet potatoes', 'purple potatoes', 'white potatoes',
+  'fresh or frozen', 'frozen or fresh', 'fresh or dried', 'dried or fresh',
+  'fresh or canned', 'canned or fresh'
 ]);
 
 /**
@@ -1102,8 +1104,20 @@ export function formatIngredientsForGroceryList(
       
       for (const ingredient of group.ingredients) {
         const originalText = `${ingredient.amount || ''} ${ingredient.unit || ''} ${ingredient.name}`.trim();
+        console.log('[groceryHelpers] 🔍 DEBUG: Processing ingredient for grocery list:', {
+          originalName: ingredient.name,
+          originalText,
+          amount: ingredient.amount,
+          unit: ingredient.unit
+        });
         const parsedName = parseIngredientDisplayName(ingredient.name);
-        
+        console.log('[groceryHelpers] 🔍 DEBUG: Parsed ingredient name:', {
+          originalName: ingredient.name,
+          parsedBaseName: parsedName.baseName,
+          parsedSubstitutionText: parsedName.substitutionText,
+          result: parsedName
+        });
+
         // Handle amount - it might be a number, string, or null (parse first)
         let amount: number | null = null;
         if (ingredient.amount !== null && ingredient.amount !== undefined) {
@@ -1352,6 +1366,16 @@ export function formatIngredientsForGroceryList(
           source_recipe_title: recipe.title || 'Unknown Recipe',
           preparation: ingredient.preparation || null // Include preparation method
         };
+
+        console.log('[groceryHelpers] ✅ DEBUG: Created final grocery item:', {
+          originalName: ingredient.name,
+          finalItemName: groceryItem.item_name,
+          quantity_amount: groceryItem.quantity_amount,
+          quantity_unit: groceryItem.quantity_unit,
+          display_unit: groceryItem.display_unit,
+          originalText,
+          parsedName
+        });
         
         if (process.env.NODE_ENV === 'development') {
           console.log(`[groceryHelpers] 🔍 Detailed grocery item creation:`, {
