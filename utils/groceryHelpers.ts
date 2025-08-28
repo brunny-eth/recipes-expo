@@ -380,12 +380,16 @@ function singularize(name: string): string {
       // berries → berry, cherries → cherry
       const singular = lastWord.slice(0, -3) + 'y';
       words[words.length - 1] = singular;
+    } else if (lastWord === 'preserves') {
+      // preserves → preserve (regular plural, not irregular like leaves → leaf)
+      const singular = lastWord.slice(0, -1);
+      words[words.length - 1] = singular;
     } else if (lastWord.endsWith('ves')) {
-      // leaves → leaf, shelves → shelf
+      // leaves → leaf, shelves → shelf (true irregular plurals)
       const singular = lastWord.slice(0, -3) + 'f';
       words[words.length - 1] = singular;
-    } else if (lastWord.endsWith('es') && 
-               (lastWord.endsWith('ches') || lastWord.endsWith('shes') || 
+    } else if (lastWord.endsWith('es') &&
+               (lastWord.endsWith('ches') || lastWord.endsWith('shes') ||
                 lastWord.endsWith('ses') || lastWord.endsWith('xes') || lastWord.endsWith('zes'))) {
       // matches → match, dishes → dish, boxes → box
       const singular = lastWord.slice(0, -2);

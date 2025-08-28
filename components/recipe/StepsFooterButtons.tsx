@@ -44,7 +44,7 @@ const StepsFooterButtons: React.FC<StepsFooterButtonsProps> = ({
             disabled={isSaving}
           >
             <Text style={styles.saveButtonText}>
-              {isSaving ? 'Saving...' : 'Save Changes'}
+              {isSaving ? 'Saving...' : 'Save'}
             </Text>
           </TouchableOpacity>
         </View>

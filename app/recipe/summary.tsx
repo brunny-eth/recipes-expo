@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import FastImage from '@d11/react-native-fast-image';
+import RecipeHeaderTitle from '@/components/recipe/RecipeHeaderTitle';
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -70,6 +71,7 @@ import IngredientList from '@/components/recipe/IngredientList';
 import ServingScaler from '@/components/recipe/ServingScaler';
 import FolderPickerModal from '@/components/FolderPickerModal';
 import RecipeFooterButtons from '@/components/recipe/RecipeFooterButtons';
+import RecipeVariationsModal, { VariationType } from '@/components/RecipeVariationsModal';
 
 import RecipeStepsHeader from '@/components/recipe/RecipeStepsHeader';
 import ScreenHeader from '@/components/ScreenHeader';
@@ -300,6 +302,8 @@ export default function RecipeSummaryScreen() {
   const [isSourceExpanded, setIsSourceExpanded] = useState(false);
   const [isRecipeSizeExpanded, setIsRecipeSizeExpanded] = useState(false);
   const [isDescriptionTextExpanded, setIsDescriptionTextExpanded] = useState(false);
+  const [isVariationsModalVisible, setIsVariationsModalVisible] = useState(false);
+  const [isApplyingVariation, setIsApplyingVariation] = useState(false);
   // State to track if image failed to load
   const [imageLoadFailed, setImageLoadFailed] = useState(false);
   
@@ -347,7 +351,7 @@ export default function RecipeSummaryScreen() {
   // Track loading state for saving changes on saved recipes
   const [isSavingChanges, setIsSavingChanges] = useState(false);
   // Track loading state for cook now button
-  const [isCookingNow, setIsCookingNow] = useState(false);
+
   const [isHelpModalVisible, setIsHelpModalVisible] = useState(false);
   const [preparedRecipeData, setPreparedRecipeData] = useState<any>(null);
   const [selectedIngredientOriginalData, setSelectedIngredientOriginalData] =
@@ -1341,6 +1345,14 @@ export default function RecipeSummaryScreen() {
     handleError
   ]);
 
+  // Cancel title editing and revert to original title
+  const handleCancelTitleEdit = useCallback(() => {
+    if (!isSavingTitle) {
+      setTitle(originalTitleRef.current || 'Recipe');
+      setIsEditingTitle(false);
+    }
+  }, [isSavingTitle]);
+
   // Update hasModifications when scaling factor or applied changes change
   useEffect(() => {
     // Calculate hasModifications for both mise and saved entrypoints
@@ -1880,6 +1892,48 @@ export default function RecipeSummaryScreen() {
     router.replace('/tabs' as any);
   };
 
+  const handleOpenVariations = () => {
+    try {
+      setIsVariationsModalVisible(true);
+    } catch (error) {
+      console.error('Error opening variations modal:', error);
+      handleError('Modal Error', 'Failed to open variations modal. Please try again.');
+    }
+  };
+
+  const handleCloseVariations = () => {
+    try {
+      setIsVariationsModalVisible(false);
+    } catch (error) {
+      console.error('Error closing variations modal:', error);
+      // Try to force close by setting to false directly
+      setIsVariationsModalVisible(false);
+    }
+  };
+
+  const handleVariationSelected = async (variationType: VariationType) => {
+    console.log('Starting variation selection for:', variationType);
+
+    // Close modal immediately and navigate to loading screen
+    setIsVariationsModalVisible(false);
+
+    // Navigate to loading screen
+    try {
+      router.push({
+        pathname: '/loading',
+        params: {
+          type: 'remix',
+          variationType: variationType,
+          recipeId: recipe?.id?.toString(),
+        }
+      });
+    } catch (navError) {
+      console.error('Navigation error to loading screen:', navError);
+      handleError('Navigation Error', 'Failed to start remix process. Please try again.');
+    }
+
+  };
+
   const handleSaveToFolder = async (folderId: number) => {
   if (!recipe?.id || !session?.user) {
       handleError('Authentication Required', 'You need an account to save recipes.', undefined, {
@@ -2196,8 +2250,6 @@ export default function RecipeSummaryScreen() {
       hasScaledIngredients: !!scaledIngredients,
     });
 
-    setIsCookingNow(true);
-
     try {
       let finalInstructions = recipe.instructions || [];
       let newTitle: string | null = null;
@@ -2209,7 +2261,6 @@ export default function RecipeSummaryScreen() {
         const removalCount = [...persistedChanges, ...currentUnsavedChanges].filter((c) => !c.to).length;
         if (removalCount > 2) {
           handleError('Limit Reached', 'You can only remove up to 2 ingredients per recipe.');
-          setIsCookingNow(false);
           return;
         }
 
@@ -2347,8 +2398,6 @@ export default function RecipeSummaryScreen() {
     } catch (error: any) {
       console.error('[Summary] Error in cook now:', error);
       handleError('Cook Now Failed', error);
-    } finally {
-      setIsCookingNow(false);
     }
   };
 
@@ -2886,7 +2935,7 @@ export default function RecipeSummaryScreen() {
       />
       
       {/* Custom Header with Editable Title */}
-      <View style={styles.customHeader} onLayout={onHeaderLayout}>
+      <Pressable style={styles.customHeader} onLayout={onHeaderLayout} onPress={isEditingTitle ? handleCancelTitleEdit : undefined}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
@@ -2900,13 +2949,13 @@ export default function RecipeSummaryScreen() {
             value={title}
             onChangeText={setTitle}
             editable={!isSavingTitle}
-            maxLength={100}
+            maxLength={60}
             returnKeyType="done"
             onSubmitEditing={handleSaveTitle}
             onBlur={() => {
-              // Only save on blur if not already saving
+              // Cancel editing on blur instead of auto-saving
               if (!isSavingTitle) {
-                handleSaveTitle();
+                handleCancelTitleEdit();
               }
             }}
             autoFocus={true}
@@ -2920,9 +2969,7 @@ export default function RecipeSummaryScreen() {
             activeOpacity={0.7}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Text style={styles.headerTitle} numberOfLines={2} ellipsizeMode="tail">
-              {title || 'Recipe'}
-            </Text>
+            <RecipeHeaderTitle title={title || 'Recipe'} />
           </TouchableOpacity>
         )}
         <View style={styles.headerRight}>
@@ -2949,16 +2996,17 @@ export default function RecipeSummaryScreen() {
             </TouchableOpacity>
           )}
         </View>
-      </View>
+      </Pressable>
 
       {/* Sharp divider to separate title from content */}
       <View style={styles.titleDivider} />
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        onLayout={onScrollViewLayout}
-      >
+      <Pressable style={{ flex: 1 }} onPress={isEditingTitle ? handleCancelTitleEdit : undefined}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          onLayout={onScrollViewLayout}
+        >
         {/* Recipe image - only render if image exists */}
         {(() => {
           const imageUrl = recipe.image || recipe.thumbnailUrl;
@@ -3123,7 +3171,8 @@ export default function RecipeSummaryScreen() {
             </Text>
           </View>
         )}
-      </ScrollView>
+        </ScrollView>
+      </Pressable>
 
       {/* Title pop-up modal for long titles */}
       <Modal
@@ -3142,6 +3191,13 @@ export default function RecipeSummaryScreen() {
         </Pressable>
       </Modal>
 
+      {/* Recipe Variations Modal */}
+      <RecipeVariationsModal
+        visible={isVariationsModalVisible}
+        onClose={handleCloseVariations}
+        onSelectVariation={handleVariationSelected}
+      />
+
       <RecipeFooterButtons
         handleGoToSteps={handleGoToSteps}
         isRewriting={isRewriting}
@@ -3154,10 +3210,11 @@ export default function RecipeSummaryScreen() {
         isSavingForLater={isSavingForLater}
         isSavingModifications={isSavingModifications}
         isSavingChanges={isSavingChanges}
-        isCookingNow={isCookingNow}
+
         entryPoint={entryPoint}
         hasModifications={hasModifications}
         isAlreadyInMise={isAlreadyInMise}
+        onOpenVariations={handleOpenVariations}
       />
       
     </View>

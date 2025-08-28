@@ -11,10 +11,93 @@ import { modifyInstructions } from '../services/instructionModification';
 import { getAllRecipes, getRecipeById } from '../services/recipeDB';
 import { generateAndSaveEmbedding } from '../../utils/recipeEmbeddings';
 import { CombinedParsedRecipe } from '../../common/types';
-import { IngredientChange } from '../llm/modificationPrompts';
+import { IngredientChange, buildVariationPrompt, VariationType } from '../llm/modificationPrompts';
+import { runDefaultLLM } from '../llm/adapters';
 import logger from '../lib/logger'; 
 import { ParseErrorCode } from '../../common/types/errors';
 import { ImageData } from '../services/parseImageRecipe';
+
+// Helper function to merge substitutions from original recipe with LLM-generated ones
+function mergeSubstitutions(originalGroups: any[], modifiedGroups: any[], variationType: VariationType): any[] {
+  const mergedGroups = modifiedGroups.map(modifiedGroup => {
+    const mergedIngredients = modifiedGroup.ingredients.map((modifiedIngredient: any) => {
+      // Find matching original ingredient (fuzzy match by name)
+      const originalIngredient = findMatchingOriginalIngredient(modifiedIngredient, originalGroups);
+
+      if (originalIngredient && originalIngredient.suggested_substitutions) {
+        // Check if this ingredient was actually changed by the variation
+        const wasChanged = wasIngredientChanged(modifiedIngredient, originalIngredient, variationType);
+
+        if (!wasChanged && modifiedIngredient.suggested_substitutions === null) {
+          // Ingredient wasn't changed, copy original substitutions
+          return {
+            ...modifiedIngredient,
+            suggested_substitutions: originalIngredient.suggested_substitutions,
+            _substitutionSource: 'inherited'
+          };
+        }
+      }
+
+      // Ingredient was changed or LLM provided substitutions, keep LLM's version
+      return {
+        ...modifiedIngredient,
+        _substitutionSource: 'llm'
+      };
+    });
+
+    return {
+      ...modifiedGroup,
+      ingredients: mergedIngredients
+    };
+  });
+
+  return mergedGroups;
+}
+
+// Helper to find matching ingredient from original recipe
+function findMatchingOriginalIngredient(modifiedIngredient: any, originalGroups: any[]): any | null {
+  for (const group of originalGroups) {
+    for (const originalIngredient of group.ingredients) {
+      // Simple fuzzy match - could be improved with better similarity logic
+      const modifiedName = modifiedIngredient.name?.toLowerCase() || '';
+      const originalName = originalIngredient.name?.toLowerCase() || '';
+
+      if (modifiedName === originalName ||
+          modifiedName.includes(originalName) ||
+          originalName.includes(modifiedName) ||
+          // Also check if amounts are similar (indicating same ingredient)
+          (modifiedIngredient.amount === originalIngredient.amount &&
+           modifiedIngredient.unit === originalIngredient.unit)) {
+        return originalIngredient;
+      }
+    }
+  }
+  return null;
+}
+
+// Helper to determine if an ingredient was actually changed by the variation
+function wasIngredientChanged(modifiedIngredient: any, originalIngredient: any, variationType: VariationType): boolean {
+  // Compare names (case insensitive)
+  const nameChanged = modifiedIngredient.name?.toLowerCase() !== originalIngredient.name?.toLowerCase();
+
+  // For vegetarian, check if meat/fish was replaced
+  if (variationType === 'vegetarian') {
+    const meatFishKeywords = ['beef', 'chicken', 'pork', 'lamb', 'fish', 'shrimp', 'salmon', 'tuna', 'crab', 'lobster'];
+    const originalHasMeat = meatFishKeywords.some(keyword =>
+      originalIngredient.name?.toLowerCase().includes(keyword)
+    );
+    const modifiedHasMeat = meatFishKeywords.some(keyword =>
+      modifiedIngredient.name?.toLowerCase().includes(keyword)
+    );
+
+    if (originalHasMeat && !modifiedHasMeat) {
+      return true; // Meat was replaced with vegetarian alternative
+    }
+  }
+
+  // For other variations, check if name changed significantly
+  return nameChanged;
+}
 
 interface SaveModifiedRecipeRequestBody {
   originalRecipeId: number;
@@ -723,6 +806,302 @@ router.patch('/:id(\\d+)', async (req: Request, res: Response) => {
   } catch (err) {
     const error = err as Error;
     logger.error({ requestId, err: error, route: req.originalUrl, method: req.method, params: req.params }, 'Error in PATCH /:id route');
+    res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+});
+
+// --- Recipe Variations Endpoint ---
+// POST /api/recipes/variations
+router.post('/variations', async (req: Request, res: Response) => {
+  const requestId = (req as any).id;
+
+  try {
+    const { recipeId, variationType, modifiedRecipeData } = req.body;
+
+    logger.info({ requestId, recipeId, variationType }, '[variations] Received request');
+
+    // Validation
+    if (!recipeId || typeof recipeId !== 'number') {
+      logger.warn({ requestId, recipeId }, 'Missing or invalid recipeId');
+      return res.status(400).json({ error: 'Missing or invalid recipeId' });
+    }
+
+    if (!variationType || typeof variationType !== 'string') {
+      logger.warn({ requestId, variationType }, 'Missing or invalid variationType');
+      return res.status(400).json({ error: 'Missing or invalid variationType' });
+    }
+
+    // Validate variation type
+    const validVariations = ['low_fat', 'higher_protein', 'gluten_free', 'dairy_free', 'vegetarian', 'easier_recipe'];
+    if (!validVariations.includes(variationType)) {
+      logger.warn({ requestId, variationType }, 'Invalid variation type');
+      return res.status(400).json({ error: 'Invalid variation type' });
+    }
+
+    // Fetch original recipe from database
+    const { data: originalRecipe, error: fetchError } = await supabaseAdmin
+      .from('processed_recipes_cache')
+      .select('*')
+      .eq('id', recipeId)
+      .single();
+
+    if (fetchError || !originalRecipe) {
+      logger.error({ requestId, recipeId, err: fetchError }, 'Recipe not found in processed_recipes_cache');
+      return res.status(404).json({ error: 'Recipe not found' });
+    }
+
+    logger.info({ requestId, recipeId, variationType }, '[variations] Processing variation request');
+
+    let finalModifiedRecipe = modifiedRecipeData;
+
+    // If no modified data provided, use LLM to generate variations
+    if (!finalModifiedRecipe) {
+      try {
+        logger.info({ requestId, recipeId, variationType }, '[variations] Calling LLM for recipe variation');
+
+        // Build the variation prompt
+        const prompt = buildVariationPrompt(originalRecipe.recipe_data, variationType as VariationType);
+
+        // Add metadata to the prompt
+        prompt.metadata = {
+          requestId,
+          route: req.originalUrl
+        };
+
+        // Call the LLM
+        const llmResponse = await runDefaultLLM(prompt);
+
+        if (llmResponse.error || !llmResponse.output) {
+          logger.error({ requestId, error: llmResponse.error }, '[variations] LLM call failed');
+          return res.status(500).json({ error: 'Failed to generate recipe variation' });
+        }
+
+        logger.info({
+          requestId,
+          variationType,
+          responseLength: llmResponse.output.length,
+          responsePreview: llmResponse.output.substring(0, 200)
+        }, '[variations] Raw LLM response');
+
+        // Parse the JSON response
+        let parsedResponse;
+        try {
+          // Clean the response - remove any markdown code blocks if present
+          let cleanOutput = llmResponse.output.trim();
+
+          // Remove markdown code blocks if present
+          if (cleanOutput.startsWith('```json')) {
+            cleanOutput = cleanOutput.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+          } else if (cleanOutput.startsWith('```')) {
+            cleanOutput = cleanOutput.replace(/^```\s*/, '').replace(/\s*```$/, '');
+          }
+
+          // Find JSON object in the response
+          const jsonMatch = cleanOutput.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            cleanOutput = jsonMatch[0];
+          }
+
+          logger.info({
+            requestId,
+            cleanOutputPreview: cleanOutput.substring(0, 200)
+          }, '[variations] Cleaned LLM response');
+
+          parsedResponse = JSON.parse(cleanOutput);
+          logger.info({ requestId, variationType }, '[variations] Successfully parsed LLM response');
+        } catch (parseError) {
+          const errorMessage = parseError instanceof Error ? parseError.message : 'Unknown parse error';
+          logger.error({
+            requestId,
+            parseError: errorMessage,
+            rawOutput: llmResponse.output,
+            outputLength: llmResponse.output.length
+          }, '[variations] Failed to parse LLM JSON response');
+          return res.status(500).json({
+            error: 'Failed to parse variation response',
+            details: errorMessage,
+            responsePreview: llmResponse.output.substring(0, 200)
+          });
+        }
+
+        // Validate the response has required fields
+        if (!parsedResponse.title || !parsedResponse.instructions || !parsedResponse.ingredientGroups) {
+          logger.error({ requestId, parsedResponse }, '[variations] LLM response missing required fields');
+          return res.status(500).json({ error: 'Invalid variation response structure' });
+        }
+
+        // Merge substitutions: LLM only generates for changed ingredients, we copy originals for unchanged
+        if (originalRecipe?.recipe_data?.ingredientGroups) {
+          parsedResponse.ingredientGroups = mergeSubstitutions(
+            originalRecipe.recipe_data.ingredientGroups,
+            parsedResponse.ingredientGroups,
+            variationType as VariationType
+          );
+        }
+
+        // Log substitutions info for debugging
+        let totalSubstitutions = 0;
+        let llmGeneratedSubstitutions = 0;
+        let inheritedSubstitutions = 0;
+
+        parsedResponse.ingredientGroups.forEach((group: any) => {
+          group.ingredients.forEach((ingredient: any) => {
+            if (ingredient.suggested_substitutions && ingredient.suggested_substitutions.length > 0) {
+              totalSubstitutions += ingredient.suggested_substitutions.length;
+              if (ingredient._substitutionSource === 'llm') {
+                llmGeneratedSubstitutions += ingredient.suggested_substitutions.length;
+              } else if (ingredient._substitutionSource === 'inherited') {
+                inheritedSubstitutions += ingredient.suggested_substitutions.length;
+              }
+            }
+          });
+        });
+
+        logger.info({
+          requestId,
+          variationType,
+          totalIngredients: parsedResponse.ingredientGroups.reduce((acc: number, group: any) => acc + group.ingredients.length, 0),
+          totalSubstitutions,
+          llmGeneratedSubstitutions,
+          inheritedSubstitutions,
+          substitutionsSample: parsedResponse.ingredientGroups.flatMap((g: any) => g.ingredients).slice(0, 3).map((ing: any) => ({
+            name: ing.name,
+            hasSubs: !!ing.suggested_substitutions,
+            subCount: ing.suggested_substitutions?.length || 0,
+            source: ing._substitutionSource
+          }))
+        }, '[variations] Substitutions analysis after merging');
+
+        // Validate vegetarian recipes don't contain meat/fish
+        if (variationType === 'vegetarian') {
+          const meatFishKeywords = ['beef', 'chicken', 'pork', 'lamb', 'fish', 'shrimp', 'salmon', 'tuna', 'crab', 'lobster', 'meat', 'poultry', 'seafood'];
+          const foundMeatFish: string[] = [];
+
+          parsedResponse.ingredientGroups.forEach((group: any) => {
+            group.ingredients.forEach((ingredient: any) => {
+              const ingredientName = ingredient.name?.toLowerCase() || '';
+              const foundKeyword = meatFishKeywords.find(keyword => ingredientName.includes(keyword));
+              if (foundKeyword) {
+                foundMeatFish.push(`${ingredient.name} (contains: ${foundKeyword})`);
+              }
+            });
+          });
+
+          if (foundMeatFish.length > 0) {
+            logger.error({
+              requestId,
+              variationType,
+              foundMeatFish,
+              recipeTitle: parsedResponse.title
+            }, '[variations] Vegetarian recipe still contains meat/fish ingredients!');
+
+            return res.status(500).json({
+              error: 'Vegetarian recipe validation failed',
+              details: `Recipe still contains meat/fish ingredients: ${foundMeatFish.join(', ')}. Please try again.`
+            });
+          }
+
+          logger.info({ requestId, variationType }, '[variations] Vegetarian validation passed - no meat/fish found');
+        }
+
+        finalModifiedRecipe = parsedResponse;
+
+        logger.info({
+          requestId,
+          variationType,
+          usage: llmResponse.usage
+        }, '[variations] LLM variation generation successful');
+
+      } catch (llmError) {
+        logger.error({ requestId, llmError }, '[variations] LLM call threw exception');
+        return res.status(500).json({ error: 'Failed to generate recipe variation' });
+      }
+    } else {
+      logger.info({ requestId, recipeId, variationType }, '[variations] Using provided modified recipe data');
+    }
+
+    // --- 1. Generate a new unique URL (UUID) for the modified recipe ---
+    const newRecipeUrl = uuidv4(); // Generates a Version 4 UUID
+
+    // --- 2. Insert the modified recipe into processed_recipes_cache ---
+    // A) Strip any incoming id field to prevent parent ID pollution
+    const { id: _jsonIdDrop, ...cleanModified } = finalModifiedRecipe ?? {};
+
+    // B) Preserve image from parent recipe if it exists
+    const parentImage = originalRecipe?.recipe_data?.image;
+    const parentThumbnailUrl = originalRecipe?.recipe_data?.thumbnailUrl;
+
+    // C) Merge parent images with modified recipe data
+    const finalRecipeData = {
+      ...cleanModified,
+      ...(parentImage && { image: parentImage }),
+      ...(parentThumbnailUrl && { thumbnailUrl: parentThumbnailUrl })
+    };
+
+    // D) Insert without ID field to ensure clean data
+    const { data: newModifiedRecipeRows, error: insertRecipeError } = await supabaseAdmin
+      .from('processed_recipes_cache')
+      .insert({
+        url: newRecipeUrl,
+        recipe_data: finalRecipeData, // Store the recipe with preserved images
+        parent_recipe_id: recipeId,
+        source_type: 'user_modified', // Add a source type to distinguish modified recipes
+        is_user_modified: true, // Explicitly set the boolean flag for modified recipes
+      })
+      .select('*') // Select all fields to return the full recipe
+      .single(); // Expect a single row back
+
+    if (insertRecipeError || !newModifiedRecipeRows) {
+      logger.error({ requestId, recipeId, newRecipeUrl, err: insertRecipeError }, 'Failed to insert modified recipe into processed_recipes_cache.');
+      return res.status(500).json({ error: 'Failed to save modified recipe content.' });
+    }
+
+    const newModifiedRecipeId = newModifiedRecipeRows.id;
+
+    // C) Force JSON id to equal the row id (belt-and-suspenders)
+    const { error: updateError } = await supabaseAdmin
+      .from('processed_recipes_cache')
+      .update({
+        recipe_data: { ...finalRecipeData, id: newModifiedRecipeId },
+      })
+      .eq('id', newModifiedRecipeId);
+
+    if (updateError) {
+      logger.warn({ requestId, newModifiedRecipeId, err: updateError }, 'Failed to update recipe_data.id with row ID, but insert succeeded');
+      // Continue execution since the main insert succeeded
+    } else {
+      logger.info({ requestId, newModifiedRecipeId }, 'Successfully updated recipe_data.id to match row ID');
+    }
+
+    logger.info({
+      requestId,
+      newModifiedRecipeId,
+      parentRecipeId: recipeId,
+      sourceType: 'user_modified',
+      isUserModified: true,
+      variationType
+    }, '[variations] Modified recipe inserted into processed_recipes_cache.');
+
+    // --- 3. Return the modified recipe ---
+    const modifiedRecipe = {
+      id: newModifiedRecipeRows.id,
+      is_user_modified: newModifiedRecipeRows.is_user_modified,
+      parent_recipe_id: newModifiedRecipeRows.parent_recipe_id,
+      recipe_data: newModifiedRecipeRows.recipe_data
+    };
+
+    logger.info({ requestId, recipeId, variationType }, '[variations] Returning modified recipe response');
+
+    res.json({
+      message: `Recipe variation (${variationType}) processed successfully`,
+      recipe: modifiedRecipe,
+      variationType,
+      isPlaceholder: !modifiedRecipeData // Indicate if this was a placeholder modification
+    });
+
+  } catch (err) {
+    const error = err as Error;
+    logger.error({ requestId, err: error, route: req.originalUrl, method: req.method }, 'Error in /variations route processing');
     res.status(500).json({ error: error.message || 'Internal server error' });
   }
 });

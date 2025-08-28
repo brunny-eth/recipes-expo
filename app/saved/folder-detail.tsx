@@ -677,7 +677,7 @@ export default function SavedFolderDetailScreen() {
             onChangeText={setEditedFolderName}
             // Do not auto-save on blur or submit; rely on the checkmark
             editable={!isSavingFolderName}
-            maxLength={50}
+            maxLength={30}
             returnKeyType="done"
             blurOnSubmit={false}
           />

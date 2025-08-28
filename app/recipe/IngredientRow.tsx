@@ -118,16 +118,27 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
     (change) => change.from === ingredientToCheck
   );
 
-  // If an ingredient has a persisted change or natural language substitutions, it should not be modifiable
-  const isLocked = hasPersistedChange || hasNaturalLanguageSubstitutions;
+  // If an ingredient has a persisted change OR natural language substitutions AND no structured substitutions, it should not be modifiable
+  const isLocked = hasPersistedChange || (hasNaturalLanguageSubstitutions && (!ingredient.suggested_substitutions || ingredient.suggested_substitutions.length === 0));
 
   // Show revert button only if there's an actual unsaved change and it's not locked
   const showRevertButton = hasUnsavedChange && !isLocked;
 
-  // Debug logging to help track the locking behavior - remove in production
-  if (substitutedFor || hasPersistedChange || hasUnsavedChange || showRevertButton || isUIGeneratedSubstitution || hasNaturalLanguageSubstitutions) {
-    console.log('[INGREDIENT_LOCKING]', {
+  // Debug logging to help track the locking behavior and substitutions
+  const shouldShowSubstitutionButton =
+    !substitutedFor &&
+    !isRemoved &&
+    !isLocked &&
+    ingredient.suggested_substitutions &&
+    ingredient.suggested_substitutions.length > 0 &&
+    ingredient.suggested_substitutions.some((sub) => sub && sub.name != null);
+
+  if (substitutedFor || hasPersistedChange || hasUnsavedChange || showRevertButton || isUIGeneratedSubstitution || hasNaturalLanguageSubstitutions || shouldShowSubstitutionButton || (ingredient.suggested_substitutions && ingredient.suggested_substitutions.length > 0)) {
+    console.log('[INGREDIENT_DEBUG]', {
       ingredientName: ingredient.name,
+      hasSuggestedSubstitutions: !!ingredient.suggested_substitutions,
+      substitutionsCount: ingredient.suggested_substitutions?.length || 0,
+      substitutionsSample: ingredient.suggested_substitutions?.slice(0, 2),
       isUIGeneratedSubstitution,
       hasNaturalLanguageSubstitutions,
       baseName,
@@ -136,9 +147,8 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
       hasPersistedChange,
       hasUnsavedChange,
       isLocked,
+      shouldShowSubstitutionButton,
       showRevertButton,
-      persistedChangesCount: persistedChanges.length,
-      currentChangesCount: appliedChanges.length,
       timestamp: new Date().toISOString(),
     });
   }
