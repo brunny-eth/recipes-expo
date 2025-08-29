@@ -494,7 +494,7 @@ export default function MiseScreen() {
 
       // Debug logging for backend data
       if (groceryData?.items) {
-              const eggItems = groceryData.items.filter(item =>
+              const eggItems = groceryData.items.filter((item: any) =>
         (item.item_name || item.name || '').toLowerCase().includes('egg')
       );
       }
@@ -1440,7 +1440,7 @@ export default function MiseScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-        <ScreenHeader title="Prep station" showBack={false} />
+        <ScreenHeader title="Prep Station" showBack={false} />
       
       {/* Tab selector - underline style */}
       <View style={styles.tabContainer}>
@@ -1452,7 +1452,7 @@ export default function MiseScreen() {
             styles.tabButtonText,
             selectedTab === 'recipes' && styles.tabButtonTextActive
           ]}>
-            Ready to Cook
+            Recipes
           </Text>
           {/* underline removed */}
         </TouchableOpacity>

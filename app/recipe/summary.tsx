@@ -2400,7 +2400,7 @@ export default function RecipeSummaryScreen() {
       });
 
       // Navigate to mise tab to show the recipe was added
-      showSuccess('Added to mise', 'Recipe ready for cooking!', 2000);
+      showSuccess('Added to Prep', 'Recipe ready for cooking!', 2000);
       router.push('/tabs/mise');
 
     } catch (error: any) {

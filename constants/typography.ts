@@ -32,14 +32,14 @@ export const FONT = {
     caption: responsiveFont(14, 13, 14),
     body: responsiveFont(16, 14, 16),
     sectionHeader: responsiveFont(18, 16, 18),
-    screenTitle: responsiveFont(24, 20, 24),
+    screenTitle: responsiveFont(26, 22, 26),
     logo: responsiveFont(32, 28, 32),
     // Legacy aliases (to be removed after full migration)
     xs: responsiveFont(12, 11, 12),
     smBody: responsiveFont(14, 13, 14),
     bodyMedium: responsiveFont(16, 14, 16),
     lg: responsiveFont(18, 16, 18),
-    xl: responsiveFont(24, 20, 24),
+    xl: responsiveFont(26, 22, 26),
     xxl: responsiveFont(32, 28, 32),
   },
   weight: {
@@ -59,7 +59,7 @@ export const FONT = {
 
 // Predefined text styles for common use cases
 export const screenTitleText: TextStyle = {
-  fontFamily: FONT.family.heading,
+  fontFamily: FONT.family.bold,
   fontSize: FONT.size.screenTitle,
   fontWeight: '600',
 };
