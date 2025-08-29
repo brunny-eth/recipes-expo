@@ -66,7 +66,7 @@ export function AuthNavigationHandler() {
     });
 
     return unsubscribe;
-  }, [onAuthNavigation, router, showSuccess, showError]);
+  }, [onAuthNavigation, router, showSuccess, showError, handleError]);
 
   // This component doesn't render anything
   return null;
