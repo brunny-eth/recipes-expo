@@ -929,7 +929,7 @@ export default function HomeScreen() {
                       {/* Dynamic helper text based on selected mode */}
                       <Text style={styles.helperText}>
                         {importMode === 'url'
-                          ? 'Paste a link from a food blog or social media'
+                          ? 'Paste a website or social media link'
                           : importMode === 'image'
                           ? 'Upload recipe PDFs or screenshots'
                           : 'Paste the entire recipe text directly'
@@ -1018,7 +1018,7 @@ export default function HomeScreen() {
                       <Text style={styles.helperText}>
                         {importMode === 'name'
                           ? 'Search for a recipe by name'
-                          : 'Browse curated recipes and cooking inspiration'
+                          : 'Browse our curated recipes for inspiration'
                         }
                       </Text>
                     </>
@@ -1099,7 +1099,6 @@ const styles = StyleSheet.create({
   importSection: {
     gap: 0,
     marginTop: SPACING.lg,
-    minHeight: 230, // Increased to prevent shifting when input content is hidden
   },
   secondCardSection: {
     gap: 0,
