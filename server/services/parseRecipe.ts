@@ -34,7 +34,8 @@ export type ParseResult = {
 
 export async function parseAndCacheRecipe(
     input: string,
-    forceNewParse?: boolean
+    forceNewParse?: boolean,
+    isDishNameSearch?: boolean
 ): Promise<ParseResult> {
     const requestId = createHash('sha256').update(Date.now().toString() + Math.random().toString()).digest('hex').substring(0, 12);
     const requestStartTime = Date.now();
@@ -84,7 +85,7 @@ export async function parseAndCacheRecipe(
         } else if (inputType === 'video') {
             return await parseVideoRecipe(trimmedInput);
         } else { // 'raw_text'
-            return await parseTextRecipe(trimmedInput, requestId, forceNewParse);
+            return await parseTextRecipe(trimmedInput, requestId, forceNewParse, { isDishNameSearch });
         }
 
     } catch (err) {

@@ -1,6 +1,7 @@
 import { StructuredIngredient, IngredientGroup } from '../common/types/recipes';
 import { parseAmountString } from './recipeUtils';
 import { availableUnits, Unit } from './units';
+import { detectInputType } from '../server/utils/detectInputType';
 
 // === COMPREHENSIVE UNIT SYSTEM ===
 
@@ -690,14 +691,24 @@ export function parseRecipeDisplayName(name: string): {
  * Parses an ingredient display name for GROCERY LIST purposes.
  * Aggressively cleans and normalizes ingredient names.
  */
-export function parseIngredientDisplayName(name: string): { 
-  baseName: string; 
+export function parseIngredientDisplayName(name: string): {
+  baseName: string;
   substitutionText: string | null;
   isRemoved?: boolean;
   substitutedFor?: string | null;
 } {
   if (process.env.NODE_ENV === 'development') {
     console.log('[ingredientHelpers] 🔄 Parsing GROCERY ingredient name:', name);
+  }
+
+  // Fix for egg pluralization issue - return egg names unchanged
+  if (name.toLowerCase().includes('egg')) {
+    return {
+      baseName: name,
+      substitutionText: null,
+      isRemoved: false,
+      substitutedFor: null
+    };
   }
   
   // Handle null/undefined input
@@ -838,5 +849,80 @@ export function parseIngredientDisplayName(name: string): {
   };
 }
 
-// Removed parseCanonicalIngredientName function - functionality moved to 
+// Removed parseCanonicalIngredientName function - functionality moved to
 // normalizeName in groceryHelpers.ts for better consistency
+
+/**
+ * Checks if a dish name is descriptive enough to generate a good recipe
+ * Returns true if the name is descriptive enough, false if it's too vague
+ */
+export function isDescriptiveDishName(input: string): boolean {
+  const trimmed = input.trim();
+  if (trimmed.length === 0) return false;
+
+  // Convert to lowercase for easier matching
+  const lowerInput = trimmed.toLowerCase();
+
+  // Too short - single words are usually too vague
+  const words = lowerInput.split(/\s+/);
+  if (words.length < 2) {
+    return false;
+  }
+
+  // Check for descriptive words that indicate specificity
+  const descriptiveIndicators = [
+    // Cooking methods
+    'baked', 'fried', 'grilled', 'roasted', 'stewed', 'braised', 'steamed',
+    'sauteed', 'pan-fried', 'deep-fried', 'air-fried', 'slow-cooked',
+    // Ingredients
+    'chicken', 'beef', 'pork', 'fish', 'salmon', 'shrimp', 'turkey', 'lamb',
+    'tofu', 'lentil', 'bean', 'cheese', 'cream', 'garlic', 'onion', 'tomato',
+    'spinach', 'broccoli', 'carrot', 'potato', 'rice', 'pasta', 'noodle',
+    'vegetable', 'fruit', 'chocolate', 'vanilla', 'cinnamon', 'herb',
+    // Styles/cuisines
+    'italian', 'mexican', 'chinese', 'thai', 'indian', 'french', 'spanish',
+    'greek', 'japanese', 'korean', 'vietnamese', 'mediterranean',
+    // Dietary indicators
+    'vegan', 'vegetarian', 'gluten-free', 'low-carb', 'keto', 'paleo',
+    'dairy-free', 'nut-free', 'spicy', 'mild', 'sweet', 'savory',
+    // Preparation styles
+    'stuffed', 'crusted', 'marinated', 'seasoned', 'herbed', 'spiced',
+    'creamy', 'tangy', 'crispy', 'tender', 'juicy', 'fluffy'
+  ];
+
+  // Check if any descriptive words are present
+  const hasDescriptiveWord = descriptiveIndicators.some(indicator =>
+    lowerInput.includes(indicator)
+  );
+
+  // If it has descriptive words, it's likely specific enough
+  if (hasDescriptiveWord) {
+    return true;
+  }
+
+  // Check for numbers (like "3-ingredient", "5-minute")
+  if (/\d+/.test(lowerInput)) {
+    return true;
+  }
+
+  // Check for common vague food categories that need more specificity
+  const vagueCategories = [
+    'soup', 'salad', 'sandwich', 'pizza', 'pasta', 'curry', 'stew',
+    'casserole', 'pie', 'cake', 'cookies', 'bread', 'muffin', 'pancakes',
+    'waffles', 'omelette', 'frittata', 'quiche', 'lasagna', 'tacos',
+    'burritos', 'quesadilla', 'nachos', 'guacamole', 'salsa', 'hummus',
+    'pesto', 'sauce', 'dressing', 'dip', 'spread', 'jam', 'jelly'
+  ];
+
+  // If it's a vague category without descriptive words, it's too vague
+  const isVagueCategory = vagueCategories.some(category =>
+    lowerInput.includes(category) && words.length <= 2
+  );
+
+  if (isVagueCategory) {
+    return false;
+  }
+
+  // Default to requiring at least 3 words for most dish names
+  return words.length >= 3;
+}

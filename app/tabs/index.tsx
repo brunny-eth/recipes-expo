@@ -42,7 +42,7 @@ import RecipePDFImageUploader, { UploadResult } from '@/components/RecipePDFImag
 import UploadRecipeModal from '@/components/UploadRecipeModal';
 import { CombinedParsedRecipe } from '@/common/types';
 import { useRecipeSubmission } from '@/hooks/useRecipeSubmission';
-import { detectInputType } from '../../server/utils/detectInputType';
+import { detectInputType, validateRawTextInput, validateDishNameInput } from '../../server/utils/detectInputType';
 import { useAnalytics } from '@/utils/analytics';
 import { useHandleError } from '@/hooks/useHandleError';
 
@@ -148,8 +148,8 @@ export default function HomeScreen() {
     []
   );
 
-  // Import mode: 'url' | 'image' | 'name'
-  const [importMode, setImportMode] = useState<'url' | 'image' | 'name'>('url');
+  // Import mode: 'url' | 'image' | 'text' | 'name' | 'explore'
+  const [importMode, setImportMode] = useState<'url' | 'image' | 'text' | 'name' | 'explore'>('url');
 
   // On mount, animate URL prompt once
   useEffect(() => {
@@ -288,6 +288,9 @@ export default function HomeScreen() {
         showError('Missing recipe text', 'Please enter some recipe text and try again.');
         return;
       }
+
+
+
       track('recipe_create_new_selected', {
         recipeInput: inputToParse,
         inputType: 'raw_text',
@@ -347,17 +350,36 @@ export default function HomeScreen() {
         );
         // Clear the active input for better UX
         if (importMode === 'url') setRecipeUrl('');
-        if (importMode === 'name') setRecipeName('');
+        if (importMode === 'name' || importMode === 'text') setRecipeName('');
         return;
       }
 
-      // Name mode: require a minimal amount of descriptive letters (align with backend validation)
-      if (importMode === 'name') {
-        const letterCount = (localRecipeInput.match(/[a-zA-Z]/g) || []).length;
-        if (letterCount < 3) {
+      // Mode-specific validation using new validation functions
+      if (importMode === 'text') {
+        const validation = validateRawTextInput(localRecipeInput);
+        if (!validation.isValid) {
           showError(
-            'Please enter more detail',
-            'Please be a bit more descriptive about the dish you want to cook.',
+            'Invalid recipe text',
+            validation.error || 'Please provide valid recipe text or ingredients.',
+            undefined,
+            () => {
+              hideError();
+              router.push('/tabs/library');
+            },
+            'Go to Explore'
+          );
+          setRecipeName('');
+          return;
+        }
+      }
+
+      // Name mode: use specific dish name validation
+      if (importMode === 'name') {
+        const validation = validateDishNameInput(localRecipeInput);
+        if (!validation.isValid) {
+          showError(
+            'Invalid dish name',
+            validation.error || 'Please enter a valid dish name.',
             undefined,
             () => {
               hideError();
@@ -412,26 +434,47 @@ export default function HomeScreen() {
         return;
       }
 
-      // If user is in text mode, strictly disallow URLs/videos and require text
-      if (importMode === 'name' && inputType !== 'raw_text') {
-        showError(
-          'Please enter text',
-          'The Text field is for recipe text or a dish name. If you have a link, switch to URL.',
-        );
-        return;
+      // Mode-specific validation - raw text mode should have recipe-like content
+      if (importMode === 'text') {
+        const rawTextValidation = validateRawTextInput(localRecipeInput);
+        if (!rawTextValidation.isValid) {
+          showError(
+            'Invalid recipe text',
+            rawTextValidation.error || 'The Raw Text field is for recipe text or ingredients. If you have a link, switch to Website.',
+          );
+          return;
+        }
+      }
+
+      // Mode-specific validation - dish name mode should be simple names, not full recipes
+      if (importMode === 'name') {
+        const dishNameValidation = validateDishNameInput(localRecipeInput);
+        if (!dishNameValidation.isValid) {
+          showError(
+            'Invalid dish name',
+            dishNameValidation.error || 'The Dish Name field is for recipe names. If you have a link, switch to Website.',
+          );
+          return;
+        }
       }
       currentStage = 'analytics_tracking';
       try { await track('input_mode_selected', { inputType }); } catch {}
       try { await track('recipe_submission_started', { inputLength: localRecipeInput.length, inputType, submissionId: localSubmissionId, userId: session?.user?.id }); } catch {}
 
-      console.log('[HomeScreen] About to call submitRecipe with input:', { 
-        inputLength: localRecipeInput.length, 
-        inputType, 
-        submissionId: localSubmissionId 
-      });
-      
-      currentStage = 'recipe_submission';
-      const result = await submitRecipe(localRecipeInput);
+            // Handle dish name vs raw text differently
+      let result;
+      if (importMode === 'name') {
+        // For dish names, we want to do fuzzy search first
+        console.log('[HomeScreen] Dish name mode - doing fuzzy search first');
+        currentStage = 'recipe_submission';
+        // For now, we'll still use the same submitRecipe but with a flag to indicate dish name mode
+        result = await submitRecipe(localRecipeInput, { isDishNameSearch: true });
+      } else {
+        // For raw text, go directly to parsing
+        console.log('[HomeScreen] Raw text mode - going directly to parsing');
+        currentStage = 'recipe_submission';
+        result = await submitRecipe(localRecipeInput, { isDishNameSearch: false });
+      }
       
       console.log('[HomeScreen] submitRecipe returned:', { 
         success: result.success, 
@@ -464,9 +507,11 @@ export default function HomeScreen() {
           submissionId: localSubmissionId
         });
         if (result.action === 'show_validation_error') {
-          // In Dish name mode, show a name-specific message instead of the generic URL/text one
+          // Show mode-specific error messages
           if (importMode === 'name') {
             showError('Invalid dish name', 'Please input a valid dish name.');
+          } else if (importMode === 'text') {
+            showError('Invalid recipe text', 'Please provide valid recipe text or ingredients.');
           } else if (result.error) {
             handleError('Validation Error', result.error, { stage: 'validation' });
           }
@@ -547,6 +592,8 @@ export default function HomeScreen() {
 
   // URL submit wrapper
   const handleSubmit = async () => handleSubmitInput(recipeUrl);
+  // Text submit wrapper
+  const handleSubmitText = async () => handleSubmitInput(recipeName);
   // Name submit wrapper
   const handleSubmitName = async () => handleSubmitInput(recipeName);
 
@@ -723,64 +770,43 @@ export default function HomeScreen() {
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.sectionsContainer}>
-              {/* Marketing heading */}
-              <View style={[styles.heroSection, isCompact && { marginTop: 0, marginBottom: 0 }]}>
-                <Text
-                  style={[styles.heroHeading, isCompact && { fontSize: FONT.size.sectionHeader }]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.9}
-                >
-                  The best way to prep and cook
-                </Text>
-              </View>
-
-              {/* Import section */}
+              {/* First card - Import from any source */}
               <View style={styles.importSection}>
-                 {/* Removed legacy subheading above the import card */}
-
-                {/* Unified import card: header + segmented control + input */}
+                <Text style={styles.cardSubheading}>Import recipes from any source</Text>
                 <View style={styles.importCard}>
-                  <Text style={styles.importCardTitle}>Bring your recipes in</Text>
-                  {/* Segmented control: URL | Dish Name | Image */}
+                  {/* Segmented control: Website | Photo | Raw Text */}
                   <View style={styles.segmentedControlContainer}>
                     <TouchableOpacity
-                      style={[styles.segmentedItem, styles.segmentedItemNarrow, importMode === 'url' && styles.segmentedItemActive]}
+                      style={[styles.segmentedItem, importMode === 'url' && styles.segmentedItemActive]}
                       onPress={() => setImportMode('url')}
                     >
                       <Text
                         style={[styles.segmentedItemText, importMode === 'url' && styles.segmentedItemTextActive]}
                         numberOfLines={1}
-                        adjustsFontSizeToFit
-                        minimumFontScale={0.75}
                       >
-                        URL
+                        Website
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.segmentedItem, styles.segmentedItemWide, importMode === 'name' && styles.segmentedItemActive]}
-                      onPress={() => setImportMode('name')}
-                    >
-                      <Text
-                        style={[styles.segmentedItemText, importMode === 'name' && styles.segmentedItemTextActive]}
-                        numberOfLines={1}
-                        adjustsFontSizeToFit
-                        minimumFontScale={0.7}
-                      >
-                        Dish name
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.segmentedItem, styles.segmentedItemNarrow, importMode === 'image' && styles.segmentedItemActive]}
+                      style={[styles.segmentedItem, importMode === 'image' && styles.segmentedItemActive]}
                       onPress={() => setImportMode('image')}
                     >
                       <Text
                         style={[styles.segmentedItemText, importMode === 'image' && styles.segmentedItemTextActive]}
                         numberOfLines={1}
-                        adjustsFontSizeToFit
-                        minimumFontScale={0.75}
                       >
-                        Image
+                        Photo
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.segmentedItem, importMode === 'text' && styles.segmentedItemActive]}
+                      onPress={() => setImportMode('text')}
+                    >
+                      <Text
+                        style={[styles.segmentedItemText, importMode === 'text' && styles.segmentedItemTextActive]}
+                        numberOfLines={1}
+                      >
+                        Raw Text
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -817,7 +843,7 @@ export default function HomeScreen() {
                     </View>
                   ) : importMode === 'image' ? (
                     <View style={styles.fullWidthRow}>
-                      <TouchableOpacity 
+                      <TouchableOpacity
                         style={styles.fullWidthPrimaryButton}
                         onPress={handleShowUploadModal}
                       >
@@ -828,7 +854,7 @@ export default function HomeScreen() {
                     <View style={styles.inputContainer}>
                       <TextInput
                         style={[styles.input, styles.inputLeft]}
-                        placeholder={nameDisplayedPlaceholder}
+                        placeholder="Paste or type recipe text here"
                         placeholderTextColor={COLORS.darkGray}
                         value={recipeName}
                         onChangeText={setRecipeName}
@@ -839,7 +865,7 @@ export default function HomeScreen() {
                         blurOnSubmit={true}
                         enablesReturnKeyAutomatically={true}
                         keyboardType="default"
-                        onSubmitEditing={handleSubmitName}
+                        onSubmitEditing={handleSubmitText}
                         underlineColorAndroid="transparent"
                       />
                       <TouchableOpacity
@@ -848,44 +874,113 @@ export default function HomeScreen() {
                           styles.submitButtonConnected,
                           isSubmitting && styles.submitButtonDisabled,
                         ]}
-                        onPress={handleSubmitName}
+                        onPress={handleSubmitText}
                         disabled={isSubmitting}
                       >
                         {getSubmitButtonContent()}
                       </TouchableOpacity>
-                      
                     </View>
                   )}
-                  {/* Removed inline community link for name mode */}
+
+                  {/* Dynamic helper text based on selected mode */}
+                  <Text style={styles.helperText}>
+                    {importMode === 'url'
+                      ? 'Paste a link from a food blog or social media'
+                      : importMode === 'image'
+                      ? 'Upload recipe PDFs or screenshots'
+                      : 'Paste the entire recipe text directly'
+                    }
+                  </Text>
                 </View>
               </View>
 
-              {/* Slight spacer before secondary actions (reduced from flexGrow to bring items up slightly) */}
-              <View style={{ height: SPACING.lg }} />
-
-              {/* Secondary actions grouped near bottom */}
-              <View style={styles.secondarySections}>
-                  {/* Action section 3: Explore */}
-                  <View style={styles.actionSection}>
-                    <View style={styles.sectionTitleWrap}>
-                      <Text style={[styles.subheadingText, { marginTop: 0, marginBottom: SPACING.xs }]}>{''}</Text>
-                    </View>
-                    <View style={[styles.quickList, { marginBottom: 0 }]}> 
-                      <TouchableOpacity
-                        style={styles.quickPill}
-                        onPress={() => router.push('/explore')}
+              {/* Second card - Find Meez recipes */}
+              <View style={styles.secondCardSection}>
+                <Text style={styles.cardSubheading}>...or find a recipe of ours</Text>
+                <View style={styles.importCard}>
+                  {/* Segmented control: Dish name | Explore */}
+                  <View style={styles.segmentedControlContainer}>
+                    <TouchableOpacity
+                      style={[styles.segmentedItem, importMode === 'name' && styles.segmentedItemActive]}
+                      onPress={() => setImportMode('name')}
+                    >
+                      <Text
+                        style={[styles.segmentedItemText, importMode === 'name' && styles.segmentedItemTextActive]}
+                        numberOfLines={1}
                       >
-                        <Text style={styles.quickPillText}>Discover new dishes</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.quickPill}
-                        onPress={() => router.push('/tabs/mise')}
+                        Dish name
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.segmentedItem, importMode === 'explore' && styles.segmentedItemActive]}
+                      onPress={() => setImportMode('explore')}
+                    >
+                      <Text
+                        style={[styles.segmentedItemText, importMode === 'explore' && styles.segmentedItemTextActive]}
+                        numberOfLines={1}
                       >
-                        <Text style={styles.quickPillText}>Use your prep station</Text>
-                      </TouchableOpacity>
-                    </View>
+                        Explore
+                      </Text>
+                    </TouchableOpacity>
                   </View>
+
+                  {/* Only show content if user has explicitly selected a second card option */}
+                  {(importMode === 'name' || importMode === 'explore') && (
+                    <>
+                      {importMode === 'name' ? (
+                        <View style={styles.inputContainer}>
+                          <TextInput
+                            style={[styles.input, styles.inputLeft]}
+                            placeholder={nameDisplayedPlaceholder}
+                            placeholderTextColor={COLORS.darkGray}
+                            value={recipeName}
+                            onChangeText={setRecipeName}
+                            autoCapitalize="sentences"
+                            autoCorrect={true}
+                            editable={true}
+                            returnKeyType="search"
+                            blurOnSubmit={true}
+                            enablesReturnKeyAutomatically={true}
+                            keyboardType="default"
+                            onSubmitEditing={handleSubmitName}
+                            underlineColorAndroid="transparent"
+                          />
+                          <TouchableOpacity
+                            style={[
+                              styles.submitButton,
+                              styles.submitButtonConnected,
+                              isSubmitting && styles.submitButtonDisabled,
+                            ]}
+                            onPress={handleSubmitName}
+                            disabled={isSubmitting}
+                          >
+                            {getSubmitButtonContent()}
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <View style={styles.fullWidthRow}>
+                          <TouchableOpacity
+                            style={styles.fullWidthPrimaryButton}
+                            onPress={() => router.push('/explore')}
+                          >
+                            <Text style={styles.fullWidthPrimaryButtonText}>Discover new dishes</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+
+                      {/* Dynamic helper text based on selected mode */}
+                      <Text style={styles.helperText}>
+                        {importMode === 'name'
+                          ? 'Search for a recipe by name'
+                          : 'Browse curated recipes and cooking inspiration'
+                        }
+                      </Text>
+                    </>
+                  )}
+                </View>
               </View>
+
+
             </View>
           </ScrollView>
         </Animated.View>
@@ -954,11 +1049,14 @@ const styles = StyleSheet.create({
   sectionsContainer: {
     gap: 0,
     flexGrow: 1,
-    justifyContent: 'space-between',
   },
   importSection: {
     gap: 0,
-    marginTop: SPACING.xxxl,
+    marginTop: SPACING.lg,
+  },
+  secondCardSection: {
+    gap: 0,
+    marginTop: SPACING.lg - 12, // Bring second card up by 12px
   },
   secondarySections: {
     width: '100%',
@@ -984,23 +1082,28 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: SPACING.xs,
   },
-  importCard: {
-    width: '100%',
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.md,
-    padding: SPACING.md,
-    gap: SPACING.sm,
-    marginTop: SPACING.smLg,
-    marginBottom: SPACING.xl,
-    ...SHADOWS.small, // subtle shadow (~2px blur equivalent)
-  },
-  importCardTitle: {
+
+  cardSubheading: {
     fontFamily: FONT.family.body,
-    fontSize: FONT.size.sectionHeader,
+    fontSize: FONT.size.sectionHeader || 18, // Fallback to prevent NaN
     fontWeight: '700',
     color: COLORS.textDark,
     textAlign: 'center',
     marginBottom: SPACING.sm,
+    marginTop: SPACING.xl,
+  },
+  importCard: {
+    width: '100%',
+    backgroundColor: '#FAFAFA', // Off-white background for better contrast
+    borderRadius: RADIUS.lg, // Match button radius for consistency
+    padding: SPACING.md,
+    gap: SPACING.sm,
+    marginBottom: SPACING.xl,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3, // Android shadow
   },
   actionSection: {
     gap: 0,
@@ -1102,7 +1205,7 @@ const styles = StyleSheet.create({
     height: '100%',
     paddingHorizontal: SPACING.base,
     color: COLORS.textDark,
-    fontSize: FONT.size.caption,
+    fontSize: FONT.size.caption || 14, // Fallback to prevent NaN
     lineHeight: undefined,
     backgroundColor: COLORS.surface,
     borderWidth: 0,
@@ -1176,19 +1279,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  segmentedItemWide: {
-    flex: 1.3,
-  },
-  segmentedItemNarrow: {
-    flex: 0.85,
-  },
+
   segmentedItemActive: {
     backgroundColor: COLORS.primary,
   },
   segmentedItemText: {
     ...bodyStrongText,
     color: COLORS.primary,
-    fontSize: FONT.size.caption,
+    fontSize: FONT.size.caption || 14, // Fallback to prevent NaN
   },
   segmentedItemTextActive: {
     color: COLORS.white,
@@ -1225,5 +1323,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexDirection: 'row',
     columnGap: 4,
+  },
+  helperText: {
+    ...bodyText,
+    color: COLORS.textMuted,
+    fontSize: FONT.size.caption || 14, // Fallback to prevent NaN
+    textAlign: 'center',
+    lineHeight: FONT.lineHeight.normal || 24, // Fallback to prevent NaN
+    fontStyle: 'italic',
   },
 });

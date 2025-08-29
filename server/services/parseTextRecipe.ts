@@ -42,11 +42,13 @@ export async function parseTextRecipe(
     forceNewParse?: boolean | string,
     options?: {
         fromImageExtraction?: boolean; // Indicates text was extracted from image/PDF
+        isDishNameSearch?: boolean; // Indicates if this is a dish name search
     }
 ): Promise<ParseResult> {
     // Coerce forceNewParse to boolean
     const forceNewParseBool = forceNewParse === true || forceNewParse === 'true';
     const isFromImageExtraction = options?.fromImageExtraction === true;
+    const isDishNameSearch = options?.isDishNameSearch === true;
     
     if (process.env.NODE_ENV === 'development') {
       console.log(`[parseTextRecipe] forceNewParse received as:`, forceNewParse, `| typeof:`, typeof forceNewParse, `| coerced:`, forceNewParseBool);
@@ -76,7 +78,8 @@ export async function parseTextRecipe(
         fromImageExtraction: isFromImageExtraction 
     }, "Checking fuzzy match environment variable, forceNewParse, and fromImageExtraction");
     
-    if (!forceNewParseBool && !isFromImageExtraction && process.env.ENABLE_FUZZY_MATCH === 'true') {
+    // Skip fuzzy matching for raw text inputs (only do it for dish name searches)
+    if (!forceNewParseBool && !isFromImageExtraction && process.env.ENABLE_FUZZY_MATCH === 'true' && isDishNameSearch) {
         logger.info({ requestId }, "Fuzzy match enabled, attempting to find similar recipes.");
         const fuzzyMatchStartTime = Date.now();
         try {

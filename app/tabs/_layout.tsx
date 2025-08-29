@@ -111,6 +111,10 @@ const MemoizedTabsNavigator = React.memo(() => {
 
 MemoizedTabsNavigator.displayName = 'MemoizedTabsNavigator';
 
-export default function TabLayout() {
+const TabLayout = () => {
   return <MemoizedTabsNavigator />;
-}
+};
+
+TabLayout.displayName = 'TabLayout';
+
+export default TabLayout;

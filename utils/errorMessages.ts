@@ -10,11 +10,17 @@ export function getErrorMessage(errorCode: ParseErrorCode, context?: string): st
       if (context === 'image' || context === 'images') {
         return "Those images don't appear to contain a recipe. Please try uploading images that show recipe ingredients and instructions.";
       }
+      if (context === 'raw_text') {
+        return "Please be a bit more descriptive so we can make you the best recipe! Try adding details like 'chicken empanadas with cheese' or 'vegetarian empanadas with spinach'.";
+      }
       return "That doesn't look like a valid recipe. \n\n Please try a URL with an actual recipe in it, or just paste the recipe text directly.";
       
     case ParseErrorCode.GENERATION_FAILED:
       if (context === 'image' || context === 'images') {
         return "We couldn't find a recipe in those images. Please try uploading clearer images that show recipe ingredients and cooking steps.";
+      }
+      if (context === 'raw_text') {
+        return "We couldn't process that recipe. Please be a bit more descriptive so we can make you the best recipe! Try adding details like cooking method or main ingredients.";
       }
       return "We couldn't process that recipe. \n\n Please try a URL with an actual recipe on it, or just paste the recipe text directly.";
       
@@ -25,6 +31,9 @@ export function getErrorMessage(errorCode: ParseErrorCode, context?: string): st
       if (context === 'url') {
         return "No recipe found at that URL. Please try a different link or paste the recipe text directly.";
       }
+      if (context === 'raw_text') {
+        return "We couldn't find enough recipe details in that text. Please be more specific about what you'd like to cook - try including ingredients, cooking method, or dietary preferences.";
+      }
       return "We couldn't find enough recipe details in that text. Please include ingredients and cooking instructions.";
       
     case ParseErrorCode.FINAL_VALIDATION_FAILED:
@@ -33,6 +42,9 @@ export function getErrorMessage(errorCode: ParseErrorCode, context?: string): st
       }
       if (context === 'url') {
         return "The recipe from that URL seems incomplete. Please try a different link or paste the recipe text directly.";
+      }
+      if (context === 'raw_text') {
+        return "The recipe details seem incomplete. Please add more specific ingredients or cooking steps - the more details you provide, the better we can help!";
       }
       return "The recipe details seem incomplete. Please add more ingredients or cooking steps and try again.";
       

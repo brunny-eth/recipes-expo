@@ -1894,6 +1894,14 @@ export default function RecipeSummaryScreen() {
 
   const handleOpenVariations = () => {
     try {
+      // Check if there are unsaved modifications and warn the user
+      if (hasModifications) {
+        showError(
+          'Unsaved Changes',
+          'You have unsaved changes that won\'t be applied to the remix. Save your recipe first if you want these changes included.'
+        );
+      }
+
       setIsVariationsModalVisible(true);
     } catch (error) {
       console.error('Error opening variations modal:', error);

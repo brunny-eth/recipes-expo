@@ -68,30 +68,32 @@ export function buildVariationPrompt(
             'Check processed foods for casein or whey ingredients and replace with dairy-free alternatives'
         ],
         'vegetarian': [
-            'MANDATORY: Replace ALL beef/chicken/pork with lentils, beans, tofu, or tempeh - do not leave any meat in the recipe',
-            'MANDATORY: Replace ALL fish/shrimp/seafood with tofu, tempeh, seitan, or mushrooms - do not leave any seafood in the recipe',
-            'Use vegetable broth instead of meat broth',
+            'MANDATORY: Replace ALL meat, poultry, and seafood with appropriate vegetarian alternatives based on dish context - do not leave any animal protein in the recipe',
+            'For ROASTS and LARGE CUTS (beef brisket, pork shoulder, lamb): Use cauliflower, eggplant, portobello mushrooms, or seitan - these provide similar hearty texture and absorb flavors well',
+            'For GROUND MEAT (beef, turkey, pork in burgers/meatballs): Use lentils, black beans, chickpeas, or crumbled tofu/firm tofu - these work best when seasoned heavily',
+            'For CHICKEN BREAST/FILLET: Use firm tofu, tempeh, or seitan - slice similarly and consider marinating for flavor absorption',
+            'For FISH/SEAFOOD: Use firm tofu, tempeh, seitan, or mushrooms - match the delicate texture and consider seaweed for briny notes',
+            'For SAUSAGES/HOT DOGS: Use vegetarian sausage alternatives, seitan, or marinated tofu',
+            'For BACON: Use coconut bacon, tempeh bacon, or smoked tofu',
+            'Use vegetable broth, mushroom broth, or water with bouillon instead of meat broth',
             'Use eggs or cheese for protein where appropriate (these are vegetarian)',
             'Replace gelatin with agar-agar',
             'Use vegetarian Worcestershire sauce or alternatives',
             'Replace fish sauce with soy sauce, tamari, or coconut aminos',
             'Replace oyster sauce with mushroom-based stir-fry sauce',
-            'Remove or replace anchovy paste with capers or olives',
+            'Remove or replace anchovy paste with capers, olives, or miso paste',
             'Check all sauces and condiments for hidden animal ingredients',
-            'ENSURE: Every ingredient in the final recipe must be vegetarian - double-check for any remaining meat/fish'
+            'ENSURE: Every ingredient in the final recipe must be vegetarian - double-check for any remaining meat/fish/seafood'
         ],
         'easier_recipe': [
             'Reduce total cooking/prep time by using easier techniques and store-bought ingredients while maintaining core flavors',
-            'Minimize number of pots/pans needed (ideally 1-2 max)',
-            'Replace homemade components with store-bought alternatives (fresh pasta → boxed pasta, homemade stock → bouillon cubes)',
+            'Minimize number of pots/pans needed (ideally 1-2 max, if the recipe allows it)',
+            'Replace homemade components with store-bought alternatives (fresh pasta → boxed pasta, homemade stock → bouillon cubes, pasta sauce -> jarred pasta sauce)',
             'Simplify cooking techniques (baking → stovetop, complex sauces → simple seasonings)',
             'Reduce or eliminate lengthy marinating/resting times',
-            'Use pre-cut/prepared ingredients where available',
-            'Combine multiple steps into single efficient steps',
             'Replace specialty ingredients with common pantry staples',
             'Reduce complex knife work (dicing → chopping, julienning → slicing)',
             'Use one-pot/one-pan cooking methods when possible',
-            'Minimize cleanup by using fewer dishes and disposable alternatives if appropriate',
             'Focus on weeknight-friendly timing (under 45 minutes total when possible)'
         ]
     };

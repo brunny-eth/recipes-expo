@@ -18,6 +18,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { CombinedParsedRecipe } from '@/common/types';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { bodyStrongText, bodyText, titleText, sectionHeaderText, FONT } from '@/constants/typography';
+import { isDescriptiveDishName } from '@/utils/ingredientHelpers';
 
 interface RecipeMatchSelectionModalProps {
   visible: boolean;
@@ -39,6 +40,7 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
   const [isCreateExpanded, setIsCreateExpanded] = useState(false);
   const [inputText, setInputText] = useState('');
   const [showValidation, setShowValidation] = useState(false);
+  const [validationError, setValidationError] = useState('');
   const [buttonsHeight, setButtonsHeight] = useState(0);
 
   console.log('[RecipeMatchSelectionModal] Modal rendered with', matches.length, 'matches.', { visible, debugSource });
@@ -51,8 +53,18 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
       setInputText(initialInputText || '');
       setIsCreateExpanded(false);
       setShowValidation(false);
+      setValidationError('');
     }
   }, [visible, initialInputText]);
+
+  // Clear validation error when input changes significantly
+  const [lastValidatedInput, setLastValidatedInput] = useState('');
+
+  React.useEffect(() => {
+    if (validationError && inputText !== lastValidatedInput && inputText.length > lastValidatedInput.length) {
+      setValidationError('');
+    }
+  }, [inputText, validationError, lastValidatedInput]);
 
   const handleRecipeSelect = (recipeId: string | number) => {
     const selectedRecipeId = recipeId.toString();
@@ -73,6 +85,17 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
   const handleImageError = (imageUrl: string) => {
     console.log('[RecipeMatchSelectionModal] Image failed to load:', imageUrl);
     setFailedImages(prev => new Set(prev).add(imageUrl));
+  };
+
+  // Helper function to determine if input looks like a dish name vs URL
+  const looksLikeDishName = (text: string): boolean => {
+    const trimmed = text.trim();
+    // If it contains spaces or common dish words, it's likely a dish name
+    if (trimmed.includes(' ') || /\b(recipe|dish|food|cook|bake|fry|grill)\b/i.test(trimmed)) {
+      return true;
+    }
+    // If it doesn't look like a URL (no http/https, no domain-like pattern), treat as dish name
+    return !trimmed.match(/^https?:\/\//i) && !trimmed.includes('.com') && !trimmed.includes('.org') && !trimmed.includes('www.');
   };
 
   const renderRecipeItem = ({ item }: { item: { recipe: CombinedParsedRecipe; similarity: number; } }) => {
@@ -191,14 +214,29 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
                 {showValidation && inputText.trim().length === 0 && (
                   <Text style={styles.validationText}>You can continue without adding details, or type a few hints.</Text>
                 )}
+                {validationError ? (
+                  <Text style={styles.validationErrorText}>{validationError}</Text>
+                ) : null}
               </View>
 
               <View style={styles.buttonContainer} onLayout={(e) => setButtonsHeight(e.nativeEvent.layout.height)}>
                 <TouchableOpacity
                   style={[styles.button, styles.primaryButton]}
                   onPress={() => {
-                    console.log('[RecipeMatchSelectionModal] Confirm create with input text length:', inputText?.length || 0);
-                    onAction('createNew', inputText.trim());
+                    const trimmedInput = inputText.trim();
+                    console.log('[RecipeMatchSelectionModal] Confirm create with input text length:', trimmedInput.length);
+
+                    // Validate dish name inputs
+                    if (looksLikeDishName(trimmedInput) && !isDescriptiveDishName(trimmedInput)) {
+                      setValidationError('Please be a bit more descriptive so we can make you the best recipe!');
+                      setLastValidatedInput(trimmedInput);
+                      return;
+                    }
+
+                    // Clear any previous validation error and proceed
+                    setValidationError('');
+                    setLastValidatedInput('');
+                    onAction('createNew', trimmedInput);
                   }}
                 >
                   <Text style={styles.primaryButtonText}>Make my recipe</Text>
@@ -331,6 +369,12 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xs,
     color: COLORS.darkGray,
     ...bodyText,
+  } as TextStyle,
+  validationErrorText: {
+    marginTop: SPACING.xs,
+    color: COLORS.error || '#E74C3C',
+    ...bodyText,
+    fontSize: FONT.size.smBody,
   } as TextStyle,
   button: {
     paddingVertical: SPACING.md,

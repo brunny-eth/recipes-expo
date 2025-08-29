@@ -362,6 +362,15 @@ function singularize(name: string): string {
     }
     return name;
   }
+
+  // Additional safeguard: Never try to singularize words that end with 'ss'
+  // This prevents "eggs" from becoming "egg" and then "eggs" again
+  if (lastWord.endsWith('ss')) {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[groceryHelpers] 🚫 Skipping singularization (ends with ss):', name);
+    }
+    return name;
+  }
   
   // Handle irregular plurals
   if (IRREGULAR_PLURALS[lastWord]) {
@@ -516,6 +525,16 @@ function applySpecialCases(name: string): string {
  * This is the main entry point for ingredient name normalization.
  */
 export function normalizeName(name: string): string {
+  // Fix for egg pluralization issue - prevent double pluralization
+  if (name.toLowerCase().includes('egg') && !name.includes('eggss')) {
+    return name; // Return egg names unchanged to prevent corruption
+  }
+
+  // Fix any corrupted egg items that have extra 's'
+  if (name === 'eggss') {
+    return 'eggs';
+  }
+
   if (process.env.NODE_ENV === 'development') {
     console.log('[groceryHelpers] 🔄 normalizeName called with:', name);
   }
@@ -537,13 +556,13 @@ export function normalizeName(name: string): string {
   
   // Step 2: Apply ingredient aliases (consolidate common variations)
   normalized = applyIngredientAliases(normalized);
-  
+
   // Step 3: Remove non-essential adjectives while preserving important combinations
   normalized = removeAdjectives(normalized);
-  
+
   // Step 4: Apply special ingredient-specific rules
   normalized = applySpecialCases(normalized);
-  
+
   // Step 5: Singularize while respecting exceptions
   normalized = singularize(normalized);
   
@@ -561,7 +580,7 @@ export function normalizeName(name: string): string {
       console.log('[groceryHelpers] 🍾 Vinegar normalization:', name, '→', normalized);
     }
     // Special logging for herb items to verify fresh/dried logic
-    if (name.toLowerCase().includes('basil') || name.toLowerCase().includes('cilantro') || 
+    if (name.toLowerCase().includes('basil') || name.toLowerCase().includes('cilantro') ||
         name.toLowerCase().includes('dill') || name.toLowerCase().includes('thyme') ||
         name.toLowerCase().includes('rosemary') || name.toLowerCase().includes('parsley')) {
       console.log('[groceryHelpers] 🌿 Herb normalization:', name, '→', normalized);
@@ -828,7 +847,7 @@ export function aggregateGroceryList(items: GroceryListItem[]): GroceryListItem[
        item.item_name.toLowerCase().includes('pastry'));
     
     const normalizedName = (isPotatoVariant || isFlourVariant) ? item.item_name : normalizeName(item.item_name);
-    
+
     // Create a normalized copy of the item with normalized name as the display name
     const normalizedItem = {
       ...item,
@@ -1122,6 +1141,8 @@ export function formatIngredientsForGroceryList(
           result: parsedName
         });
 
+
+
         // Handle amount - it might be a number, string, or null (parse first)
         let amount: number | null = null;
         if (ingredient.amount !== null && ingredient.amount !== undefined) {
@@ -1380,6 +1401,8 @@ export function formatIngredientsForGroceryList(
           originalText,
           parsedName
         });
+
+
         
         if (process.env.NODE_ENV === 'development') {
           console.log(`[groceryHelpers] 🔍 Detailed grocery item creation:`, {

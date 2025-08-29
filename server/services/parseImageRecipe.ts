@@ -288,10 +288,10 @@ export async function parseImageRecipe(
         }, `Piping extracted ${imageDataArray.length > 1 ? 'multi-image ' : ''}text to parseTextRecipe`);
 
         const textParseResult = await parseTextRecipe(
-            extractedText, 
-            finalRequestId, 
+            extractedText,
+            finalRequestId,
             false, // don't force new parse - let fromImageExtraction handle fuzzy matching bypass
-            { fromImageExtraction: true } // bypass fuzzy matching for image-extracted content
+            { fromImageExtraction: true, isDishNameSearch: false } // bypass fuzzy matching for image-extracted content, treat as raw text
         );
 
         // Merge timing and usage data

@@ -9,21 +9,18 @@ type WelcomeScreenState = 'welcome' | 'onboarding';
 
 export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) {
   const [currentScreen, setCurrentScreen] = useState<WelcomeScreenState>('welcome');
-  const features: { verb: string; rest: string; subtext: string }[] = [
-    { 
-      verb: 'Import', 
-      rest: ' any recipe from any source',
-      subtext: 'Food blogs, social media, or pics of cookbooks and handwritten recipes'
+  const features: { verb: string; rest: string }[] = [
+    {
+      verb: 'Import',
+      rest: ' and save any recipe from any source'
     },
-    { 
-      verb: 'Customize', 
-      rest: ' recipes to your tastes',
-      subtext: 'Swap ingredients, adjust servings, and recipe steps update automatically'
+    {
+      verb: 'Customize',
+      rest: ' recipes to your taste and diet, then save for later'
     },
-    { 
-      verb: 'Shop & cook', 
-      rest: ' multiple recipes at once',
-      subtext: 'Get organized grocery lists, then cook everything together'
+    {
+      verb: 'Generate shopping lists',
+      rest: ' and cook multiple recipes at once'
     },
   ];
 
@@ -63,7 +60,10 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
               }}
             >
               <Text style={styles.mainTitle}>
-                The best way to prep and cook meals at home
+                Every recipe, your way.
+              </Text>
+              <Text style={styles.subtitle}>
+                Customize it. Shop it. Cook it.
               </Text>
             </Animated.View>
 
@@ -79,7 +79,6 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
                       <Text style={styles.listVerb}>{item.verb}</Text>
                       {item.rest}
                     </Text>
-                    <Text style={styles.listSubtext}>{item.subtext}</Text>
                   </View>
                 </View>
               ))}
@@ -108,13 +107,22 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
 const styles = StyleSheet.create({
   mainTitle: {
     fontSize: FONT.size.screenTitle,
-    marginBottom: SPACING.xxxl,
+    marginBottom: SPACING.lg,
     textAlign: 'center',
     color: COLORS.textDark,
     lineHeight: FONT.lineHeight.relaxed,
     paddingTop: SPACING.xl,
     fontFamily: FONT.family.interSemiBold, // Semi-bold for better readability
     paddingHorizontal: SPACING.md, // Add horizontal padding for better text containment
+  } as TextStyle,
+  subtitle: {
+    fontSize: FONT.size.sectionHeader,
+    marginBottom: SPACING.xxxl,
+    textAlign: 'center',
+    color: COLORS.textMuted,
+    lineHeight: FONT.lineHeight.normal,
+    fontFamily: FONT.family.inter,
+    paddingHorizontal: SPACING.md,
   } as TextStyle,
   listContainer: {
     width: '100%',
@@ -143,29 +151,24 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   listNumberText: {
     color: COLORS.white,
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: FONT.family.interSemiBold,
+    textAlign: 'center',
+    lineHeight: 16,
   } as TextStyle,
   listContent: {
     flex: 1,
     paddingRight: SPACING.pageHorizontal, // Add right padding to prevent text from extending to screen edge
   } as ViewStyle,
   listText: {
-    fontSize: FONT.size.body,
+    fontSize: FONT.size.sectionHeader,
     color: COLORS.textDark,
     lineHeight: FONT.lineHeight.normal,
     marginTop: 2,
-    marginBottom: SPACING.sm, // Increased space between main text and subtext
     paddingRight: SPACING.sm, // Right padding for text
     fontFamily: FONT.family.interSemiBold, // Semi-bold for main bullet text
   } as TextStyle,
-  listSubtext: {
-    fontSize: FONT.size.body, // Increased from caption for better readability
-    color: COLORS.textMuted, // Changed from textSubtle for better contrast
-    lineHeight: FONT.lineHeight.normal, // Increased line height for better readability
-    fontFamily: FONT.family.inter,
-    marginLeft: 0, // Align with main bullet text
-  } as TextStyle,
+
   listVerb: {
     fontFamily: FONT.family.interSemiBold, // Semi-bold for sub-headers
     color: COLORS.textDark,

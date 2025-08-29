@@ -77,7 +77,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
     if (isVideo) return "Processing video recipe...";
     if (isImage) return "Extracting recipe from image...";
     if (isImages) return "Processing recipe pages...";
-    return "Working on our mise en place...";
+    return "Creating your recipe...";
   };
   const getReadyText = () => {
     if (isVideo) return "Video Recipe Ready!";
@@ -471,7 +471,6 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
         {headerLogo}
         {!hideChecklist && (
           <View style={styles.contentWrapper}>
-            <Text style={styles.tagline}>{getTagline()}</Text>
             <View style={styles.checklistContainer}>
               <ChecklistProgress isFinished={isParsingFinished} inputType={inputType} />
             </View>
@@ -542,7 +541,8 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
 const styles = StyleSheet.create({
   contentWrapper: {
     width: '100%',
-    marginTop: SPACING.xs,
+    marginTop: SPACING.xxxl, // More space below Meez logo
+    marginBottom: SPACING.xxxl, // Maintain spacing that was previously provided by tagline
   } as ViewStyle,
   checklistContainer: {
     alignItems: 'stretch',

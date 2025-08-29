@@ -2,8 +2,18 @@ import { TextStyle } from 'react-native';
 import { RFValue } from 'react-native-responsive-fontsize';
 
 export function responsiveFont(base: number, min: number, max: number) {
-  const scaled = RFValue(base);
-  return Math.min(Math.max(scaled, min), max);
+  try {
+    const scaled = RFValue(base);
+    // Ensure we never return NaN or Infinity
+    if (isNaN(scaled) || !isFinite(scaled)) {
+      console.warn('[Typography] RFValue returned invalid value, using base:', scaled, base);
+      return Math.min(Math.max(base, min), max);
+    }
+    return Math.min(Math.max(scaled, min), max);
+  } catch (error) {
+    console.warn('[Typography] Error in responsiveFont calculation:', error);
+    return Math.min(Math.max(base, min), max);
+  }
 }
 
 export const FONT = {

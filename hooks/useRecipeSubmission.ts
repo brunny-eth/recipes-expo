@@ -13,9 +13,13 @@ import type {
   CombinedParsedRecipe
 } from '../common/types';
 
+export interface SubmitRecipeOptions {
+  isDishNameSearch?: boolean;
+}
+
 export interface UseRecipeSubmissionReturn {
   submissionState: SubmissionState;
-  submitRecipe: (input: string) => Promise<SubmissionResult>;
+  submitRecipe: (input: string, options?: SubmitRecipeOptions) => Promise<SubmissionResult>;
   validateInput: (input: string) => ValidationResult;
   checkCache: (normalizedUrl: string) => Promise<CacheCheckResult>;
   isSubmitting: boolean;
@@ -124,7 +128,8 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
     }
   }, []);
 
-  const submitRecipe = useCallback(async (input: string): Promise<SubmissionResult> => {
+  const submitRecipe = useCallback(async (input: string, options?: SubmitRecipeOptions): Promise<SubmissionResult> => {
+    const { isDishNameSearch = false } = options || {};
     // Check authentication - users must be logged in to use the app
     if (!session) {
       return {
@@ -182,7 +187,7 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
         }
       } else if (inputType === 'raw_text') {
         setSubmissionState('parsing');
-        
+
         // For text input, make backend call to get intelligent response
         const backendUrl = process.env.EXPO_PUBLIC_API_URL;
         if (!backendUrl) {
@@ -190,16 +195,16 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
         }
 
         console.log('[useRecipeSubmission] Making backend request to:', `${backendUrl}/api/recipes/parse`);
-        console.log('[useRecipeSubmission] Request payload:', { input: normalizedInput });
-        
+        console.log('[useRecipeSubmission] Request payload:', { input: normalizedInput, isDishNameSearch });
+
         const response = await fetch(`${backendUrl}/api/recipes/parse`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ input: normalizedInput }),
+          body: JSON.stringify({ input: normalizedInput, isDishNameSearch }),
         });
-        
+
         console.log('[useRecipeSubmission] Backend response status:', response.status);
         console.log('[useRecipeSubmission] Backend response ok:', response.ok);
 
@@ -209,7 +214,7 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
         }
 
         const parseResult = await response.json();
-        
+
         // Debug logging to understand what the backend returns
         console.log('[useRecipeSubmission] Backend request successful - parse result:', {
           hasRecipe: !!parseResult.recipe,
@@ -217,9 +222,10 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
           cachedMatchesLength: parseResult.cachedMatches?.length || 0,
           fromCache: parseResult.fromCache,
           fetchMethodUsed: parseResult.fetchMethodUsed,
-          hasError: !!parseResult.error
+          hasError: !!parseResult.error,
+          isDishNameSearch
         });
-        
+
         // Handle error responses
         if (parseResult.error) {
           setSubmissionState('idle');
@@ -229,35 +235,68 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
             error: parseResult.error.message || 'Failed to process recipe'
           };
         }
-        
-        // Priority 1: Direct recipe hit (either new parse OR single fuzzy match)
-        if (parseResult.recipe) {
-          setSubmissionState('idle');
-          console.log('[useRecipeSubmission] Direct recipe hit - returning for navigation to summary');
-          
-          return {
-            success: true,
-            action: 'navigate_to_summary',
-            recipe: parseResult.recipe
-          };
+
+        // Different priority handling based on input type
+        if (isDishNameSearch) {
+          // For dish name searches, prioritize showing matches first
+          console.log('[useRecipeSubmission] Dish name search - prioritizing matches');
+
+          // Priority 1: Multiple matches - show selection modal (dish name searches should show options)
+          if (parseResult.cachedMatches && parseResult.cachedMatches.length > 0) {
+            setSubmissionState('idle');
+            console.log('[useRecipeSubmission] Dish name search - showing match modal');
+
+            return {
+              success: true,
+              action: 'show_match_modal',
+              matches: parseResult.cachedMatches
+            };
+          }
+
+          // Priority 2: Direct recipe hit (fallback for dish name)
+          if (parseResult.recipe) {
+            setSubmissionState('idle');
+            console.log('[useRecipeSubmission] Dish name search - direct recipe hit');
+
+            return {
+              success: true,
+              action: 'navigate_to_summary',
+              recipe: parseResult.recipe
+            };
+          }
+        } else {
+          // For raw text input, prioritize direct parsing
+          console.log('[useRecipeSubmission] Raw text input - prioritizing direct parsing');
+
+          // Priority 1: Direct recipe hit (raw text should parse directly)
+          if (parseResult.recipe) {
+            setSubmissionState('idle');
+            console.log('[useRecipeSubmission] Raw text - direct recipe hit');
+
+            return {
+              success: true,
+              action: 'navigate_to_summary',
+              recipe: parseResult.recipe
+            };
+          }
+
+          // Priority 2: Multiple matches - show selection modal (fallback for raw text)
+          if (parseResult.cachedMatches && parseResult.cachedMatches.length > 1) {
+            setSubmissionState('idle');
+            console.log('[useRecipeSubmission] Raw text - showing match modal as fallback');
+
+            return {
+              success: true,
+              action: 'show_match_modal',
+              matches: parseResult.cachedMatches
+            };
+          }
         }
-        
-        // Priority 2: Multiple matches - show selection modal
-        if (parseResult.cachedMatches && parseResult.cachedMatches.length > 1) {
-          setSubmissionState('idle');
-          console.log('[useRecipeSubmission] Multiple matches - showing modal');
-          
-          return {
-            success: true,
-            action: 'show_match_modal',
-            matches: parseResult.cachedMatches
-          };
-        }
-        
-        // Priority 3: No matches or unclear result - proceed to full parsing
+
+        // Priority 3: No matches or unclear result - proceed to full parsing (both cases)
         setSubmissionState('idle');
         console.log('[useRecipeSubmission] No clear matches - returning for navigation to loading');
-        
+
         return {
           success: true,
           action: 'navigate_to_loading',
@@ -280,7 +319,7 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
     } finally {
       setIsSubmitting(false);
     }
-  }, [session, validateInput, checkCache]);
+  }, [session, validateInput, checkCache, submissionState]);
 
   const clearState = useCallback(() => {
     setSubmissionState('idle');

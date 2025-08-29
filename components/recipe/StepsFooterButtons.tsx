@@ -76,7 +76,7 @@ const StepsFooterButtons: React.FC<StepsFooterButtonsProps> = ({
             style={styles.endSessionsButton}
             onPress={onEndCookingSessions}
           >
-            <Text style={styles.endSessionsButtonText}>End Cooking Sessions</Text>
+            <Text style={styles.endSessionsButtonText}>End Cooking Session</Text>
           </TouchableOpacity>
         </View>
       )}

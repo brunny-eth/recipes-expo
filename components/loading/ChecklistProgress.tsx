@@ -81,7 +81,7 @@ const TEXT_STEPS = [
     subtext: 'Scanning trusted recipes and techniques',
   },
   {
-    label: 'Building a solid ingredient list',
+    label: 'Building an ingredient list',
     subtext: 'Only the best ingredients for a Meez-er',
   },
   {

@@ -232,7 +232,7 @@ export default function CookScreen() {
     } catch (error) {
       console.error('[DEBUG] ❌ Error fetching canonical recipe:', error);
     }
-  }, [session?.user.id, session?.access_token, session?.user?.id]);
+  }, [session?.user.id, session?.access_token]);
 
   // Drive fetch by selectedMiseId only
   useFocusEffect(
@@ -301,7 +301,7 @@ export default function CookScreen() {
         }
       }, 100); // Update every 100ms instead of every 16ms
     }
-  }, [cookingContext.state.activeRecipeId, cookingContext]);
+  }, [cookingContext.state.activeRecipeId]);
 
   // Keep screen awake while cooking
   useKeepAwake();
@@ -342,7 +342,7 @@ export default function CookScreen() {
     setInitializedFromCanonical(false);
   }, [canonicalRecipeData?.id]);
 
-  // Timer and scroll cleanup - only on component unmount
+    // Timer and scroll cleanup - only on component unmount
   useEffect(() => {
     return () => {
       // Clean up all timers
@@ -350,7 +350,7 @@ export default function CookScreen() {
         clearInterval(interval);
       });
       timerIntervalsRef.current.clear();
-      
+
       // Clean up scroll timeout
       if (scrollPositionTimeoutRef.current) {
         clearTimeout(scrollPositionTimeoutRef.current);
@@ -887,9 +887,11 @@ export default function CookScreen() {
 
   const closeEditModal = () => {
     setEditModalVisible(false);
-    // Clear state immediately - the visual jank might be from modal sizing
-    setEditingStepId(null);
-    setEditingStepText('');
+    // Delay clearing state to prevent visual jank during modal close animation
+    setTimeout(() => {
+      setEditingStepId(null);
+      setEditingStepText('');
+    }, 300); // Match modal animation duration
   };
 
   const saveStepText = () => {
@@ -2028,9 +2030,10 @@ const styles = StyleSheet.create({
   editModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'center',
-    padding: SPACING.pageHorizontal,
+    paddingTop: SPACING.xxxl * 3, // Position modal higher up by default
+    paddingHorizontal: SPACING.pageHorizontal,
   },
   editModalContent: {
     backgroundColor: COLORS.white,

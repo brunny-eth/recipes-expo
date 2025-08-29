@@ -152,6 +152,11 @@ export default function AddNewFolderModal({
             onSubmitEditing={handleCreate}
             editable={!isLoading}
             maxLength={50}
+            // Ensure consistent rendering behavior
+            autoCorrect={false}
+            autoCapitalize="words"
+            // Prevent layout shifts by maintaining consistent font metrics
+            textAlign="left"
           />
 
           <View style={styles.buttonContainer}>
@@ -163,9 +168,9 @@ export default function AddNewFolderModal({
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
+                        <TouchableOpacity
               style={[
-                styles.button, 
+                styles.button,
                 styles.createButton,
                 (!folderName.trim() || isLoading) && styles.createButtonDisabled
               ]}
@@ -230,15 +235,25 @@ const styles = StyleSheet.create({
     fontSize: FONT.size.caption,
   } as TextStyle,
   textInput: {
-    ...bodyText,
+    fontFamily: FONT.family.body, // Explicit font family
+    fontSize: FONT.size.body, // Explicit font size
+    fontWeight: '400', // Explicit font weight to match placeholder
+    lineHeight: FONT.size.body + 6, // Explicit line height for consistent baseline
+    color: COLORS.textDark, // Explicit text color
     borderWidth: 1,
     borderColor: COLORS.lightGray,
     borderRadius: RADIUS.sm,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     marginBottom: SPACING.lg,
-    fontSize: FONT.size.body,
     backgroundColor: COLORS.background,
+    // Fix layout stability: ensure consistent sizing
+    minHeight: 44, // Match button minHeight for visual consistency
+    textAlignVertical: 'center', // Center text vertically
+    // Prevent intrinsic sizing from affecting container
+    alignSelf: 'stretch',
+    // Ensure consistent font metrics between placeholder and typed text
+    includeFontPadding: false, // Remove extra padding that can cause alignment issues
   } as TextStyle,
   textInputError: {
     borderColor: COLORS.error,
@@ -256,6 +271,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 44,
+    // Fix layout stability: ensure buttons don't resize
+    minWidth: 80, // Ensure consistent width for "Create" text
   } as ViewStyle,
   cancelButton: {
     backgroundColor: 'transparent',
@@ -276,6 +293,8 @@ const styles = StyleSheet.create({
   createButtonText: {
     ...bodyStrongText,
     color: COLORS.white,
+    fontSize: 14, // Fixed font size to prevent layout shifts
+    fontWeight: '600', // Fixed weight to prevent metric changes
   } as TextStyle,
   createButtonTextDisabled: {
     color: COLORS.textMuted,

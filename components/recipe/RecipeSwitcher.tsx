@@ -11,7 +11,7 @@ interface RecipeSwitcherProps {
   onRecipeSwitch: (recipeId: string) => void;
 }
 
-// Helper function to truncate title to 15 characters + ellipses
+// Helper function to truncate title to 15 characters + ellipses (original cook screen length)
 const truncateTitle = (title: string, maxLength: number = 15): string => {
   if (title.length <= maxLength) return title;
   return title.substring(0, maxLength) + '...';
@@ -205,6 +205,7 @@ const styles = StyleSheet.create({
     fontSize: FONT.size.body,
     letterSpacing: 0.5,
     textTransform: 'uppercase' as const,
+    textAlign: 'center',
   },
   singleRecipeUnderline: {
     position: 'absolute',

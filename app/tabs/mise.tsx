@@ -96,7 +96,11 @@ type GroceryCategory = {
 // Convert flat grocery items array to categorized format
 const convertToGroceryCategories = (items: any[]): GroceryCategory[] => {
   const categories: { [key: string]: GroceryItem[] } = {};
-  
+
+    const eggItems = items.filter(item =>
+    (item.item_name || item.name || '').toLowerCase().includes('egg')
+  );
+
   items.forEach((item, index) => {
     const categoryName = item.grocery_category || 'Other';
     
@@ -143,6 +147,8 @@ const convertToGroceryCategories = (items: any[]): GroceryCategory[] => {
       checked: item.is_checked || false,
       preparation: item.preparation || null, // Include preparation method
     };
+
+
     
     categories[categoryName].push(groceryItem);
   });
@@ -485,6 +491,13 @@ export default function MiseScreen() {
         recipesResponse.json(),
         groceryResponse.json(),
       ]);
+
+      // Debug logging for backend data
+      if (groceryData?.items) {
+              const eggItems = groceryData.items.filter(item =>
+        (item.item_name || item.name || '').toLowerCase().includes('egg')
+      );
+      }
 
       const fetchedRecipes = recipesData?.recipes || [];
 
@@ -1161,7 +1174,7 @@ export default function MiseScreen() {
             </View>
 
             <View style={styles.groceryItemTextContainer}>
-              <Text 
+              <Text
                 style={[
                   styles.groceryItemText,
                   groceryItem.checked && styles.groceryItemChecked
