@@ -340,13 +340,12 @@ export default function HomeScreen() {
       if (localRecipeInput.length === 0) {
         showError(
           'Add a recipe to get started',
-          'Add a recipe to get started.\n\nLooking for ideas? Head to the Explore tab.',
+          'Add a recipe to get started.',
           undefined,
           () => {
             hideError();
-            router.push('/tabs/library');
           },
-          'Go to Explore'
+          'OK'
         );
         // Clear the active input for better UX
         if (importMode === 'url') setRecipeUrl('');
@@ -364,9 +363,8 @@ export default function HomeScreen() {
             undefined,
             () => {
               hideError();
-              router.push('/tabs/library');
             },
-            'Go to Explore'
+            'OK'
           );
           setRecipeName('');
           return;
@@ -383,9 +381,8 @@ export default function HomeScreen() {
             undefined,
             () => {
               hideError();
-              router.push('/tabs/library');
             },
-            'Go to Explore'
+            'OK'
           );
           setRecipeName('');
           return;
@@ -394,18 +391,35 @@ export default function HomeScreen() {
 
       // Early validation of the text/URL before mode-specific checks
       if (!isValidRecipeInput(localRecipeInput)) {
+        let errorMessage = 'Please enter valid input for the selected mode.';
+        let errorTitle = 'Input Not Recognized';
+
+        // Mode-specific error messages
+        switch (importMode) {
+          case 'url':
+            errorMessage = 'Please enter a valid website link (e.g., https://example.com/recipe)';
+            break;
+          case 'name':
+            errorMessage = 'Please enter a real dish name (like "chicken soup" or "tomato pasta")';
+            break;
+          case 'text':
+            errorMessage = 'Please enter recipe text or ingredients';
+            break;
+          default:
+            errorMessage = 'Please enter a valid recipe URL, dish name, or recipe text';
+        }
+
         showError(
-          'Input Not Recognized',
-          'Please enter a real dish name (like "chicken soup" or "tomato pasta") or a recipe link',
+          errorTitle,
+          errorMessage,
           undefined,
           () => {
             hideError();
-            router.push('/tabs/library');
           },
-          'Go to Explore'
+          'OK'
         );
         if (importMode === 'url') setRecipeUrl('');
-        if (importMode === 'name') setRecipeName('');
+        if (importMode === 'name' || importMode === 'text') setRecipeName('');
         return;
       }
 
@@ -467,11 +481,33 @@ export default function HomeScreen() {
         // For dish names, we want to do fuzzy search first
         console.log('[HomeScreen] Dish name mode - doing fuzzy search first');
         currentStage = 'recipe_submission';
-        // For now, we'll still use the same submitRecipe but with a flag to indicate dish name mode
         result = await submitRecipe(localRecipeInput, { isDishNameSearch: true });
+      } else if (importMode === 'text') {
+        // For raw text, navigate to loading screen like URLs do
+        console.log('[HomeScreen] Raw text mode - navigating to loading screen');
+        currentStage = 'navigation_routing';
+        try {
+          await track('navigation_to_loading_screen', {
+            normalizedUrl: localRecipeInput,
+            inputType: 'raw_text',
+            submissionId: localSubmissionId,
+            userId: session?.user?.id
+          });
+        } catch {}
+        InteractionManager.runAfterInteractions(() => {
+          router.push({
+            pathname: '/loading',
+            params: {
+              recipeUrl: localRecipeInput,
+              inputType: 'raw_text',
+              forceNewParse: 'true'
+            }
+          });
+        });
+        return;
       } else {
-        // For raw text, go directly to parsing
-        console.log('[HomeScreen] Raw text mode - going directly to parsing');
+        // For other modes, use the normal flow
+        console.log('[HomeScreen] Other mode - using normal submit flow');
         currentStage = 'recipe_submission';
         result = await submitRecipe(localRecipeInput, { isDishNameSearch: false });
       }
@@ -508,10 +544,12 @@ export default function HomeScreen() {
         });
         if (result.action === 'show_validation_error') {
           // Show mode-specific error messages
-          if (importMode === 'name') {
-            showError('Invalid dish name', 'Please input a valid dish name.');
-          } else if (importMode === 'text') {
-            showError('Invalid recipe text', 'Please provide valid recipe text or ingredients.');
+          if (importMode === 'url') {
+            showError('Invalid website link', 'Please enter a valid website link (e.g., https://example.com/recipe).');
+          } else if (importMode === 'image') {
+            showError('Image processing error', 'There was an error processing your image. Please try again.');
+          } else if (importMode === 'explore') {
+            showError('Explore error', 'There was an error loading recipes. Please try again.');
           } else if (result.error) {
             handleError('Validation Error', result.error, { stage: 'validation' });
           }
@@ -711,7 +749,10 @@ export default function HomeScreen() {
   // Track if user has typed
   const handleChangeText = (text: string) => {
     console.log('[UI] 📝 TextInput onChangeText called with:', { text, type: typeof text, length: text?.length });
-    setRecipeUrl(text);
+    // Only update URL field if we're in URL mode
+    if (importMode === 'url') {
+      setRecipeUrl(text);
+    }
     if (text.length > 0 && !hasUserTyped) {
       setHasUserTyped(true);
     }
@@ -811,86 +852,91 @@ export default function HomeScreen() {
                     </TouchableOpacity>
                   </View>
 
-                  {importMode === 'url' ? (
-                    <View style={styles.inputContainer}>
-                      <TextInput
-                        style={[styles.input, styles.inputLeft]}
-                        placeholder={urlDisplayedPlaceholder}
-                        placeholderTextColor={COLORS.darkGray}
-                        value={recipeUrl}
-                        onChangeText={handleChangeText}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        onSubmitEditing={handleSubmit}
-                        editable={!isSubmitting}
-                        onFocus={handleInputFocus}
-                        onBlur={handleInputBlur}
-                        returnKeyType="go"
-                        blurOnSubmit={false}
-                        enablesReturnKeyAutomatically={true}
-                        keyboardType="default"
-                        textContentType="none"
-                        underlineColorAndroid="transparent"
-                      />
-                      <TouchableOpacity
-                        style={[styles.submitButton, styles.submitButtonConnected, isSubmitting && styles.submitButtonDisabled]}
-                        onPress={handleSubmit}
-                        disabled={isSubmitting}
-                        onPressIn={() => console.log('[UI] 🎯 Submit button pressed in - isSubmitting:', isSubmitting)}
-                      >
-                        {getSubmitButtonContent()}
-                      </TouchableOpacity>
-                    </View>
-                  ) : importMode === 'image' ? (
-                    <View style={styles.fullWidthRow}>
-                      <TouchableOpacity
-                        style={styles.fullWidthPrimaryButton}
-                        onPress={handleShowUploadModal}
-                      >
-                        <Text style={styles.fullWidthPrimaryButtonText}>Choose image</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <View style={styles.inputContainer}>
-                      <TextInput
-                        style={[styles.input, styles.inputLeft]}
-                        placeholder="Paste or type recipe text here"
-                        placeholderTextColor={COLORS.darkGray}
-                        value={recipeName}
-                        onChangeText={setRecipeName}
-                        autoCapitalize="sentences"
-                        autoCorrect={true}
-                        editable={true}
-                        returnKeyType="search"
-                        blurOnSubmit={true}
-                        enablesReturnKeyAutomatically={true}
-                        keyboardType="default"
-                        onSubmitEditing={handleSubmitText}
-                        underlineColorAndroid="transparent"
-                      />
-                      <TouchableOpacity
-                        style={[
-                          styles.submitButton,
-                          styles.submitButtonConnected,
-                          isSubmitting && styles.submitButtonDisabled,
-                        ]}
-                        onPress={handleSubmitText}
-                        disabled={isSubmitting}
-                      >
-                        {getSubmitButtonContent()}
-                      </TouchableOpacity>
-                    </View>
-                  )}
+                  {/* Only show input area and subtext if top card option is selected */}
+                  {(importMode === 'url' || importMode === 'image' || importMode === 'text') && (
+                    <>
+                      {importMode === 'url' ? (
+                        <View style={styles.inputContainer}>
+                          <TextInput
+                            style={[styles.input, styles.inputLeft]}
+                            placeholder={urlDisplayedPlaceholder}
+                            placeholderTextColor={COLORS.darkGray}
+                            value={recipeUrl}
+                            onChangeText={handleChangeText}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            onSubmitEditing={handleSubmit}
+                            editable={!isSubmitting}
+                            onFocus={handleInputFocus}
+                            onBlur={handleInputBlur}
+                            returnKeyType="go"
+                            blurOnSubmit={false}
+                            enablesReturnKeyAutomatically={true}
+                            keyboardType="default"
+                            textContentType="none"
+                            underlineColorAndroid="transparent"
+                          />
+                          <TouchableOpacity
+                            style={[styles.submitButton, styles.submitButtonConnected, isSubmitting && styles.submitButtonDisabled]}
+                            onPress={handleSubmit}
+                            disabled={isSubmitting}
+                            onPressIn={() => console.log('[UI] 🎯 Submit button pressed in - isSubmitting:', isSubmitting)}
+                          >
+                            {getSubmitButtonContent()}
+                          </TouchableOpacity>
+                        </View>
+                      ) : importMode === 'image' ? (
+                        <View style={styles.fullWidthRow}>
+                          <TouchableOpacity
+                            style={styles.fullWidthPrimaryButton}
+                            onPress={handleShowUploadModal}
+                          >
+                            <Text style={styles.fullWidthPrimaryButtonText}>Choose image</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <View style={styles.inputContainer}>
+                          <TextInput
+                            style={[styles.input, styles.inputLeft]}
+                            placeholder="Paste or type recipe text here"
+                            placeholderTextColor={COLORS.darkGray}
+                            value={recipeName}
+                            onChangeText={setRecipeName}
+                            autoCapitalize="sentences"
+                            autoCorrect={true}
+                            editable={true}
+                            returnKeyType="search"
+                            blurOnSubmit={true}
+                            enablesReturnKeyAutomatically={true}
+                            keyboardType="default"
+                            onSubmitEditing={handleSubmitText}
+                            underlineColorAndroid="transparent"
+                          />
+                          <TouchableOpacity
+                            style={[
+                              styles.submitButton,
+                              styles.submitButtonConnected,
+                              isSubmitting && styles.submitButtonDisabled,
+                            ]}
+                            onPress={handleSubmitText}
+                            disabled={isSubmitting}
+                          >
+                            {getSubmitButtonContent()}
+                          </TouchableOpacity>
+                        </View>
+                      )}
 
-                  {/* Dynamic helper text based on selected mode */}
-                  <Text style={styles.helperText}>
-                    {importMode === 'url'
-                      ? 'Paste a link from a food blog or social media'
-                      : importMode === 'image'
-                      ? 'Upload recipe PDFs or screenshots'
-                      : 'Paste the entire recipe text directly'
-                    }
-                  </Text>
+                      {/* Dynamic helper text based on selected mode */}
+                      <Text style={styles.helperText}>
+                        {importMode === 'url'
+                          ? 'Paste a link from a food blog or social media'
+                          : importMode === 'image'
+                          ? 'Upload recipe PDFs or screenshots'
+                          : 'Paste the entire recipe text directly'
+                        }
+                      </Text>
+                    </>
+                  )}
                 </View>
               </View>
 
@@ -924,7 +970,7 @@ export default function HomeScreen() {
                     </TouchableOpacity>
                   </View>
 
-                  {/* Only show content if user has explicitly selected a second card option */}
+                  {/* Only show content if user has explicitly selected a bottom card option */}
                   {(importMode === 'name' || importMode === 'explore') && (
                     <>
                       {importMode === 'name' ? (
@@ -1053,6 +1099,7 @@ const styles = StyleSheet.create({
   importSection: {
     gap: 0,
     marginTop: SPACING.lg,
+    minHeight: 230, // Increased to prevent shifting when input content is hidden
   },
   secondCardSection: {
     gap: 0,

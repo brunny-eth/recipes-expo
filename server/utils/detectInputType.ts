@@ -131,7 +131,7 @@ export function validateRawTextInput(input: string): { isValid: boolean; error?:
   if (heuristics.confidence < 0.3) {
     return {
       isValid: false,
-      error: 'This doesn\'t look like recipe text. Try entering a dish name instead, or paste the full recipe content.',
+      error: 'This doesn\'t look like recipe text. Try pasting the full recipe content or entering a dish name in the Dish Name field.',
       heuristics
     };
   }
