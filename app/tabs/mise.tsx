@@ -1452,7 +1452,7 @@ export default function MiseScreen() {
             styles.tabButtonText,
             selectedTab === 'recipes' && styles.tabButtonTextActive
           ]}>
-            Recipes
+            Menu
           </Text>
           {/* underline removed */}
         </TouchableOpacity>
@@ -1471,7 +1471,7 @@ export default function MiseScreen() {
             styles.tabButtonText,
             selectedTab === 'grocery' && styles.tabButtonTextActive
           ]}>
-            Shopping List
+            Groceries
           </Text>
           {/* underline removed */}
         </TouchableOpacity>
