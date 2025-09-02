@@ -174,6 +174,37 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
     }
   };
 
+  // Special layout for mise entry point - single centered button
+  if (entryPoint === 'mise') {
+    return (
+      <>
+        <View style={styles.footer}>
+          <View style={styles.centeredButtonContainer}>
+            <TouchableOpacity
+              style={[
+                styles.miseButtonStyle,
+                buttonDisabled && styles.mainButtonDisabled,
+              ]}
+              onPress={getMainButtonHandler()}
+              disabled={buttonDisabled}
+            >
+              {(isRewriting || isScalingInstructions || isSavingModifications) && (
+                <ActivityIndicator
+                  size="small"
+                  color={COLORS.white}
+                  style={{ marginRight: SPACING.xs }}
+                />
+              )}
+              <Text style={styles.mainButtonText}>
+                {getMainButtonText()}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </>
+    );
+  }
+
   return (
     <>
       <View style={styles.footer}>
@@ -293,6 +324,9 @@ const styles = StyleSheet.create({
     borderTopWidth: BORDER_WIDTH.hairline,
     borderTopColor: COLORS.divider,
   } as ViewStyle,
+  centeredButtonContainer: {
+    alignItems: 'center',
+  } as ViewStyle,
   buttonRow: {
     flexDirection: 'row',
     gap: SPACING.sm,
@@ -308,6 +342,16 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     paddingVertical: SPACING.md,
     flexDirection: 'row',
+  } as ViewStyle,
+  miseButtonStyle: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.xl,
+    borderRadius: RADIUS.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    minWidth: 200, // Make it wider than the standard button
   } as ViewStyle,
   mainButtonDisabled: {
     backgroundColor: COLORS.darkGray,

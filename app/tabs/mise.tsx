@@ -14,6 +14,8 @@ import {
   Share,
   Modal,
   RefreshControl,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
@@ -338,6 +340,9 @@ export default function MiseScreen() {
 
   // Flag to prevent reloading manual items after clearing them
   const [manualItemsCleared, setManualItemsCleared] = useState(false);
+
+  // FlatList ref for keyboard handling and scrolling
+  const groceryListRef = useRef<FlatList>(null);
 
   // Load manual items from storage on component mount
   const loadManualItemsFromStorage = useCallback(async () => {
@@ -906,15 +911,15 @@ export default function MiseScreen() {
           const preparationPart = item.preparation || '';
           
           // Combine with proper comma handling
-          let displayText = item.name;
+          let displayText = item.name.toLowerCase();
           if (amountPart && preparationPart) {
-            displayText = `${item.name} - ${amountPart}, ${preparationPart}`;
+            displayText = `${item.name.toLowerCase()} - ${amountPart}, ${preparationPart}`;
           } else if (amountPart) {
-            displayText = `${item.name} - ${amountPart}`;
+            displayText = `${item.name.toLowerCase()} - ${amountPart}`;
           } else if (preparationPart) {
-            displayText = `${item.name} - ${preparationPart}`;
+            displayText = `${item.name.toLowerCase()} - ${preparationPart}`;
           } else if (asNeededText) {
-            displayText = `${item.name} - ${asNeededText}`;
+            displayText = `${item.name.toLowerCase()} - ${asNeededText}`;
           }
           
           plainText += `${checkbox} ${displayText}\n`;
@@ -1047,7 +1052,23 @@ export default function MiseScreen() {
   const handleStartInlineAdd = useCallback((categoryName: string) => {
     setInlineAddCategory(categoryName);
     setInlineAddText('');
-  }, []);
+
+    // Scroll to the category being edited to ensure input is visible when keyboard opens
+    if (groceryListRef.current) {
+      // Find the index of the category being edited
+      const categoryIndex = groceryList.findIndex(category => category.name === categoryName);
+      if (categoryIndex !== -1) {
+        // Add a small delay to allow state to update before scrolling
+        setTimeout(() => {
+          groceryListRef.current?.scrollToIndex({
+            index: categoryIndex,
+            animated: true,
+            viewPosition: 0.3, // Position category at 30% from top to ensure input field is visible
+          });
+        }, 100);
+      }
+    }
+  }, [groceryList]);
 
   const handleCancelInlineAdd = useCallback(() => {
     setInlineAddCategory(null);
@@ -1107,12 +1128,27 @@ export default function MiseScreen() {
   const renderRecipeItem = useCallback(({ item }: { item: MiseRecipe }) => {
     const displayTitle = item.title_override || item.prepared_recipe_data.title;
 
+    const handleRecipePress = () => {
+      router.push({
+        pathname: '/recipe/summary',
+        params: {
+          recipeId: item.prepared_recipe_data.id?.toString(),
+          entryPoint: 'mise',
+          miseRecipeId: item.id,
+          appliedChanges: item.applied_changes ? JSON.stringify(item.applied_changes) : undefined,
+          titleOverride: item.title_override,
+          originalRecipeData: item.original_recipe_data ? JSON.stringify(item.original_recipe_data) : undefined,
+        },
+      });
+    };
+
     return (
-      <View style={[styles.card, styles.cardWithMinHeight]}>
-        <View
-          style={styles.cardContent}
-          // DISABLED: Recipe cards temporarily not clickable to prevent summary navigation from mise
-        >
+      <TouchableOpacity
+        style={[styles.card, styles.cardWithMinHeight]}
+        onPress={handleRecipePress}
+        activeOpacity={0.7}
+      >
+        <View style={styles.cardContent}>
           <View style={styles.cardTextContainer}>
             <Text style={styles.cardTitle} numberOfLines={2}>
               {displayTitle}
@@ -1125,155 +1161,177 @@ export default function MiseScreen() {
             })()}
           </View>
         </View>
-        
+
         {/* Trash icon */}
         <TouchableOpacity
           style={styles.trashIcon}
-          onPress={() => handleDeleteRecipe(item.id)}
+          onPress={(e) => {
+            e.stopPropagation();
+            handleDeleteRecipe(item.id);
+          }}
           activeOpacity={0.7}
         >
           <MaterialCommunityIcons name="trash-can" size={16} color={COLORS.textMuted} />
         </TouchableOpacity>
-      </View>
+      </TouchableOpacity>
     );
   }, [handleDeleteRecipe, router]);
 
   // Render grocery category
-  const renderGroceryCategory = useCallback(({ item }: { item: GroceryCategory }) => (
-    <View style={styles.groceryCategory}>
-      <View style={styles.groceryCategoryHeader}>
-        <Text style={styles.groceryCategoryTitle}>{item.name}</Text>
-        {/* Hide add button in alphabetical mode since "All Items" isn't a real category */}
-        {sortMode === 'category' && (
-          <TouchableOpacity 
-            onPress={() => handleStartInlineAdd(item.name)}
-            style={styles.addButton}
+  const renderGroceryCategory = useCallback(({ item }: { item: GroceryCategory }) => {
+    // Separate checked and unchecked items, then sort alphabetically within each group
+    const uncheckedItems = item.items
+      .filter(item => !item.checked)
+      .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+    const checkedItems = item.items
+      .filter(item => item.checked)
+      .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+
+    // Helper function to render individual grocery item
+    const renderGroceryItem = (groceryItem: GroceryItem, index: number, isLastInGroup: boolean) => (
+      <TouchableOpacity
+        key={groceryItem.id}
+        style={[
+          styles.groceryItem,
+          isLastInGroup && styles.groceryItemLast
+        ]}
+        onPress={() => handleGroceryToggle(groceryItem.id)}
+        activeOpacity={0.8}
+      >
+        <View style={styles.groceryItemCheckbox}>
+          <MaterialCommunityIcons
+            name={groceryItem.checked ? "checkbox-marked" : "checkbox-blank-outline"}
+            size={28}
+            color={groceryItem.checked ? COLORS.primary : COLORS.textMuted}
+          />
+        </View>
+
+        <View style={styles.groceryItemTextContainer}>
+          <Text
+            style={[
+              styles.groceryItemText,
+              groceryItem.checked && styles.groceryItemChecked
+            ]}
           >
-            <MaterialCommunityIcons name="plus" size={20} color={COLORS.primary} />
+            {groceryItem.name.toLowerCase()}
+          </Text>
+          <Text
+            style={[
+              styles.groceryItemSubtext,
+              groceryItem.checked && styles.groceryItemChecked
+            ]}
+          >
+            {(() => {
+              // Manual items: show a consistent subtext
+              if (groceryItem.isManual) {
+                return '(manually added)';
+              }
+
+              const amountText = groceryItem.amount ? formatAmountForGroceryDisplay(groceryItem.amount) : '';
+              const unitText = groceryItem.unit ? ` ${groceryItem.unit}` : '';
+
+              // Add "(as needed)" for items with no amount
+              const asNeededText = (!groceryItem.amount && !amountText) ? '(as needed)' : '';
+
+              // Build subtext parts
+              const amountPart = `${amountText}${unitText}`;
+              const preparationPart = groceryItem.preparation || '';
+
+              // Combine with proper comma handling
+              let subtext = '';
+              if (amountPart && preparationPart) {
+                subtext = `${amountPart}, ${preparationPart}`;
+              } else if (amountPart) {
+                subtext = amountPart;
+              } else if (preparationPart) {
+                subtext = preparationPart;
+              } else if (asNeededText) {
+                subtext = asNeededText;
+              }
+
+              return subtext;
+            })()}
+          </Text>
+        </View>
+
+        {groceryItem.isManual && (
+          <TouchableOpacity
+            onPress={() => handleDeleteManualItem(groceryItem.id)}
+            style={styles.deleteManualButton}
+          >
+            <MaterialCommunityIcons name="close" size={16} color={COLORS.textMuted} />
           </TouchableOpacity>
         )}
-      </View>
-      {item.items.map((groceryItem, index) => {
-        const isLastItem = index === item.items.length - 1;
-        return (
-          <TouchableOpacity
-            key={groceryItem.id}
-            style={[
-              styles.groceryItem,
-              isLastItem && styles.groceryItemLast
-            ]}
-            onPress={() => handleGroceryToggle(groceryItem.id)}
-            activeOpacity={0.8}
-          >
+      </TouchableOpacity>
+    );
+
+    return (
+      <View style={styles.groceryCategory}>
+        <View style={styles.groceryCategoryHeader}>
+          <Text style={styles.groceryCategoryTitle}>{item.name}</Text>
+          {/* Hide add button in alphabetical mode since "All Items" isn't a real category */}
+          {sortMode === 'category' && (
+            <TouchableOpacity
+              onPress={() => handleStartInlineAdd(item.name)}
+              style={styles.addButton}
+            >
+              <MaterialCommunityIcons name="plus" size={20} color={COLORS.primary} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Unchecked items (need to get) */}
+        {uncheckedItems.map((groceryItem, index) => {
+          const isLastUnchecked = index === uncheckedItems.length - 1 && checkedItems.length === 0 && inlineAddCategory !== item.name;
+          return renderGroceryItem(groceryItem, index, isLastUnchecked);
+        })}
+
+        {/* Inline add row for this category - only show if there are unchecked items or no items at all */}
+        {inlineAddCategory === item.name && (
+          <View style={[
+            styles.groceryItem,
+            uncheckedItems.length === 0 && checkedItems.length === 0 && styles.groceryItemLast
+          ]}>
             <View style={styles.groceryItemCheckbox}>
               <MaterialCommunityIcons
-                name={groceryItem.checked ? "checkbox-marked" : "checkbox-blank-outline"}
+                name="checkbox-blank-outline"
                 size={28}
-                color={groceryItem.checked ? COLORS.primary : COLORS.textMuted}
+                color={COLORS.textMuted}
               />
             </View>
-
-            <View style={styles.groceryItemTextContainer}>
-              <Text
-                style={[
-                  styles.groceryItemText,
-                  groceryItem.checked && styles.groceryItemChecked
-                ]}
-              >
-                {groceryItem.name}
-              </Text>
-              <Text 
-                style={[
-                  styles.groceryItemSubtext,
-                  groceryItem.checked && styles.groceryItemChecked
-                ]}
-              >
-                {(() => {
-                  // Manual items: show a consistent subtext
-                  if (groceryItem.isManual) {
-                    return '(manually added)';
-                  }
-
-                  const amountText = groceryItem.amount ? formatAmountForGroceryDisplay(groceryItem.amount) : '';
-                  const unitText = groceryItem.unit ? ` ${groceryItem.unit}` : '';
-                  
-                  // Add "(as needed)" for items with no amount
-                  const asNeededText = (!groceryItem.amount && !amountText) ? '(as needed)' : '';
-                  
-                  // Build subtext parts
-                  const amountPart = `${amountText}${unitText}`;
-                  const preparationPart = groceryItem.preparation || '';
-                  
-                  // Combine with proper comma handling
-                  let subtext = '';
-                  if (amountPart && preparationPart) {
-                    subtext = `${amountPart}, ${preparationPart}`;
-                  } else if (amountPart) {
-                    subtext = amountPart;
-                  } else if (preparationPart) {
-                    subtext = preparationPart;
-                  } else if (asNeededText) {
-                    subtext = asNeededText;
-                  }
-                  
-                  // Debug broccoli display
-                  if (groceryItem.name.toLowerCase().includes('broccoli')) {
-                    console.log('[mise.tsx] 🥦 BROCCOLI DISPLAY:', {
-                      amountText,
-                      unitText,
-                      groceryItemName: groceryItem.name,
-                      subtext
-                    });
-                  }
-                  
-                  return subtext;
-                })()}
-              </Text>
-            </View>
-            
-            {groceryItem.isManual && (
-              <TouchableOpacity
-                onPress={() => handleDeleteManualItem(groceryItem.id)}
-                style={styles.deleteManualButton}
-              >
-                <MaterialCommunityIcons name="close" size={16} color={COLORS.textMuted} />
+            <View style={[styles.groceryItemTextContainer, { flexDirection: 'row', alignItems: 'center' }] }>
+              <TextInput
+                style={[styles.inlineTextInput, inlineAddText.length > 0 && styles.inlineTextInputTyped]}
+                value={inlineAddText}
+                onChangeText={setInlineAddText}
+                returnKeyType="done"
+                onSubmitEditing={handleConfirmInlineAdd}
+                multiline={false}
+                blurOnSubmit
+                autoFocus
+              />
+              <TouchableOpacity onPress={handleConfirmInlineAdd} style={styles.inlineIconButton}>
+                <MaterialCommunityIcons name="check" size={22} color={COLORS.primary} />
               </TouchableOpacity>
-            )}
-          </TouchableOpacity>
-        );
-      })}
-      {/* Inline add row for this category */}
-      {inlineAddCategory === item.name && (
-        <View style={[styles.groceryItem, styles.groceryItemLast]}>
-          <View style={styles.groceryItemCheckbox}>
-            <MaterialCommunityIcons
-              name="checkbox-blank-outline"
-              size={28}
-              color={COLORS.textMuted}
-            />
+              <TouchableOpacity onPress={handleCancelInlineAdd} style={styles.inlineIconButton}>
+                <MaterialCommunityIcons name="close" size={22} color={COLORS.textMuted} />
+              </TouchableOpacity>
+            </View>
           </View>
-          <View style={[styles.groceryItemTextContainer, { flexDirection: 'row', alignItems: 'center' }] }>
-            <TextInput
-              style={[styles.inlineTextInput, inlineAddText.length > 0 && styles.inlineTextInputTyped]}
-              value={inlineAddText}
-              onChangeText={setInlineAddText}
-              returnKeyType="done"
-              onSubmitEditing={handleConfirmInlineAdd}
-              multiline={false}
-              blurOnSubmit
-              autoFocus
-            />
-            <TouchableOpacity onPress={handleConfirmInlineAdd} style={styles.inlineIconButton}>
-              <MaterialCommunityIcons name="check" size={22} color={COLORS.primary} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleCancelInlineAdd} style={styles.inlineIconButton}>
-              <MaterialCommunityIcons name="close" size={22} color={COLORS.textMuted} />
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-    </View>
-  ), [handleGroceryToggle, handleStartInlineAdd, handleDeleteManualItem, inlineAddCategory, inlineAddText, handleConfirmInlineAdd, handleCancelInlineAdd, sortMode]);
+        )}
+
+        {/* Checked items at the bottom */}
+        {checkedItems.length > 0 && (
+          <>
+            {checkedItems.map((groceryItem, index) => {
+              const isLastChecked = index === checkedItems.length - 1;
+              return renderGroceryItem(groceryItem, index, isLastChecked);
+            })}
+          </>
+        )}
+      </View>
+    );
+  }, [handleGroceryToggle, handleStartInlineAdd, handleDeleteManualItem, inlineAddCategory, inlineAddText, handleConfirmInlineAdd, handleCancelInlineAdd, sortMode]);
 
   const renderContent = () => {
     if (isLoading) {
@@ -1392,13 +1450,19 @@ export default function MiseScreen() {
       }
 
       return (
-        <View style={styles.groceryContainer}>
+        <KeyboardAvoidingView
+          style={styles.groceryContainer}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 40 : 0}
+        >
           <FlatList
+            ref={groceryListRef}
             data={displayGroceryList}
             renderItem={renderGroceryCategory}
             keyExtractor={(item) => `category-${item.name}-${item.items.length}`}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
             refreshControl={
               <RefreshControl
                 refreshing={false}
@@ -1413,7 +1477,7 @@ export default function MiseScreen() {
               />
             }
           />
-        </View>
+        </KeyboardAvoidingView>
       );
     }
   };

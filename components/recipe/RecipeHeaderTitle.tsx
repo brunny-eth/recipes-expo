@@ -15,10 +15,6 @@ const RecipeHeaderTitle: React.FC<RecipeHeaderTitleProps> = ({
   const [isReady, setIsReady] = useState(false);
   const [fadeAnim] = useState(new Animated.Value(0));
 
-  // Get the base font size from screenTitleText (should be around 24px)
-  const baseFontSize = screenTitleText.fontSize || 24;
-  const minFontSize = Math.floor(baseFontSize * 0.85); // ~85% of base size
-
   // Reserve space for 2 lines to prevent reflow
   const reservedHeight = FONT.lineHeight.normal * 2;
 
@@ -36,6 +32,53 @@ const RecipeHeaderTitle: React.FC<RecipeHeaderTitleProps> = ({
     return () => clearTimeout(timer);
   }, [fadeAnim]);
 
+  // Helper function to split title into lines with character limits
+  const formatTitleForDisplay = (title: string): string => {
+    if (!title) return 'Recipe';
+
+    // If title is short enough, return as-is
+    if (title.length <= 18) {
+      return title;
+    }
+
+    // Find the best place to break the first line (prefer breaking at spaces)
+    let firstLineEnd = 18;
+    if (title[18] !== ' ' && title.indexOf(' ', 10) !== -1) {
+      // Find the last space within the first 18 characters
+      const lastSpace = title.lastIndexOf(' ', 18);
+      if (lastSpace > 10) { // Only break if we have at least 10 chars on first line
+        firstLineEnd = lastSpace;
+      }
+    }
+
+    const firstLine = title.substring(0, firstLineEnd).trim();
+    let remainingText = title.substring(firstLineEnd).trim();
+
+    // If there's remaining text, create second line
+    if (remainingText.length > 0) {
+      let secondLine = remainingText;
+
+      // If second line is longer than 20 chars, truncate with ellipsis
+      if (remainingText.length > 20) {
+        // Find the best truncation point
+        let secondLineEnd = 20;
+        if (remainingText[20] !== ' ' && remainingText.indexOf(' ', 15) !== -1) {
+          const lastSpace = remainingText.lastIndexOf(' ', 20);
+          if (lastSpace > 15) {
+            secondLineEnd = lastSpace;
+          }
+        }
+        secondLine = remainingText.substring(0, secondLineEnd).trim() + '...';
+      }
+
+      return `${firstLine}\n${secondLine}`;
+    }
+
+    return firstLine;
+  };
+
+  const formattedTitle = formatTitleForDisplay(title);
+
   return (
     <View style={{ flexShrink: 1, height: reservedHeight, justifyContent: 'center' }}>
       <Animated.View style={{ opacity: fadeAnim }}>
@@ -45,6 +88,7 @@ const RecipeHeaderTitle: React.FC<RecipeHeaderTitleProps> = ({
               ...screenTitleText,
               color: COLORS.textDark,
               textAlign: 'center',
+              fontSize: 24, // Fixed font size
               // Ensure consistent line height to prevent jumping
               lineHeight: FONT.lineHeight.normal,
             },
@@ -52,12 +96,9 @@ const RecipeHeaderTitle: React.FC<RecipeHeaderTitleProps> = ({
           ]}
           numberOfLines={2}
           ellipsizeMode="tail"
-          adjustsFontSizeToFit={true}
-          minimumFontScale={minFontSize / baseFontSize}
-          allowFontScaling={true}
-          maxFontSizeMultiplier={1.2}
+          allowFontScaling={false} // Disable font scaling
         >
-          {title || 'Recipe'}
+          {formattedTitle}
         </Text>
       </Animated.View>
     </View>

@@ -187,6 +187,7 @@ const PRESERVED_COMBINATIONS = new Set([
   'greek yogurt', 'plain yogurt',
   'golden potatoes', 'red potatoes', 'small potatoes', 'baby potatoes', 'fingerling potatoes',
   'russet potatoes', 'yukon gold potatoes', 'sweet potatoes', 'purple potatoes', 'white potatoes',
+  'mini cucumbers',
   'fresh or frozen', 'frozen or fresh', 'fresh or dried', 'dried or fresh',
   'fresh or canned', 'canned or fresh'
 ]);
@@ -227,7 +228,7 @@ const PLURAL_EXCEPTIONS = new Set([
   'eggs', 'nuts', 'almonds', 'walnuts', 'pecans', 'cashews', 'peanuts',
   'tomatoes', 'potatoes', 'avocados', 'mangoes', 'onions', 'shallots',
   'cloves', 'spices', 'herbs', 'greens', 'sprouts', 'leftovers',
-  'chives', 'olives'
+  'chives', 'olives', 'molasses'
 ]);
 
 /**

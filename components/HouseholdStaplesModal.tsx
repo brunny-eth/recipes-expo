@@ -52,6 +52,10 @@ const HOUSEHOLD_STAPLES_BY_CATEGORY = {
     'thyme',
     'cumin',
     'chili powder',
+    'cayenne',
+    'coriander',
+    'cardamom',
+    'turmeric',
   ],
   'Dairy & Eggs': [
     'milk',
@@ -72,10 +76,13 @@ const HOUSEHOLD_STAPLES_BY_CATEGORY = {
     'chicken broth',
     'soy sauce',
     'vinegar',
+    'mayo',
+    'honey',
+    'maple syrup',
   ],
 };
 
-// Flatten the categorized staples for the select all functionality
+// Flatten the categorized staples for reference
 const ALL_STAPLES = Object.values(HOUSEHOLD_STAPLES_BY_CATEGORY).flat();
 
 interface HouseholdStaplesModalProps {
@@ -96,6 +103,7 @@ export default function HouseholdStaplesModal({
   onStaplesToggle,
 }: HouseholdStaplesModalProps) {
   const [localSelected, setLocalSelected] = useState<string[]>(selectedStaples);
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
   // Sync with props when modal opens
   useEffect(() => {
@@ -112,20 +120,26 @@ export default function HouseholdStaplesModal({
   }, [visible, selectedStaples]);
 
   const handleToggleStaple = (staple: string) => {
-    setLocalSelected(prev => 
+    setLocalSelected(prev =>
       prev.includes(staple)
         ? prev.filter(s => s !== staple)
         : [...prev, staple]
     );
   };
 
-  const handleToggleAll = () => {
-    if (localSelected.length === ALL_STAPLES.length) {
-      setLocalSelected([]); // If all selected, select none
-    } else {
-      setLocalSelected(ALL_STAPLES); // Otherwise, select all
-    }
+  const handleToggleSection = (category: string) => {
+    setCollapsedSections(prev => {
+      const newCollapsed = new Set(prev);
+      if (newCollapsed.has(category)) {
+        newCollapsed.delete(category);
+      } else {
+        newCollapsed.add(category);
+      }
+      return newCollapsed;
+    });
   };
+
+
 
   const handleSave = () => {
     onStaplesChange(localSelected);
@@ -164,36 +178,43 @@ export default function HouseholdStaplesModal({
                     showsVerticalScrollIndicator={true}
                     indicatorStyle="black"
                   >
-                    {Object.entries(HOUSEHOLD_STAPLES_BY_CATEGORY).map(([category, staples]) => (
-                      <View key={category} style={styles.categorySection}>
-                        <Text style={styles.categoryHeader}>{category}</Text>
-                        {staples.map((staple) => (
+                    {Object.entries(HOUSEHOLD_STAPLES_BY_CATEGORY).map(([category, staples]) => {
+                      const isCollapsed = collapsedSections.has(category);
+                      return (
+                        <View key={category} style={styles.categorySection}>
                           <TouchableOpacity
-                            key={staple}
-                            style={styles.stapleItem}
-                            onPress={() => handleToggleStaple(staple)}
+                            style={styles.categoryHeaderContainer}
+                            onPress={() => handleToggleSection(category)}
                           >
+                            <Text style={styles.categoryHeader}>{category}</Text>
                             <MaterialCommunityIcons
-                              name={localSelected.includes(staple) ? "checkbox-marked" : "checkbox-blank-outline"}
-                              size={24}
-                              color={localSelected.includes(staple) ? COLORS.primary : COLORS.secondary}
+                              name={isCollapsed ? "chevron-down" : "chevron-up"}
+                              size={20}
+                              color={COLORS.textMuted}
                             />
-                            <Text style={styles.stapleText}>{staple}</Text>
                           </TouchableOpacity>
-                        ))}
-                      </View>
-                    ))}
+                          {!isCollapsed && staples.map((staple) => (
+                            <TouchableOpacity
+                              key={staple}
+                              style={styles.stapleItem}
+                              onPress={() => handleToggleStaple(staple)}
+                            >
+                              <MaterialCommunityIcons
+                                name={localSelected.includes(staple) ? "checkbox-marked" : "checkbox-blank-outline"}
+                                size={24}
+                                color={localSelected.includes(staple) ? COLORS.primary : COLORS.secondary}
+                              />
+                              <Text style={styles.stapleText}>{staple}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      );
+                    })}
                   </ScrollView>
                 </View>
               </View>
 
-              <View style={styles.buttonRow}>
-                <TouchableOpacity onPress={handleToggleAll} style={styles.selectButton}>
-                  <Text style={styles.selectButtonText}>
-                    {localSelected.length === ALL_STAPLES.length ? 'Clear all' : 'Select all'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+
 
               <View style={styles.actionButtons}>
                 <TouchableOpacity onPress={handleCancel} style={[styles.button, styles.cancelButton]}>
@@ -258,25 +279,7 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 14,
   } as TextStyle,
-  buttonRow: {
-    alignItems: 'center',
-    marginTop: SPACING.sm,
-    marginBottom: SPACING.md,
-  } as ViewStyle,
-  selectButton: {
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-    borderRadius: 0,
-    borderWidth: 0,
-    backgroundColor: 'transparent',
-    alignSelf: 'center',
-    marginBottom: SPACING.xl,
-  } as ViewStyle,
-  selectButtonText: {
-    color: COLORS.textDark,
-    fontSize: FONT.size.caption,
-    textAlign: 'left',
-  } as TextStyle,
+
   scrollWrapper: {
     marginBottom: SPACING.lg,
   } as ViewStyle,
@@ -316,6 +319,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: BORDER_WIDTH.hairline,
     borderBottomColor: COLORS.primaryLight,
   } as TextStyle,
+  categoryHeaderContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.sm,
+    borderRadius: RADIUS.sm,
+  } as ViewStyle,
   stapleItem: {
     flexDirection: 'row',
     alignItems: 'center',

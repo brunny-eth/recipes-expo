@@ -302,6 +302,7 @@ export default function RecipeSummaryScreen() {
   const [isSourceExpanded, setIsSourceExpanded] = useState(false);
   const [isRecipeSizeExpanded, setIsRecipeSizeExpanded] = useState(false);
   const [isDescriptionTextExpanded, setIsDescriptionTextExpanded] = useState(false);
+  const [isInstructionsExpanded, setIsInstructionsExpanded] = useState(false);
   const [isVariationsModalVisible, setIsVariationsModalVisible] = useState(false);
   const [isApplyingVariation, setIsApplyingVariation] = useState(false);
   // State to track if image failed to load
@@ -3102,20 +3103,9 @@ export default function RecipeSummaryScreen() {
               : recipe.shortDescription}
           </Text>
         )} */}
-        {/* Condensed single-line meta info */}
-        {(recipe.prepTime || recipe.cookTime || detectedAllergens.length > 0) && (
-          <View style={styles.metaInfoCondensed}>
-            <Text style={styles.metaInfoCondensedText}>
-              {[
-                recipe.prepTime && `prep: ${formatTimeCondensed(recipe.prepTime)}`,
-                recipe.cookTime && `cook: ${formatTimeCondensed(recipe.cookTime)}`,
-                detectedAllergens.length > 0 && `allergens: ${detectedAllergens.join(', ')}`
-              ].filter(Boolean).join(' | ')}
-            </Text>
-          </View>
-        )}
 
-        {/* Divider between meta info and Adjust servings */}
+
+        {/* Divider above Adjust servings */}
         <View style={{ marginTop: SPACING.lg, marginBottom: SPACING.lg }}>
           <View style={styles.divider} />
         </View>
@@ -3130,30 +3120,13 @@ export default function RecipeSummaryScreen() {
           />
         </View>
 
-        {/* Divider between Adjust servings and Swap ingredients */}
+        {/* Divider between Adjust servings and Ingredients */}
         <View style={{ marginTop: SPACING.lg, marginBottom: SPACING.lg }}>
           <View style={styles.divider} />
         </View>
 
         <View style={{ marginTop: 0 }}>
-          <Text style={styles.sectionTitle}>Swap ingredients</Text>
-          {selectedScaleFactor !== 1 && (
-            <Text style={styles.ingredientsSubtext}>
-              {(() => {
-                const direction = selectedScaleFactor < 1 ? 'down' : 'up';
-                // Always scale from original recipe yield
-                const scaledYieldString = getScaledYieldText(originalRecipe?.recipeYield || recipe?.recipeYield, selectedScaleFactor);
-                
-                console.log('[DEBUG] Yield display (simplified):', {
-                  originalYield: originalRecipe?.recipeYield || recipe?.recipeYield,
-                  scaledYieldString,
-                  selectedScaleFactor,
-                });
-                return `Now scaled ${direction} to ${scaledYieldString}.`;
-              })()}
-            </Text>
-          )}
-          <View style={{marginTop: SPACING.xs, paddingLeft: SPACING.md}}>
+          <View style={{marginTop: SPACING.xs}}>
             <IngredientList
               ingredientGroups={scaledIngredientGroups}
               selectedScaleFactor={selectedScaleFactor}
@@ -3164,19 +3137,75 @@ export default function RecipeSummaryScreen() {
               undoSubstitution={undoSubstitution}
               showCheckboxes={false}
               isViewingSavedRecipe={isViewingSavedRecipe}
+              showTitle={true}
             />
           </View>
         </View>
 
-        {/* Visit Source link inside ScrollView with proper spacing - only show for URL-based recipes or saved recipes */}
-        {recipe?.sourceUrl && (params.inputType === 'url' || !params.inputType) && (
-          <View style={[styles.visitSourceContainer, { marginBottom: 60 }]}>
-            <Text
-              style={styles.visitSourceLink}
-              onPress={() => Linking.openURL(recipe.sourceUrl!)}
+        {/* Divider between Ingredients and Peek at Instructions */}
+        <View style={{ marginTop: SPACING.lg, marginBottom: SPACING.lg }}>
+          <View style={styles.divider} />
+        </View>
+
+        {/* Peek at Instructions Section */}
+        <View style={{ marginTop: 0 }}>
+          <Text style={styles.sectionTitle}>Peek at instructions</Text>
+
+          {recipe?.instructions && recipe.instructions.length > 0 && (
+            <ScrollView
+              style={styles.instructionsScrollContainer}
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+              nestedScrollEnabled={true}
+              keyboardShouldPersistTaps="handled"
+              scrollEventThrottle={16}
             >
-              Visit Source ↗︎
-            </Text>
+              <View style={styles.instructionsContent}>
+                {recipe.instructions.map((instruction, index) => {
+                  const instructionText = typeof instruction === 'string'
+                    ? instruction
+                    : instruction.text || '';
+                  return (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.instructionItem}
+                      activeOpacity={1}
+                      onPress={() => {}} // Prevents interference with scrolling
+                    >
+                      <Text style={styles.instructionBullet}>•</Text>
+                      <Text style={styles.instructionText}>{instructionText}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          )}
+        </View>
+
+        {/* Divider below Peek at Instructions */}
+        <View style={{ marginTop: SPACING.lg, marginBottom: SPACING.lg }}>
+          <View style={styles.divider} />
+        </View>
+
+        {/* Bottom info section - allergens and visit source */}
+        {(detectedAllergens.length > 0 || (recipe?.sourceUrl && (params.inputType === 'url' || !params.inputType))) && (
+          <View style={[styles.bottomInfoContainer, { marginBottom: 60 }]}>
+            {/* Allergens info */}
+            {detectedAllergens.length > 0 && (
+              <Text style={styles.allergensInfoText}>
+                {`allergens: ${detectedAllergens.join(', ')}`}
+              </Text>
+            )}
+
+            {/* Visit Source link */}
+            {recipe?.sourceUrl && (params.inputType === 'url' || !params.inputType) && (
+              <Text
+                style={styles.allergensInfoText}
+                onPress={() => Linking.openURL(recipe.sourceUrl!)}
+              >
+                visit source ↗︎
+              </Text>
+            )}
           </View>
         )}
         </ScrollView>
@@ -3324,6 +3353,7 @@ const styles = StyleSheet.create({
     ...sectionHeaderText,
     color: COLORS.textDark,
     textAlign: 'left',
+    textDecorationLine: 'underline',
   } as TextStyle,
   sectionTitle: {
     ...sectionHeaderText,
@@ -3331,6 +3361,7 @@ const styles = StyleSheet.create({
     color: COLORS.textDark,
     textAlign: 'left',
     marginBottom: SPACING.xs,
+    textDecorationLine: 'underline',
   } as TextStyle,
   centeredStatusContainer: {
     flex: 1,
@@ -3473,31 +3504,56 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.xs, // Reduced for wider text area
     lineHeight: FONT.lineHeight.tight,
   },
-  metaInfoCondensed: {
-    fontFamily: FONT.family.body,
-    alignItems: 'center',
-    marginBottom: SPACING.sm
-  },
-  metaInfoCondensedText: {
-    ...captionText,
-    color: COLORS.textMuted,
-    fontSize: FONT.size.caption,
-    textAlign: 'left',
-  },
-  visitSourceContainer: {
+
+  bottomInfoContainer: {
     alignItems: 'center',
     marginTop: SPACING.lg,
-    marginBottom: SPACING.sm, // Smaller margin to bring closer to buttons
     zIndex: 1, // Ensure it's above other elements
     elevation: 1, // For Android
   },
-  visitSourceLink: {
-    fontFamily: FONT.family.body,
+  allergensInfoText: {
+    ...captionText,
+    color: COLORS.textMuted,
     fontSize: FONT.size.caption,
-    color: COLORS.textDark,
-    textDecorationLine: 'underline',
-    opacity: 0.5,
+    textAlign: 'center',
+    marginBottom: SPACING.xs,
   },
+  instructionsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: SPACING.sm,
+  } as ViewStyle,
+  instructionsScrollContainer: {
+    maxHeight: 250, // Allow scrolling for long instruction lists
+    marginTop: SPACING.sm,
+  } as ViewStyle,
+  instructionsContent: {
+    paddingLeft: SPACING.md,
+    paddingRight: SPACING.sm,
+    paddingBottom: SPACING.sm,
+  } as ViewStyle,
+  instructionItem: {
+    flexDirection: 'row',
+    marginBottom: SPACING.sm,
+    alignItems: 'flex-start',
+    paddingVertical: SPACING.xs,
+  } as ViewStyle,
+  instructionBullet: {
+    fontSize: FONT.size.body,
+    color: COLORS.primary,
+    marginRight: SPACING.sm,
+    fontWeight: 'bold',
+    marginTop: 2,
+    paddingHorizontal: SPACING.xs,
+  } as TextStyle,
+  instructionText: {
+    flex: 1,
+    fontSize: FONT.size.body,
+    color: COLORS.textDark,
+    lineHeight: FONT.size.body * 1.4,
+    paddingVertical: SPACING.xs,
+  } as TextStyle,
   titleModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',

@@ -6,6 +6,7 @@ import CollapsibleSection from '@/components/CollapsibleSection';
 import {
   captionText,
   bodyStrongText,
+  sectionHeaderText,
   FONT,
 } from '@/constants/typography';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
@@ -28,6 +29,7 @@ type IngredientListProps = {
   undoSubstitution: (originalName: string) => void;
   showCheckboxes?: boolean; // New prop to control checkbox visibility
   isViewingSavedRecipe?: boolean; // Keep for backward compatibility
+  showTitle?: boolean; // New prop to control title display
 };
 
 const IngredientList: React.FC<IngredientListProps> = ({
@@ -42,6 +44,7 @@ const IngredientList: React.FC<IngredientListProps> = ({
   undoSubstitution,
   showCheckboxes = true,
   isViewingSavedRecipe = false,
+  showTitle = false,
 }) => {
   // State to track which groups are expanded (default: all collapsed = false)
   const [expandedGroups, setExpandedGroups] = useState<{ [key: number]: boolean }>({});
@@ -99,26 +102,41 @@ const IngredientList: React.FC<IngredientListProps> = ({
 
     // If there are multiple groups, show each group with a toggle
     // Use group name or a default title
-    const groupTitle = group.name === 'Main' ? 'Main Ingredients' : 
+    const groupTitle = group.name === 'Main' ? 'Main Ingredients' :
                       (group.name || `Group ${groupIndex + 1}`);
     const isExpanded = !!expandedGroups[groupIndex];
 
     return (
-      <View key={`group-${groupIndex}`} style={styles.groupContainer}>
-        <CollapsibleSection
-          title={groupTitle}
-          isExpanded={isExpanded}
-          onToggle={() => toggleGroupExpanded(groupIndex)}
-          titleStyle={styles.groupToggleTitle}
-        >
-          {renderIngredients()}
-        </CollapsibleSection>
+      <View key={`group-${groupIndex}`} style={[
+        styles.groupContainer,
+        showTitle && groupIndex > 0 && styles.groupContainerWithTopMargin
+      ]}>
+        {showTitle ? (
+          <>
+            <Text style={styles.groupTitle}>{groupTitle}</Text>
+            <View style={{ marginTop: 8 }}>
+              {renderIngredients()}
+            </View>
+          </>
+        ) : (
+          <CollapsibleSection
+            title={groupTitle}
+            isExpanded={isExpanded}
+            onToggle={() => toggleGroupExpanded(groupIndex)}
+            titleStyle={styles.groupToggleTitle}
+          >
+            {renderIngredients()}
+          </CollapsibleSection>
+        )}
       </View>
     );
   };
 
   return (
     <View style={styles.container}>
+      {showTitle && ingredientGroups.length === 1 && (
+        <Text style={styles.mainTitle}>Ingredients</Text>
+      )}
       {ingredientGroups.length === 0 ? (
         <Text style={styles.placeholderText}>No ingredients found.</Text>
       ) : (
@@ -140,8 +158,27 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  mainTitle: {
+    ...sectionHeaderText,
+    fontFamily: FONT.family.bold,
+    color: COLORS.textDark,
+    textAlign: 'left',
+    marginBottom: SPACING.xs,
+    textDecorationLine: 'underline',
+  } as TextStyle,
+  groupTitle: {
+    ...sectionHeaderText,
+    fontFamily: FONT.family.bold,
+    color: COLORS.textDark,
+    textAlign: 'left',
+    marginBottom: SPACING.xs,
+    textDecorationLine: 'underline',
+  } as TextStyle,
   groupContainer: {
-    marginBottom: SPACING.base,
+    marginBottom: SPACING.lg,
+  },
+  groupContainerWithTopMargin: {
+    marginTop: SPACING.md,
   },
   groupHeader: {
     ...bodyStrongText,

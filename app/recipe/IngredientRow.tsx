@@ -125,7 +125,7 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
   const showRevertButton = hasUnsavedChange && !isLocked;
 
   // Debug logging to help track the locking behavior and substitutions
-  const shouldShowSubstitutionButton =
+  const shouldShowSubstitutionOnTap =
     !substitutedFor &&
     !isRemoved &&
     !isLocked &&
@@ -133,7 +133,7 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
     ingredient.suggested_substitutions.length > 0 &&
     ingredient.suggested_substitutions.some((sub) => sub && sub.name != null);
 
-  if (substitutedFor || hasPersistedChange || hasUnsavedChange || showRevertButton || isUIGeneratedSubstitution || hasNaturalLanguageSubstitutions || shouldShowSubstitutionButton || (ingredient.suggested_substitutions && ingredient.suggested_substitutions.length > 0)) {
+  if (substitutedFor || hasPersistedChange || hasUnsavedChange || showRevertButton || isUIGeneratedSubstitution || hasNaturalLanguageSubstitutions || shouldShowSubstitutionOnTap || (ingredient.suggested_substitutions && ingredient.suggested_substitutions.length > 0)) {
     console.log('[INGREDIENT_DEBUG]', {
       ingredientName: ingredient.name,
       hasSuggestedSubstitutions: !!ingredient.suggested_substitutions,
@@ -147,17 +147,29 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
       hasPersistedChange,
       hasUnsavedChange,
       isLocked,
-      shouldShowSubstitutionButton,
+      shouldShowSubstitutionOnTap,
       showRevertButton,
       timestamp: new Date().toISOString(),
     });
   }
 
+
+
+  const handleRowPress = () => {
+    if (shouldShowSubstitutionOnTap) {
+      // If substitution is available, open substitution modal
+      openSubstitutionModal(ingredient);
+    } else if (!isRemoved && showCheckboxes) {
+      // Otherwise, toggle checkbox if applicable
+      toggleCheckIngredient(index);
+    }
+  };
+
   return (
     <TouchableOpacity
       style={[styles.ingredientItemContainer]}
-      onPress={() => !isRemoved && showCheckboxes && toggleCheckIngredient(index)}
-      activeOpacity={showCheckboxes ? 0.7 : 1}
+      onPress={handleRowPress}
+      activeOpacity={shouldShowSubstitutionOnTap || (!isRemoved && showCheckboxes) ? 0.7 : 1}
     >
       {/* Checkbox Visual or Bullet */}
       {showCheckboxes ? (
@@ -216,7 +228,7 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
             <MaterialCommunityIcons
               name="arrow-u-left-top"
               size={FONT.size.lg}
-              color={COLORS.primary}
+              color={COLORS.textDark}
             />
           </TouchableOpacity>
         )}
@@ -230,32 +242,19 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
             <MaterialCommunityIcons
               name="arrow-u-left-top"
               size={FONT.size.lg}
-              color={COLORS.primary}
+              color={COLORS.textDark}
             />
           </TouchableOpacity>
         )}
 
-        {/* Substitution Button */}
-        {!substitutedFor &&
-          !isRemoved &&
-          !isLocked &&
-          ingredient.suggested_substitutions &&
-          ingredient.suggested_substitutions.length > 0 &&
-          ingredient.suggested_substitutions.some(
-            (sub) => sub && sub.name != null,
-          ) && (
-            <TouchableOpacity
-              style={styles.infoButton}
-              onPress={() => openSubstitutionModal(ingredient)}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              testID={`substitution-button-${ingredient.name}`}
-            >
-              <MaterialCommunityIcons
-                name="pencil"
-                size={FONT.size.lg}
-                color={COLORS.primary}
-              />
-            </TouchableOpacity>
+          {/* Chevron for tappable rows */}
+          {(shouldShowSubstitutionOnTap || (!isRemoved && showCheckboxes)) && (
+            <MaterialCommunityIcons
+              name="chevron-right"
+              size={FONT.size.lg}
+              color={COLORS.darkGray}
+              style={styles.chevronIcon}
+            />
           )}
         </View>
       </View>
@@ -267,9 +266,11 @@ const styles = StyleSheet.create({
   ingredientItemContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: SPACING.smLg,
+    marginBottom: SPACING.xs,
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.xs, // Reduced horizontal padding
+    borderBottomWidth: BORDER_WIDTH.hairline,
+    borderBottomColor: COLORS.surface,
   } as ViewStyle,
   checkboxPlaceholder: {
     width: ICON_SIZE.md,
@@ -300,7 +301,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-start',
-    minHeight: ICON_SIZE.xl, // Ensure consistent height for button or no button
+    minHeight: ICON_SIZE.md, // Ensure consistent height for button or no button
   } as ViewStyle,
   ingredientName: {
     ...bodyStrongText,
@@ -309,6 +310,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     flex: 1,
     marginRight: SPACING.sm, // Consistent spacing from text to button area
+    fontWeight: '600', // Make ingredient names bolder
   } as TextStyle,
   ingredientTextRemoved: {
     color: COLORS.darkGray,
@@ -330,11 +332,13 @@ const styles = StyleSheet.create({
     color: COLORS.darkGray,
     marginTop: SPACING.xxs,
     marginLeft: SPACING.xxs,
+    opacity: 0.7, // Make preparation text more subtle
   } as TextStyle,
   ingredientQuantityParenthetical: {
     ...bodyTextLoose,
-    fontSize: FONT.size.caption,
+    fontSize: FONT.size.caption - 1, // Slightly smaller than caption
     color: COLORS.darkGray,
+    opacity: 0.7, // Make quantity text more subtle
   } as TextStyle,
   revertButton: {
     paddingHorizontal: SPACING.sm,
@@ -343,12 +347,11 @@ const styles = StyleSheet.create({
     marginLeft: SPACING.sm,
   } as ViewStyle,
   infoButton: {
-    width: ICON_SIZE.xl,
-    height: ICON_SIZE.xl,
-    borderRadius: RADIUS.lg,
+    width: ICON_SIZE.md,
+    height: ICON_SIZE.md,
+    borderRadius: RADIUS.md,
     backgroundColor: 'transparent',
-    borderWidth: BORDER_WIDTH.default,
-    borderColor: COLORS.primary,
+    borderWidth: 0,
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: SPACING.sm,
@@ -360,9 +363,12 @@ const styles = StyleSheet.create({
   buttonArea: {
     flexDirection: 'row',
     alignItems: 'center',
-    minWidth: ICON_SIZE.xl, // Reserve space for button even when not present
+    minWidth: ICON_SIZE.md, // Reserve space for button even when not present
     justifyContent: 'flex-end', // Align button to the right
   } as ViewStyle,
+  chevronIcon: {
+    marginLeft: SPACING.sm,
+  } as TextStyle,
 });
 
 export default React.memo(IngredientRow);

@@ -5,6 +5,7 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   ActivityIndicator,
   RefreshControl,
   ViewStyle,
@@ -12,6 +13,7 @@ import {
   TextInput,
   Alert,
   Modal,
+  Keyboard,
 } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -746,29 +748,32 @@ export default function LibraryScreen() {
     }
 
     return (
-      <View style={styles.savedContent}>
-        {/* Search bar */}
-        <View style={styles.searchContainer}>
-          <MaterialCommunityIcons name="magnify" size={20} color={COLORS.textMuted} style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search all your saved recipes"
-            placeholderTextColor={COLORS.textMuted}
-            returnKeyType="search"
-            autoCorrect={false}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity
-              onPress={() => setSearchQuery('')}
-              style={styles.clearButton}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <MaterialCommunityIcons name="close" size={18} color={COLORS.textMuted} />
-            </TouchableOpacity>
-          )}
-        </View>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.savedContent}>
+          {/* Search bar */}
+          <TouchableWithoutFeedback>
+            <View style={styles.searchContainer}>
+              <MaterialCommunityIcons name="magnify" size={20} color={COLORS.textMuted} style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Search all your saved recipes"
+                placeholderTextColor={COLORS.textMuted}
+                returnKeyType="search"
+                autoCorrect={false}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => setSearchQuery('')}
+                  style={styles.clearButton}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <MaterialCommunityIcons name="close" size={18} color={COLORS.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
+          </TouchableWithoutFeedback>
 
         {/* Show search results if searching */}
         {searchQuery.length > 0 && (
@@ -784,6 +789,7 @@ export default function LibraryScreen() {
                 contentContainerStyle={styles.searchResultsList}
                 showsVerticalScrollIndicator={false}
                 nestedScrollEnabled={true}
+                style={styles.searchResultsFlatList}
               />
             ) : (
               <View style={styles.noSearchResults}>
@@ -832,7 +838,8 @@ export default function LibraryScreen() {
             </View>
           </>
         )}
-      </View>
+        </View>
+      </TouchableWithoutFeedback>
     );
   };
 
@@ -1244,6 +1251,7 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     marginBottom: SPACING.md,
     ...SHADOWS.small,
+    maxHeight: '90%', // Allow more height while still preventing cutoff by tab bar
   } as ViewStyle,
   searchResultsHeader: {
     ...bodyStrongText,
@@ -1254,6 +1262,9 @@ const styles = StyleSheet.create({
   searchResultsList: {
     paddingBottom: SPACING.md,
   },
+  searchResultsFlatList: {
+    maxHeight: '100%', // Allow FlatList to take full height of container and scroll
+  } as ViewStyle,
   noSearchResults: {
     alignItems: 'center',
     paddingVertical: SPACING.xl,
