@@ -631,7 +631,7 @@ export function parseRecipeDisplayName(name: string): {
     }
   } else {
     // Split on other substitution markers
-    const substitutionMarkers = [' or ', ' (or ', ' / ', ' OR ', ' / ', '/'];
+    const substitutionMarkers = [' or ', ' (or ', ' / ', ' OR '];
 
     for (const marker of substitutionMarkers) {
       if (originalName.includes(marker)) {
@@ -720,7 +720,7 @@ export function parseIngredientDisplayName(name: string): {
   }
 
   // Split on substitution markers, but be smarter about compound ingredient names
-  const substitutionMarkers = [' or ', ' (or ', ' / ', ' OR ', ' / ', '/'];
+  const substitutionMarkers = [' or ', ' (or ', ' / ', ' OR '];
   let baseName = name;
   let substitutionText = null;
 
@@ -778,6 +778,16 @@ export function parseIngredientDisplayName(name: string): {
         substitutionText = null;
         if (process.env.NODE_ENV === 'development') {
           console.log('[ingredientHelpers] 🌶️ Preserving compound paprika name:', name);
+        }
+        break;
+      }
+
+      // Special case: If the ingredient contains "half & half", treat this as a compound ingredient name
+      if (name.toLowerCase().includes('half & half') || name.toLowerCase().includes('half and half')) {
+        baseName = name; // Keep the full name as-is
+        substitutionText = null;
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[ingredientHelpers] 🥛 Preserving compound half & half name:', name);
         }
         break;
       }

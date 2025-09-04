@@ -3149,7 +3149,7 @@ export default function RecipeSummaryScreen() {
 
         {/* Peek at Instructions Section */}
         <View style={{ marginTop: 0 }}>
-          <Text style={styles.sectionTitle}>Peek at instructions</Text>
+          <Text style={styles.sectionTitle}>Preview</Text>
 
           {recipe?.instructions && recipe.instructions.length > 0 && (
             <ScrollView

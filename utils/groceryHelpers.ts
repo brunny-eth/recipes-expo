@@ -536,6 +536,11 @@ export function normalizeName(name: string): string {
     return 'eggs';
   }
 
+  // Fix for half & half - preserve compound ingredient name
+  if (name.toLowerCase().includes('half & half') || name.toLowerCase().includes('half and half')) {
+    return name; // Return half & half names unchanged to prevent corruption
+  }
+
   if (process.env.NODE_ENV === 'development') {
     console.log('[groceryHelpers] 🔄 normalizeName called with:', name);
   }

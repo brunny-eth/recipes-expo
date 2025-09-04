@@ -5,14 +5,17 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  TouchableHighlight,
   ActivityIndicator,
   Image,
   TextInput,
   Pressable,
+  ViewStyle,
 } from 'react-native';
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import FastImage from '@d11/react-native-fast-image';
 
-import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
+import { COLORS, SPACING, RADIUS, BORDER_WIDTH, SHADOWS } from '@/constants/theme';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import {
   bodyStrongText,
@@ -90,18 +93,21 @@ export default function SavedFolderDetailScreen() {
   // Search state
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('');
-  
+  const [isSearchActive, setIsSearchActive] = useState(false);
+
   // Bulk actions state
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedRecipes, setSelectedRecipes] = useState<Set<number>>(new Set());
   const [showFolderPicker, setShowFolderPicker] = useState(false);
+  
+  // Delete folder state
+  const [showDeleteFolderModal, setShowDeleteFolderModal] = useState(false);
   const [isMovingRecipes, setIsMovingRecipes] = useState(false);
   const [isRemovingRecipes, setIsRemovingRecipes] = useState(false);
   const [showBulkRemoveModal, setShowBulkRemoveModal] = useState(false);
   const [bulkActionsHeight, setBulkActionsHeight] = useState(0);
   
   // Confirmation modals state
-  const [showDeleteFolderModal, setShowDeleteFolderModal] = useState(false);
   const [showDeleteRecipeModal, setShowDeleteRecipeModal] = useState(false);
   const [recipeToDelete, setRecipeToDelete] = useState<string | null>(null);
 
@@ -252,6 +258,92 @@ export default function SavedFolderDetailScreen() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // SEARCH button logic simplified (no active state highlighting)
+
+  // Toggle search
+  const toggleSearch = useCallback(() => {
+    setIsSearchActive(prev => {
+      if (prev) {
+        // When hiding search, clear the search query
+        setSearchQuery('');
+      } else {
+        // When showing search, exit selection mode
+        setIsSelectionMode(false);
+        setSelectedRecipes(new Set());
+      }
+      return !prev;
+    });
+  }, []);
+
+  // Toggle selection mode
+  const toggleSelection = useCallback(() => {
+    setIsSelectionMode(prev => {
+      if (prev) {
+        // When exiting selection mode, clear selected recipes
+        setSelectedRecipes(new Set());
+      } else {
+        // When entering selection mode, hide search
+        setIsSearchActive(false);
+        setSearchQuery('');
+      }
+      return !prev;
+    });
+  }, [isSearchActive, isSelectionMode]);
+
+  // Handle delete folder button (kept for future use, not exposed in UI)
+  const handleDeleteFolder = useCallback(() => {
+    // Exit search and selection modes when deleting
+    setIsSearchActive(false);
+    setSearchQuery('');
+    setIsSelectionMode(false);
+    setSelectedRecipes(new Set());
+    setShowDeleteFolderModal(true);
+  }, []);
+
+
+
+  // Handle swipe gesture to go back
+  const handleSwipeGesture = useCallback((event: any) => {
+    if (event.nativeEvent.state === State.END) {
+      const { translationX, velocityX } = event.nativeEvent;
+      // If swiped right with sufficient distance or velocity, go back
+      if (translationX > 100 || velocityX > 500) {
+        router.back();
+      }
+    }
+  }, [router]);
+
+  // Handle delete folder
+  const confirmDeleteFolder = useCallback(async () => {
+    if (!folderId || !session?.user) return;
+
+    try {
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+      const response = await fetch(`${backendUrl}/api/saved/folders/${folderId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          userId: session.user.id,
+        }),
+      });
+
+      if (response.ok) {
+        // Navigate back to library after successful deletion
+        router.back();
+      } else {
+        setError('Failed to delete folder. Please try again.');
+      }
+    } catch (err) {
+      console.error('[SavedFolderDetailScreen] Error deleting folder:', err);
+      setError('Failed to delete folder. Please try again.');
+    } finally {
+      setShowDeleteFolderModal(false);
+    }
+  }, [folderId, session?.user, router]);
+
   // Build indexed list for search
   const indexedRecipes = useMemo(() => {
     return savedRecipes.map((r) => ({ recipe: r, blob: buildSearchBlob(r) }));
@@ -364,11 +456,7 @@ export default function SavedFolderDetailScreen() {
     }
   }, [recipeToDelete, session?.user]);
 
-  // Bulk move functionality
-  const handleStartSelection = useCallback(() => {
-    setIsSelectionMode(true);
-    setSelectedRecipes(new Set());
-  }, []);
+  // Bulk move functionality - now handled by toggleSelection
 
   const handleCancelSelection = useCallback(() => {
     setIsSelectionMode(false);
@@ -384,6 +472,8 @@ export default function SavedFolderDetailScreen() {
     if (selectedRecipes.size === 0) return;
     setShowBulkRemoveModal(true);
   }, [selectedRecipes.size]);
+
+
 
   const handleFolderPickerSelect = useCallback(async (targetFolderId: number) => {
     setShowFolderPicker(false);
@@ -439,72 +529,138 @@ export default function SavedFolderDetailScreen() {
     }
   }, [selectedRecipes]);
 
+  // Start cooking with selected recipes
+  const handleStartCookingSelectedRecipes = useCallback(async () => {
+    if (!session?.user || selectedRecipes.size === 0) return;
+
+    console.log('[COOKING_DEBUG] Starting to cook with selected recipes:', {
+      selectedCount: selectedRecipes.size,
+      selectedIds: Array.from(selectedRecipes)
+    });
+
+    setIsMovingRecipes(true);
+    try {
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+
+      // Get the selected recipes data
+      const selectedRecipeData = savedRecipes.filter(recipe =>
+        selectedRecipes.has(recipe.base_recipe_id)
+      );
+
+      // Add each recipe to mise
+      const addPromises = selectedRecipeData.map(async (recipe) => {
+        const recipeData = recipe.processed_recipes_cache?.recipe_data;
+        if (!recipeData) {
+          console.error(`Missing recipe data for recipe ${recipe.base_recipe_id}`);
+          return null;
+        }
+
+        console.log(`Adding recipe ${recipe.base_recipe_id} to mise:`, {
+          hasRecipeData: !!recipeData,
+          title: recipeData.title,
+          hasAppliedChanges: !!recipe.applied_changes,
+          titleOverride: recipe.title_override
+        });
+
+        const response = await fetch(`${backendUrl}/api/mise/save-recipe`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            userId: session.user.id,
+            originalRecipeId: recipe.base_recipe_id,
+            preparedRecipeData: recipeData,
+            titleOverride: recipe.title_override,
+            appliedChanges: recipe.applied_changes || {},
+          }),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Failed to add recipe ${recipe.base_recipe_id} to mise:`, {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorText
+          });
+          return null;
+        }
+
+        return response.json();
+      });
+
+      const results = await Promise.all(addPromises);
+      const successfulAdds = results.filter(result => result !== null);
+
+      console.log('[COOKING_DEBUG] Cooking setup complete:', {
+        totalAttempted: selectedRecipeData.length,
+        successfulAdds: successfulAdds.length,
+        failedAdds: results.length - successfulAdds.length
+      });
+
+      if (successfulAdds.length > 0) {
+        // Navigate to mise screen
+        console.log('[COOKING_DEBUG] Navigating to mise screen');
+        router.push('/tabs/mise');
+      } else {
+        setError('Failed to add recipes to mise. Please try again.');
+      }
+    } catch (err) {
+      console.error('[SavedFolderDetailScreen] Error adding recipes to mise:', err);
+      setError('Failed to start cooking. Please try again.');
+    } finally {
+      setIsMovingRecipes(false);
+      setShowFolderPicker(false);
+    }
+  }, [session, selectedRecipes, savedRecipes, router]);
+
   // Render recipe item
-  const renderRecipeItem = useCallback(({ item }: { item: SavedRecipe }) => {
+  const renderRecipeItem = useCallback(({ item, index }: { item: SavedRecipe; index: number }) => {
     if (!item.processed_recipes_cache?.recipe_data) {
       return null;
     }
 
     const { recipe_data, source_type } = item.processed_recipes_cache;
-    const imageUrl = recipe_data.image || recipe_data.thumbnailUrl;
     const isModified = source_type === 'user_modified';
     const displayTitle = item.title_override || recipe_data.title;
     const isSelected = selectedRecipes.has(item.base_recipe_id);
+    const servingsCount = parseServingsValue(recipe_data.recipeYield);
 
     return (
       <TouchableOpacity
         style={[
-          styles.recipeCard,
-          isSelected && styles.recipeCardSelected,
+          styles.card,
+          styles.cardWithMinHeight,
+          isSelected && styles.cardSelected,
+          index === 0 && { marginTop: SPACING.sm }, // Add top margin to first recipe
+          index === 0 && { borderTopWidth: 1, borderTopColor: '#000000' } // Add top border to first recipe
         ]}
         onPress={() => handleRecipePress(item)}
+        activeOpacity={0.7}
       >
-        {isSelectionMode && (
-          <View style={styles.selectionIndicator}>
-            <MaterialCommunityIcons
-              name={isSelected ? 'check-circle' : 'circle-outline'}
-              size={24}
-              color={isSelected ? COLORS.primary : COLORS.textMuted}
-            />
+        <View style={styles.cardContent}>
+          {isSelectionMode && (
+            <View style={styles.selectionIndicator}>
+              <MaterialCommunityIcons
+                name={isSelected ? 'check-circle' : 'circle-outline'}
+                size={24}
+                color={isSelected ? COLORS.primary : COLORS.textMuted}
+              />
+            </View>
+          )}
+          
+          <View style={styles.cardTextContainer}>
+            <Text style={styles.cardTitle} numberOfLines={1} ellipsizeMode="tail">
+              {displayTitle}
+            </Text>
+            {servingsCount && (
+              <Text style={styles.servingsText}>(For {servingsCount})</Text>
+            )}
           </View>
-        )}
-        
-        {imageUrl ? (
-          <FastImage
-            source={{ uri: imageUrl }}
-            style={styles.recipeImage}
-          />
-        ) : (
-          <View style={styles.fallbackImageContainer}>
-            <Image
-              source={require('@/assets/images/meezblue_underline.webp')}
-              style={styles.fallbackImage}
-              resizeMode="contain"
-            />
-          </View>
-        )}
-        
-        <View style={styles.recipeInfo}>
-          <Text style={styles.recipeTitle} numberOfLines={2}>
-            {displayTitle}
-          </Text>
-          {(() => {
-            const servingsCount = parseServingsValue(recipe_data.recipeYield);
-            return servingsCount ? (
-              <Text style={styles.servingsText}>(servings: {servingsCount})</Text>
-            ) : null;
-          })()}
         </View>
-        
-        {!isSelectionMode && (
-          <TouchableOpacity 
-            style={styles.deleteButton} 
-            onPress={() => handleDeleteRecipe(item.id)}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <MaterialCommunityIcons name="trash-can" size={16} color={COLORS.textMuted} />
-          </TouchableOpacity>
-        )}
+
+
       </TouchableOpacity>
     );
   }, [handleRecipePress, handleDeleteRecipe, isSelectionMode, selectedRecipes]);
@@ -546,19 +702,57 @@ export default function SavedFolderDetailScreen() {
       );
     }
 
+    // Show search results when searching
+    if (isSearchActive && searchQuery.length > 0) {
+      return (
+        <>
+          {filteredRecipes.length > 0 ? (
+            <>
+              <Text style={styles.searchResultsHeader}>
+                Search results ({filteredRecipes.length})
+              </Text>
+              <FlatList
+                data={filteredRecipes}
+                renderItem={({ item, index }) => renderRecipeItem({ item, index })}
+                keyExtractor={(item, index) => `search-recipe-${item.processed_recipes_cache?.id.toString() || item.base_recipe_id.toString()}-${index}`}
+                contentContainerStyle={[
+                  styles.listContent,
+                  { paddingBottom: 100 + (isSelectionMode ? bulkActionsHeight + insets.bottom : 0) },
+                ]}
+                showsVerticalScrollIndicator={false}
+              />
+            </>
+          ) : (
+            <>
+              <Text style={styles.searchResultsHeader}>
+                Search results ({filteredRecipes.length})
+              </Text>
+                          <View style={styles.noSearchResults}>
+              <Text style={styles.emptyText}>No matches.</Text>
+              <Text style={styles.emptySubtext}>Try a different search term.</Text>
+            </View>
+            </>
+          )}
+        </>
+      );
+    }
+
     return (
       <>
+        {/* Placeholder header to maintain consistent spacing */}
+        <View style={styles.headerPlaceholder} />
+
         <FlatList
           data={filteredRecipes}
-          renderItem={renderRecipeItem}
-          keyExtractor={(item) => item.processed_recipes_cache?.id.toString() || item.base_recipe_id.toString()}
+          renderItem={({ item, index }) => renderRecipeItem({ item, index })}
+          keyExtractor={(item, index) => `recipe-${item.processed_recipes_cache?.id.toString() || item.base_recipe_id.toString()}-${index}`}
           contentContainerStyle={[
             styles.listContent,
             { paddingBottom: 100 + (isSelectionMode ? bulkActionsHeight + insets.bottom : 0) },
           ]}
           showsVerticalScrollIndicator={false}
         />
-        {savedRecipes.length > 0 && filteredRecipes.length === 0 && (
+        {savedRecipes.length > 0 && filteredRecipes.length === 0 && !isSearchActive && (
           <View style={styles.emptyContainer}>
             <MaterialCommunityIcons name="magnify" size={48} color={COLORS.lightGray} />
             <Text style={styles.emptyText}>No matches</Text>
@@ -576,8 +770,31 @@ export default function SavedFolderDetailScreen() {
               <Text style={styles.selectedCountText}>
                 {selectedRecipes.size} recipe{selectedRecipes.size !== 1 ? 's' : ''} selected
               </Text>
+              <TouchableOpacity
+                style={styles.closeSelectionButton}
+                onPress={toggleSelection}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.closeSelectionText}>×</Text>
+              </TouchableOpacity>
             </View>
             <View style={styles.bulkActionsButtonsStack}>
+              <TouchableOpacity
+                style={[
+                  styles.primaryActionButton,
+                  (selectedRecipes.size === 0 || isMovingRecipes) && styles.primaryActionButtonDisabled,
+                ]}
+                onPress={handleStartCookingSelectedRecipes}
+                disabled={selectedRecipes.size === 0 || isMovingRecipes}
+              >
+                {isMovingRecipes && (
+                  <ActivityIndicator size="small" color={COLORS.white} style={{ marginRight: 8 }} />
+                )}
+                <Text style={styles.primaryActionButtonText}>
+                  Cook now {selectedRecipes.size > 1 ? `(${selectedRecipes.size})` : ''}
+                </Text>
+              </TouchableOpacity>
+
               <TouchableOpacity
                 style={[
                   styles.primaryActionButton,
@@ -589,7 +806,7 @@ export default function SavedFolderDetailScreen() {
                 {isMovingRecipes && (
                   <ActivityIndicator size="small" color={COLORS.white} style={{ marginRight: 8 }} />
                 )}
-                <Text style={styles.primaryActionButtonText}>Move to...</Text>
+                <Text style={styles.primaryActionButtonText}>Move to</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -606,12 +823,7 @@ export default function SavedFolderDetailScreen() {
                 <Text style={styles.dangerOutlineButtonText}>Remove from saved</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity 
-                style={styles.secondaryOutlineButton}
-                onPress={handleCancelSelection}
-              >
-                <Text style={styles.secondaryOutlineButtonText}>Cancel</Text>
-              </TouchableOpacity>
+
             </View>
           </View>
         )}
@@ -619,7 +831,7 @@ export default function SavedFolderDetailScreen() {
     );
   };
 
-  // Header action
+  // Header action - only for renaming
   const renderHeaderAction = () => {
     // When renaming, show a checkmark to confirm save
     if (isRenaming) {
@@ -645,30 +857,18 @@ export default function SavedFolderDetailScreen() {
       );
     }
 
-    if (savedRecipes.length === 0 || isSelectionMode) return null;
-
-    return (
-      <TouchableOpacity
-        style={styles.selectButton}
-        onPress={handleStartSelection}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      >
-        <MaterialCommunityIcons name="checkbox-multiple-marked-outline" size={24} color={COLORS.primary} />
-      </TouchableOpacity>
-    );
+    return null;
   };
 
   return (
-    <Pressable style={[styles.container, { paddingTop: insets.top }]} onPress={isRenaming ? cancelRenaming : undefined}>
+    <PanGestureHandler
+      onHandlerStateChange={handleSwipeGesture}
+      activeOffsetX={[-10, 10]}
+      failOffsetY={[-5, 5]}
+    >
+      <Pressable style={[styles.container, { paddingTop: insets.top }]} onPress={isRenaming ? cancelRenaming : undefined}>
       {/* Custom Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textDark} />
-        </TouchableOpacity>
         {isRenaming ? (
           <TextInput
             ref={nameInputRef}
@@ -677,7 +877,7 @@ export default function SavedFolderDetailScreen() {
             onChangeText={setEditedFolderName}
             // Do not auto-save on blur or submit; rely on the checkmark
             editable={!isSavingFolderName}
-            maxLength={30}
+            maxLength={18}
             returnKeyType="done"
             blurOnSubmit={false}
           />
@@ -688,35 +888,71 @@ export default function SavedFolderDetailScreen() {
             activeOpacity={0.7}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Text style={styles.headerTitle} numberOfLines={1}>{folderName}</Text>
+            <Text style={styles.headerTitle} numberOfLines={1}>{folderName.toUpperCase()}</Text>
           </TouchableOpacity>
         )}
         <View style={styles.headerRight}>
           {renderHeaderAction()}
         </View>
       </View>
-      {/* Search bar */}
-      <View style={styles.searchContainer}>
-        <MaterialCommunityIcons name="magnify" size={20} color={COLORS.textMuted} style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder="Search inside this folder"
-          placeholderTextColor={COLORS.textMuted}
-          returnKeyType="search"
-          autoCorrect={false}
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity
-            onPress={() => setSearchQuery('')}
-            style={styles.clearButton}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <MaterialCommunityIcons name="close" size={18} color={COLORS.textMuted} />
-          </TouchableOpacity>
-        )}
+      {/* Search and Select toolbar */}
+      <View style={styles.toolbarContainer}>
+        <TouchableHighlight
+          key="search-button"
+          style={styles.toolbarButton}
+          onPress={isSearchActive ? undefined : toggleSearch}
+          underlayColor="transparent"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <View style={styles.toolbarButtonContent}>
+            {isSearchActive ? (
+              <TextInput
+                style={styles.toolbarButtonText}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder=""
+                returnKeyType="search"
+                autoCorrect={false}
+                autoFocus={true}
+                onBlur={() => {
+                  setIsSearchActive(false);
+                  setSearchQuery('');
+                }}
+              />
+            ) : (
+              <Text style={styles.toolbarButtonText}>SEARCH</Text>
+            )}
+          </View>
+        </TouchableHighlight>
+
+        <TouchableHighlight
+          key="select-button"
+          style={styles.toolbarButton}
+          onPress={toggleSelection}
+          underlayColor="transparent"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <View style={styles.toolbarButtonContent}>
+            <Text style={styles.toolbarButtonText}>SELECT</Text>
+          </View>
+        </TouchableHighlight>
+
+        <TouchableHighlight
+          key="delete-folder-button"
+          style={[styles.toolbarButton, styles.deleteButton]}
+          onPress={handleDeleteFolder}
+          underlayColor="transparent"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <View style={styles.toolbarButtonContent}>
+            <Text style={styles.toolbarButtonText}>DELETE FOLDER</Text>
+          </View>
+        </TouchableHighlight>
+
+
       </View>
+
+
       {renameError ? <Text style={styles.renameErrorText}>{renameError}</Text> : null}
       
       {renderContent()}
@@ -727,6 +963,9 @@ export default function SavedFolderDetailScreen() {
         onClose={() => setShowFolderPicker(false)}
         onSelectFolder={handleFolderPickerSelect}
         isLoading={isMovingRecipes}
+        showStartCookingOption={false}
+        onStartCooking={handleStartCookingSelectedRecipes}
+        selectedRecipeCount={selectedRecipes.size}
       />
 
       {/* Delete Recipe Confirmation Modal */}
@@ -755,7 +994,20 @@ export default function SavedFolderDetailScreen() {
         onCancel={() => setShowBulkRemoveModal(false)}
         destructive={false}
       />
-    </Pressable>
+
+      {/* Delete Folder Confirmation Modal */}
+      <ConfirmationModal
+        visible={showDeleteFolderModal}
+        title="Delete Folder"
+        message={`Are you sure? You'll be removing ${savedRecipes.length} recipe${savedRecipes.length !== 1 ? 's' : ''} from your saved folders.`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={confirmDeleteFolder}
+        onCancel={() => setShowDeleteFolderModal(false)}
+        destructive={true}
+      />
+      </Pressable>
+    </PanGestureHandler>
   );
 }
 
@@ -763,47 +1015,49 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingHorizontal: SPACING.pageHorizontal,
   },
   header: {
+    paddingHorizontal: 0,
+    paddingBottom: SPACING.md,
+    marginTop: 0,
+    minHeight: 44 + SPACING.md,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: SPACING.md,
-    marginBottom: SPACING.sm,
-  },
-  backButton: {
-    padding: SPACING.xs,
-    width: 85, // Fixed width to match headerRight
-    alignItems: 'flex-start',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
+    borderBottomWidth: 1,
+    borderBottomColor: '#D9D5CC',
   },
   headerTitle: {
     ...screenTitleText,
     color: COLORS.textDark,
-    flex: 1,
-    textAlign: 'center',
+    textAlign: 'left',
+    textTransform: 'uppercase' as const,
   },
   headerTitleInput: {
     ...screenTitleText,
     color: COLORS.textDark,
-    flex: 1,
-    textAlign: 'center',
+    textAlign: 'left',
     backgroundColor: COLORS.white,
     borderWidth: 1,
     borderColor: COLORS.lightGray,
     borderRadius: RADIUS.sm,
     paddingVertical: 6,
+    paddingLeft: 18, // Match ScreenHeader titleContainer
     paddingHorizontal: 8,
   },
   headerTitleTouchable: {
-    flex: 1,
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    paddingLeft: 18, // Match ScreenHeader titleContainer
     justifyContent: 'center',
   },
   headerRight: {
-    width: 85, // Wider to accommodate "Select" button without wrapping
     alignItems: 'flex-end',
+    justifyContent: 'center',
+    paddingRight: SPACING.pageHorizontal, // Match the page horizontal padding
+  },
+  side: {
+    width: 44,
+    alignItems: 'flex-start',
     justifyContent: 'center',
   },
   centered: {
@@ -820,21 +1074,28 @@ const styles = StyleSheet.create({
     paddingTop: '30%',
   },
   emptyText: {
-    fontFamily: FONT.family.ubuntu,
-    fontSize: 18,
+    ...bodyStrongText,
+    fontSize: FONT.size.body,
     color: COLORS.textDark,
     marginTop: SPACING.md,
     marginBottom: SPACING.sm,
+    textAlign: 'left',
   },
   emptySubtext: {
-    ...bodyTextLoose,
-    color: COLORS.darkGray,
-    textAlign: 'center',
+    ...bodyStrongText,
+    fontSize: FONT.size.body,
+    color: COLORS.textDark,
+    textAlign: 'left',
     marginTop: SPACING.xs,
   },
   listContent: {
-    paddingTop: SPACING.sm,
+    // Removed paddingTop to match library.tsx positioning
     paddingBottom: 100, // Extra space for bulk actions bar
+  },
+  searchWrapper: {
+    paddingHorizontal: SPACING.pageHorizontal,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.sm,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -846,7 +1107,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.sm,
     // Fix height so it doesn't change between placeholder and typed text
     height: 40,
-    marginBottom: SPACING.sm,
   },
   searchIcon: {
     marginRight: SPACING.xs,
@@ -864,54 +1124,86 @@ const styles = StyleSheet.create({
   clearButton: {
     padding: 4,
   },
-  recipeCard: {
+  // Toolbar styles
+  toolbarContainer: {
+    flexDirection: 'column', // Stack vertically
+    height: 72, // 24px (first button) + 8px + 24px (second button) + 8px + 24px (third button)
+    backgroundColor: 'transparent',
+    width: '90%',
+    alignSelf: 'flex-start', // Left align to screen edge
+    marginLeft: '5%', // Offset to account for 90% width
+    marginTop: 8, // Small top margin to match library.tsx SEARCH positioning
+    marginBottom: SPACING.xxxl - 24 + SPACING.contentTopMargin, // Adjusted margin to compensate for extra button height plus content top margin
+  },
+  toolbarButton: {
+    height: 24, // Match library.tsx button height
+    backgroundColor: 'transparent',
+  },
+  deleteButton: {
+    width: '45%', // Smaller width for DELETE FOLDER button
+    alignSelf: 'flex-start', // Left align the button
+  },
+
+  toolbarButtonContent: {
     flexDirection: 'row',
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.sm,
-    padding: 12,
-    marginBottom: SPACING.md,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
     alignItems: 'center',
+    height: '100%',
+    paddingLeft: 0, // Remove left padding for true left alignment
+    paddingRight: 18, // Keep some right padding
   },
-  recipeCardSelected: {
-    borderWidth: 2,
-    borderColor: COLORS.primary,
+  toolbarButtonText: {
+    fontFamily: 'Inter',
+    fontSize: 18,
+    fontWeight: '400', // Non-bold variant to match library.tsx
+    lineHeight: 22,
+    color: COLORS.textDark,
+    flex: 1,
+    textAlign: 'left', // Ensure left alignment
   },
-  selectionIndicator: {
-    marginRight: SPACING.md,
+
+  toolbarDivider: {
+    width: 1,
+    height: '100%',
+    backgroundColor: '#D9D5CC',
   },
-  recipeImage: {
-    width: SPACING.xxl + 8,
-    height: SPACING.xxl + 8,
-    borderRadius: 6,
-    marginRight: SPACING.md,
+  // Card styles to match mise.tsx
+  card: {
+    backgroundColor: 'transparent',
+    borderBottomWidth: 1,
+    borderBottomColor: '#000000',
+    width: '90%',
+    alignSelf: 'flex-start', // Left align to screen edge
+    marginLeft: '5%', // Offset to account for 90% width
+    position: 'relative',
   },
-  fallbackImageContainer: {
-    width: SPACING.xxl + 8,
-    height: SPACING.xxl + 8,
-    borderRadius: 6,
-    marginRight: SPACING.md,
-    backgroundColor: COLORS.white,
-    justifyContent: 'center',
+  cardContent: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    height: '100%',
+    paddingLeft: 0, // Remove left padding for true left alignment
+    paddingRight: 18, // Keep some right padding
   },
-  fallbackImage: {
-    width: '80%',
-    height: '80%',
+  trashIcon: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    padding: 4,
   },
-  recipeInfo: {
+  cardWithMinHeight: {
+    height: 64,
+  },
+  cardSelected: {
+    // No border styling - only checkbox indicates selection
+  },
+  cardTextContainer: {
     flex: 1,
   },
-  recipeTitle: {
-    ...bodyStrongText,
-    fontSize: FONT.size.body - 1,
+  cardTitle: {
+    ...bodyText,
+    fontSize: FONT.size.body,
     color: COLORS.textDark,
     lineHeight: 19,
-    flexWrap: 'wrap',
   },
   servingsText: {
     ...bodyText,
@@ -920,8 +1212,8 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     marginTop: SPACING.xs,
   },
-  deleteButton: {
-    padding: SPACING.xs,
+  selectionIndicator: {
+    marginRight: SPACING.md,
   },
   selectButton: {
     padding: SPACING.xs,
@@ -933,18 +1225,33 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: SPACING.pageHorizontal,
     paddingTop: SPACING.md,
     paddingBottom: SPACING.xxl,
-    backgroundColor: COLORS.background,
-    borderTopWidth: BORDER_WIDTH.hairline,
-    borderTopColor: COLORS.divider,
+    backgroundColor: '#DEF6FF', // Lighter blue background
+    borderTopWidth: 1,
+    borderTopColor: '#000000',
   },
   bulkActionsHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: SPACING.md,
+    width: '90%',
+    alignSelf: 'flex-start', // Left align to screen edge
+    marginLeft: '5%', // Offset to account for 90% width
   },
   selectedCountText: {
+    ...bodyStrongText,
+    color: COLORS.textDark,
+    fontSize: FONT.size.lg,
+    textAlign: 'left', // Left align like toolbar buttons
+    paddingLeft: 0, // Remove left padding for true left alignment
+    paddingRight: 18, // Keep some right padding like toolbar buttons
+  },
+  closeSelectionButton: {
+    padding: SPACING.xs,
+  },
+  closeSelectionText: {
     ...bodyStrongText,
     color: COLORS.textDark,
     fontSize: FONT.size.lg,
@@ -952,55 +1259,66 @@ const styles = StyleSheet.create({
   },
   bulkActionsButtonsStack: {
     gap: SPACING.sm,
+    width: '90%',
+    alignSelf: 'flex-start', // Left align to screen edge
+    marginLeft: '5%', // Offset to account for 90% width
+    paddingLeft: 0, // Remove left padding for true left alignment
+    paddingRight: 18, // Keep some right padding like toolbar buttons
   },
   primaryActionButton: {
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.sm,
-    paddingVertical: SPACING.md,
+    height: 24, // Match SEARCH/SELECT button height
+    backgroundColor: 'transparent',
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: SPACING.pageHorizontal,
+    width: 'auto', // Width based on content, not full width
   },
   primaryActionButtonDisabled: {
-    backgroundColor: COLORS.darkGray,
+    opacity: 0.6, // Match the lighter grey inactive state of "Remove from saved"
   },
   primaryActionButtonText: {
-    ...bodyStrongText,
-    color: COLORS.white,
+    fontFamily: 'Inter',
+    fontSize: 18,
+    fontWeight: '400', // Match SEARCH/SELECT non-bold weight
+    lineHeight: 22,
+    color: COLORS.textDark,
+    flex: 1,
+    textAlign: 'left', // Match SEARCH/SELECT left alignment
   },
   secondaryOutlineButton: {
+    height: 24, // Match SEARCH/SELECT button height
+    backgroundColor: 'transparent',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.sm,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: COLORS.primary,
+    width: 'auto', // Width based on content, not full width
   },
   secondaryOutlineButtonText: {
-    ...bodyStrongText,
-    color: COLORS.primary,
+    fontFamily: 'Inter',
+    fontSize: 18,
+    fontWeight: '400', // Match SEARCH/SELECT non-bold weight
+    lineHeight: 22,
+    color: COLORS.textDark,
+    flex: 1,
+    textAlign: 'left', // Match SEARCH/SELECT left alignment
   },
   dangerOutlineButton: {
+    height: 24, // Match SEARCH/SELECT button height
+    backgroundColor: 'transparent',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.sm,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: COLORS.error,
+    width: 'auto', // Width based on content, not full width
   },
   dangerOutlineButtonDisabled: {
-    borderColor: COLORS.lightGray,
+    borderColor: COLORS.error,
+    opacity: 0.6,
   },
   dangerOutlineButtonText: {
-    ...bodyStrongText,
-    color: COLORS.error,
+    fontFamily: 'Inter',
+    fontSize: 18,
+    fontWeight: '400', // Match SEARCH/SELECT non-bold weight
+    lineHeight: 22,
+    color: COLORS.textDark,
+    flex: 1,
+    textAlign: 'left', // Match SEARCH/SELECT left alignment
   },
   errorText: {
     ...bodyText,
@@ -1014,5 +1332,53 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: SPACING.xs,
     marginBottom: SPACING.xs,
+  },
+  // New styles for search
+  searchResultsWrapper: {
+    paddingLeft: 0, // Remove left padding for true left alignment
+    paddingRight: SPACING.pageHorizontal, // Keep right padding
+    paddingTop: 0,
+    paddingBottom: SPACING.md,
+    width: '90%',
+    alignSelf: 'flex-start', // Left align to screen edge
+    marginLeft: '5%', // Offset to account for 90% width
+  } as ViewStyle,
+  searchResultsContainer: {
+    backgroundColor: 'transparent',
+    borderRadius: RADIUS.md,
+    padding: 0, // Remove padding for true left alignment
+    ...SHADOWS.small,
+    maxHeight: '90%', // Allow more height while still preventing cutoff by tab bar
+  } as ViewStyle,
+  searchResultsHeader: {
+    ...bodyStrongText,
+    fontSize: FONT.size.body,
+    color: COLORS.textDark,
+    marginBottom: SPACING.sm,
+    width: '90%',
+    alignSelf: 'flex-start', // Left align to screen edge
+    marginLeft: '5%', // Offset to account for 90% width
+    paddingLeft: 0, // Remove left padding for perfect alignment
+    paddingRight: 18, // Match other elements' right padding
+  },
+  headerPlaceholder: {
+    // Invisible placeholder to maintain consistent spacing when search is not active
+    height: 24 + SPACING.sm, // lineHeight (24) + marginBottom (8) to match searchResultsHeader exactly
+  },
+  searchResultsList: {
+    // Match listContent style for consistent sizing and positioning
+    paddingBottom: 100, // Extra space for bulk actions bar
+  },
+  searchResultsFlatList: {
+    maxHeight: '100%', // Allow FlatList to take full height of container and scroll
+  } as ViewStyle,
+  noSearchResults: {
+    alignItems: 'flex-start',
+    paddingVertical: SPACING.xl,
+    width: '90%',
+    alignSelf: 'flex-start', // Left align to screen edge
+    marginLeft: '5%', // Offset to account for 90% width
+    paddingLeft: 0, // Remove left padding for perfect alignment
+    paddingRight: 18, // Match other elements' right padding
   },
 }); 

@@ -10,9 +10,10 @@ type ScreenHeaderProps = {
   onLayout?: (event: LayoutChangeEvent) => void;
   showBack?: boolean;
   onTitlePress?: () => void;
+  titleStyle?: TextStyle;
 };
 
-export default function ScreenHeader({ title, onLayout, showBack = true, onTitlePress }: ScreenHeaderProps) {
+export default function ScreenHeader({ title, onLayout, showBack = true, onTitlePress, titleStyle }: ScreenHeaderProps) {
   const router = useRouter();
   return (
     <View style={styles.header} onLayout={onLayout}>
@@ -27,45 +28,50 @@ export default function ScreenHeader({ title, onLayout, showBack = true, onTitle
         >
           <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textDark} />
         </TouchableOpacity>
-      ) : (
-        <View style={styles.side} />
-      )}
+      ) : null}
       {onTitlePress ? (
         <TouchableOpacity
           onPress={onTitlePress}
           activeOpacity={0.7}
           accessibilityRole="button"
           accessibilityLabel={title}
-          style={{ flex: 1 }}
+          style={styles.titleContainer}
         >
-          <Text style={styles.title} numberOfLines={2} ellipsizeMode="tail">{title}</Text>
+          <Text style={[styles.title, titleStyle]} numberOfLines={2} ellipsizeMode="tail">{title}</Text>
         </TouchableOpacity>
       ) : (
-        <Text style={[styles.title, { flex: 1 }]} numberOfLines={2} ellipsizeMode="tail">{title}</Text>
+        <View style={styles.titleContainer}>
+          <Text style={[styles.title, titleStyle]} numberOfLines={2} ellipsizeMode="tail">{title}</Text>
+        </View>
       )}
-      <View style={styles.side} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   header: {
-    paddingHorizontal: SPACING.pageHorizontal,
+    paddingHorizontal: 0,
     paddingBottom: SPACING.md,
-    marginTop: SPACING.pageHorizontal,
+    marginTop: 0,
     minHeight: 44 + SPACING.md,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
+    borderBottomWidth: 1,
+    borderBottomColor: '#D9D5CC',
   } as ViewStyle,
   side: {
     width: 44,
     alignItems: 'flex-start',
     justifyContent: 'center',
   } as ViewStyle,
+  titleContainer: {
+    paddingLeft: 18, // Match the folder row padding
+  } as ViewStyle,
   title: {
     ...screenTitleText,
     color: COLORS.textDark,
-    textAlign: 'center',
+    textAlign: 'left',
+    textTransform: 'uppercase' as const,
   } as TextStyle,
 }); 

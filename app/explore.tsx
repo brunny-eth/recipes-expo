@@ -107,7 +107,7 @@ export default function ExploreScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>        
-      <ScreenHeader title="Explore recipes" showBack={true} />
+      <ScreenHeader title="EXPLORE RECIPES" showBack={true} />
       {isLoading ? (
         <ActivityIndicator style={styles.centered} size="large" color={COLORS.primary} />
       ) : error ? (

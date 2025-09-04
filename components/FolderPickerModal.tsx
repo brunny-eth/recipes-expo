@@ -32,6 +32,9 @@ type FolderPickerModalProps = {
   onClose: () => void;
   onSelectFolder: (folderId: number) => void;
   isLoading?: boolean;
+  showStartCookingOption?: boolean;
+  onStartCooking?: () => void;
+  selectedRecipeCount?: number;
 };
 
 type ModalMode = 'select' | 'create';
@@ -41,6 +44,9 @@ export default function FolderPickerModal({
   onClose,
   onSelectFolder,
   isLoading = false,
+  showStartCookingOption = false,
+  onStartCooking,
+  selectedRecipeCount = 0,
 }: FolderPickerModalProps) {
   const { session } = useAuth();
   const [folders, setFolders] = useState<SavedFolder[]>([]);
@@ -360,7 +366,7 @@ export default function FolderPickerModal({
               </TouchableOpacity>
             )}
             <Text style={styles.title}>
-              {mode === 'select' ? 'Save to folder' : 'Add new folder'}
+              {mode === 'select' ? (showStartCookingOption ? 'Choose action' : 'Save to folder') : 'Add new folder'}
             </Text>
             <TouchableOpacity
               style={styles.closeButton}
@@ -378,18 +384,28 @@ export default function FolderPickerModal({
 
           {/* Add New Folder Button - only show in select mode */}
           {mode === 'select' && (
-            <TouchableOpacity
-              style={styles.addFolderButton}
-              onPress={handleShowCreateMode}
-              disabled={isLoading}
-            >
-              <MaterialCommunityIcons
-                name="plus"
-                size={16}
-                color={COLORS.primary}
-              />
-              <Text style={styles.addFolderText}>Add new folder</Text>
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity
+                style={styles.addFolderButton}
+                onPress={handleShowCreateMode}
+                disabled={isLoading}
+              >
+                <Text style={styles.addFolderText}>Add new folder</Text>
+              </TouchableOpacity>
+
+              {/* Start Cooking Button - only show when option is enabled */}
+              {showStartCookingOption && (
+                <TouchableOpacity
+                  style={styles.startCookingButton}
+                  onPress={onStartCooking}
+                  disabled={isLoading}
+                >
+                  <Text style={styles.startCookingText}>
+                    Start cooking {selectedRecipeCount > 0 ? `(${selectedRecipeCount})` : ''}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </>
           )}
         </TouchableOpacity>
       </TouchableOpacity>
@@ -536,13 +552,29 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm,
     borderWidth: 1,
     borderColor: COLORS.primary,
-    margin: SPACING.lg,
-    marginTop: SPACING.md,
+    marginHorizontal: SPACING.lg,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.xs,
   } as ViewStyle,
   addFolderText: {
     ...bodyStrongText,
     color: COLORS.primary,
-    marginLeft: SPACING.xs,
+  } as TextStyle,
+  startCookingButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.sm,
+    marginHorizontal: SPACING.lg,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.lg,
+  } as ViewStyle,
+  startCookingText: {
+    ...bodyStrongText,
+    color: COLORS.white,
   } as TextStyle,
   // Create mode styles
   createContainer: {

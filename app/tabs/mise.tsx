@@ -5,6 +5,7 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  TouchableHighlight,
   ActivityIndicator,
   ScrollView,
   ViewStyle,
@@ -327,7 +328,7 @@ export default function MiseScreen() {
   const [manualItems, setManualItems] = useState<ManualGroceryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedTab, setSelectedTab] = useState<'recipes' | 'grocery'>('recipes');
+
   // Inline add state (replaces modal)
   const [inlineAddCategory, setInlineAddCategory] = useState<string | null>(null);
   const [inlineAddText, setInlineAddText] = useState<string>('');
@@ -438,14 +439,14 @@ export default function MiseScreen() {
     loadStaplesPreferences();
   }, [loadManualItemsFromStorage, loadSortModeFromStorage, loadStaplesPreferences]);
 
-  // Keep screen awake only when on grocery tab to prevent battery drain
+  // Keep screen awake when grocery list has items to prevent battery drain
   useEffect(() => {
-    if (selectedTab === 'grocery') {
+    if (groceryList.length > 0) {
       const { activateKeepAwakeAsync, deactivateKeepAwake } = require('expo-keep-awake');
       activateKeepAwakeAsync();
       return () => deactivateKeepAwake();
     }
-  }, [selectedTab]);
+  }, [groceryList.length]);
 
   // Removed loadCachedMiseData function - always fetch fresh data
 
@@ -1125,7 +1126,7 @@ export default function MiseScreen() {
 
 
   // Render recipe item
-  const renderRecipeItem = useCallback(({ item }: { item: MiseRecipe }) => {
+  const renderRecipeItem = useCallback(({ item, index }: { item: MiseRecipe; index: number }) => {
     const displayTitle = item.title_override || item.prepared_recipe_data.title;
 
     const handleRecipePress = () => {
@@ -1144,19 +1145,24 @@ export default function MiseScreen() {
 
     return (
       <TouchableOpacity
-        style={[styles.card, styles.cardWithMinHeight]}
+        style={[
+          styles.card,
+          styles.cardWithMinHeight,
+          index === 0 && { marginTop: SPACING.sm }, // Add top margin to first recipe
+          index === 0 && { borderTopWidth: 1, borderTopColor: '#000000' } // Add top border to first recipe
+        ]}
         onPress={handleRecipePress}
         activeOpacity={0.7}
       >
         <View style={styles.cardContent}>
           <View style={styles.cardTextContainer}>
-            <Text style={styles.cardTitle} numberOfLines={2}>
+            <Text style={styles.cardTitle} numberOfLines={1} ellipsizeMode="tail">
               {displayTitle}
             </Text>
             {(() => {
               const servingsCount = parseServingsValue(item.prepared_recipe_data.recipeYield);
               return servingsCount ? (
-                <Text style={styles.servingsText}>(servings: {servingsCount})</Text>
+                <Text style={styles.servingsText}>(For {servingsCount})</Text>
               ) : null;
             })()}
           </View>
@@ -1193,7 +1199,9 @@ export default function MiseScreen() {
         key={groceryItem.id}
         style={[
           styles.groceryItem,
-          isLastInGroup && styles.groceryItemLast
+          isLastInGroup && styles.groceryItemLast,
+          index === 0 && !groceryItem.checked && { marginTop: SPACING.sm }, // Add top margin to first unchecked grocery item
+          index === 0 && !groceryItem.checked && { borderTopWidth: 1, borderTopColor: '#000000' } // Add top border to first unchecked grocery item
         ]}
         onPress={() => handleGroceryToggle(groceryItem.id)}
         activeOpacity={0.8}
@@ -1386,100 +1394,106 @@ export default function MiseScreen() {
       );
     }
 
-    if (selectedTab === 'recipes') {
-      if (miseRecipes.length === 0) {
-        return (
-          <View style={styles.emptyContainer}>
-            {/* Hero Section */}
-            <View style={styles.heroSection}>
-              <MaterialCommunityIcons
-                name="chef-hat"
-                size={64}
-                color={COLORS.primary}
-              />
-              <Text style={styles.heroTitle}>Your Prep Area</Text>
-              <Text style={styles.heroSubtitle}>
-                Add recipes here to make a shopping list and follow multiple recipes at once
+    return (
+      <ScrollView style={styles.combinedContent} showsVerticalScrollIndicator={false}>
+        {/* Action Buttons */}
+        <View style={styles.miseToolbarContainer}>
+          <TouchableOpacity
+            style={styles.miseToolbarButton}
+            onPress={handleCookMyRecipes}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.miseToolbarButtonText}>COOK YOUR RECIPES</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.miseToolbarButton}
+            onPress={handleShareGrocery}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.miseToolbarButtonText}>SHARE YOUR LIST</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.miseToolbarButton}
+            onPress={handleOpenStaplesModal}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.miseToolbarButtonText}>UPDATE YOUR PANTRY</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Menu Section */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeaderWithControls}>
+            <Text style={styles.sectionTitle}>MENU</Text>
+          </View>
+          {miseRecipes.length === 0 ? (
+            <View style={styles.emptySection}>
+              <Text style={styles.emptySectionText}>No recipes in your menu.</Text>
+              <Text style={styles.emptySectionSubtext}>
+                Add recipes to build a grocery list and start cooking.
               </Text>
-            </View>
-            
-            {/* CTA Section */}
-            <View style={styles.ctaSection}>
-              <TouchableOpacity 
-                style={styles.primaryButton}
-                onPress={() => router.push('/tabs')}
-              >
-                <Text style={styles.primaryButtonText}>Import Recipes</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.secondaryButton}
+              <TouchableOpacity
                 onPress={() => router.push('/tabs/library')}
               >
-                <Text style={styles.secondaryButtonText}>My recipes</Text>
+                <Text style={styles.emptyActionText}>Go to my recipe library.</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => router.push('/tabs/import')}
+              >
+                <Text style={styles.emptyActionText}>Go to the import recipe page.</Text>
               </TouchableOpacity>
             </View>
+          ) : (
+            <View style={styles.recipeListContainer}>
+              {miseRecipes.map((item, index) => (
+                <View key={item.id}>
+                  {renderRecipeItem({ item, index })}
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* Groceries Section */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeaderWithControls}>
+            <Text style={styles.sectionTitle}>GROCERIES</Text>
+            
+
           </View>
-        );
-      }
-
-      return (
-        <FlatList
-          data={miseRecipes}
-          renderItem={renderRecipeItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-        />
-      );
-    } else {
-      // Determine which data to use based on sort mode and staples filter
-      let displayGroceryList = groceryList;
-      
-      // First apply staples filtering if enabled
-      displayGroceryList = filterHouseholdStaples(displayGroceryList, staplesEnabled, selectedStaples);
-      
-      // Then apply sorting if alphabetical mode
-      if (sortMode === 'alphabetical') {
-        displayGroceryList = sortGroceryItemsAlphabetically(displayGroceryList);
-      }
-
-      // Always render the grocery list; ensure there's always a Miscellaneous category
-      if (displayGroceryList.length === 0) {
-        displayGroceryList = [{ name: 'Miscellaneous', items: [] }];
-      }
-
-      return (
-        <KeyboardAvoidingView
-          style={styles.groceryContainer}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 40 : 0}
-        >
-          <FlatList
-            ref={groceryListRef}
-            data={displayGroceryList}
-            renderItem={renderGroceryCategory}
-            keyExtractor={(item) => `category-${item.name}-${item.items.length}`}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            refreshControl={
-              <RefreshControl
-                refreshing={false}
-                onRefresh={() => {
-                  if (session?.user?.id && session.access_token) {
-                    console.log('[MiseScreen] 🔄 Manual grocery list refresh');
-                    refreshGroceryListOnly();
-                  }
-                }}
-                colors={[COLORS.primary]}
-                tintColor={COLORS.primary}
-              />
+          
+          {(() => {
+            // Determine which data to use based on sort mode and staples filter
+            let displayGroceryList = groceryList;
+            
+            // First apply staples filtering if enabled
+            displayGroceryList = filterHouseholdStaples(displayGroceryList, staplesEnabled, selectedStaples);
+            
+            // Then apply sorting if alphabetical mode
+            if (sortMode === 'alphabetical') {
+              displayGroceryList = sortGroceryItemsAlphabetically(displayGroceryList);
             }
-          />
-        </KeyboardAvoidingView>
-      );
-    }
+
+            // Always render the grocery list; ensure there's always a Miscellaneous category
+            if (displayGroceryList.length === 0) {
+              displayGroceryList = [{ name: 'Miscellaneous', items: [] }];
+            }
+
+            return (
+              <View style={styles.groceryListContainer}>
+                {displayGroceryList.map((category) => (
+                  <View key={`category-${category.name}-${category.items.length}`}>
+                    {renderGroceryCategory({ item: category })}
+                  </View>
+                ))}
+              </View>
+            );
+          })()}
+        </View>
+      </ScrollView>
+    );
   };
 
   // Handle cooking session start
@@ -1504,101 +1518,17 @@ export default function MiseScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-        <ScreenHeader title="Prep Station" showBack={false} />
+        <ScreenHeader title="PREP STATION" showBack={false} />
       
-      {/* Tab selector - underline style */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={styles.tabButton}
-          onPress={() => setSelectedTab('recipes')}
-        >
-          <Text style={[
-            styles.tabButtonText,
-            selectedTab === 'recipes' && styles.tabButtonTextActive
-          ]}>
-            Menu
-          </Text>
-          {/* underline removed */}
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.tabButton}
-          onPress={() => {
-            setSelectedTab('grocery');
-            // Refresh grocery list when switching to grocery tab to catch ingredient changes
-            if (session?.user?.id && session.access_token) {
-              console.log('[MiseScreen] 🔄 Refreshing grocery list on tab switch');
-              refreshGroceryListOnly();
-            }
-          }}
-        >
-          <Text style={[
-            styles.tabButtonText,
-            selectedTab === 'grocery' && styles.tabButtonTextActive
-          ]}>
-            Groceries
-          </Text>
-          {/* underline removed */}
-        </TouchableOpacity>
-      </View>
 
 
 
-      {/* Controls for grocery tab */}
-      {selectedTab === 'grocery' && groceryList.length > 0 && (
-        <View style={styles.groceryControls}>
-          {session && (
-            <TouchableOpacity
-              style={styles.shareButton}
-              onPress={handleShareGrocery}
-            >
-              <MaterialCommunityIcons name="export" size={16} color={COLORS.white} />
-              <Text style={styles.shareButtonText}>Share</Text>
-            </TouchableOpacity>
-          )}
 
-          <View style={{ flex: 1 }} />
 
-          <TouchableOpacity
-            style={styles.staplesSettingsButton}
-            onPress={handleOpenStaplesModal}
-            accessibilityLabel="Pantry settings"
-            accessibilityHint="Opens pantry selection settings"
-          >
-            <MaterialCommunityIcons name="tune" size={16} color={COLORS.primary} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.staplesButton,
-              !staplesEnabled && styles.staplesButtonDisabled,
-            ]}
-            onPress={handleToggleStaples}
-          >
-            <Text
-              style={[
-                styles.staplesButtonText,
-                !staplesEnabled && styles.staplesButtonTextDisabled,
-              ]}
-            >
-              {staplesEnabled ? 'Show pantry' : 'Hide pantry'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
 
       {renderContent()}
 
-      {/* Cooking Session Button - only show on recipes tab */}
-      {selectedTab === 'recipes' && miseRecipes.length > 0 && (
-        <TouchableOpacity
-          style={styles.cookingSessionButton}
-          onPress={handleCookMyRecipes}
-        >
-          <Text style={styles.cookingSessionButtonText}>
-            Cook your recipes
-          </Text>
-        </TouchableOpacity>
-      )}
+
       
 
 
@@ -1620,41 +1550,143 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingHorizontal: SPACING.pageHorizontal,
   } as ViewStyle,
-  // Tab styles - underline style like ESPN+
-  tabContainer: {
+  // Toolbar styles to match folder-detail.tsx
+  toolbarContainer: {
     flexDirection: 'row',
+    height: 64,
+    borderTopWidth: 1,
+    borderTopColor: '#D9D5CC',
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.surface,
-    marginBottom: SPACING.md,
-  } as ViewStyle,
-  tabButton: {
+    borderBottomColor: '#D9D5CC',
+    backgroundColor: 'transparent',
+  },
+  toolbarButton: {
     flex: 1,
-    paddingVertical: 16,
-    paddingHorizontal: 8,
+    height: '100%',
+    borderBottomWidth: 1,
+    borderBottomColor: '#D9D5CC',
+    backgroundColor: 'transparent',
+  },
+  toolbarButtonActive: {
+    backgroundColor: '#EEF6FF',
+  },
+  toolbarButtonContent: {
+    flexDirection: 'row',
     alignItems: 'center',
-    position: 'relative',
-    backgroundColor: COLORS.background,
-  } as ViewStyle,
-  tabUnderline: {
-    position: 'absolute',
-    bottom: 2,
-    height: 2,
-    width: '60%',
-    backgroundColor: COLORS.primary,
-    borderRadius: 1,
-  } as ViewStyle,
-  tabButtonText: {
-    ...bodyStrongText,
-    color: COLORS.textMuted,
-    fontSize: FONT.size.body,
-    letterSpacing: 0.5,
+    justifyContent: 'center',
+    height: '100%',
+    paddingHorizontal: 18,
+  },
+  toolbarButtonText: {
+    fontFamily: 'Inter',
+    fontSize: 18,
+    fontWeight: '800',
+    lineHeight: 22,
     textTransform: 'uppercase' as const,
-  } as TextStyle,
-  tabButtonTextActive: {
+    color: COLORS.textDark,
+  },
+  toolbarButtonTextActive: {
     color: COLORS.primary,
-  } as TextStyle,
+  },
+  toolbarDivider: {
+    width: 1,
+    height: '100%',
+    backgroundColor: '#D9D5CC',
+  },
+  // Combined content styles
+  combinedContent: {
+    flex: 1,
+  },
+  sectionContainer: {
+    marginBottom: SPACING.lg,
+  },
+  sectionTitle: {
+    fontFamily: 'Inter',
+    fontSize: 18,
+    fontWeight: '800',
+    lineHeight: 22,
+    textTransform: 'uppercase' as const,
+    color: COLORS.textDark,
+    backgroundColor: COLORS.background,
+  },
+  sectionHeaderWithControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.pageHorizontal,
+    paddingVertical: SPACING.md,
+    backgroundColor: COLORS.background,
+  },
+  inlineControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.lg,
+  },
+  inlineControlText: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.primary,
+    textTransform: 'uppercase' as const,
+  },
+  emptySection: {
+    alignItems: 'flex-start',
+    paddingVertical: SPACING.xl,
+    paddingHorizontal: SPACING.pageHorizontal,
+  },
+  emptySectionText: {
+    ...bodyStrongText,
+    fontSize: FONT.size.body,
+    color: COLORS.textDark,
+    marginTop: SPACING.md,
+    textAlign: 'left',
+  },
+  emptySectionSubtext: {
+    ...bodyStrongText,
+    fontSize: FONT.size.body,
+    color: COLORS.textDark,
+    textAlign: 'left',
+    marginTop: SPACING.xs,
+  },
+  emptyActionText: {
+    ...bodyStrongText,
+    color: COLORS.primary,
+    fontSize: FONT.size.body,
+    marginTop: SPACING.sm,
+  },
+  // Toolbar styles matching library.tsx and folder-detail.tsx
+  miseToolbarContainer: {
+    flexDirection: 'column', // Stack vertically
+    justifyContent: 'space-between', // Distribute space between buttons
+    height: 72, // Fixed height for three buttons
+    backgroundColor: 'transparent',
+    width: '90%',
+    alignSelf: 'flex-start', // Left align to screen edge
+    marginLeft: '5%', // Offset to account for 90% width
+    marginTop: 8, // Small top margin to match library.tsx SEARCH positioning
+    marginBottom: SPACING.xxxl, // Add bottom margin to match library.tsx
+  },
+  miseToolbarButton: {
+    height: 24, // Match library.tsx button height
+    backgroundColor: 'transparent',
+  },
+  miseToolbarButtonText: {
+    fontFamily: 'Inter',
+    fontSize: 18,
+    fontWeight: '400', // Non-bold variant to match library.tsx
+    lineHeight: 22,
+    color: COLORS.textDark,
+    flex: 1,
+    textAlign: 'left', // Ensure left alignment
+  },
+  recipeListContainer: {
+    // No horizontal padding to keep cards full width
+  },
+  groceryListContainer: {
+    // No horizontal padding to keep cards full width
+  },
+
   listContent: {
     paddingTop: SPACING.sm,
     paddingBottom: SPACING.pageHorizontal,
@@ -1759,21 +1791,21 @@ const styles = StyleSheet.create({
 
   // New card styles to match saved.tsx
   card: {
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.sm,
-    padding: 12,
-    marginBottom: SPACING.md,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
+    backgroundColor: 'transparent',
+    borderBottomWidth: 1,
+    borderBottomColor: '#000000',
+    width: '90%',
+    alignSelf: 'flex-start', // Left align to screen edge
+    marginLeft: '5%', // Offset to account for 90% width
     position: 'relative',
   } as ViewStyle,
   cardContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
+    justifyContent: 'space-between',
+    height: '100%',
+    paddingLeft: 0, // Remove left padding for true left alignment
+    paddingRight: 18, // Keep some right padding
   } as ViewStyle,
   trashIcon: {
     position: 'absolute',
@@ -1782,7 +1814,7 @@ const styles = StyleSheet.create({
     padding: 4,
   } as ViewStyle,
   cardWithMinHeight: {
-    minHeight: 75,
+    height: 64,
   } as ViewStyle,
   cardImage: {
     width: SPACING.xxl + 8,
@@ -1794,11 +1826,10 @@ const styles = StyleSheet.create({
     flex: 1,
   } as ViewStyle,
   cardTitle: {
-    ...bodyStrongText,
-    fontSize: FONT.size.body - 1,
+    ...bodyText,
+    fontSize: FONT.size.body,
     color: COLORS.textDark,
     lineHeight: 19,
-    flexWrap: 'wrap',
   } as TextStyle,
   servingsText: {
     ...bodyText,
@@ -1806,13 +1837,14 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     fontWeight: '400',
     marginTop: SPACING.xs,
+    textAlign: 'left',
   } as TextStyle,
 
   groceryContainer: {
     flex: 1,
   } as ViewStyle,
   groceryCategory: {
-    backgroundColor: COLORS.white,
+    backgroundColor: 'transparent',
     borderRadius: RADIUS.sm,
     paddingVertical: SPACING.lg, // Consistent vertical padding
     paddingHorizontal: SPACING.lg,
@@ -1843,8 +1875,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: SPACING.md, // Increased padding for even spacing
+    backgroundColor: 'transparent',
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.surface,
+    borderBottomColor: '#000000',
+    width: '90%',
+    alignSelf: 'flex-start', // Left align to screen edge
+    marginLeft: '5%', // Offset to account for 90% width
   } as ViewStyle,
 
   groceryItemCheckbox: {
@@ -1874,8 +1910,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   } as TextStyle,
   groceryItemLast: {
-    borderBottomWidth: 0, // Remove border for last item
-    marginBottom: 0, // Remove bottom margin for last item
+    // Keep bottom border for last item in category (same as recipe cards)
   } as ViewStyle,
   groceryItemChecked: {
     textDecorationLine: 'line-through',
@@ -1912,22 +1947,27 @@ const styles = StyleSheet.create({
   } as ViewStyle,
 
   cookingSessionButton: {
+    height: 64,
+    borderBottomWidth: 1,
+    borderBottomColor: '#D9D5CC',
+    backgroundColor: COLORS.primary,
+  },
+  cookingSessionButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.primary,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.sm,
-    marginHorizontal: SPACING.pageHorizontal,
-    marginBottom: SPACING.lg,
-    marginTop: SPACING.md,
-    ...SHADOWS.small,
-  } as ViewStyle,
+    height: '100%',
+    paddingHorizontal: 18,
+  },
   cookingSessionButtonText: {
-    ...bodyStrongText,
+    fontFamily: 'Inter',
+    fontSize: 18,
+    fontWeight: '800',
+    lineHeight: 22,
+    textTransform: 'uppercase' as const,
     color: COLORS.white,
-  } as TextStyle,
+    flex: 1,
+  },
 
   
   groceryControls: {

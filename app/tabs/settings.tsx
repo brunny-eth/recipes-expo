@@ -110,7 +110,7 @@ export default function AccountScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScreenHeader title="Account" showBack={false} />
+      <ScreenHeader title="ACCOUNT" showBack={false} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}

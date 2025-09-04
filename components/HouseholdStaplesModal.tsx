@@ -214,7 +214,17 @@ export default function HouseholdStaplesModal({
                 </View>
               </View>
 
-
+              {/* Show/Hide Toggle Button */}
+              <View style={styles.toggleSection}>
+                <TouchableOpacity 
+                  onPress={() => onStaplesToggle(!staplesEnabled)} 
+                  style={[styles.toggleButton, !staplesEnabled && styles.toggleButtonInactive]}
+                >
+                  <Text style={[styles.toggleButtonText, !staplesEnabled && styles.toggleButtonTextInactive]}>
+                    {staplesEnabled ? 'Hide' : 'Show'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
 
               <View style={styles.actionButtons}>
                 <TouchableOpacity onPress={handleCancel} style={[styles.button, styles.cancelButton]}>
@@ -268,16 +278,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: SPACING.md,
   } as ViewStyle,
+  toggleSection: {
+    alignItems: 'center',
+    marginBottom: SPACING.lg,
+  } as ViewStyle,
   toggleButton: {
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.sm,
     borderRadius: RADIUS.sm,
     backgroundColor: COLORS.primary,
+    borderWidth: BORDER_WIDTH.default,
+    borderColor: COLORS.primary,
+    minWidth: 100,
+    alignItems: 'center',
+  } as ViewStyle,
+  toggleButtonInactive: {
+    backgroundColor: COLORS.surface,
+    borderColor: COLORS.lightGray,
   } as ViewStyle,
   toggleButtonText: {
     ...bodyStrongText,
     color: COLORS.white,
     fontSize: 14,
+    textTransform: 'uppercase' as const,
+  } as TextStyle,
+  toggleButtonTextInactive: {
+    color: COLORS.textMuted,
   } as TextStyle,
 
   scrollWrapper: {

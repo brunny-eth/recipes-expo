@@ -12,7 +12,8 @@
     "update-normalized-urls": "npx ts-node scripts/updateNormalizedUrls.ts",
     "reparse-test-recipes": "npx ts-node scripts/reparseAllRecipes.ts",
     "bulk-import": "npx ts-node scripts/bulkImportLocalInputs.ts",
-    "bulk-import-csv": "npx ts-node scripts/bulkImportFromCsv.ts"
+    "bulk-import-csv": "npx ts-node scripts/bulkImportFromCsv.ts",
+    "bulk-import-pdf": "npx ts-node scripts/bulk-pdf-import.ts"
   },
   "dependencies": {
     "@d11/react-native-fast-image": "^8.9.2",

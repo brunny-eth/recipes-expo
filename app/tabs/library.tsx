@@ -5,6 +5,7 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  TouchableHighlight,
   TouchableWithoutFeedback,
   ActivityIndicator,
   RefreshControl,
@@ -59,16 +60,17 @@ type SavedRecipe = {
   display_order: number;
 };
 
-// Predefined folder colors (8 choices in 4x2 grid)
+// Predefined folder colors (9 gradient hues) - Teal/Cyan theme (lighter tones only)
 const FOLDER_COLORS = [
-  '#109DF0', // Primary blue
-  '#9253E0', // Purple
-  '#2E7D32', // Green
-  '#FFA000', // Orange
-  '#D32F2F', // Red
-  '#7a8c99', // Gray
-  '#FF6B6B', // Coral
-  '#DDA0DD', // Plum
+  '#F0F8F8', // Very light teal mist
+  '#E0F2F1', // Light teal mint
+  '#D1EDE9', // Soft teal cream
+  '#B2DFDB', // Gentle teal
+  '#A7D7D2', // Light medium teal
+  '#9CCFC9', // Soft medium teal
+  '#80CBC4', // Light rich teal
+  '#6BBFB7', // Gentle rich teal
+  '#4DB6AC', // Medium teal (still light)
 ];
 
 // Helpers for client-side search (same as in folder-detail.tsx)
@@ -136,6 +138,8 @@ export default function LibraryScreen() {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('');
   const [savedRecipes, setSavedRecipes] = useState<SavedRecipe[]>([]);
   const [isSearchingRecipes, setIsSearchingRecipes] = useState(false);
+  const [isSearchActive, setIsSearchActive] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false); // Prevent flicker during navigation
   
   // Add new folder modal state
   const [showAddFolderModal, setShowAddFolderModal] = useState(false);
@@ -154,6 +158,20 @@ export default function LibraryScreen() {
     const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 200);
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  // SEARCH button active state (matches folder-detail.tsx pattern)
+  const isSearchButtonActive = isSearchActive;
+
+  // Toggle search
+  const toggleSearch = useCallback(() => {
+    setIsSearchActive(prev => {
+      if (prev) {
+        // When hiding search, clear the search query
+        setSearchQuery('');
+      }
+      return !prev;
+    });
+  }, []);
 
   // Build indexed list for search
   const indexedRecipes = useMemo(() => {
@@ -395,6 +413,7 @@ export default function LibraryScreen() {
     useCallback(() => {
       fetchSavedFolders();
       fetchAllSavedRecipes(); // Also fetch recipes for search
+      setIsNavigating(false); // Reset navigation state when returning to screen
     }, [fetchSavedFolders, fetchAllSavedRecipes])
   );
 
@@ -416,19 +435,22 @@ export default function LibraryScreen() {
 
   // Navigate to recipe
   const navigateToRecipe = useCallback(async (recipe: ParsedRecipe) => {
+    // Set navigating state to prevent flicker
+    setIsNavigating(true);
+
     // Track input mode selection if user is on explore tab
     if (selectedTab === 'explore') {
       try {
         await track('input_mode_selected', { inputType: 'explore' });
       } catch (error) {
-        track('track_explore_recipe_selection_error', { 
-          screen: 'LibraryScreen', 
+        track('track_explore_recipe_selection_error', {
+          screen: 'LibraryScreen',
           error: error instanceof Error ? error.message : String(error),
           userId: session?.user?.id,
         });
       }
     }
-    
+
     router.push({
       pathname: '/recipe/summary',
       params: {
@@ -549,45 +571,31 @@ export default function LibraryScreen() {
   }, [navigateToRecipe, handleImageError, imageErrors]);
 
   // Render folder item
-  const renderFolderItem = useCallback(({ item }: { item: SavedFolder }) => (
-    <TouchableOpacity
-      style={styles.folderCard}
+  const renderFolderItem = useCallback(({ item, index }: { item: SavedFolder; index: number }) => (
+    <TouchableHighlight
+      style={[
+        styles.folderRow,
+        { backgroundColor: 'transparent' }, // Make transparent instead of using folder colors
+        index === 0 && { marginTop: SPACING.sm }, // Add top margin to first folder
+        index === 0 && { borderTopWidth: 1, borderTopColor: '#000000' } // Add top border to first folder
+      ]}
       onPress={() => navigateToFolder(item)}
+      underlayColor="#EEF6FF" // Use light blue for press state
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
     >
-      <TouchableOpacity 
-        style={styles.folderIcon}
-        onPress={() => {
-          setFolderToEdit(item);
-          setShowColorPickerModal(true);
-        }}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      >
-        <MaterialCommunityIcons
-          name="folder"
-          size={28}
-          color={item.color || COLORS.primary}
-        />
-      </TouchableOpacity>
-      <View style={styles.folderInfo}>
-        <Text style={styles.folderName} numberOfLines={1} ellipsizeMode="tail">
-          {item.name}
+      <View style={styles.folderRowContent}>
+        <Text 
+          style={styles.folderRowName} 
+          numberOfLines={1} 
+          ellipsizeMode="tail"
+          maxFontSizeMultiplier={1.2}
+        >
+          {item.name.toUpperCase()}
         </Text>
-        <Text style={styles.recipeCountText}>
-          {item.recipe_count} recipe{item.recipe_count !== 1 ? 's' : ''}
-        </Text>
+        <Text style={styles.chevronText}>›</Text>
       </View>
-              <View style={styles.folderActions}>
-          <TouchableOpacity 
-            style={styles.deleteButton} 
-            onPress={() => handleDeleteFolder(item)}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <MaterialCommunityIcons name="trash-can" size={16} color={COLORS.textMuted} />
-          </TouchableOpacity>
-          <MaterialCommunityIcons name="chevron-right" size={20} color={COLORS.textMuted} />
-        </View>
-    </TouchableOpacity>
-  ), [navigateToFolder, handleDeleteFolder]);
+    </TouchableHighlight>
+  ), [navigateToFolder]);
 
   // Render search result item
   const renderSearchResultItem = useCallback(({ item }: { item: SavedRecipe }) => {
@@ -600,7 +608,7 @@ export default function LibraryScreen() {
 
     return (
       <TouchableOpacity
-        style={styles.exploreCard}
+        style={styles.searchResultCard}
         onPress={() => navigateToRecipe(data)}
       >
         {/* Left half - Image */}
@@ -660,7 +668,7 @@ export default function LibraryScreen() {
       <FlatList
         data={exploreRecipes}
         renderItem={renderExploreItem}
-        keyExtractor={(item) => (item.id as number).toString()}
+        keyExtractor={(item) => `explore-${(item.id as number).toString()}`}
         contentContainerStyle={styles.listContent}
         refreshControl={
           <RefreshControl
@@ -733,16 +741,6 @@ export default function LibraryScreen() {
               Create your first folder to organize your saved recipes.
             </Text>
           </View>
-          
-          {/* Add New Folder Button at Bottom */}
-          <View style={styles.bottomButtonContainer}>
-            <TouchableOpacity
-              style={styles.addFolderButton}
-              onPress={() => setShowAddFolderModal(true)}
-            >
-              <Text style={styles.addFolderText}>Add new folder</Text>
-            </TouchableOpacity>
-          </View>
         </View>
       );
     }
@@ -750,64 +748,85 @@ export default function LibraryScreen() {
     return (
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.savedContent}>
-          {/* Search bar */}
-          <TouchableWithoutFeedback>
-            <View style={styles.searchContainer}>
-              <MaterialCommunityIcons name="magnify" size={20} color={COLORS.textMuted} style={styles.searchIcon} />
-              <TextInput
-                style={styles.searchInput}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                placeholder="Search all your saved recipes"
-                placeholderTextColor={COLORS.textMuted}
-                returnKeyType="search"
-                autoCorrect={false}
-              />
-              {searchQuery.length > 0 && (
-                <TouchableOpacity
-                  onPress={() => setSearchQuery('')}
-                  style={styles.clearButton}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <MaterialCommunityIcons name="close" size={18} color={COLORS.textMuted} />
-                </TouchableOpacity>
+          {/* Search toolbar */}
+          <TouchableHighlight
+            style={styles.searchToolbar}
+            onPress={isSearchActive ? undefined : toggleSearch}
+            underlayColor="transparent"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <View style={styles.searchToolbarContent}>
+              {isSearchActive ? (
+                <TextInput
+                  style={styles.headerText}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder=""
+                  returnKeyType="search"
+                  autoCorrect={false}
+                  autoFocus={true}
+                  onBlur={() => {
+                    setIsSearchActive(false);
+                    setSearchQuery('');
+                  }}
+                />
+              ) : (
+                <Text style={[
+                  styles.headerText,
+                  isSearchButtonActive && styles.headerTextActive
+                ]}>SEARCH</Text>
               )}
             </View>
-          </TouchableWithoutFeedback>
+          </TouchableHighlight>
 
-        {/* Show search results if searching */}
-        {searchQuery.length > 0 && (
-          <View style={styles.searchResultsContainer}>
-            <Text style={styles.searchResultsHeader}>
-              Search results ({filteredRecipes.length})
-            </Text>
-            {filteredRecipes.length > 0 ? (
-              <FlatList
-                data={filteredRecipes}
-                renderItem={renderSearchResultItem}
-                keyExtractor={(item) => item.processed_recipes_cache?.id.toString() || item.base_recipe_id.toString()}
-                contentContainerStyle={styles.searchResultsList}
-                showsVerticalScrollIndicator={false}
-                nestedScrollEnabled={true}
-                style={styles.searchResultsFlatList}
-              />
-            ) : (
-              <View style={styles.noSearchResults}>
-                <MaterialCommunityIcons name="magnify" size={48} color={COLORS.lightGray} />
-                <Text style={styles.emptyText}>No matches</Text>
-                <Text style={styles.emptySubtext}>Try a different search term.</Text>
-              </View>
-            )}
+          {/* Add New Folder - right below search */}
+          <TouchableHighlight
+            style={styles.addFolderRow}
+            onPress={() => setShowAddFolderModal(true)}
+            underlayColor="#EEF6FF"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <View style={styles.searchToolbarContent}>
+              <Text style={styles.headerText}>ADD NEW FOLDER</Text>
+            </View>
+          </TouchableHighlight>
+
+          {/* Spacing now handled by addFolderRow marginBottom */}
+
+        {/* Show search results if searching or navigating */}
+        {((isSearchActive && searchQuery.length > 0) || isNavigating) && (
+          <View style={styles.searchResultsWrapper}>
+            <View style={styles.searchResultsContainer}>
+              <Text style={styles.searchResultsHeader}>
+                {isNavigating ? 'Loading recipe...' : `Search results (${filteredRecipes.length})`}
+              </Text>
+              {filteredRecipes.length > 0 ? (
+                <FlatList
+                  data={filteredRecipes}
+                  renderItem={renderSearchResultItem}
+                  keyExtractor={(item, index) => `search-${item.processed_recipes_cache?.id.toString() || item.base_recipe_id.toString()}-${index}`}
+                  contentContainerStyle={styles.searchResultsList}
+                  showsVerticalScrollIndicator={false}
+                  nestedScrollEnabled={true}
+                  style={styles.searchResultsFlatList}
+                />
+              ) : (
+                <View style={styles.noSearchResults}>
+                  <Text style={styles.emptyText}>No matches.</Text>
+                  <Text style={styles.emptySubtext}>Try a different search term.</Text>
+                </View>
+              )}
+            </View>
           </View>
         )}
 
-        {/* Show folders when not searching or when search has no results */}
-        {(!searchQuery || filteredRecipes.length === 0) && (
+        {/* Show folders when not searching or when search query is empty */}
+        {(!isSearchActive || (isSearchActive && searchQuery.length === 0)) && (
           <>
             <FlatList
               data={savedFolders}
-              renderItem={renderFolderItem}
-              keyExtractor={(item) => (item.id as number).toString()}
+              renderItem={({ item, index }) => renderFolderItem({ item, index })}
+              keyExtractor={(item) => `folder-${(item.id as number).toString()}`}
               contentContainerStyle={styles.listContent}
               refreshControl={
                 <RefreshControl
@@ -826,16 +845,6 @@ export default function LibraryScreen() {
                 </View>
               }
             />
-
-            {/* Add New Folder Button at Bottom */}
-            <View style={styles.bottomButtonContainer}>
-              <TouchableOpacity
-                style={styles.addFolderButton}
-                onPress={() => setShowAddFolderModal(true)}
-              >
-                <Text style={styles.addFolderText}>Add new folder</Text>
-              </TouchableOpacity>
-            </View>
           </>
         )}
         </View>
@@ -845,7 +854,7 @@ export default function LibraryScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScreenHeader title="Cookbooks" showBack={false} />
+      <ScreenHeader title="LIBRARY" showBack={false} />
       
       {/* Content: Saved only */}
       {renderSavedContent()}
@@ -898,7 +907,7 @@ export default function LibraryScreen() {
                
                <View style={styles.colorGrid}>
                  <View style={styles.colorRow}>
-                   {FOLDER_COLORS.slice(0, 4).map((color, index) => (
+                   {FOLDER_COLORS.slice(0, 3).map((color, index) => (
                      <TouchableOpacity
                        key={index}
                        style={[
@@ -914,9 +923,25 @@ export default function LibraryScreen() {
                    ))}
                  </View>
                  <View style={styles.colorRow}>
-                   {FOLDER_COLORS.slice(4, 8).map((color, index) => (
+                   {FOLDER_COLORS.slice(3, 6).map((color, index) => (
                      <TouchableOpacity
-                       key={index + 4}
+                       key={index + 3}
+                       style={[
+                         styles.colorSquare,
+                         { backgroundColor: color },
+                         folderToEdit.color === color && styles.selectedColorSquare
+                       ]}
+                       onPress={() => {
+                         updateFolderColor(folderToEdit.id, color);
+                         setShowColorPickerModal(false);
+                       }}
+                     />
+                   ))}
+                 </View>
+                 <View style={styles.colorRow}>
+                   {FOLDER_COLORS.slice(6, 9).map((color, index) => (
+                     <TouchableOpacity
+                       key={index + 6}
                        style={[
                          styles.colorSquare,
                          { backgroundColor: color },
@@ -942,7 +967,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingHorizontal: SPACING.pageHorizontal,
   },
   tabContainer: {
     flexDirection: 'row',
@@ -983,7 +1007,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   listContent: {
-    paddingTop: SPACING.sm,
+    // Removed paddingTop to eliminate gap above first folder
   },
   errorContainer: {
     flex: 1,
@@ -1016,16 +1040,18 @@ const styles = StyleSheet.create({
     paddingTop: '30%',
   },
   emptyText: {
-    fontFamily: FONT.family.heading,
-    fontSize: 18,
+    ...bodyStrongText,
+    fontSize: FONT.size.body,
     color: COLORS.textDark,
     marginTop: SPACING.md,
     marginBottom: SPACING.sm,
+    textAlign: 'left',
   },
   emptySubtext: {
-    ...bodyText,
-    color: COLORS.darkGray,
-    textAlign: 'center',
+    ...bodyStrongText,
+    fontSize: FONT.size.body,
+    color: COLORS.textDark,
+    textAlign: 'left',
     marginTop: SPACING.xs,
   },
   loginButton: {
@@ -1039,55 +1065,45 @@ const styles = StyleSheet.create({
     ...bodyStrongText,
     color: COLORS.white,
   },
-  // Folder styles
-  folderCard: {
+  // Folder row styles
+  folderRow: {
+    height: 64,
+    borderBottomWidth: 1,
+    borderBottomColor: '#000000',
+    width: '90%',
+    alignSelf: 'flex-start', // Left align to screen edge
+    marginLeft: '5%', // Offset to account for 90% width
+  },
+  folderRowAlternate: {
+    // Removed - now using individual folder colors
+  },
+  folderRowContent: {
     flexDirection: 'row',
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.sm,
-    padding: SPACING.lg,
-    marginBottom: SPACING.md,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
     alignItems: 'center',
+    justifyContent: 'space-between',
+    height: '100%',
+    paddingLeft: 0, // Remove left padding for true left alignment
+    paddingRight: 18, // Keep some right padding
   },
-  folderIcon: {
-    width: 48,
-    height: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: SPACING.md,
-  },
-  folderInfo: {
-    flex: 1,
-    marginRight: SPACING.sm, // Ensure consistent spacing from actions
-  },
-  folderName: {
-    ...bodyStrongText,
-    fontSize: FONT.size.body,
+  folderRowName: {
+    fontFamily: 'Inter',
+    fontSize: 18,
+    fontWeight: '800',
+    lineHeight: 22,
+    textTransform: 'uppercase' as const,
     color: COLORS.textDark,
-    marginBottom: 6,
+    flex: 1,
+    textAlign: 'left', // Ensure left alignment
   },
-  recipeCountText: {
-    ...metaText,
+  chevronText: {
+    fontSize: 20,
     color: COLORS.textMuted,
-  },
-  folderActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minWidth: 60, // Ensure consistent width for actions
-    justifyContent: 'flex-end',
-  },
-  deleteButton: {
-    padding: SPACING.xs,
-    marginRight: SPACING.sm,
+    fontWeight: '400',
   },
   // Explore card styles
   exploreCard: {
     flexDirection: 'row',
-    backgroundColor: COLORS.white,
+    backgroundColor: 'transparent',
     borderRadius: RADIUS.sm,
     marginBottom: SPACING.md,
     shadowColor: COLORS.black,
@@ -1097,12 +1113,41 @@ const styles = StyleSheet.create({
     elevation: 3,
     height: 120,
     overflow: 'hidden',
+    width: '90%',
+    alignSelf: 'center',
+  },
+  // Search result card styles - left aligned
+  searchResultCard: {
+    flexDirection: 'row',
+    backgroundColor: 'transparent',
+    borderRadius: RADIUS.sm,
+    marginBottom: SPACING.md,
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    height: 120,
+    overflow: 'hidden',
+    width: '95%', // Slightly wider to account for left edge positioning
+    alignSelf: 'flex-start', // Left align to screen edge
+    marginLeft: 0, // Start from absolute left edge
+    paddingLeft: 0, // Ensure no internal left padding
   },
   imageContainer: {
     width: '40%',
     height: '100%',
     borderRadius: RADIUS.md,
     overflow: 'hidden',
+  },
+  // Specific title container for search results to ensure alignment
+  searchResultTitleContainer: {
+    width: '60%',
+    height: '100%',
+    paddingLeft: 0, // Remove left padding for perfect alignment
+    paddingRight: SPACING.sm,
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
   exploreCardImage: {
     width: '100%',
@@ -1114,7 +1159,7 @@ const styles = StyleSheet.create({
     paddingLeft: SPACING.md,
     paddingRight: SPACING.sm,
     justifyContent: 'center',
-    backgroundColor: COLORS.white,
+    backgroundColor: 'transparent',
   },
   exploreCardTitle: {
     color: COLORS.textDark,
@@ -1123,27 +1168,23 @@ const styles = StyleSheet.create({
     lineHeight: FONT.size.body * 1.3,
   },
   
-  // Add new folder styles
-  bottomButtonContainer: {
-    backgroundColor: COLORS.background,
-  } as ViewStyle,
-  addFolderButton: {
+  // Add new folder styles - now looks like search text
+  addFolderRow: {
+    height: 24, // Match search height for tight spacing (18px font + 6px)
+    width: '90%',
+    alignSelf: 'flex-start', // Left align to screen edge
+    marginLeft: '5%', // Offset to account for 90% width
+    marginBottom: SPACING.xxxl + SPACING.contentTopMargin, // Big bottom margin for spacing from folders plus content top margin
+  },
+  addFolderRowContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.primary,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.sm,
-    marginHorizontal: SPACING.pageHorizontal,
-    marginBottom: SPACING.lg,
-    marginTop: SPACING.md,
-    ...SHADOWS.small,
-  } as ViewStyle,
-  addFolderText: {
-    ...bodyStrongText,
-    color: COLORS.white,
-  } as TextStyle,
+    justifyContent: 'space-between',
+    height: '100%',
+    paddingLeft: 0, // Remove left padding for true left alignment
+    paddingRight: 18, // Keep some right padding
+  },
+  // Note: addFolderRowText now uses headerText style for consistency
 
   // New styles for saved content
   savedContent: {
@@ -1216,57 +1257,91 @@ const styles = StyleSheet.create({
      ...bodyStrongText,
      color: COLORS.white,
    },
-  // New styles for search
-  searchContainer: {
+  // New styles for search - minimal height
+  searchToolbar: {
+    height: 24, // Just bigger than font size (18px + 6px)
+    width: '90%',
+    alignSelf: 'flex-start', // Left align to screen edge
+    marginLeft: '5%', // Offset to account for 90% width
+    marginTop: 8, // Small top margin
+  },
+
+  searchToolbarContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
-    paddingHorizontal: SPACING.sm,
-    // Fix height so it doesn't change between placeholder and typed text
-    height: 40,
-    marginBottom: SPACING.sm,
-  } as ViewStyle,
-  searchIcon: {
-    marginRight: SPACING.xs,
-  },
-  searchInput: {
-    // Avoid inheriting bodyText lineHeight which can misalign TextInput vertically
-    fontFamily: FONT.family.body,
-    fontSize: FONT.size.body,
-    flex: 1,
-    color: COLORS.textDark,
-    paddingVertical: 0,
     height: '100%',
+    paddingLeft: 0, // Remove left padding for true left alignment
+    paddingRight: 18, // Keep some right padding
+  },
+  searchToolbarText: {
+    fontFamily: 'Inter',
+    fontSize: 18,
+    fontWeight: '800',
+    lineHeight: 22,
+    textTransform: 'uppercase' as const,
+    color: COLORS.textDark,
+    flex: 1,
     textAlignVertical: 'center',
+    paddingVertical: 0,
   },
-  clearButton: {
-    padding: 4,
+  // Shared text style for search and add folder - non-bold
+  headerText: {
+    fontFamily: 'Inter',
+    fontSize: 18,
+    fontWeight: '400', // Non-bold variant
+    lineHeight: 22,
+    color: COLORS.textDark,
+    flex: 1,
+    textAlign: 'left', // Ensure left alignment
+    textAlignVertical: 'center',
+    paddingVertical: 0,
   },
+  // Active state for search (matches folder-detail.tsx)
+  headerTextActive: {
+    color: COLORS.primary, // Blue color when active
+  },
+
+
+
+
+
+  searchResultsWrapper: {
+    paddingLeft: 0, // Remove left padding for true left alignment
+    paddingRight: SPACING.pageHorizontal, // Keep right padding
+    paddingTop: 0,
+    paddingBottom: SPACING.md,
+    width: '90%',
+    alignSelf: 'flex-start', // Left align to screen edge
+    marginLeft: '5%', // Offset to account for 90% width
+  } as ViewStyle,
   searchResultsContainer: {
-    backgroundColor: COLORS.white,
+    backgroundColor: 'transparent',
     borderRadius: RADIUS.md,
-    padding: SPACING.md,
-    marginBottom: SPACING.md,
+    padding: 0, // Remove padding for true left alignment
     ...SHADOWS.small,
     maxHeight: '90%', // Allow more height while still preventing cutoff by tab bar
+    width: '100%',
   } as ViewStyle,
   searchResultsHeader: {
     ...bodyStrongText,
     fontSize: FONT.size.body,
     color: COLORS.textDark,
     marginBottom: SPACING.sm,
+    paddingLeft: 0, // Remove left padding for perfect alignment
+    paddingRight: 18, // Match other elements' right padding
   },
   searchResultsList: {
+    paddingLeft: 0, // Match other elements' left padding
+    paddingRight: 18, // Match other elements' right padding
     paddingBottom: SPACING.md,
   },
   searchResultsFlatList: {
     maxHeight: '100%', // Allow FlatList to take full height of container and scroll
   } as ViewStyle,
   noSearchResults: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingVertical: SPACING.xl,
+    paddingLeft: 0, // Remove left padding for perfect alignment
+    paddingRight: 18, // Match other elements' right padding
   },
 }); 

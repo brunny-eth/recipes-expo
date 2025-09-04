@@ -7,8 +7,9 @@ import { captionText, FONT } from '@/constants/typography';
 
 const styles = StyleSheet.create({
   tabBar: {
-    borderTopWidth: 0,
-    borderTopColor: 'transparent',
+    backgroundColor: COLORS.background,
+    borderTopWidth: 0.5,
+    borderTopColor: COLORS.divider,
     height: 72,
     paddingBottom: Platform.OS === 'ios' ? 26 : 12,
     paddingTop: 6,
@@ -25,25 +26,20 @@ const styles = StyleSheet.create({
   },
   tabBarText: {
     ...captionText,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '600',
     textAlign: 'center',
     width: 64,
   },
 });
 
-// Helper function to create tab bar icon with label above icon
+// Helper function to create tab bar text only (no icons)
 const createTabBarIcon = (iconName: string, label: string) => {
   return ({ color, focused }: { color: string; focused: boolean }) => (
     <View style={styles.tabBarItem}>
       <Text style={[styles.tabBarText, { color }]} numberOfLines={1}>
         {label}
       </Text>
-      <MaterialCommunityIcons
-        name={iconName as any}
-        size={22}
-        color={color}
-      />
     </View>
   );
 };
@@ -71,6 +67,15 @@ const MemoizedTabsNavigator = React.memo(() => {
       <Tabs.Screen
         name="index"
         options={{
+          title: 'Home',
+          tabBarIcon: createTabBarIcon('home', 'Home'),
+          tabBarLabel: () => null,
+          unmountOnBlur: false,
+        }}
+      />
+      <Tabs.Screen
+        name="import"
+        options={{
           title: 'Import',
           tabBarIcon: createTabBarIcon('silverware-fork-knife', 'Import'),
           tabBarLabel: () => null,
@@ -80,8 +85,8 @@ const MemoizedTabsNavigator = React.memo(() => {
       <Tabs.Screen
         name="library"
         options={{
-          title: 'Cookbooks',
-          tabBarIcon: createTabBarIcon('book-open-variant', 'Cookbooks'),
+          title: 'Library',
+          tabBarIcon: createTabBarIcon('book-open-variant', 'Library'),
           tabBarLabel: () => null,
           unmountOnBlur: false,
         }}
@@ -89,8 +94,8 @@ const MemoizedTabsNavigator = React.memo(() => {
       <Tabs.Screen
         name="mise"
         options={{
-          title: 'Prep',
-          tabBarIcon: createTabBarIcon('chef-hat', 'Prep'),
+          title: 'Cook',
+          tabBarIcon: createTabBarIcon('chef-hat', 'Cook'),
           tabBarLabel: () => null,
           unmountOnBlur: false,
         }}

@@ -1,10 +1,10 @@
 export const COLORS = {
-  primary: '#109DF0', // Primary Accent: burnt orange
-  primaryLight: '#e6f4fd', // A lighter shade of primary for backgrounds/hovers
-  secondary: '#7a8c99', // Tertiary/Border for secondary or disabled states
-  accent: '#9253E0', // A brighter, more vibrant orange for active states
+  primary: '#005AC9', 
+  primaryLight: '#e6f4fd', 
+  secondary: '#7a8c99', 
+  accent: '#9253E0', 
 
-  background: '#eeece5', // Main app background
+  background: '#FFFFF7', // Main app background
   white: '#FFFFFF',
   black: '#000000',
 
@@ -56,6 +56,7 @@ export const SPACING = {
   xxlAlt: 30,
   xxxl: 48,
   xxxlAlt: 35,
+  contentTopMargin: 48, // Additional top margin for content sections
   footerHeight: 80,
 };
 
