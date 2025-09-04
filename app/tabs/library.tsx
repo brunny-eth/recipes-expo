@@ -590,7 +590,7 @@ export default function LibraryScreen() {
           ellipsizeMode="tail"
           maxFontSizeMultiplier={1.2}
         >
-          {item.name.toUpperCase()}
+          {item.name.replace(/\b\w/g, (l) => l.toUpperCase())}
         </Text>
         <Text style={styles.chevronText}>›</Text>
       </View>
@@ -645,7 +645,7 @@ export default function LibraryScreen() {
         <ActivityIndicator
           style={styles.centered}
           size="large"
-          color={COLORS.primary}
+          color="black"
         />
       );
     }
@@ -694,7 +694,7 @@ export default function LibraryScreen() {
         <ActivityIndicator
           style={styles.centered}
           size="large"
-          color={COLORS.primary}
+          color="black"
         />
       );
     }
@@ -774,7 +774,7 @@ export default function LibraryScreen() {
                 <Text style={[
                   styles.headerText,
                   isSearchButtonActive && styles.headerTextActive
-                ]}>SEARCH</Text>
+                ]}>Search</Text>
               )}
             </View>
           </TouchableHighlight>
@@ -787,7 +787,7 @@ export default function LibraryScreen() {
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <View style={styles.searchToolbarContent}>
-              <Text style={styles.headerText}>ADD NEW FOLDER</Text>
+              <Text style={styles.headerText}>Add New Folder</Text>
             </View>
           </TouchableHighlight>
 
@@ -1087,10 +1087,9 @@ const styles = StyleSheet.create({
   },
   folderRowName: {
     fontFamily: 'Inter',
-    fontSize: 18,
-    fontWeight: '800',
-    lineHeight: 22,
-    textTransform: 'uppercase' as const,
+    fontSize: 30,
+    fontWeight: '500',
+    lineHeight: 30,
     color: COLORS.textDark,
     flex: 1,
     textAlign: 'left', // Ensure left alignment
@@ -1170,7 +1169,7 @@ const styles = StyleSheet.create({
   
   // Add new folder styles - now looks like search text
   addFolderRow: {
-    height: 24, // Match search height for tight spacing (18px font + 6px)
+    height: 24, 
     width: '90%',
     alignSelf: 'flex-start', // Left align to screen edge
     marginLeft: '5%', // Offset to account for 90% width

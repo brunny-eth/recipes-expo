@@ -116,6 +116,12 @@ export default function HouseholdStaplesModal({
       } else {
         setLocalSelected(selectedStaples);
       }
+
+      // Close all category toggles by default
+      const allCategories = Object.keys(HOUSEHOLD_STAPLES_BY_CATEGORY);
+      const collapsedState = new Set(allCategories);
+      setCollapsedSections(collapsedState);
+      console.log('[HouseholdStaplesModal] 🔽 All category toggles collapsed by default');
     }
   }, [visible, selectedStaples]);
 
@@ -165,7 +171,7 @@ export default function HouseholdStaplesModal({
               <View style={styles.header}>
                 <Text style={styles.title}>Pantry</Text>
                 <Text style={styles.subtitle}>
-                  Select items to leave out of your shopping list
+                  Leave items out of your groceries
                 </Text>
               </View>
 
@@ -200,9 +206,9 @@ export default function HouseholdStaplesModal({
                               onPress={() => handleToggleStaple(staple)}
                             >
                               <MaterialCommunityIcons
-                                name={localSelected.includes(staple) ? "checkbox-marked" : "checkbox-blank-outline"}
+                                name={localSelected.includes(staple) ? "circle" : "circle-outline"}
                                 size={24}
-                                color={localSelected.includes(staple) ? COLORS.primary : COLORS.secondary}
+                                color={localSelected.includes(staple) ? COLORS.textDark : COLORS.textMuted}
                               />
                               <Text style={styles.stapleText}>{staple}</Text>
                             </TouchableOpacity>
@@ -214,24 +220,18 @@ export default function HouseholdStaplesModal({
                 </View>
               </View>
 
-              {/* Show/Hide Toggle Button */}
-              <View style={styles.toggleSection}>
-                <TouchableOpacity 
-                  onPress={() => onStaplesToggle(!staplesEnabled)} 
-                  style={[styles.toggleButton, !staplesEnabled && styles.toggleButtonInactive]}
-                >
-                  <Text style={[styles.toggleButtonText, !staplesEnabled && styles.toggleButtonTextInactive]}>
-                    {staplesEnabled ? 'Hide' : 'Show'}
+              {/* All Buttons Stacked */}
+              <View style={styles.buttonStack}>
+                <TouchableOpacity onPress={() => onStaplesToggle(!staplesEnabled)} style={styles.stackedButton}>
+                  <Text style={[styles.stackedButtonText, !staplesEnabled && styles.stackedButtonTextInactive]}>
+                    {staplesEnabled ? 'Hide Pantry Items' : 'Show Pantry Items'}
                   </Text>
                 </TouchableOpacity>
-              </View>
-
-              <View style={styles.actionButtons}>
-                <TouchableOpacity onPress={handleCancel} style={[styles.button, styles.cancelButton]}>
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                <TouchableOpacity onPress={handleCancel} style={styles.stackedButton}>
+                  <Text style={styles.stackedButtonText}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={handleSave} style={[styles.button, styles.saveButton]}>
-                  <Text style={styles.saveButtonText}>Save</Text>
+                <TouchableOpacity onPress={handleSave} style={styles.stackedButton}>
+                  <Text style={styles.stackedButtonText}>Save</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -262,88 +262,84 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   } as ViewStyle,
   title: {
-    fontFamily: FONT.family.bold,
-    fontSize: FONT.size.sectionHeader,
+    fontFamily: FONT.family.graphikMedium,
+    fontSize: 28,
+    fontWeight: '600',
+    lineHeight: 32,
     color: COLORS.textDark,
     marginBottom: SPACING.xs,
-    textAlign: 'center',
+    textAlign: 'left',
   } as TextStyle,
   subtitle: {
-    fontSize: FONT.size.caption,
+    fontFamily: 'Inter',
+    fontSize: 16,
+    fontWeight: '400',
+    lineHeight: 22,
     color: COLORS.textMuted,
-    lineHeight: 18,
-    textAlign: 'center',
-  } as TextStyle,
-  toggleRow: {
-    alignItems: 'center',
-    marginBottom: SPACING.md,
-  } as ViewStyle,
-  toggleSection: {
-    alignItems: 'center',
-    marginBottom: SPACING.lg,
-  } as ViewStyle,
-  toggleButton: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.primary,
-    borderWidth: BORDER_WIDTH.default,
-    borderColor: COLORS.primary,
-    minWidth: 100,
-    alignItems: 'center',
-  } as ViewStyle,
-  toggleButtonInactive: {
-    backgroundColor: COLORS.surface,
-    borderColor: COLORS.lightGray,
-  } as ViewStyle,
-  toggleButtonText: {
-    ...bodyStrongText,
-    color: COLORS.white,
-    fontSize: 14,
-    textTransform: 'uppercase' as const,
-  } as TextStyle,
-  toggleButtonTextInactive: {
-    color: COLORS.textMuted,
+    textAlign: 'left',
   } as TextStyle,
 
   scrollWrapper: {
     marginBottom: SPACING.lg,
   } as ViewStyle,
   scrollHint: {
-    ...bodyText,
-    fontSize: 12,
+    fontFamily: 'Inter',
+    fontSize: FONT.size.meta,
+    fontWeight: '400',
+    lineHeight: FONT.lineHeight.tight,
     color: COLORS.textMuted,
     textAlign: 'center',
     marginBottom: SPACING.sm,
+  } as TextStyle,
+
+  buttonStack: {
+    alignItems: 'flex-start',
+    gap: SPACING.sm,
+  } as ViewStyle,
+  stackedButton: {
+    height: 24,
+    backgroundColor: 'transparent',
+    alignItems: 'flex-start',
+  } as ViewStyle,
+  stackedButtonText: {
+    fontFamily: 'Inter',
+    fontSize: 18,
+    fontWeight: '400',
+    lineHeight: 22,
+    color: COLORS.textDark,
+    flex: 1,
+    textAlign: 'left',
+    textTransform: 'none' as const,
+  } as TextStyle,
+  stackedButtonTextInactive: {
+    color: COLORS.textMuted,
   } as TextStyle,
   scrollContainerWrapper: {
     position: 'relative', // Needed for absolute positioning of gradient
   } as ViewStyle,
   scrollContainer: {
     maxHeight: 350, // Increased height to show more content
-    borderWidth: 2, // Thicker border to make it more obvious
-    borderColor: COLORS.primaryLight,
+    borderWidth: 1,
+    borderColor: '#000000',
     borderRadius: RADIUS.sm,
     paddingHorizontal: SPACING.sm,
     backgroundColor: COLORS.white,
-    // Add shadow to make the container stand out
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   } as ViewStyle,
   categorySection: {
     marginBottom: SPACING.md,
   } as ViewStyle,
   categoryHeader: {
-    ...bodyStrongText,
-    fontSize: FONT.size.caption,
-    color: COLORS.textMuted,
+    fontFamily: FONT.family.graphikMedium,
+    fontSize: FONT.size.body,
+    fontWeight: '600',
+    lineHeight: FONT.lineHeight.normal,
+    color: COLORS.textDark,
     marginBottom: SPACING.xs,
     paddingBottom: SPACING.xs,
-    borderBottomWidth: BORDER_WIDTH.hairline,
-    borderBottomColor: COLORS.primaryLight,
+    borderBottomWidth: 1,
+    borderBottomColor: '#000000',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   } as TextStyle,
   categoryHeaderContainer: {
     flexDirection: 'row',
@@ -362,39 +358,12 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm,
   } as ViewStyle,
   stapleText: {
-    ...bodyText,
+    fontFamily: 'Inter',
+    fontSize: FONT.size.body,
+    fontWeight: '400',
+    lineHeight: FONT.lineHeight.normal,
     color: COLORS.textDark,
     marginLeft: SPACING.md,
     flex: 1,
-  } as TextStyle,
-  actionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: SPACING.md,
-  } as ViewStyle,
-  button: {
-    flex: 1,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.sm,
-    alignItems: 'center',
-  } as ViewStyle,
-  cancelButton: {
-    backgroundColor: COLORS.white,
-    borderWidth: BORDER_WIDTH.default,
-    borderColor: COLORS.lightGray,
-  } as ViewStyle,
-  cancelButtonText: {
-    ...bodyStrongText,
-    color: COLORS.textMuted,
-  } as TextStyle,
-  saveButton: {
-    backgroundColor: COLORS.primary,
-    borderWidth: BORDER_WIDTH.default,
-    borderColor: COLORS.primary,
-  } as ViewStyle,
-  saveButtonText: {
-    ...bodyStrongText,
-    color: COLORS.white,
   } as TextStyle,
 }); 

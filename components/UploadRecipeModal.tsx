@@ -59,7 +59,7 @@ export default function UploadRecipeModal({
                 <MaterialCommunityIcons
                   name="file-document"
                   size={24}
-                  color={COLORS.primary}
+                  color="#000000"
                 />
               </View>
               <View style={styles.optionContent}>
@@ -68,7 +68,7 @@ export default function UploadRecipeModal({
               <MaterialCommunityIcons
                 name="chevron-right"
                 size={20}
-                color={COLORS.gray}
+                color={COLORS.textDark}
               />
             </TouchableOpacity>
 
@@ -80,7 +80,7 @@ export default function UploadRecipeModal({
                 <MaterialCommunityIcons
                   name="camera"
                   size={24}
-                  color={COLORS.primary}
+                  color="#000000"
                 />
               </View>
               <View style={styles.optionContent}>
@@ -89,7 +89,7 @@ export default function UploadRecipeModal({
               <MaterialCommunityIcons
                 name="chevron-right"
                 size={20}
-                color={COLORS.gray}
+                color={COLORS.textDark}
               />
             </TouchableOpacity>
 
@@ -101,7 +101,7 @@ export default function UploadRecipeModal({
                 <MaterialCommunityIcons
                   name="image"
                   size={24}
-                  color={COLORS.primary}
+                  color="#000000"
                 />
               </View>
               <View style={styles.optionContent}>
@@ -110,15 +110,12 @@ export default function UploadRecipeModal({
               <MaterialCommunityIcons
                 name="chevron-right"
                 size={20}
-                color={COLORS.gray}
+                color={COLORS.textDark}
               />
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity
-            style={styles.cancelButton}
-            onPress={handleClose}
-          >
+          <TouchableOpacity onPress={handleClose} style={styles.cancelButton}>
             <Text style={styles.cancelButtonText}>Cancel</Text>
           </TouchableOpacity>
         </TouchableOpacity>
@@ -139,8 +136,12 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderRadius: RADIUS.lg,
     padding: SPACING.lg,
-    width: '100%',
+    width: '90%',
     maxWidth: 350,
+    alignSelf: 'center',
+    marginLeft: '5%',
+    borderWidth: 1,
+    borderColor: '#000000',
     shadowColor: COLORS.black,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.25,
@@ -148,16 +149,21 @@ const styles = StyleSheet.create({
     elevation: 10,
   } as ViewStyle,
   title: {
-    ...bodyStrongText,
-    fontSize: 20,
+    fontFamily: FONT.family.graphikMedium,
+    fontSize: 28,
+    fontWeight: '600',
+    lineHeight: 32,
     color: COLORS.textDark,
-    textAlign: 'center',
+    textAlign: 'left',
     marginBottom: SPACING.lg,
   } as TextStyle,
   subtitle: {
-    ...bodyText,
+    fontFamily: 'Inter',
+    fontSize: 16,
+    fontWeight: '400',
+    lineHeight: 22,
     color: COLORS.textMuted,
-    textAlign: 'center',
+    textAlign: 'left',
     marginBottom: SPACING.lg,
   } as TextStyle,
   optionsContainer: {
@@ -165,21 +171,22 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   } as ViewStyle,
   optionButton: {
+    width: '100%',
+    backgroundColor: COLORS.primary,
+    borderWidth: 1,
+    borderColor: '#000000',
+    borderRadius: RADIUS.md,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: SPACING.md,
+    paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.md,
-    borderRadius: RADIUS.md,
-    backgroundColor: COLORS.surface,
-    borderWidth: BORDER_WIDTH.default,
-    borderColor: COLORS.divider,
-    minHeight: 50,
+    minHeight: 44,
   } as ViewStyle,
   optionIcon: {
     width: 40,
     height: 40,
     borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: SPACING.md,
@@ -189,24 +196,22 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   optionTitle: {
     ...bodyStrongText,
-    color: COLORS.textDark,
-    fontSize: FONT.size.body,
-    letterSpacing: 0.2,
+    color: '#000000',
+    textAlign: 'left',
   } as TextStyle,
   cancelButton: {
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 44,
+    height: 24,
     backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
+    alignItems: 'flex-start',
   } as ViewStyle,
   cancelButtonText: {
-    ...bodyStrongText,
-    color: COLORS.textMuted,
-    fontSize: 14,
+    fontFamily: 'Inter',
+    fontSize: 18,
+    fontWeight: '400',
+    lineHeight: 22,
+    color: COLORS.textDark,
+    flex: 1,
+    textAlign: 'left',
+    textTransform: 'none' as const,
   } as TextStyle,
 }); 

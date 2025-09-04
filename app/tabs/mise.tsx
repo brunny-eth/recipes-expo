@@ -1148,7 +1148,7 @@ export default function MiseScreen() {
         style={[
           styles.card,
           styles.cardWithMinHeight,
-          index === 0 && { marginTop: SPACING.sm }, // Add top margin to first recipe
+          index === 0 && { marginTop: 0 }, // Add top margin to first recipe
           index === 0 && { borderTopWidth: 1, borderTopColor: '#000000' } // Add top border to first recipe
         ]}
         onPress={handleRecipePress}
@@ -1162,13 +1162,13 @@ export default function MiseScreen() {
             {(() => {
               const servingsCount = parseServingsValue(item.prepared_recipe_data.recipeYield);
               return servingsCount ? (
-                <Text style={styles.servingsText}>(For {servingsCount})</Text>
+                <Text style={styles.servingsText}>For {servingsCount}</Text>
               ) : null;
             })()}
           </View>
         </View>
 
-        {/* Trash icon */}
+        {/* Delete icon */}
         <TouchableOpacity
           style={styles.trashIcon}
           onPress={(e) => {
@@ -1177,7 +1177,7 @@ export default function MiseScreen() {
           }}
           activeOpacity={0.7}
         >
-          <MaterialCommunityIcons name="trash-can" size={16} color={COLORS.textMuted} />
+          <Text style={styles.deleteIcon}>×</Text>
         </TouchableOpacity>
       </TouchableOpacity>
     );
@@ -1194,23 +1194,20 @@ export default function MiseScreen() {
       .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
 
     // Helper function to render individual grocery item
-    const renderGroceryItem = (groceryItem: GroceryItem, index: number, isLastInGroup: boolean) => (
+    const renderGroceryItem = (groceryItem: GroceryItem, index: number) => (
       <TouchableOpacity
         key={groceryItem.id}
         style={[
-          styles.groceryItem,
-          isLastInGroup && styles.groceryItemLast,
-          index === 0 && !groceryItem.checked && { marginTop: SPACING.sm }, // Add top margin to first unchecked grocery item
-          index === 0 && !groceryItem.checked && { borderTopWidth: 1, borderTopColor: '#000000' } // Add top border to first unchecked grocery item
+          styles.groceryItem
         ]}
         onPress={() => handleGroceryToggle(groceryItem.id)}
         activeOpacity={0.8}
       >
         <View style={styles.groceryItemCheckbox}>
           <MaterialCommunityIcons
-            name={groceryItem.checked ? "checkbox-marked" : "checkbox-blank-outline"}
-            size={28}
-            color={groceryItem.checked ? COLORS.primary : COLORS.textMuted}
+            name={groceryItem.checked ? "circle" : "circle-outline"}
+            size={24}
+            color={groceryItem.checked ? COLORS.textDark : COLORS.textMuted}
           />
         </View>
 
@@ -1283,27 +1280,25 @@ export default function MiseScreen() {
               onPress={() => handleStartInlineAdd(item.name)}
               style={styles.addButton}
             >
-              <MaterialCommunityIcons name="plus" size={20} color={COLORS.primary} />
+              <MaterialCommunityIcons name="plus" size={20} color={COLORS.textDark} />
             </TouchableOpacity>
           )}
         </View>
 
         {/* Unchecked items (need to get) */}
         {uncheckedItems.map((groceryItem, index) => {
-          const isLastUnchecked = index === uncheckedItems.length - 1 && checkedItems.length === 0 && inlineAddCategory !== item.name;
-          return renderGroceryItem(groceryItem, index, isLastUnchecked);
+          return renderGroceryItem(groceryItem, index);
         })}
 
         {/* Inline add row for this category - only show if there are unchecked items or no items at all */}
         {inlineAddCategory === item.name && (
           <View style={[
-            styles.groceryItem,
-            uncheckedItems.length === 0 && checkedItems.length === 0 && styles.groceryItemLast
+            styles.groceryItem
           ]}>
             <View style={styles.groceryItemCheckbox}>
               <MaterialCommunityIcons
-                name="checkbox-blank-outline"
-                size={28}
+                name="circle-outline"
+                size={24}
                 color={COLORS.textMuted}
               />
             </View>
@@ -1332,8 +1327,7 @@ export default function MiseScreen() {
         {checkedItems.length > 0 && (
           <>
             {checkedItems.map((groceryItem, index) => {
-              const isLastChecked = index === checkedItems.length - 1;
-              return renderGroceryItem(groceryItem, index, isLastChecked);
+              return renderGroceryItem(groceryItem, index);
             })}
           </>
         )}
@@ -1347,7 +1341,7 @@ export default function MiseScreen() {
         <ActivityIndicator
           style={styles.centered}
           size="large"
-          color={COLORS.primary}
+          color="black"
         />
       );
     }
@@ -1403,7 +1397,7 @@ export default function MiseScreen() {
             onPress={handleCookMyRecipes}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Text style={styles.miseToolbarButtonText}>COOK YOUR RECIPES</Text>
+            <Text style={styles.miseToolbarButtonText}>Cook Recipes</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -1411,7 +1405,7 @@ export default function MiseScreen() {
             onPress={handleShareGrocery}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Text style={styles.miseToolbarButtonText}>SHARE YOUR LIST</Text>
+            <Text style={styles.miseToolbarButtonText}>Share List</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -1419,7 +1413,7 @@ export default function MiseScreen() {
             onPress={handleOpenStaplesModal}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Text style={styles.miseToolbarButtonText}>UPDATE YOUR PANTRY</Text>
+            <Text style={styles.miseToolbarButtonText}>Pantry</Text>
           </TouchableOpacity>
         </View>
 
@@ -1428,6 +1422,7 @@ export default function MiseScreen() {
           <View style={styles.sectionHeaderWithControls}>
             <Text style={styles.sectionTitle}>MENU</Text>
           </View>
+          <View style={styles.sectionDivider} />
           {miseRecipes.length === 0 ? (
             <View style={styles.emptySection}>
               <Text style={styles.emptySectionText}>No recipes in your menu.</Text>
@@ -1460,9 +1455,8 @@ export default function MiseScreen() {
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeaderWithControls}>
             <Text style={styles.sectionTitle}>GROCERIES</Text>
-            
-
           </View>
+          <View style={styles.sectionDivider} />
           
           {(() => {
             // Determine which data to use based on sort mode and staples filter
@@ -1601,21 +1595,28 @@ const styles = StyleSheet.create({
   sectionContainer: {
     marginBottom: SPACING.lg,
   },
+  sectionDivider: {
+    width: '90%',
+    alignSelf: 'flex-start',
+    marginLeft: '5%',
+    borderBottomWidth: 1,
+    borderBottomColor: '#000000',
+    marginBottom: 18,
+  },
   sectionTitle: {
-    fontFamily: 'Inter',
-    fontSize: 18,
-    fontWeight: '800',
-    lineHeight: 22,
-    textTransform: 'uppercase' as const,
+    fontFamily: FONT.family.graphikMedium,
+    fontSize: 28,
+    fontWeight: '600',
+    lineHeight: 32,
     color: COLORS.textDark,
-    backgroundColor: COLORS.background,
   },
   sectionHeaderWithControls: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.pageHorizontal,
-    paddingVertical: SPACING.md,
+    paddingTop: 20,
+    paddingBottom: 0,
     backgroundColor: COLORS.background,
   },
   inlineControls: {
@@ -1632,28 +1633,36 @@ const styles = StyleSheet.create({
   },
   emptySection: {
     alignItems: 'flex-start',
-    paddingVertical: SPACING.xl,
+    paddingTop: SPACING.sm,
+    paddingBottom: SPACING.xl,
     paddingHorizontal: SPACING.pageHorizontal,
   },
   emptySectionText: {
-    ...bodyStrongText,
-    fontSize: FONT.size.body,
+    fontFamily: 'Inter',
+    fontSize: 16,
+    fontWeight: '400',
+    lineHeight: 22,
     color: COLORS.textDark,
     marginTop: SPACING.md,
     textAlign: 'left',
   },
   emptySectionSubtext: {
-    ...bodyStrongText,
-    fontSize: FONT.size.body,
+    fontFamily: 'Inter',
+    fontSize: 16,
+    fontWeight: '400',
+    lineHeight: 22,
     color: COLORS.textDark,
     textAlign: 'left',
     marginTop: SPACING.xs,
   },
   emptyActionText: {
-    ...bodyStrongText,
-    color: COLORS.primary,
-    fontSize: FONT.size.body,
+    fontFamily: 'Inter',
+    fontSize: 16,
+    fontWeight: '400',
+    lineHeight: 22,
+    color: COLORS.textDark,
     marginTop: SPACING.sm,
+    textDecorationLine: 'underline',
   },
   // Toolbar styles matching library.tsx and folder-detail.tsx
   miseToolbarContainer: {
@@ -1679,6 +1688,7 @@ const styles = StyleSheet.create({
     color: COLORS.textDark,
     flex: 1,
     textAlign: 'left', // Ensure left alignment
+    textTransform: 'none' as const, // Match library.tsx - no uppercase transformation
   },
   recipeListContainer: {
     // No horizontal padding to keep cards full width
@@ -1809,10 +1819,16 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   trashIcon: {
     position: 'absolute',
-    bottom: 8,
+    bottom: 4,
     right: 8,
     padding: 4,
   } as ViewStyle,
+  deleteIcon: {
+    ...bodyStrongText,
+    color: COLORS.textMuted,
+    fontSize: FONT.size.lg,
+    textAlign: 'center',
+  } as TextStyle,
   cardWithMinHeight: {
     height: 64,
   } as ViewStyle,
@@ -1846,24 +1862,29 @@ const styles = StyleSheet.create({
   groceryCategory: {
     backgroundColor: 'transparent',
     borderRadius: RADIUS.sm,
-    paddingVertical: SPACING.lg, // Consistent vertical padding
-    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm, // Consistent vertical padding
+    paddingHorizontal: 0, // Remove horizontal padding to match recipe width
     marginBottom: SPACING.lg, // Increased spacing between categories
-    borderWidth: BORDER_WIDTH.hairline,
-    borderColor: COLORS.primaryLight,
+    borderWidth: 0, // Remove borders between categories
     ...SHADOWS.small,
   } as ViewStyle,
   groceryCategoryHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.md,
+    marginBottom: 2, // Minimal spacing to sit on top of first row
+    width: '90%',
+    alignSelf: 'flex-start', // Left align to screen edge
+    marginLeft: '5%', // Offset to account for 90% width
+    borderBottomWidth: 1,
+    borderBottomColor: '#000000',
   } as ViewStyle,
   groceryCategoryTitle: {
-    ...bodyStrongText,
-    color: COLORS.textDark,
-    fontSize: FONT.size.caption,
+    fontFamily: FONT.family.graphikMedium,
+    fontSize: FONT.size.body,
     fontWeight: '600',
+    lineHeight: FONT.lineHeight.normal,
+    color: COLORS.textDark,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   } as TextStyle,
@@ -1909,9 +1930,6 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginTop: 2,
   } as TextStyle,
-  groceryItemLast: {
-    // Keep bottom border for last item in category (same as recipe cards)
-  } as ViewStyle,
   groceryItemChecked: {
     textDecorationLine: 'line-through',
     color: COLORS.darkGray,

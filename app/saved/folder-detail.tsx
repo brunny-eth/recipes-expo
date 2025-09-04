@@ -643,9 +643,9 @@ export default function SavedFolderDetailScreen() {
           {isSelectionMode && (
             <View style={styles.selectionIndicator}>
               <MaterialCommunityIcons
-                name={isSelected ? 'check-circle' : 'circle-outline'}
+                name={isSelected ? 'circle' : 'circle-outline'}
                 size={24}
-                color={isSelected ? COLORS.primary : COLORS.textMuted}
+                color={isSelected ? COLORS.textDark : COLORS.textMuted}
               />
             </View>
           )}
@@ -655,7 +655,7 @@ export default function SavedFolderDetailScreen() {
               {displayTitle}
             </Text>
             {servingsCount && (
-              <Text style={styles.servingsText}>(For {servingsCount})</Text>
+              <Text style={styles.servingsText}>For {servingsCount}</Text>
             )}
           </View>
         </View>
@@ -672,7 +672,7 @@ export default function SavedFolderDetailScreen() {
         <ActivityIndicator
           style={styles.centered}
           size="large"
-          color={COLORS.primary}
+          color="black"
         />
       );
     }
@@ -782,14 +782,11 @@ export default function SavedFolderDetailScreen() {
               <TouchableOpacity
                 style={[
                   styles.primaryActionButton,
-                  (selectedRecipes.size === 0 || isMovingRecipes) && styles.primaryActionButtonDisabled,
+                  selectedRecipes.size === 0 && styles.primaryActionButtonDisabled,
                 ]}
                 onPress={handleStartCookingSelectedRecipes}
-                disabled={selectedRecipes.size === 0 || isMovingRecipes}
+                disabled={selectedRecipes.size === 0}
               >
-                {isMovingRecipes && (
-                  <ActivityIndicator size="small" color={COLORS.white} style={{ marginRight: 8 }} />
-                )}
                 <Text style={styles.primaryActionButtonText}>
                   Cook now {selectedRecipes.size > 1 ? `(${selectedRecipes.size})` : ''}
                 </Text>
@@ -798,14 +795,11 @@ export default function SavedFolderDetailScreen() {
               <TouchableOpacity
                 style={[
                   styles.primaryActionButton,
-                  (selectedRecipes.size === 0 || isMovingRecipes) && styles.primaryActionButtonDisabled,
+                  selectedRecipes.size === 0 && styles.primaryActionButtonDisabled,
                 ]}
                 onPress={handleMoveSelectedRecipes}
-                disabled={selectedRecipes.size === 0 || isMovingRecipes}
+                disabled={selectedRecipes.size === 0}
               >
-                {isMovingRecipes && (
-                  <ActivityIndicator size="small" color={COLORS.white} style={{ marginRight: 8 }} />
-                )}
                 <Text style={styles.primaryActionButtonText}>Move to</Text>
               </TouchableOpacity>
 
@@ -836,7 +830,7 @@ export default function SavedFolderDetailScreen() {
     // When renaming, show a checkmark to confirm save
     if (isRenaming) {
       const isSaveDisabled =
-        isSavingFolderName || editedFolderName.trim().length === 0 || editedFolderName.trim() === folderName.trim();
+        isSavingFolderName || editedFolderName.trim().length === 0;
       return (
         <TouchableOpacity
           style={styles.selectButton}
@@ -845,19 +839,32 @@ export default function SavedFolderDetailScreen() {
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           {isSavingFolderName ? (
-            <ActivityIndicator size="small" color={COLORS.primary} />
+            <ActivityIndicator size="small" color="black" />
           ) : (
             <MaterialCommunityIcons
               name="check"
               size={24}
-              color={isSaveDisabled ? COLORS.textMuted : COLORS.primary}
+              color={isSaveDisabled ? COLORS.textMuted : COLORS.textDark}
             />
           )}
         </TouchableOpacity>
       );
     }
 
-    return null;
+    // When not renaming, show a pencil icon to start editing
+    return (
+      <TouchableOpacity
+        style={styles.selectButton}
+        onPress={handleStartRenaming}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      >
+        <MaterialCommunityIcons
+          name="pencil"
+          size={20}
+          color={COLORS.textDark}
+        />
+      </TouchableOpacity>
+    );
   };
 
   return (
@@ -897,11 +904,11 @@ export default function SavedFolderDetailScreen() {
       </View>
       {/* Search and Select toolbar */}
       <View style={styles.toolbarContainer}>
-        <TouchableHighlight
+        <TouchableOpacity
           key="search-button"
           style={styles.toolbarButton}
           onPress={isSearchActive ? undefined : toggleSearch}
-          underlayColor="transparent"
+          activeOpacity={0.7}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <View style={styles.toolbarButtonContent}>
@@ -920,10 +927,10 @@ export default function SavedFolderDetailScreen() {
                 }}
               />
             ) : (
-              <Text style={styles.toolbarButtonText}>SEARCH</Text>
+              <Text style={styles.toolbarButtonText}>Search</Text>
             )}
           </View>
-        </TouchableHighlight>
+        </TouchableOpacity>
 
         <TouchableHighlight
           key="select-button"
@@ -933,7 +940,7 @@ export default function SavedFolderDetailScreen() {
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <View style={styles.toolbarButtonContent}>
-            <Text style={styles.toolbarButtonText}>SELECT</Text>
+            <Text style={styles.toolbarButtonText}>Select</Text>
           </View>
         </TouchableHighlight>
 
@@ -945,7 +952,7 @@ export default function SavedFolderDetailScreen() {
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <View style={styles.toolbarButtonContent}>
-            <Text style={styles.toolbarButtonText}>DELETE FOLDER</Text>
+            <Text style={styles.toolbarButtonText}>Delete Folder</Text>
           </View>
         </TouchableHighlight>
 
@@ -1018,32 +1025,33 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 0,
-    paddingBottom: SPACING.md,
+    paddingBottom: 0,
     marginTop: 0,
-    minHeight: 44 + SPACING.md,
+    minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-start',
+    borderTopWidth: 1,
+    borderTopColor: '#000000',
     borderBottomWidth: 1,
-    borderBottomColor: '#D9D5CC',
+    borderBottomColor: '#000000',
   },
   headerTitle: {
     ...screenTitleText,
     color: COLORS.textDark,
     textAlign: 'left',
-    textTransform: 'uppercase' as const,
   },
   headerTitleInput: {
     ...screenTitleText,
     color: COLORS.textDark,
     textAlign: 'left',
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
-    borderRadius: RADIUS.sm,
-    paddingVertical: 6,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    paddingVertical: 0,
     paddingLeft: 18, // Match ScreenHeader titleContainer
-    paddingHorizontal: 8,
+    paddingHorizontal: 0,
+    minWidth: 100, // Prevent layout shifts by maintaining minimum width
+    flex: 1,
   },
   headerTitleTouchable: {
     alignItems: 'flex-start',
@@ -1051,6 +1059,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerRight: {
+    flex: 1,
     alignItems: 'flex-end',
     justifyContent: 'center',
     paddingRight: SPACING.pageHorizontal, // Match the page horizontal padding
@@ -1258,15 +1267,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   bulkActionsButtonsStack: {
-    gap: SPACING.sm,
     width: '90%',
     alignSelf: 'flex-start', // Left align to screen edge
     marginLeft: '5%', // Offset to account for 90% width
     paddingLeft: 0, // Remove left padding for true left alignment
     paddingRight: 18, // Keep some right padding like toolbar buttons
+    height: 64, // Adjusted for 20px buttons (20*3 + spacing = ~64px)
+    justifyContent: 'space-between', // Distribute space evenly like toolbar
   },
   primaryActionButton: {
-    height: 24, // Match SEARCH/SELECT button height
+    height: 20, // Reduced from 24px for more compact appearance
     backgroundColor: 'transparent',
     flexDirection: 'row',
     alignItems: 'center',
@@ -1301,7 +1311,7 @@ const styles = StyleSheet.create({
     textAlign: 'left', // Match SEARCH/SELECT left alignment
   },
   dangerOutlineButton: {
-    height: 24, // Match SEARCH/SELECT button height
+    height: 20, // Reduced from 24px for more compact appearance
     backgroundColor: 'transparent',
     flexDirection: 'row',
     alignItems: 'center',

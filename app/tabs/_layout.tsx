@@ -17,7 +17,6 @@ const styles = StyleSheet.create({
   tabBarLabel: {
     ...captionText,
     fontSize: 11,
-    fontWeight: '600',
   },
   tabBarItem: {
     alignItems: 'center',
@@ -27,9 +26,17 @@ const styles = StyleSheet.create({
   tabBarText: {
     ...captionText,
     fontSize: 15,
-    fontWeight: '600',
     textAlign: 'center',
     width: 64,
+  },
+  activeTabUnderline: {
+    position: 'absolute',
+    bottom: -2,
+    left: 12,
+    right: 12,
+    height: 2,
+    backgroundColor: COLORS.primary,
+    borderRadius: 1,
   },
 });
 
@@ -37,9 +44,16 @@ const styles = StyleSheet.create({
 const createTabBarIcon = (iconName: string, label: string) => {
   return ({ color, focused }: { color: string; focused: boolean }) => (
     <View style={styles.tabBarItem}>
-      <Text style={[styles.tabBarText, { color }]} numberOfLines={1}>
+      <Text style={[
+        styles.tabBarText,
+        {
+          color: focused ? COLORS.textDark : COLORS.textMuted,
+          fontWeight: focused ? '700' : '400'
+        }
+      ]} numberOfLines={1}>
         {label}
       </Text>
+      {focused && <View style={styles.activeTabUnderline} />}
     </View>
   );
 };
@@ -53,8 +67,8 @@ const MemoizedTabsNavigator = React.memo(() => {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: COLORS.primary,
-        tabBarInactiveTintColor: COLORS.darkGray,
+        tabBarActiveTintColor: COLORS.textDark,
+        tabBarInactiveTintColor: COLORS.textMuted,
         tabBarStyle: styles.tabBar,
         headerShown: false,
         tabBarLabelStyle: styles.tabBarLabel,

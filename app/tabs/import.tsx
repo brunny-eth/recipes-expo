@@ -84,9 +84,11 @@ export default function ImportScreen() {
 
 
 
-  // Placeholder rotation state (separate for URL and Name)
+  // Placeholder rotation state (separate for URL, Text, and Name)
   const [urlDisplayedPlaceholder, setUrlDisplayedPlaceholder] = useState('');
   const [isTypingUrlPlaceholder, setIsTypingUrlPlaceholder] = useState(false);
+  const [textDisplayedPlaceholder, setTextDisplayedPlaceholder] = useState('');
+  const [isTypingTextPlaceholder, setIsTypingTextPlaceholder] = useState(false);
   const [nameDisplayedPlaceholder, setNameDisplayedPlaceholder] = useState('');
   const [isTypingNamePlaceholder, setIsTypingNamePlaceholder] = useState(false);
   // Compact layout detection (smaller iPhones)
@@ -96,18 +98,21 @@ export default function ImportScreen() {
 
   // Keep interval handles so we never run two animations at once
   const urlIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const textIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const nameIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const urlPrompt = "  www.recipe.com/too-many-ads";
-  const namePrompt = "  try 'garlic chicken' or 'pizza'";
+  const urlPrompt = "www.recipe.com/too-many-ads";
+  const textPrompt = "paste or type recipe text here";
+  const namePrompt = "try 'garlic chicken' or 'pizza'";
 
-  // Local state for name input
-  const [recipeName, setRecipeName] = useState('');
+  // Local state for inputs
+  const [recipeText, setRecipeText] = useState('');
+  const [recipeDishName, setRecipeDishName] = useState('');
 
   // Generic typewriter starter for any placeholder with cleanup
   const startTypewriter = useCallback(
     (
-      label: 'URL' | 'NAME',
+      label: 'URL' | 'TEXT' | 'NAME',
       text: string,
       setTyping: (b: boolean) => void,
       setDisplayed: (s: string) => void,
@@ -215,8 +220,9 @@ export default function ImportScreen() {
     }, 1200);
     return () => {
       clearTimeout(timeoutId);
-      // Hard cleanup for both animations on unmount
+      // Hard cleanup for all animations on unmount
       if (urlIntervalRef.current) clearInterval(urlIntervalRef.current);
+      if (textIntervalRef.current) clearInterval(textIntervalRef.current);
       if (nameIntervalRef.current) clearInterval(nameIntervalRef.current);
     };
   }, [startTypewriter]);
@@ -239,13 +245,16 @@ export default function ImportScreen() {
     if (importMode === 'url' && !urlDisplayedPlaceholder && !isTypingUrlPlaceholder) {
       startTypewriter('URL', urlPrompt, setIsTypingUrlPlaceholder, setUrlDisplayedPlaceholder, urlIntervalRef);
     }
+    if (importMode === 'text' && !textDisplayedPlaceholder && !isTypingTextPlaceholder) {
+      startTypewriter('TEXT', textPrompt, setIsTypingTextPlaceholder, setTextDisplayedPlaceholder, textIntervalRef);
+    }
     if (importMode === 'name' && !nameDisplayedPlaceholder && !isTypingNamePlaceholder) {
       startTypewriter('NAME', namePrompt, setIsTypingNamePlaceholder, setNameDisplayedPlaceholder, nameIntervalRef);
     }
     // Do NOT stop the other animation when switching away.
     // Let any in-progress typewriter finish in the background so
     // placeholders are fully written when user returns.
-  }, [importMode, urlDisplayedPlaceholder, isTypingUrlPlaceholder, nameDisplayedPlaceholder, isTypingNamePlaceholder, startTypewriter]);
+  }, [importMode, urlDisplayedPlaceholder, isTypingUrlPlaceholder, textDisplayedPlaceholder, isTypingTextPlaceholder, nameDisplayedPlaceholder, isTypingNamePlaceholder, startTypewriter]);
 
   // Keyboard listeners (only track visible state for possible future use)
   useEffect(() => {
@@ -309,7 +318,7 @@ export default function ImportScreen() {
       }
     } else if (action === 'createNew') {
       // Prefer user-supplied additional details from modal, otherwise fall back to last typed input
-      const inputToParse = (extra?.trim() || recipeName?.trim() || recipeUrl?.trim() || '');
+      const inputToParse = (extra?.trim() || recipeText?.trim() || recipeDishName?.trim() || recipeUrl?.trim() || '');
       if (!inputToParse) {
         showError('Missing recipe text', 'Please enter some recipe text and try again.');
         return;
@@ -337,7 +346,7 @@ export default function ImportScreen() {
         userId: session?.user?.id,
       });
     }
-  }, [potentialMatches, router, showError, recipeUrl, recipeName, track, session?.user?.id]);
+  }, [potentialMatches, router, showError, recipeUrl, recipeText, recipeDishName, track, session?.user?.id]);
 
   // Replace isValidRecipeInput with a function that uses detectInputType
   function isValidRecipeInput(input: string) {
@@ -347,8 +356,8 @@ export default function ImportScreen() {
     return detectedType === 'url' || detectedType === 'video' || detectedType === 'raw_text';
   }
 
-  // Generic submit handler that takes arbitrary input text (URL or name)
-  const handleSubmitInput = async (inputRaw: string) => {
+  // Generic submit handler that takes arbitrary input text (URL, text, or dish name)
+  const handleSubmitInput = async (inputRaw: string, inputType: 'url' | 'text' | 'dishName' = 'url') => {
     if (__DEV__) {
       console.log('[DEBUG] handleSubmitInput – START');
       console.log('[UI] 🚀 Submit pressed with value:', inputRaw);
@@ -375,7 +384,8 @@ export default function ImportScreen() {
         );
         // Clear the active input for better UX
         if (importMode === 'url') setRecipeUrl('');
-        if (importMode === 'name' || importMode === 'text') setRecipeName('');
+        if (importMode === 'text') setRecipeText('');
+        if (importMode === 'name') setRecipeDishName('');
         return;
       }
 
@@ -392,7 +402,7 @@ export default function ImportScreen() {
             },
             'OK'
           );
-          setRecipeName('');
+          setRecipeText('');
           return;
         }
       }
@@ -410,7 +420,7 @@ export default function ImportScreen() {
             },
             'OK'
           );
-          setRecipeName('');
+          setRecipeDishName('');
           return;
         }
       }
@@ -445,7 +455,8 @@ export default function ImportScreen() {
           'OK'
         );
         if (importMode === 'url') setRecipeUrl('');
-        if (importMode === 'name' || importMode === 'text') setRecipeName('');
+        if (importMode === 'text') setRecipeText('');
+        if (importMode === 'name') setRecipeDishName('');
         return;
       }
 
@@ -656,11 +667,11 @@ export default function ImportScreen() {
   };
 
   // URL submit wrapper
-  const handleSubmit = async () => handleSubmitInput(recipeUrl);
+  const handleSubmit = async () => handleSubmitInput(recipeUrl, 'url');
   // Text submit wrapper
-  const handleSubmitText = async () => handleSubmitInput(recipeName);
+  const handleSubmitText = async () => handleSubmitInput(recipeText, 'text');
   // Name submit wrapper
-  const handleSubmitName = async () => handleSubmitInput(recipeName);
+  const handleSubmitName = async () => handleSubmitInput(recipeDishName, 'dishName');
 
   const handleUploadComplete = async (result: UploadResult) => {
     if (result.success && result.navigateToLoading) {
@@ -779,8 +790,10 @@ export default function ImportScreen() {
     // Update the appropriate field based on current import mode
     if (importMode === 'url') {
       setRecipeUrl(text);
-    } else if (importMode === 'name' || importMode === 'text') {
-      setRecipeName(text);
+    } else if (importMode === 'text') {
+      setRecipeText(text);
+    } else if (importMode === 'name') {
+      setRecipeDishName(text);
     }
     if (text.length > 0 && !hasUserTyped) {
       setHasUserTyped(true);
@@ -854,25 +867,28 @@ export default function ImportScreen() {
                   {expandedImportOption === 'website' && (
                     <View style={styles.expandedContent}>
                       <View style={styles.inputContainer}>
-                        <TextInput
-                          style={[styles.input, styles.inputLeft]}
-                          placeholder={urlDisplayedPlaceholder}
-                          placeholderTextColor={COLORS.darkGray}
-                          value={recipeUrl}
-                          onChangeText={handleChangeText}
-                          autoCapitalize="none"
-                          autoCorrect={false}
-                          onSubmitEditing={handleSubmit}
-                          editable={!isSubmitting}
-                          onFocus={handleInputFocus}
-                          onBlur={handleInputBlur}
-                          returnKeyType="go"
-                          blurOnSubmit={false}
-                          enablesReturnKeyAutomatically={true}
-                          keyboardType="default"
-                          textContentType="none"
-                          underlineColorAndroid="transparent"
-                        />
+                        <View style={styles.inputWrapper}>
+                          <TextInput
+                            style={styles.input}
+                            placeholder={urlDisplayedPlaceholder}
+                            placeholderTextColor={COLORS.darkGray}
+                            value={recipeUrl}
+                            onChangeText={handleChangeText}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            onSubmitEditing={handleSubmit}
+                            editable={!isSubmitting}
+                            onFocus={handleInputFocus}
+                            onBlur={handleInputBlur}
+                            returnKeyType="go"
+                            blurOnSubmit={false}
+                            enablesReturnKeyAutomatically={true}
+                            keyboardType="default"
+                            textContentType="none"
+                            underlineColorAndroid="transparent"
+                            allowFontScaling={false}
+                          />
+                        </View>
                         <TouchableOpacity
                           style={[styles.submitButton, styles.submitButtonConnected, isSubmitting && styles.submitButtonDisabled]}
                           onPress={handleSubmit}
@@ -955,22 +971,25 @@ export default function ImportScreen() {
                   {expandedImportOption === 'rawText' && (
                     <View style={styles.expandedContent}>
                       <View style={styles.inputContainer}>
-                        <TextInput
-                          style={[styles.input, styles.inputLeft]}
-                          placeholder="Paste or type recipe text here"
-                          placeholderTextColor={COLORS.darkGray}
-                          value={recipeName}
-                          onChangeText={setRecipeName}
-                          autoCapitalize="sentences"
-                          autoCorrect={true}
-                          editable={true}
-                          returnKeyType="search"
-                          blurOnSubmit={true}
-                          enablesReturnKeyAutomatically={true}
-                          keyboardType="default"
-                          onSubmitEditing={handleSubmitText}
-                          underlineColorAndroid="transparent"
-                        />
+                        <View style={styles.inputWrapper}>
+                          <TextInput
+                            style={styles.input}
+                            placeholder={textDisplayedPlaceholder}
+                            placeholderTextColor={COLORS.darkGray}
+                            value={recipeText}
+                            onChangeText={setRecipeText}
+                            autoCapitalize="sentences"
+                            autoCorrect={true}
+                            editable={true}
+                            returnKeyType="search"
+                            blurOnSubmit={true}
+                            enablesReturnKeyAutomatically={true}
+                            keyboardType="default"
+                            onSubmitEditing={handleSubmitText}
+                            underlineColorAndroid="transparent"
+                            allowFontScaling={false}
+                          />
+                        </View>
                         <TouchableOpacity
                           style={[
                             styles.submitButton,
@@ -1016,22 +1035,25 @@ export default function ImportScreen() {
                   {expandedImportOption === 'dishName' && (
                     <View style={styles.expandedContent}>
                       <View style={styles.inputContainer}>
-                        <TextInput
-                          style={[styles.input, styles.inputLeft]}
-                          placeholder={nameDisplayedPlaceholder}
-                          placeholderTextColor={COLORS.darkGray}
-                          value={recipeName}
-                          onChangeText={setRecipeName}
-                          autoCapitalize="sentences"
-                          autoCorrect={true}
-                          editable={true}
-                          returnKeyType="search"
-                          blurOnSubmit={true}
-                          enablesReturnKeyAutomatically={true}
-                          keyboardType="default"
-                          onSubmitEditing={handleSubmitName}
-                          underlineColorAndroid="transparent"
-                        />
+                        <View style={styles.inputWrapper}>
+                          <TextInput
+                            style={styles.input}
+                            placeholder={nameDisplayedPlaceholder}
+                            placeholderTextColor={COLORS.darkGray}
+                            value={recipeDishName}
+                            onChangeText={setRecipeDishName}
+                            autoCapitalize="sentences"
+                            autoCorrect={true}
+                            editable={true}
+                            returnKeyType="search"
+                            blurOnSubmit={true}
+                            enablesReturnKeyAutomatically={true}
+                            keyboardType="default"
+                            onSubmitEditing={handleSubmitName}
+                            underlineColorAndroid="transparent"
+                            allowFontScaling={false}
+                          />
+                        </View>
                         <TouchableOpacity
                           style={[
                             styles.submitButton,
@@ -1112,7 +1134,7 @@ export default function ImportScreen() {
           matches={potentialMatches}
           onAction={handleMatchSelectionAction}
           debugSource={isImportFocused ? 'ImportTab (focused)' : 'ImportTab (background)'}
-          initialInputText={(recipeName?.trim() || recipeUrl?.trim() || '')}
+          initialInputText={(recipeText?.trim() || recipeDishName?.trim() || recipeUrl?.trim() || '')}
         />
       )}
 
@@ -1130,6 +1152,13 @@ export default function ImportScreen() {
     </View>
   );
 }
+
+// Shared input padding constants
+const INPUT_LEFT_PAD = 16; // ~2 character spaces worth of padding
+const INPUT_HEIGHT = 46; // Input container height
+const INPUT_FONT_SIZE = 14; // Font size for caption
+const INPUT_LINE_HEIGHT = Math.ceil(INPUT_FONT_SIZE * 1.3); // ~18px to prevent ascender clipping
+const INPUT_VPAD = Math.floor((INPUT_HEIGHT - INPUT_LINE_HEIGHT) / 2) - 1; // Recomputed for new lineHeight
 
 const styles = StyleSheet.create({
   container: {
@@ -1414,24 +1443,32 @@ const styles = StyleSheet.create({
     height: 46,
     gap: 0,
   },
-  input: {
-    ...bodyText,
+  inputWrapper: {
     flex: 1,
-    height: '100%',
-    paddingLeft: 0, // Remove left padding for true left alignment
-    paddingRight: SPACING.base, // Keep some right padding
-    color: COLORS.textDark,
-    fontSize: FONT.size.caption || 14, // Fallback to prevent NaN
-    lineHeight: undefined,
-    backgroundColor: 'transparent',
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: INPUT_HEIGHT,
+    paddingLeft: INPUT_LEFT_PAD, // Left padding moved to wrapper
     borderWidth: 1,
     borderColor: '#000000',
-    borderTopLeftRadius: RADIUS.sm,
-    borderBottomLeftRadius: RADIUS.sm,
+    borderTopLeftRadius: RADIUS.lg,
+    borderBottomLeftRadius: RADIUS.lg,
     borderRightWidth: 0, // Remove right border since button will be attached
+    backgroundColor: 'transparent',
   },
-  inputLeft: {
-    // No border radius needed
+  input: {
+    flex: 1,
+    height: '100%',
+    paddingVertical: INPUT_VPAD + 0.5, // Fine-tuned vertical centering
+    color: COLORS.textDark,
+    fontFamily: FONT.family.body, // Explicit font family
+    fontSize: INPUT_FONT_SIZE, // Explicit font size
+    lineHeight: INPUT_LINE_HEIGHT, // Explicit line height - prevents ascender clipping
+    fontWeight: '400', // Explicit font weight
+    letterSpacing: 0, // Explicit letter spacing to prevent any glyph shifts
+    textAlignVertical: 'center', // Ensure vertical centering
+    includeFontPadding: false, // Prevent Android font padding issues
+    backgroundColor: 'transparent',
   },
   submitButton: {
     height: '100%',
@@ -1442,8 +1479,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#000000',
-    borderTopRightRadius: RADIUS.sm,
-    borderBottomRightRadius: RADIUS.sm,
+    borderTopRightRadius: RADIUS.lg,
+    borderBottomRightRadius: RADIUS.lg,
     borderLeftWidth: 0, // Remove left border since input will be attached
   },
   submitButtonConnected: {
@@ -1514,12 +1551,17 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     backgroundColor: COLORS.primary,
+    borderWidth: 1,
+    borderColor: '#000000',
+    borderRadius: RADIUS.lg,
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'flex-start', // Left align content
+    paddingLeft: INPUT_LEFT_PAD, // Match input left padding
   },
   fullWidthPrimaryButtonText: {
     ...bodyStrongText,
-    color: COLORS.white,
+    color: '#000000',
+    textAlign: 'left',
   },
   inlineLink: {
     color: COLORS.primary,

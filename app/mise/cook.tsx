@@ -34,7 +34,7 @@ import { useSuccessModal } from '@/context/SuccessModalContext';
 import { useAnalytics } from '@/utils/analytics';
 import { createLogger } from '@/utils/logger';
 import { COLORS, SPACING, RADIUS, OVERLAYS, SHADOWS, BORDER_WIDTH } from '@/constants/theme';
-import { sectionHeaderText, bodyText, bodyStrongText, bodyTextLoose, captionText } from '@/constants/typography';
+import { sectionHeaderText, bodyText, bodyStrongText, bodyTextLoose, captionText, FONT } from '@/constants/typography';
 import { CombinedParsedRecipe, StructuredIngredient } from '@/common/types';
 import RecipeSwitcher from '@/components/recipe/RecipeSwitcher';
 import StepItem from '@/components/recipe/StepItem';
@@ -1089,11 +1089,7 @@ export default function CookScreen() {
               style={styles.deleteButton}
               onPress={() => deleteStep(item.id)}
             >
-              <MaterialCommunityIcons
-                name="delete"
-                size={16}
-                color={COLORS.textMuted}
-              />
+              <Text style={styles.deleteIcon}>×</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1575,7 +1571,7 @@ export default function CookScreen() {
                   <MaterialCommunityIcons
                     name="lightbulb-outline"
                     size={24}
-                    color={COLORS.primary}
+                    color={COLORS.textDark}
                   />
                   <Text style={styles.recipeTipsTitle}>Recipe Tips</Text>
                 </View>
@@ -1777,6 +1773,8 @@ const styles = StyleSheet.create({
 
   recipeSwitcherContainer: {
     // Padding now handled within RecipeSwitcher component
+    borderBottomWidth: 1,
+    borderBottomColor: '#000000',
   },
   loadingContainer: {
     flex: 1,
@@ -1794,12 +1792,20 @@ const styles = StyleSheet.create({
     padding: SPACING.pageHorizontal,
   },
   emptyTitle: {
-    ...sectionHeaderText,
+    fontFamily: FONT.family.graphikMedium,
+    fontSize: 28,
+    fontWeight: '600',
+    lineHeight: 32,
+    color: COLORS.textDark,
     marginTop: SPACING.md,
     marginBottom: SPACING.sm,
+    textAlign: 'center',
   },
   emptyText: {
-    ...bodyText,
+    fontFamily: 'Inter',
+    fontSize: 16,
+    fontWeight: '400',
+    lineHeight: 22,
     color: COLORS.textMuted,
     textAlign: 'center',
     marginBottom: SPACING.xl,
@@ -1811,10 +1817,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.pageHorizontal,
     paddingVertical: SPACING.md,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.divider,
+    borderBottomColor: '#000000',
   },
   headerTitle: {
-    ...sectionHeaderText,
+    fontFamily: FONT.family.graphikMedium,
+    fontSize: 18,
+    fontWeight: '600',
+    lineHeight: FONT.lineHeight.normal,
+    color: COLORS.textDark,
     textAlign: 'center',
   },
   content: {
@@ -1832,7 +1842,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.pageHorizontal,
   },
   noRecipeText: {
-    ...bodyText,
+    fontFamily: 'Inter',
+    fontSize: FONT.size.body,
+    fontWeight: '400',
+    lineHeight: FONT.lineHeight.normal,
     color: COLORS.textMuted,
     textAlign: 'center',
   },
@@ -1844,12 +1857,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tooltipContainer: {
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.white,
     borderRadius: RADIUS.md,
     padding: SPACING.md,
     alignItems: 'center',
     maxWidth: '80%',
     width: 'auto',
+    borderWidth: 1,
+    borderColor: '#000000',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
@@ -1857,15 +1872,26 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   tooltipTitle: {
-    ...bodyStrongText,
+    fontFamily: FONT.family.graphikMedium,
+    fontSize: FONT.size.body,
+    fontWeight: '600',
+    lineHeight: FONT.lineHeight.normal,
+    color: COLORS.textDark,
     marginBottom: SPACING.xs,
   },
   tooltipText: {
-    ...bodyText,
+    fontFamily: 'Inter',
+    fontSize: FONT.size.body,
+    fontWeight: '400',
+    lineHeight: FONT.lineHeight.normal,
+    color: COLORS.textDark,
     marginBottom: SPACING.xs,
   },
   tooltipPreparationText: {
-    ...bodyTextLoose,
+    fontFamily: 'Inter',
+    fontSize: FONT.size.body,
+    fontWeight: '400',
+    lineHeight: FONT.lineHeight.normal,
     color: COLORS.textMuted,
   },
 
@@ -1891,8 +1917,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
-    borderBottomWidth: BORDER_WIDTH.hairline,
-    borderBottomColor: COLORS.divider,
+    borderBottomWidth: 1,
+    borderBottomColor: '#000000',
   },
   recipeTipsHeaderContent: {
     flexDirection: 'row',
@@ -1900,9 +1926,11 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   recipeTipsTitle: {
-    ...bodyStrongText,
-    color: COLORS.textDark,
+    fontFamily: FONT.family.graphikMedium,
     fontSize: 18,
+    fontWeight: '600',
+    lineHeight: FONT.lineHeight.normal,
+    color: COLORS.textDark,
   },
   closeButton: {
     padding: SPACING.xs,
@@ -1926,25 +1954,30 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: '#000000',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: SPACING.md,
     marginTop: 2,
   },
   tipNumber: {
-    ...bodyStrongText,
-    color: COLORS.primary,
+    fontFamily: FONT.family.graphikMedium,
     fontSize: 14,
+    fontWeight: '600',
+    lineHeight: FONT.lineHeight.tight,
+    color: COLORS.textDark,
   },
   tipContent: {
     flex: 1,
   },
   recipeTipsText: {
-    ...bodyTextLoose,
-    color: COLORS.textDark,
-    lineHeight: 24,
+    fontFamily: 'Inter',
     fontSize: 16,
+    fontWeight: '400',
+    lineHeight: 24,
+    color: COLORS.textDark,
   },
 
   // --- Draggable Steps Styles ---
@@ -1956,10 +1989,13 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
     marginBottom: SPACING.sm,
     padding: SPACING.md,
+    borderWidth: 1,
+    borderColor: '#000000',
     ...SHADOWS.small,
   },
   stepItemActive: {
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: COLORS.surface,
+    borderColor: COLORS.textDark,
     ...SHADOWS.medium,
   },
   stepContent: {
@@ -1972,13 +2008,13 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: COLORS.primary,
+    borderColor: COLORS.textDark,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 2,
   },
   stepToggleCompleted: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.textDark,
   },
   stepTextContainer: {
     flex: 1,
@@ -1986,7 +2022,11 @@ const styles = StyleSheet.create({
     paddingLeft: SPACING.sm,
   },
   stepText: {
-    ...bodyText,
+    fontFamily: 'Inter',
+    fontSize: FONT.size.body,
+    fontWeight: '400',
+    lineHeight: FONT.lineHeight.normal,
+    color: COLORS.textDark,
     marginBottom: SPACING.xs,
   },
   stepTextCompleted: {
@@ -1994,15 +2034,18 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
   },
   highlightedText: {
-    fontFamily: 'Inter-SemiBold',
-    color: COLORS.primary,
+    fontFamily: FONT.family.graphikMedium,
+    fontWeight: '600',
+    color: COLORS.textDark,
     fontSize: 16,
     lineHeight: 22,
+    textDecorationLine: 'underline',
   },
 
   stepControls: {
     alignItems: 'center',
-    gap: SPACING.sm,
+    gap: SPACING.xs,
+    flexDirection: 'column',
   },
   editButton: {
     padding: SPACING.sm,
@@ -2014,11 +2057,20 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm,
     backgroundColor: COLORS.white,
   },
+  deleteIcon: {
+    fontFamily: FONT.family.graphikMedium,
+    fontSize: FONT.size.lg,
+    fontWeight: '600',
+    lineHeight: FONT.lineHeight.normal,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+  },
   dragHandleLeft: {
-    padding: SPACING.xs,
+    padding: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: SPACING.xs,
+    marginRight: 2,
+    width: 24,
   },
 
 
@@ -2049,18 +2101,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
-    borderBottomWidth: BORDER_WIDTH.hairline,
-    borderBottomColor: COLORS.divider,
+    borderBottomWidth: 1,
+    borderBottomColor: '#000000',
   },
   editModalTitle: {
-    ...bodyStrongText,
-    color: COLORS.textDark,
+    fontFamily: FONT.family.graphikMedium,
     fontSize: 18,
+    fontWeight: '600',
+    lineHeight: FONT.lineHeight.normal,
+    color: COLORS.textDark,
   },
   editModalInput: {
-    ...bodyText,
+    fontFamily: 'Inter',
+    fontSize: FONT.size.body,
+    fontWeight: '400',
+    lineHeight: FONT.lineHeight.normal,
+    color: COLORS.textDark,
     borderWidth: 1,
-    borderColor: COLORS.divider,
+    borderColor: '#000000',
     borderRadius: RADIUS.sm,
     padding: SPACING.md,
     margin: SPACING.lg,
@@ -2069,29 +2127,32 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   editModalActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: SPACING.md,
+    alignItems: 'flex-start',
+    gap: SPACING.sm,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
   },
   editModalCancelButton: {
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.lg,
+    marginBottom: SPACING.sm,
   },
   editModalCancelText: {
-    ...bodyText,
-    color: COLORS.textMuted,
+    fontFamily: 'Inter',
+    fontSize: FONT.size.body,
+    fontWeight: '400',
+    lineHeight: FONT.lineHeight.normal,
+    color: COLORS.textDark,
+    textAlign: 'left',
   },
   editModalSaveButton: {
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.lg,
+    marginBottom: SPACING.sm,
   },
   editModalSaveText: {
-    ...bodyStrongText,
-    color: COLORS.white,
+    fontFamily: 'Inter',
+    fontSize: FONT.size.body,
+    fontWeight: '400',
+    lineHeight: FONT.lineHeight.normal,
+    color: COLORS.textDark,
+    textAlign: 'left',
   },
 
   // --- Add Step Button Styles ---
@@ -2101,7 +2162,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
     padding: SPACING.sm,
     borderWidth: 1,
-    borderColor: COLORS.primaryLight,
+    borderColor: '#000000',
     borderStyle: 'dashed',
   },
   addStepContent: {
@@ -2114,9 +2175,11 @@ const styles = StyleSheet.create({
     marginTop: 1, // Slight adjustment for visual alignment
   },
   addStepText: {
-    ...bodyText,
-    color: COLORS.textMuted,
+    fontFamily: 'Inter',
     fontSize: 14,
+    fontWeight: '400',
+    lineHeight: FONT.lineHeight.tight,
+    color: COLORS.textMuted,
   },
 
 });

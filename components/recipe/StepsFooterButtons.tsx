@@ -7,7 +7,7 @@ import {
   ViewStyle,
   TextStyle,
 } from 'react-native';
-import { bodyStrongText } from '@/constants/typography';
+import { bodyStrongText, FONT } from '@/constants/typography';
 import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
 
 type StepsFooterButtonsProps = {
@@ -34,51 +34,40 @@ const StepsFooterButtons: React.FC<StepsFooterButtonsProps> = ({
     <View style={styles.footer}>
       {/* Save Button - Conditional */}
       {hasChanges && onSavePress && (
-        <View style={styles.buttonRow}>
-          <TouchableOpacity
-            style={[
-              styles.saveButton,
-              isSaving && styles.saveButtonDisabled
-            ]}
-            onPress={onSavePress}
-            disabled={isSaving}
-          >
-            <Text style={styles.saveButtonText}>
-              {isSaving ? 'Saving...' : 'Save'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
-      
-      <View style={styles.buttonRow}>
         <TouchableOpacity
-          style={styles.timerButton}
-          onPress={onTimersPress}
+          style={styles.saveButton}
+          onPress={onSavePress}
+          disabled={isSaving}
         >
-          <Text style={styles.timerButtonText}>Timer</Text>
+          <Text style={styles.saveButtonText}>
+            {isSaving ? 'Saving...' : 'Save Updated Recipe'}
+          </Text>
         </TouchableOpacity>
-      </View>
-      
-      {hasRecipeTips && (
-        <View style={styles.buttonRow}>
-          <TouchableOpacity
-            style={styles.recipeTipsButton}
-            onPress={onRecipeTipsPress}
-          >
-            <Text style={styles.recipeTipsButtonText}>Recipe Tips</Text>
-          </TouchableOpacity>
-        </View>
       )}
-      
+
+      <TouchableOpacity
+        style={styles.timerButton}
+        onPress={onTimersPress}
+      >
+        <Text style={styles.timerButtonText}>Timer</Text>
+      </TouchableOpacity>
+
+      {hasRecipeTips && (
+        <TouchableOpacity
+          style={styles.recipeTipsButton}
+          onPress={onRecipeTipsPress}
+        >
+          <Text style={styles.recipeTipsButtonText}>Recipe Tips</Text>
+        </TouchableOpacity>
+      )}
+
       {onEndCookingSessions && (
-        <View style={styles.buttonRow}>
-          <TouchableOpacity
-            style={styles.endSessionsButton}
-            onPress={onEndCookingSessions}
-          >
-            <Text style={styles.endSessionsButtonText}>End Cooking Session</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={styles.endSessionsButton}
+          onPress={onEndCookingSessions}
+        >
+          <Text style={styles.endSessionsButtonText}>End Cooking Session</Text>
+        </TouchableOpacity>
       )}
     </View>
   );
@@ -94,83 +83,53 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.md,
     paddingBottom: SPACING.xxl,
     backgroundColor: COLORS.background,
-    borderTopWidth: BORDER_WIDTH.hairline,
-    borderTopColor: COLORS.divider,
-  } as ViewStyle,
-  buttonRow: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    marginBottom: SPACING.sm,
+    borderTopWidth: 1,
+    borderTopColor: '#000000',
   } as ViewStyle,
   recipeTipsButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.sm,
-    borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.background,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
+    marginBottom: SPACING.sm,
   } as ViewStyle,
   recipeTipsButtonText: {
-    ...bodyStrongText,
-    color: COLORS.primary,
-    fontSize: 14,
+    fontFamily: 'Inter',
+    fontSize: FONT.size.body,
+    fontWeight: '400',
+    lineHeight: FONT.lineHeight.normal,
+    color: COLORS.textDark,
+    textAlign: 'left',
   } as TextStyle,
   timerButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.sm,
-    borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.background,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
+    marginBottom: SPACING.sm,
   } as ViewStyle,
   timerButtonText: {
-    ...bodyStrongText,
-    color: COLORS.primary,
-    fontSize: 14,
+    fontFamily: 'Inter',
+    fontSize: FONT.size.body,
+    fontWeight: '400',
+    lineHeight: FONT.lineHeight.normal,
+    color: COLORS.textDark,
+    textAlign: 'left',
   } as TextStyle,
   endSessionsButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.sm,
-    borderRadius: RADIUS.sm,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: COLORS.error || '#FF4444',
+    marginBottom: SPACING.sm,
   } as ViewStyle,
   endSessionsButtonText: {
-    ...bodyStrongText,
-    color: COLORS.error || '#FF4444',
-    fontSize: 14,
+    fontFamily: 'Inter',
+    fontSize: FONT.size.body,
+    fontWeight: '400',
+    lineHeight: FONT.lineHeight.normal,
+    color: COLORS.textDark,
+    textAlign: 'left',
   } as TextStyle,
   // Save button styles
   saveButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.md,
-    backgroundColor: COLORS.primary,
-  } as ViewStyle,
-  saveButtonDisabled: {
-    backgroundColor: COLORS.textMuted,
+    marginBottom: SPACING.sm,
   } as ViewStyle,
   saveButtonText: {
-    ...bodyStrongText,
-    color: COLORS.white,
-    fontSize: 16,
+    fontFamily: 'Inter',
+    fontSize: FONT.size.body,
+    fontWeight: '400',
+    lineHeight: FONT.lineHeight.normal,
+    color: COLORS.textDark,
+    textAlign: 'left',
   } as TextStyle,
 });
 
