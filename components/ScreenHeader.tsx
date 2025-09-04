@@ -3,7 +3,19 @@ import { View, Text, StyleSheet, ViewStyle, TextStyle, LayoutChangeEvent, Toucha
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, SPACING } from '@/constants/theme';
-import { screenTitleText } from '@/constants/typography';
+import { screenTitleText, FONT } from '@/constants/typography';
+
+// Function to get appropriate font size based on title
+const getTitleFontSize = (title: string): number => {
+  if (title.toUpperCase() === 'OLEA') {
+    return 36; // Larger size for OLEA
+  }
+  // Larger size for main section headings
+  if (['IMPORT', 'LIBRARY', 'MISE', 'SETTINGS', 'EXPLORE', 'LOGIN', 'ONBOARDING'].includes(title.toUpperCase())) {
+    return 28; // Medium size for other main headings
+  }
+  return FONT.size.screenTitle; // Default size
+};
 
 type ScreenHeaderProps = {
   title: string;
@@ -11,12 +23,22 @@ type ScreenHeaderProps = {
   showBack?: boolean;
   onTitlePress?: () => void;
   titleStyle?: TextStyle;
+  backgroundColor?: string;
 };
 
-export default function ScreenHeader({ title, onLayout, showBack = true, onTitlePress, titleStyle }: ScreenHeaderProps) {
+export default function ScreenHeader({ title, onLayout, showBack = true, onTitlePress, titleStyle, backgroundColor }: ScreenHeaderProps) {
   const router = useRouter();
   return (
-    <View style={styles.header} onLayout={onLayout}>
+    <View style={[
+      styles.header,
+      {
+        borderTopWidth: 1,
+        borderTopColor: '#000000',
+        borderBottomWidth: 1,
+        borderBottomColor: '#000000'
+      },
+      backgroundColor && { backgroundColor }
+    ]} onLayout={onLayout}>
       {showBack ? (
         <TouchableOpacity
           onPress={() => router.back()}
@@ -37,11 +59,23 @@ export default function ScreenHeader({ title, onLayout, showBack = true, onTitle
           accessibilityLabel={title}
           style={styles.titleContainer}
         >
-          <Text style={[styles.title, titleStyle]} numberOfLines={2} ellipsizeMode="tail">{title}</Text>
+          <Text
+            style={[styles.title, { fontSize: getTitleFontSize(title) }, titleStyle]}
+            numberOfLines={2}
+            ellipsizeMode="tail"
+          >
+            {title}
+          </Text>
         </TouchableOpacity>
       ) : (
         <View style={styles.titleContainer}>
-          <Text style={[styles.title, titleStyle]} numberOfLines={2} ellipsizeMode="tail">{title}</Text>
+          <Text
+            style={[styles.title, { fontSize: getTitleFontSize(title) }, titleStyle]}
+            numberOfLines={2}
+            ellipsizeMode="tail"
+          >
+            {title}
+          </Text>
         </View>
       )}
     </View>
@@ -51,9 +85,9 @@ export default function ScreenHeader({ title, onLayout, showBack = true, onTitle
 const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 0,
-    paddingBottom: SPACING.md,
+    paddingBottom: 0,
     marginTop: 0,
-    minHeight: 44 + SPACING.md,
+    minHeight: 48, // Increased to accommodate larger font sizes (was 44)
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-start',

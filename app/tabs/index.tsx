@@ -64,7 +64,7 @@ export default function HomeScreen() {
       case 'prep_cook':
         router.push('/tabs/mise');
             break;
-      case 'cookbooks':
+      case 'library':
         router.push('/tabs/library');
             break;
           default:
@@ -78,6 +78,7 @@ export default function HomeScreen() {
         title="OLEA"
         showBack={false}
         titleStyle={{ fontSize: 32, fontWeight: '800' }}
+        backgroundColor="#DEF6FF"
       />
 
                     <ScrollView 
@@ -92,7 +93,7 @@ export default function HomeScreen() {
             <Text style={styles.taglineBold}>your recipe.</Text>
                       </Text>
           <Text style={[styles.taglineText, styles.taglineBullet]}>
-            Customize freely, swap ingredients, personalize instructions, and auto-build shopping lists.
+            Remix your recipes.{'\n'}Swap ingredients.{'\n'}Personalize instructions.{'\n'}Cook your way.
                       </Text>
                   </View>
 
@@ -107,82 +108,78 @@ export default function HomeScreen() {
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <View style={styles.sectionContent}>
-                <TouchableOpacity
-                  style={styles.headerTouchable}
-                  onPress={() => handleSectionAction('customize')}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.sectionTitle}>CUSTOMIZE</Text>
-                </TouchableOpacity>
+                <View style={styles.cardTextContainer}>
+                  <Text style={styles.sectionTitle}>Customize</Text>
+                  <Text style={styles.sectionDescription}>
+                    Import recipes to build your own versions
+                  </Text>
+                </View>
               </View>
             </TouchableHighlight>
+          </View>
 
-            <View style={styles.expandedContent}>
-              <Text style={styles.expandedDescription}>
-                Transform any recipe to match your preferences, dietary needs, and cooking style.
-              </Text>
-            </View>
+          {/* LIBRARY */}
+          <View style={styles.sectionWrapper}>
+            <TouchableHighlight
+              style={styles.sectionCard}
+              onPress={() => handleSectionAction('library')}
+              underlayColor="#EEF6FF"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <View style={styles.sectionContent}>
+                <View style={styles.cardTextContainer}>
+                  <Text style={styles.sectionTitle}>Library</Text>
+                  <Text style={styles.sectionDescription}>
+                    Organize your personalized recipes
+                  </Text>
+                </View>
+              </View>
+            </TouchableHighlight>
           </View>
 
           {/* PREP & COOK */}
           <View style={styles.sectionWrapper}>
             <TouchableHighlight
-              style={styles.sectionCard}
+              style={[styles.sectionCard, styles.libraryCard]}
               onPress={() => handleSectionAction('prep_cook')}
               underlayColor="#EEF6FF"
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <View style={styles.sectionContent}>
-                <TouchableOpacity
-                  style={styles.headerTouchable}
-                  onPress={() => handleSectionAction('prep_cook')}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.sectionTitle}>PREP & COOK</Text>
-                </TouchableOpacity>
+                <View style={styles.cardTextContainer}>
+                  <Text style={styles.sectionTitle}>Prep & Cook</Text>
+                  <Text style={styles.sectionDescription}>
+                    Get your grocery list and start cooking
+                  </Text>
+                </View>
               </View>
             </TouchableHighlight>
-
-            <View style={styles.expandedContent}>
-              <Text style={styles.expandedDescription}>
-                Get step-by-step guidance, smart prep suggestions, and embedded timers.
-              </Text>
-            </View>
-          </View>
-
-          {/* COOKBOOKS */}
-          <View style={styles.sectionWrapper}>
-            <TouchableHighlight
-              style={styles.sectionCard}
-              onPress={() => handleSectionAction('cookbooks')}
-              underlayColor="#EEF6FF"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <View style={styles.sectionContent}>
-                <TouchableOpacity
-                  style={styles.headerTouchable}
-                  onPress={() => handleSectionAction('cookbooks')}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.sectionTitle}>COOKBOOKS</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableHighlight>
-
-            <View style={styles.expandedContent}>
-              <Text style={styles.expandedDescription}>
-                Organize and access your personalized recipes. Browse your saved collection and discover new favorites.
-              </Text>
-            </View>
           </View>
         </View>
       </ScrollView>
 
-      {/* Bottom callout */}
-      <View style={styles.bottomCallout}>
-        <Text style={styles.inlineText}>New to Meez?</Text>
-        <TouchableOpacity onPress={() => router.push('/onboarding')}>
-          <Text style={styles.inlineLink}>Take a quick tour</Text>
+      {/* Bottom left buttons */}
+      <View style={styles.bottomButtonsContainer}>
+        <TouchableOpacity
+          style={styles.bottomButton}
+          onPress={() => router.push('/onboarding')}
+          activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <View style={styles.bottomButtonContent}>
+            <Text style={styles.bottomButtonText}>Take a quick tour</Text>
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.bottomButton}
+          onPress={() => router.push('/settings')}
+          activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <View style={styles.bottomButtonContent}>
+            <Text style={styles.bottomButtonText}>Settings</Text>
+          </View>
         </TouchableOpacity>
       </View>
     </View>
@@ -198,19 +195,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingTop: SPACING.sm,
+    paddingTop: SPACING.md,
     paddingBottom: 120, // Increased to account for tab bar height
   },
   taglineSection: {
     alignItems: 'flex-start',
     paddingHorizontal: SPACING.pageHorizontal,
-    marginTop: SPACING.xl,
-    marginBottom: SPACING.xl * 2, // 3 lines of space (xl is typically 24px, so xl*2 = 48px)
+    marginTop: SPACING.sm, // Reduced from SPACING.xl to bring it closer to header
+    marginBottom: SPACING.xl, // Increased to create more space before cards
   },
   taglineText: {
     fontFamily: 'Inter',
-    fontSize: 20,
-    fontWeight: '500',
+    fontSize: 22,
+    fontWeight: '400',
     lineHeight: 28,
     color: COLORS.textDark,
     textAlign: 'left',
@@ -231,75 +228,83 @@ const styles = StyleSheet.create({
   },
   sectionsContainer: {
     gap: 0,
+    marginTop: SPACING.xxxl, // Match import page spacing
   },
   sectionWrapper: {
     marginBottom: 0,
   },
   sectionCard: {
-    height: 60,
+    width: '90%',
+    alignSelf: 'flex-start', // Left align to screen edge
+    marginLeft: '5%', // Offset to account for 90% width
     borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderTopColor: '#D9D5CC',
-    borderBottomColor: '#D9D5CC',
-    backgroundColor: COLORS.white,
+    borderTopColor: '#000000',
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.lg,
   },
   sectionContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-start',
-    height: '100%',
-    paddingHorizontal: 18,
-    flex: 1,
+    paddingLeft: 0, // Remove left padding for true left alignment
+    paddingRight: 18, // Keep some right padding
   },
   sectionTitle: {
-    fontFamily: 'Inter',
+    fontFamily: FONT.family.graphikMedium,
     fontSize: 28,
-    fontWeight: '400',
+    fontWeight: '600',
     lineHeight: 32,
-    textTransform: 'uppercase' as const,
-    color: COLORS.primary,
-    textAlign: 'left',
-    flex: 1,
-  },
-  headerTouchable: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-    height: '100%',
-    paddingVertical: 12,
-  },
-
-  expandedContent: {
-    borderTopWidth: 1,
-    borderTopColor: '#D9D5CC',
-    paddingTop: SPACING.md,
-    paddingBottom: SPACING.xl,
-    gap: SPACING.lg,
-  },
-
-  expandedDescription: {
-    ...bodyText,
     color: COLORS.textDark,
-    fontSize: 16,
-    lineHeight: 20,
-    paddingHorizontal: SPACING.pageHorizontal,
+    textAlign: 'left',
+    marginBottom: SPACING.xs,
+  },
+  cardTextContainer: {
+    flex: 1,
+  },
+  sectionDescription: {
+    fontFamily: 'Inter',
+    fontSize: 15,
+    fontWeight: '400',
+    lineHeight: 18,
+    color: '#000000',
+  },
+  libraryCard: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#000000',
   },
 
-  inlineLink: {
-    color: COLORS.primary,
-    textDecorationLine: 'none',
-    ...captionText,
+  bottomButtonsContainer: {
+    position: 'absolute',
+    bottom: 20, // Above tab bar
+    left: 0,
+    right: 0,
+    paddingLeft: SPACING.pageHorizontal,
+    paddingRight: SPACING.pageHorizontal,
+    gap: 2, // Space between buttons
   },
-  inlineText: {
-    ...captionText,
-    color: COLORS.textMuted,
+  bottomButton: {
+    height: 24, // Match Library.tsx searchToolbar height
+    width: '100%', // Full width within container
+    backgroundColor: 'transparent',
   },
-  bottomCallout: {
-    width: '100%',
-    paddingVertical: SPACING.xs,
-    alignItems: 'center',
-    justifyContent: 'center',
+  bottomButtonContent: {
     flexDirection: 'row',
-    columnGap: 4,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    height: '100%',
+    paddingLeft: 0, // Remove left padding for true left alignment
+    paddingRight: 18, // Keep some right padding
+  },
+  bottomButtonText: {
+    fontFamily: 'Inter',
+    fontSize: 16,
+    fontWeight: '400', // Match Library.tsx headerText
+    lineHeight: 22,
+    color: COLORS.textDark,
+    flex: 1,
+    textAlign: 'left',
+    textAlignVertical: 'center',
+    paddingVertical: 0,
+    textDecorationLine: 'underline',
   },
 });

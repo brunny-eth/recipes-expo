@@ -98,8 +98,8 @@ export default function ImportScreen() {
   const urlIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const nameIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const urlPrompt = "www.recipe.com/too-many-ads";
-  const namePrompt = "try 'garlic chicken' or 'pizza'";
+  const urlPrompt = "  www.recipe.com/too-many-ads";
+  const namePrompt = "  try 'garlic chicken' or 'pizza'";
 
   // Local state for name input
   const [recipeName, setRecipeName] = useState('');
@@ -819,7 +819,7 @@ export default function ImportScreen() {
             <View style={styles.sectionsContainer}>
               {/* Header moved up near the top */}
               <View style={styles.pageHeaderContainer}>
-                <Text style={styles.pageHeader}>To start customizing, import a recipe from anywhere or choose one from our own inspiration. </Text>
+                <Text style={styles.pageHeader}>To start customizing, import a recipe from anywhere or find one of our curated recipes. </Text>
               </View>
 
               {/* Cards section pushed down */}
@@ -834,9 +834,9 @@ export default function ImportScreen() {
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
                     <View style={styles.sectionContent}>
-                      <View style={styles.sectionTextContainer}>
-                        <Text style={styles.sectionTitle}>Website</Text>
-                        <Text style={styles.sectionSubtext}>paste a URL or social media link</Text>
+                      <View style={styles.cardTextContainer}>
+                        <Text style={styles.sectionTitle}>Link</Text>
+                        <Text style={styles.sectionSubtext}>Paste a URL or social media link</Text>
                       </View>
                       <Animated.Text
                         style={[
@@ -895,9 +895,9 @@ export default function ImportScreen() {
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
                     <View style={styles.sectionContent}>
-                      <View style={styles.sectionTextContainer}>
+                      <View style={styles.cardTextContainer}>
                         <Text style={styles.sectionTitle}>Photo</Text>
-                        <Text style={styles.sectionSubtext}>upload recipe PDFs or screenshots</Text>
+                        <Text style={styles.sectionSubtext}>Upload recipe PDFs or screenshots</Text>
                       </View>
                       <Animated.Text
                         style={[
@@ -935,9 +935,9 @@ export default function ImportScreen() {
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
                     <View style={styles.sectionContent}>
-                      <View style={styles.sectionTextContainer}>
+                      <View style={styles.cardTextContainer}>
                         <Text style={styles.sectionTitle}>Text</Text>
-                        <Text style={styles.sectionSubtext}>write in your own recipe</Text>
+                        <Text style={styles.sectionSubtext}>Write in your own recipe</Text>
                       </View>
                       <Animated.Text
                         style={[
@@ -996,9 +996,9 @@ export default function ImportScreen() {
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
                     <View style={styles.sectionContent}>
-                      <View style={styles.sectionTextContainer}>
+                      <View style={styles.cardTextContainer}>
                         <Text style={styles.sectionTitle}>Dish name</Text>
-                        <Text style={styles.sectionSubtext}>type in the name of a dish you like</Text>
+                        <Text style={styles.sectionSubtext}>Type in the name of a dish</Text>
                       </View>
                       <Animated.Text
                         style={[
@@ -1051,7 +1051,10 @@ export default function ImportScreen() {
                 {/* Explore Button */}
                 <View style={styles.sectionWrapper}>
                   <TouchableHighlight
-                    style={[styles.sectionCard, styles.importExploreCard]}
+                    style={[
+                      styles.sectionCard,
+                      expandedImportOption !== 'explore' && styles.importExploreCard
+                    ]}
                     onPress={() => toggleImportOption('explore')}
                     underlayColor="#EEF6FF"
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -1059,7 +1062,7 @@ export default function ImportScreen() {
                     <View style={styles.sectionContent}>
                       <View style={styles.sectionTextContainer}>
                         <Text style={styles.sectionTitle}>Explore</Text>
-                        <Text style={styles.sectionSubtext}>find a recipe from our curated</Text>
+                        <Text style={styles.sectionSubtext}>Find a recipe from our collection</Text>
                       </View>
                       <Animated.Text
                         style={[
@@ -1075,7 +1078,7 @@ export default function ImportScreen() {
                   </TouchableHighlight>
 
                   {expandedImportOption === 'explore' && (
-                    <View style={styles.expandedContent}>
+                    <View style={[styles.expandedContent, styles.exploreExpandedContent]}>
                       <View style={styles.fullWidthRow}>
                         <TouchableOpacity
                           style={styles.fullWidthPrimaryButton}
@@ -1189,25 +1192,28 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xl,
   },
   sectionTitle: {
-    fontFamily: 'Inter',
-    fontSize: 24,
-    fontWeight: '800',
-    lineHeight: 28,
-    textTransform: 'uppercase' as const,
+    fontFamily: FONT.family.graphikMedium,
+    fontSize: 28,
+    fontWeight: '600',
+    lineHeight: 32,
     color: COLORS.textDark,
-    flex: 1,
+    textAlign: 'left',
+    marginBottom: SPACING.xs,
   },
   sectionSubtext: {
     fontFamily: 'Inter',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '400',
-    lineHeight: 20,
-    color: COLORS.textMuted,
+    lineHeight: 18,
+    color: '#000000',
     flex: 1,
   },
   sectionTextContainer: {
     flex: 1,
     justifyContent: 'center',
+  },
+  cardTextContainer: {
+    flex: 1,
   },
   sectionHeader: {
     fontFamily: 'Inter',
@@ -1226,8 +1232,8 @@ const styles = StyleSheet.create({
   },
   pageHeader: {
     fontFamily: 'Inter',
-    fontSize: 20,
-    fontWeight: '500',
+    fontSize: 22,
+    fontWeight: '400',
     lineHeight: 28,
     color: COLORS.textDark,
     textAlign: 'left',
@@ -1242,18 +1248,20 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   sectionCard: {
-    width: '100%',
-    height: 80,
+    width: '90%',
+    alignSelf: 'flex-start', // Left align to screen edge
+    marginLeft: '5%', // Offset to account for 90% width
     borderTopWidth: 1,
-    borderTopColor: '#D9D5CC',
-    paddingHorizontal: SPACING.pageHorizontal,
-    paddingTop: SPACING.sm,
+    borderTopColor: '#000000',
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.lg,
   },
   sectionContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    height: '100%',
+    justifyContent: 'flex-start',
+    paddingLeft: 0, // Remove left padding for true left alignment
+    paddingRight: 18, // Keep some right padding
   },
   sectionChevron: {
     fontSize: 24,
@@ -1264,8 +1272,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     paddingTop: 0,
     paddingBottom: SPACING.md,
-    paddingHorizontal: SPACING.pageHorizontal,
     gap: SPACING.md,
+    width: '90%',
+    alignSelf: 'flex-start', // Left align to screen edge
+    marginLeft: '5%', // Offset to account for 90% width
   },
   importWebsiteCard: {
     backgroundColor: COLORS.background,
@@ -1282,7 +1292,11 @@ const styles = StyleSheet.create({
   importExploreCard: {
     backgroundColor: COLORS.background,
     borderBottomWidth: 1,
-    borderBottomColor: '#D9D5CC',
+    borderBottomColor: '#000000',
+  },
+  exploreExpandedContent: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#000000',
   },
   expandedDescription: {
     ...bodyText,
@@ -1404,7 +1418,8 @@ const styles = StyleSheet.create({
     ...bodyText,
     flex: 1,
     height: '100%',
-    paddingHorizontal: SPACING.base,
+    paddingLeft: 0, // Remove left padding for true left alignment
+    paddingRight: SPACING.base, // Keep some right padding
     color: COLORS.textDark,
     fontSize: FONT.size.caption || 14, // Fallback to prevent NaN
     lineHeight: undefined,

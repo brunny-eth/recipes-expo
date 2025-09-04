@@ -22,6 +22,7 @@ export const FONT = {
     heading: 'Ubuntu-Regular',
     body: 'Inter-Regular',
     bold: 'Inter-SemiBold',
+    graphikMedium: 'GraphikMedium',
     // Legacy aliases (to be removed after full migration)
     ubuntu: 'Ubuntu-Regular',
     inter: 'Inter-Regular',

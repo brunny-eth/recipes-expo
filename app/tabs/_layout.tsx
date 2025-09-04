@@ -8,11 +8,11 @@ import { captionText, FONT } from '@/constants/typography';
 const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: COLORS.background,
-    borderTopWidth: 0.5,
-    borderTopColor: COLORS.divider,
-    height: 72,
+    borderTopWidth: 1,
+    borderTopColor: '#000000',
+    height: 80,
     paddingBottom: Platform.OS === 'ios' ? 26 : 12,
-    paddingTop: 6,
+    paddingTop: 14,
   },
   tabBarLabel: {
     ...captionText,
@@ -26,7 +26,7 @@ const styles = StyleSheet.create({
   },
   tabBarText: {
     ...captionText,
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '600',
     textAlign: 'center',
     width: 64,
@@ -96,15 +96,6 @@ const MemoizedTabsNavigator = React.memo(() => {
         options={{
           title: 'Cook',
           tabBarIcon: createTabBarIcon('chef-hat', 'Cook'),
-          tabBarLabel: () => null,
-          unmountOnBlur: false,
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: 'Settings',
-          tabBarIcon: createTabBarIcon('cog', 'Settings'),
           tabBarLabel: () => null,
           unmountOnBlur: false,
         }}
