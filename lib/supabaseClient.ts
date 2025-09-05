@@ -1,7 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
-import * as SecureStore from 'expo-secure-store'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Database } from '../common/types/database.types'
-import 'react-native-url-polyfill/auto'
 
 // Polyfill for structuredClone (not available in React Native)
 if (typeof global.structuredClone === 'undefined') {
@@ -24,30 +23,12 @@ const log = (msg: string) => {
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
 
-// SecureStore adapter
-const ExpoSecureStoreAdapter = {
-  getItem: async (key: string) => {
-    log(`[getItem] ${key}`)
-    const value = await SecureStore.getItemAsync(key)
-    log(`[getItem] ${key} -> ${value ? `exists (${value.slice(0,15)}...)` : 'null'}`)
-    return value
-  },
-  setItem: async (key: string, value: string) => {
-    console.log(`[DEBUG] setItem is being called for key: ${key}`);
-    console.log(`[setItem] Storing key: ${key} with value length: ${value.length} bytes.`);
-    return SecureStore.setItemAsync(key, value)
-  },
-  removeItem: async (key: string) => {
-    log(`[removeItem] ${key}`)
-    return SecureStore.deleteItemAsync(key)
-  },
-}
-
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   auth: {
-    storage: ExpoSecureStoreAdapter,
-    autoRefreshToken: true,
+    storage: AsyncStorage,
+    flowType: 'pkce',
     persistSession: true,
-    detectSessionInUrl: false, // we'll handle this manually in Linking
+    autoRefreshToken: true,
+    detectSessionInUrl: false, // we handle the return URL ourselves
   },
 })

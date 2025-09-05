@@ -18,7 +18,6 @@ import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import WelcomeScreen from '@/components/WelcomeScreen';
 import AppNavigators from '@/components/AppNavigators';
-import LoginScreen from '@/app/login';
 import { COLORS } from '@/constants/theme';
 import SplashScreenMeez from './SplashScreen';
 import { AuthNavigationHandler } from '@/components/AuthNavigationHandler';
@@ -200,7 +199,7 @@ function RootLayoutNav() {
       );
     }
 
-    // 3. **HANDLE INITIAL ROUTING**: Redirect from +not-found or empty paths to appropriate screens
+    // 3. **HANDLE INITIAL ROUTING**: Always render AppNavigators and let it handle routing
     const currentPath = segments.join('/');
     if (segments[0] === '+not-found' || currentPath === '') {
       if (session) {
@@ -225,7 +224,7 @@ function RootLayoutNav() {
         return (
           <Animated.View style={{ flex: 1, backgroundColor: COLORS.background }} entering={FadeIn.duration(400)}>
             <OfflineBanner visible={isOffline} />
-            <LoginScreen />
+            <AppNavigators />
             <StatusBar style="dark" />
           </Animated.View>
         );
@@ -255,7 +254,7 @@ function RootLayoutNav() {
       return (
         <Animated.View style={{ flex: 1, backgroundColor: COLORS.background }} entering={FadeIn.duration(400)}>
           <OfflineBanner visible={isOffline} />
-          <LoginScreen />
+          <AppNavigators />
           <StatusBar style="dark" />
         </Animated.View>
       );

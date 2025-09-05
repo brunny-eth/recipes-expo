@@ -1,3 +1,16 @@
+// Polyfills - MUST be first before any other imports (in this exact order)
+import 'react-native-get-random-values';     // provides crypto.getRandomValues
+import 'expo-standard-web-crypto';           // provides crypto.subtle (SHA-256)
+import 'react-native-url-polyfill/auto';     // provides URL, URLSearchParams
+
+// Verify polyfills are active (one-time check)
+console.log('[polyfills]', {
+  hasCrypto: !!globalThis.crypto,
+  hasSubtle: !!globalThis.crypto?.subtle,
+  hasGetRandomValues: !!globalThis.crypto?.getRandomValues,
+  URLType: typeof URL,
+});
+
 // Global Error Handling - MUST be before expo-router/entry
 // This will catch all unhandled JavaScript exceptions in production builds
 const originalErrorHandler = global.ErrorUtils?.getGlobalHandler?.();

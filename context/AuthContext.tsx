@@ -18,6 +18,7 @@ import { useHandleError } from '@/hooks/useHandleError';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { createLogger } from '@/utils/logger';
 import { useAnalytics } from '@/utils/analytics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const logger = createLogger('auth');
 
@@ -134,66 +135,49 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
 
       logger.info('Handling deep link URL', { url });
 
-      // Extract tokens from URL fragment and set session explicitly using setSession()
-      const urlParts = url.split('#');
-      let fragment = null;
-      if (urlParts.length > 1) {
-        fragment = urlParts[1];
-      }
+      try {
+        console.log('[auth][exchange] attempting exchangeCodeForSession with url:', url);
+        const {
+          data: { session: newSession },
+          error: sessionError,
+        } = await supabase.auth.exchangeCodeForSession(url);
 
-      if (!fragment) {
-        logger.warn('No URL fragment found in deep link', { url });
-        return;
-      }
+        console.log('[auth][exchange] result', { ok: !sessionError, session: !!newSession, sessionError });
 
-      const params = new URLSearchParams(fragment);
-      const accessToken = params.get('access_token');
-      const refreshToken = params.get('refresh_token');
-
-      if (accessToken && refreshToken) {
-        logger.info('Tokens found in deep link URL', { 
-          accessTokenPresent: !!accessToken, 
-          refreshTokenPresent: !!refreshToken 
-        });
-        
-        try {
-          const {
-            data: { session: newSession },
-            error: sessionError,
-          } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
-
-          if (sessionError) {
-            logger.error('Authentication Error: Failed to set session via deeplink', { 
-              error: sessionError.message, 
-              url 
-            });
-              showErrorRef.current(
-              'Authentication Error',
-              `Authentication failed: ${sessionError.message}`,
-            );
-            emitNavigationEvent({ type: 'AUTH_ERROR', error: sessionError.message });
-          } else if (newSession) {
-            // We intentionally avoid local state updates and event emission here.
-            // Setting the session triggers Supabase's onAuthStateChange listener, which is our single source of truth.
-            logger.info('Session set via deep link', { userId: newSession.user.id });
-            // Do not call setSession / setJustLoggedIn / maybeIdentifyUser / emit SIGNED_IN here
-          }
-        } catch (e: any) {
-          logger.error('Authentication Error: Unexpected error setting session via deeplink', { 
-            error: e.message, 
+        if (sessionError) {
+          logger.error('Authentication Error: Failed to exchange code for session', { 
+            error: sessionError.message, 
             url 
           });
           showErrorRef.current(
             'Authentication Error',
-            `Unexpected error setting session: ${e.message}`,
+            `Authentication failed: ${sessionError.message}`,
           );
-          emitNavigationEvent({ type: 'AUTH_ERROR', error: e.message });
+          emitNavigationEvent({ type: 'AUTH_ERROR', error: sessionError.message });
+        } else if (newSession) {
+          // We intentionally avoid local state updates and event emission here.
+          // The session will be picked up by the useEffect that listens to onAuthStateChange.
+          logger.info('Authentication successful via PKCE code exchange', { 
+            userId: newSession.user.id, 
+            provider: newSession.user.app_metadata?.provider 
+          });
+          emitNavigationEvent({ 
+            type: 'SIGNED_IN', 
+            userId: newSession.user.id, 
+            userMetadata: newSession.user.user_metadata || null 
+          });
         }
-      } else {
-        logger.warn('No access/refresh tokens found in URL fragment', { url });
+      } catch (error: any) {
+        console.log('[auth][exchange] exception during code exchange', error);
+        logger.error('Authentication Error: Exception during code exchange', { 
+          error: error.message, 
+          url 
+        });
+        showErrorRef.current(
+          'Authentication Error',
+          `Authentication failed: ${error.message}`,
+        );
+        emitNavigationEvent({ type: 'AUTH_ERROR', error: error.message });
       }
     },
     [emitNavigationEvent],
@@ -202,6 +186,11 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   // Effect to set up auth state change listener and deep link listener
   useEffect(() => {
     logger.info('Setting up auth state change listener and URL listener');
+
+    // Temporary debug logging for auth events
+    supabase.auth.onAuthStateChange((_event, session) => {
+      console.log('[auth] event=', _event, 'hasSession=', !!session);
+    });
 
     // Set up auth state change listener
     const { data: authListener } = supabase.auth.onAuthStateChange(
@@ -334,7 +323,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           // *** THIS IS THE CRITICAL CHANGE ***
           // For native Apple Sign In, the clientId for Supabase's verification
           // should typically be your app's Bundle ID, not the Service ID (which is more for web flows).
-          const supabaseClientId = 'com.meez.recipes';
+          const supabaseClientId = 'com.meez.recipes.oauth';
 
           const { data, error } = await supabase.auth.signInWithIdToken({
             provider: 'apple',
@@ -391,35 +380,30 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           return false; // Indicate failure
         }
       } else { // Google OAuth flow
-        const redirectTo = process.env.EXPO_PUBLIC_AUTH_URL;
+        const GOOGLE_REDIRECT = 'olea://auth-callback';
 
-        if (!redirectTo) {
-          const errorMsg =
-            'Missing EXPO_PUBLIC_AUTH_URL environment variable. Cannot proceed with authentication.';
-          logger.error('Configuration Error: Missing EXPO_PUBLIC_AUTH_URL', { error: errorMsg });
-          handleError('Configuration Error', errorMsg);
-          return false; // Indicate failure
-        }
-
-        logger.info('Web browser session opened', { provider, redirectTo });
-
+        console.log('[auth][google] starting signInWithOAuth');
         const { data, error } = await supabase.auth.signInWithOAuth({
-          provider,
-          options: {
-            redirectTo,
-            skipBrowserRedirect: true,
-          },
+          provider: 'google',
+          options: { redirectTo: GOOGLE_REDIRECT, skipBrowserRedirect: true },
         });
+        if (error) { console.log('[auth][google] signInWithOAuth error', error); throw error; }
 
-        if (error) throw error;
+        console.log('[auth][google] auth url', data?.url);
+        console.log('[auth][google] pkce before open', await AsyncStorage.getItem('supabase.auth.pkce'));
 
         if (data.url) {
-          const result = await WebBrowser.openAuthSessionAsync(
-            data.url,
-            redirectTo,
-          );
+          const result = await WebBrowser.openAuthSessionAsync(data.url, GOOGLE_REDIRECT);
+          console.log('[auth][google] openAuthSessionAsync result', result);
+
           if (result.type === 'success' && result.url) {
-            logger.info('Web browser session success', { provider, url: result.url });
+            // Minimal visibility: prove "state" exists
+            const hasState = /[?&#]state=/.test(result.url);
+            console.log('[auth][google] callback has state?', hasState, result.url);
+
+            // Also check the PKCE record still exists
+            console.log('[auth][google] pkce before exchange', await AsyncStorage.getItem('supabase.auth.pkce'));
+
             await handleUrl(result.url);
             return true; // Indicate that browser flow completed successfully
           } else if (result.type === 'cancel') {

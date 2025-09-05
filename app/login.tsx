@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Platform, ViewStyle, TextStyle, Image } from 'react-native';
 import { useHandleError } from '@/hooks/useHandleError';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
 import { useSuccessModal } from '@/context/SuccessModalContext';
 import { COLORS, SPACING, RADIUS, ICON_SIZE } from '@/constants/theme';
@@ -9,9 +9,7 @@ import { FontAwesome } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Linking } from 'react-native';
 import { FONT, bodyText, bodyTextLoose, bodyStrongText } from '@/constants/typography';
-import LogoHeader from '@/components/LogoHeader';
-import Animated from 'react-native-reanimated';
-import Logo from '@/assets/images/logo.svg';
+import ScreenHeader from '@/components/ScreenHeader';
 
 type AuthProvider = 'google' | 'apple';
 
@@ -20,13 +18,8 @@ const LoginScreen = () => {
   const handleError = useHandleError();
   const { showSuccess } = useSuccessModal();
   const [isSigningIn, setIsSigningIn] = useState<AuthProvider | null>(null);
+  const insets = useSafeAreaInsets();
 
-  // Create the same animated logo as the index page
-  const animatedLogo = (
-    <Animated.View>
-      <Logo width={120} height={60} style={{ alignSelf: 'center' }} />
-    </Animated.View>
-  );
 
   const handleSignIn = async (provider: AuthProvider) => {
     if (isSigningIn) return;
@@ -67,10 +60,15 @@ const LoginScreen = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <ScreenHeader
+        title="OLEA"
+        showBack={false}
+        titleStyle={{ fontSize: 32, fontWeight: '800' }}
+        backgroundColor="#DEF6FF"
+      />
       <View style={styles.content}>
         <View style={styles.logoSection}>
-          <LogoHeader animatedLogo={animatedLogo} />
           <Text style={styles.title}>Before we get started...</Text>
         </View>
         <View style={styles.authSection}>
@@ -138,7 +136,7 @@ const LoginScreen = () => {
           </Text>
         </View>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -146,12 +144,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-    justifyContent: 'center',
   } as ViewStyle,
   buttonContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     width: '100%',
   },
   loadingContainer: {
@@ -162,44 +159,53 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   content: {
     paddingHorizontal: SPACING.pageHorizontal,
-    alignItems: 'center',
+    alignItems: 'flex-start',
     flex: 1,
+    justifyContent: 'center',
   } as ViewStyle,
   logoSection: {
-    paddingTop: SPACING.xxl,
-    alignItems: 'center',
+    paddingTop: SPACING.sm,
+    alignItems: 'flex-start',
+    width: '100%',
   } as ViewStyle,
   authSection: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
+    width: '100%',
   } as ViewStyle,
   tosSection: {
     paddingBottom: SPACING.md,
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    width: '100%',
   } as ViewStyle,
   title: {
-    fontSize: FONT.size.xl,
-    fontWeight: FONT.weight.semiBold,
+    fontFamily: 'Inter',
+    fontSize: 22,
+    fontWeight: '400',
+    lineHeight: 28,
     color: COLORS.textDark,
-    marginTop: SPACING.lg,
-    marginBottom: SPACING.md,
-    fontFamily: FONT.family.ubuntu,
+    textAlign: 'left',
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.xl,
   } as TextStyle,
   subtitle: {
-    ...bodyText,
-    fontSize: FONT.size.sectionHeader,
+    fontFamily: 'Inter',
+    fontSize: 22,
+    fontWeight: '400',
+    lineHeight: 28,
     color: COLORS.textDark,
-    textAlign: 'center',
+    textAlign: 'left',
     marginTop: SPACING.xs,
-    marginBottom: SPACING.xl,
+    marginBottom: 36 + SPACING.xl,
   } as TextStyle,
   button: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     width: '100%',
     paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.md,
     borderRadius: RADIUS.md,
     marginBottom: SPACING.md,
     minHeight: 54,
@@ -220,7 +226,7 @@ const styles = StyleSheet.create({
   tosText: {
     fontSize: 12,
     color: COLORS.textMuted,
-    textAlign: 'center',
+    textAlign: 'left',
     marginTop: SPACING.sm,
     marginBottom: SPACING.md,
   } as TextStyle,

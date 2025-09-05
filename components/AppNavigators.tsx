@@ -7,7 +7,8 @@ import { Stack } from 'expo-router';
  */
 const AppNavigators = React.memo(() => {
   return (
-    <Stack initialRouteName="tabs">
+    <Stack>
+      <Stack.Screen name="login" options={{ headerShown: false }} />
       <Stack.Screen name="recipe/summary" options={{ headerShown: false }} />
       <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
       <Stack.Screen name="+not-found" />
