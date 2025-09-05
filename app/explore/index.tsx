@@ -156,15 +156,18 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingHorizontal: SPACING.pageHorizontal,
   },
   centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: SPACING.pageHorizontal,
   },
-  listContent: { paddingTop: SPACING.sm },
-  errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: SPACING.xl },
+  listContent: {
+    paddingTop: SPACING.sm,
+    paddingHorizontal: SPACING.pageHorizontal,
+  },
+  errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: SPACING.pageHorizontal },
   errorText: { ...bodyText, color: COLORS.error, textAlign: 'center', marginBottom: SPACING.lg },
   retryButton: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#000000', paddingVertical: 12, paddingHorizontal: 24, borderRadius: RADIUS.sm },
   retryButtonText: { ...bodyStrongText, color: '#000000' },
@@ -193,7 +196,7 @@ const styles = StyleSheet.create({
     textAlign: 'left',
     textTransform: 'uppercase' as const,
     fontSize: 28,
-    paddingLeft: 0,
+    paddingLeft: SPACING.pageHorizontal,
   },
 });
 

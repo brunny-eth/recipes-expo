@@ -83,7 +83,7 @@ export default React.memo(SplashScreenMeez);
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fefcf7', // Exact same as native splash background
+    backgroundColor: '#DEF6FF', // Match brand color and native splash background
     width: '100%',
     height: '100%',
   },
@@ -95,9 +95,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logoImage: {
-    // Centered logo only – match native splash placement
-    width: Math.min(width * 0.6, 300),
-    height: Math.min(width * 0.6, 300) * 0.48,
+    // Centered logo only – match native splash placement (50% bigger)
+    width: Math.min(width * 0.9, 450),
+    height: Math.min(width * 0.9, 450) * 0.48,
   },
   heading: {},
 });

@@ -453,8 +453,8 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
             source={require('@/assets/images/logo.svg')}
             resizeMode="contain"
             style={{
-              width: isCompact ? 128 : 150,
-              height: isCompact ? 64 : 75,
+                          width: isCompact ? 300 : 400,
+            height: isCompact ? 150 : 200,
               alignSelf: 'center',
               marginTop: isCompact ? SPACING.lg : SPACING.xl,
               marginBottom: 0,

@@ -13,8 +13,8 @@ export default function MeezLogo() {
 
 const styles = StyleSheet.create({
   logo: {
-    width: 220,
-    height: 120,
+    width: 440, // Much bigger for testing: 220 * 2
+    height: 240, // Much bigger for testing: 120 * 2
     marginBottom: SPACING.md,
     alignSelf: 'center',
   },

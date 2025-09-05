@@ -112,7 +112,15 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
         onPress={() => handleRecipeSelect(recipe.id || 0)}
       >
         <View style={styles.imageContainer}>
-          {shouldShowFallback ? null : (
+          {shouldShowFallback ? (
+            <View style={styles.fallbackImageContainer}>
+              <Image
+                source={require('@/assets/images/Olea.png')}
+                resizeMode="contain"
+                style={styles.fallbackImage}
+              />
+            </View>
+          ) : (
             <FastImage
               source={{ uri: imageUrl }}
               style={styles.exploreCardImage as any}
@@ -179,12 +187,27 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
             </>
           ) : (
             <>
-              <View style={styles.header}>
-                <Text style={styles.title}>OK! We&apos;ll make a new recipe</Text>
-                <Text style={styles.subtitle}>Add more detail to help us create the best recipe for you.</Text>
+              <View style={styles.headerExpanded}>
+                <View style={styles.headerExpandedContent}>
+                  <Text style={styles.title}>OK! We&apos;ll make you a new one.</Text>
+                  <Text style={styles.subtitleLeft}>Add more detail for the best recipe.</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.closeButtonExpanded}
+                  onPress={() => {
+                    console.log('[RecipeMatchSelectionModal] User clicked close X');
+                    setIsCreateExpanded(false);
+                    setInputText('');
+                    setShowValidation(false);
+                    setValidationError('');
+                  }}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <MaterialCommunityIcons name="close" size={24} color={COLORS.textMuted} />
+                </TouchableOpacity>
               </View>
 
-              <View style={styles.inputSection}>
+              <View style={styles.inputSectionExpanded}>
                 <TextInput
                   style={[styles.textArea, showValidation && inputText.trim().length === 0 && styles.textAreaError]}
                   placeholder="Add ingredients, style, or dietary needs (optional)"
@@ -207,31 +230,33 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
                   <Text style={styles.validationErrorText}>{validationError}</Text>
                 ) : null}
               </View>
-
-              <View style={styles.buttonContainer}>
-                <TouchableOpacity
-                  style={styles.primaryButton}
-                  onPress={() => {
-                    const trimmedInput = inputText.trim();
-                    console.log('[RecipeMatchSelectionModal] Confirm create with input text length:', trimmedInput.length);
-
-                    // Validate dish name inputs
-                    if (looksLikeDishName(trimmedInput) && !isDescriptiveDishName(trimmedInput)) {
-                      setValidationError('Please be a bit more descriptive so we can make you the best recipe!');
-                      setLastValidatedInput(trimmedInput);
-                      return;
-                    }
-
-                    // Clear any previous validation error and proceed
-                    setValidationError('');
-                    setLastValidatedInput('');
-                    onAction('createNew', trimmedInput);
-                  }}
-                >
-                  <Text style={styles.primaryButtonText}>Make my recipe</Text>
-                </TouchableOpacity>
-              </View>
             </>
+          )}
+
+          {isCreateExpanded && (
+            <View style={styles.buttonContainerBottom}>
+              <TouchableOpacity
+                style={styles.primaryButton}
+                onPress={() => {
+                  const trimmedInput = inputText.trim();
+                  console.log('[RecipeMatchSelectionModal] Confirm create with input text length:', trimmedInput.length);
+
+                  // Validate dish name inputs
+                  if (looksLikeDishName(trimmedInput) && !isDescriptiveDishName(trimmedInput)) {
+                    setValidationError('Please be a bit more descriptive so we can make you the best recipe!');
+                    setLastValidatedInput(trimmedInput);
+                    return;
+                  }
+
+                  // Clear any previous validation error and proceed
+                  setValidationError('');
+                  setLastValidatedInput('');
+                  onAction('createNew', trimmedInput);
+                }}
+              >
+                <Text style={styles.primaryButtonText}>Make my recipe</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </SafeAreaView>
       </View>
@@ -263,10 +288,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   } as ViewStyle,
+  headerExpanded: {
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.md,
+    alignItems: 'flex-start',
+    paddingHorizontal: SPACING.pageHorizontal,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  } as ViewStyle,
+  headerExpandedContent: {
+    flex: 1,
+    flexDirection: 'column',
+    justifyContent: 'flex-start',
+  } as ViewStyle,
+  closeButtonExpanded: {
+    padding: SPACING.xs,
+    paddingRight: SPACING.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
+  } as ViewStyle,
   title: {
     ...sectionHeaderText,
     color: COLORS.textDark,
-    textAlign: 'center',
+    textAlign: 'left',
     marginBottom: SPACING.xs,
   } as TextStyle,
   mainTitle: {
@@ -287,6 +331,13 @@ const styles = StyleSheet.create({
     maxWidth: 280,
     alignSelf: 'center',
   } as TextStyle,
+  subtitleLeft: {
+    ...bodyText,
+    color: COLORS.textMuted,
+    textAlign: 'left',
+    maxWidth: 280,
+    alignSelf: 'flex-start',
+  } as TextStyle,
   recipeList: {
     flex: 1,
     paddingVertical: SPACING.md,
@@ -298,6 +349,15 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     padding: SPACING.lg,
     width: '100%',
+  } as ViewStyle,
+  buttonContainerBottom: {
+    backgroundColor: COLORS.primary,
+    padding: SPACING.lg,
+    width: '100%',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
   } as ViewStyle,
   recipeCard: {
     flexDirection: 'row',
@@ -322,16 +382,16 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   fallbackImageContainer: {
-    width: SPACING.xxxl || 72,
-    height: SPACING.xxxl || 72,
-    backgroundColor: COLORS.lightGray,
+    width: '100%',
+    height: '100%',
+    backgroundColor: COLORS.background,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: SPACING.md,
+    padding: SPACING.sm,
   } as ViewStyle,
   fallbackImage: {
-    width: '60%',
-    height: '60%',
+    width: '80%',
+    height: '80%',
   } as ImageStyle,
   titleContainer: {
     width: '60%',
@@ -357,6 +417,10 @@ const styles = StyleSheet.create({
     fontSize: FONT.size.smBody,
   } as TextStyle,
   inputSection: {
+    paddingTop: SPACING.sm,
+  } as ViewStyle,
+  inputSectionExpanded: {
+    flex: 1,
     paddingTop: SPACING.sm,
   } as ViewStyle,
   textArea: {
@@ -406,6 +470,7 @@ const styles = StyleSheet.create({
     color: COLORS.textDark,
     flex: 1,
     textAlign: 'left',
+    paddingBottom: SPACING.xs,
   } as TextStyle,
   secondaryButtonText: {
     fontFamily: 'Inter',

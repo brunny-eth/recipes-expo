@@ -26,11 +26,13 @@ import {
   bodyStrongText,
   screenTitleText,
   sectionHeaderText,
+  captionText,
   FONT,
 } from '@/constants/typography';
 import ScreenHeader from '@/components/ScreenHeader';
 import { useRenderCounter } from '@/hooks/useRenderCounter';
 import { useHandleError } from '@/hooks/useHandleError';
+import BottomTabBar from '@/components/BottomTabBar';
 
 export default function AccountScreen() {
   const { signOut, isAuthenticated, session } = useAuth();
@@ -220,27 +222,29 @@ export default function AccountScreen() {
           </View>
         )}
 
+        {/* Bottom info - ordered: tagline, version, legal links */}
+        <View style={styles.bottomLegalSection}>
+          <Text style={styles.tagline}>Designed for home cooks, by home cooks</Text>
+          <Text style={styles.versionText}>Version {appVersion}</Text>
+          <View style={styles.legalSection}>
+            <TouchableOpacity
+              style={styles.legalLink}
+              onPress={() => Linking.openURL('https://meez.app/privacy.html')}
+            >
+              <Text style={styles.legalLinkText}>Privacy Policy</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.legalLink}
+              onPress={() => Linking.openURL('https://meez.app/tos.html')}
+            >
+              <Text style={styles.legalLinkText}>Terms of Service</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
       </ScrollView>
 
-      {/* Bottom info - ordered: tagline, version, legal links */}
-      <View style={styles.bottomLegalSection}>
-        <Text style={styles.tagline}>Designed for home cooks, by home cooks</Text>
-        <Text style={styles.versionText}>Version {appVersion}</Text>
-        <View style={styles.legalSection}>
-          <TouchableOpacity 
-            style={styles.legalLink} 
-            onPress={() => Linking.openURL('https://meez.app/privacy.html')}
-          >
-            <Text style={styles.legalLinkText}>Privacy Policy</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.legalLink} 
-            onPress={() => Linking.openURL('https://meez.app/tos.html')}
-          >
-            <Text style={styles.legalLinkText}>Terms of Service</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <BottomTabBar />
     </View>
   );
 }
@@ -249,7 +253,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-    paddingHorizontal: SPACING.pageHorizontal,
     justifyContent: 'space-between',
   } as ViewStyle,
   scrollView: {
@@ -261,20 +264,24 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   authStatusText: {
     ...bodyText,
-    color: COLORS.textSubtle,
+    color: COLORS.textDark,
     textAlign: 'center',
   } as TextStyle,
   signOutButton: {
     marginTop: SPACING.sm,
     marginBottom: SPACING.xxl,
-    backgroundColor: COLORS.lightGray,
-    padding: SPACING.smLg,
-    borderRadius: RADIUS.smMd,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#000000',
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.sm,
     alignItems: 'center',
+    minHeight: 44,
   } as ViewStyle,
   signOutButtonText: {
     ...bodyStrongText,
-    color: COLORS.white,
+    color: COLORS.textDark,
     fontSize: FONT.size.smBody,
   } as TextStyle,
   feedbackSection: {
@@ -292,13 +299,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   } as TextStyle,
   feedbackTitle: {
-    fontSize: FONT.size.body,
-    fontFamily: FONT.family.heading,
+    ...sectionHeaderText,
+    color: COLORS.textDark,
+    textAlign: 'center',
   } as TextStyle,
   feedbackInput: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.background,
     borderWidth: BORDER_WIDTH.default,
-    borderColor: COLORS.lightGray,
+    borderColor: '#000000',
     borderRadius: RADIUS.sm,
     padding: SPACING.md,
     minHeight: 140,
@@ -333,7 +341,7 @@ const styles = StyleSheet.create({
   devLinkText: {
     ...bodyText,
     fontSize: FONT.size.smBody,
-    color: COLORS.primary,
+    color: COLORS.textDark,
   } as TextStyle,
   legalSection: {
     flexDirection: 'row',
@@ -346,11 +354,11 @@ const styles = StyleSheet.create({
   legalLinkText: {
     ...bodyText,
     fontSize: FONT.size.caption,
-    color: COLORS.textSubtle,
+    color: COLORS.textDark,
   } as TextStyle,
   versionText: {
     ...bodyText,
-    color: COLORS.textSubtle,
+    color: COLORS.textDark,
     textAlign: 'center',
     fontSize: FONT.size.caption,
     marginTop: 0,
@@ -358,7 +366,7 @@ const styles = StyleSheet.create({
   tagline: {
     ...bodyText,
     textAlign: 'center',
-    color: COLORS.textSubtle,
+    color: COLORS.textDark,
     marginTop: SPACING.xs,
     marginBottom: SPACING.xxl,
     fontSize: FONT.size.caption,
@@ -369,6 +377,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.xl,
     borderRadius: RADIUS.sm,
     alignItems: 'center',
+    marginBottom: SPACING.lg,
   } as ViewStyle,
   loginButtonText: {
     ...bodyStrongText,
@@ -376,12 +385,12 @@ const styles = StyleSheet.create({
     fontSize: FONT.size.smBody,
   } as TextStyle,
   scrollContent: {
-    paddingBottom: SPACING.xl,
+    paddingBottom: 0,
+    paddingHorizontal: SPACING.pageHorizontal,
   } as ViewStyle,
   bottomLegalSection: {
-    paddingHorizontal: SPACING.pageHorizontal,
-    paddingTop: 0,
-    paddingBottom: 0,
+    paddingTop: SPACING.xl,
+    paddingBottom: SPACING.xl,
     alignItems: 'center',
   } as ViewStyle,
   signOutButtonDisabled: {

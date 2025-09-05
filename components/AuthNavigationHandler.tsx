@@ -31,14 +31,14 @@ export function AuthNavigationHandler() {
           
           if (isNewUser) {
             showSuccess(
-              'Welcome to Meez!',
-              'You can start importing recipes here or save recipes from the Explore page.',
+              'Welcome to Olea.',
+              'Turn any recipe into your recipe.',
               4000 // Show for 4 seconds
             );
           } else {
             showSuccess(
-              'Welcome back to Meez!',
-              'Great to see you again. Your recipes are ready for you.',
+              'Welcome back to Olea.',
+              'Your recipes are ready for you.',
               4000 // Show for 4 seconds
             );
           }
