@@ -18,7 +18,7 @@ interface StepItemProps {
 
 const stateConfig = {
   pending: {
-    labelColor: COLORS.disabled,
+    labelColor: COLORS.textMuted,
     subtextColor: COLORS.textSubtle,
   },
   active: {
@@ -26,7 +26,7 @@ const stateConfig = {
     subtextColor: COLORS.textSubtle,
   },
   complete: {
-    labelColor: COLORS.primary,
+    labelColor: COLORS.textDark,
     subtextColor: COLORS.textSubtle,
   },
 };

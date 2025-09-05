@@ -8,7 +8,7 @@ import {
   TextStyle,
   ActivityIndicator,
 } from 'react-native';
-import { bodyStrongText } from '@/constants/typography';
+import { bodyStrongText, FONT } from '@/constants/typography';
 import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
 import FolderPickerModal from '@/components/FolderPickerModal';
 
@@ -117,8 +117,8 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
           return (
             <TouchableOpacity
               style={[
-                styles.secondaryButtonStyle,
-                isSavingChanges && styles.secondaryButtonDisabled
+                styles.plainButton,
+                isSavingChanges && styles.plainButtonDisabled
               ]}
               onPress={handleSaveChanges}
               disabled={isSavingChanges}
@@ -126,13 +126,13 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
               {isSavingChanges && (
                 <ActivityIndicator
                   size="small"
-                  color={COLORS.primary}
-                  style={{ marginRight: 8 }}
+                  color="black"
+                  style={{ marginRight: SPACING.xs }}
                 />
               )}
               <Text style={[
-                styles.secondaryButtonText,
-                isSavingChanges && styles.secondaryButtonTextDisabled
+                styles.plainButtonText,
+                isSavingChanges && styles.plainButtonTextDisabled
               ]}>
                 {isSavingChanges ? 'Saving changes...' : 'Save changes'}
               </Text>
@@ -150,8 +150,8 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
         return (
           <TouchableOpacity
             style={[
-              styles.secondaryButtonStyle,
-              isSavingForLater && styles.secondaryButtonDisabled
+              styles.plainButton,
+              isSavingForLater && styles.plainButtonDisabled
             ]}
             onPress={handleSaveForLaterPress} // Updated to show folder picker
             disabled={isSavingForLater}
@@ -159,13 +159,13 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
             {isSavingForLater && (
               <ActivityIndicator
                 size="small"
-                color={COLORS.primary}
-                style={{ marginRight: 8 }}
+                color="black"
+                style={{ marginRight: SPACING.xs }}
               />
             )}
             <Text style={[
-              styles.secondaryButtonText,
-              isSavingForLater && styles.secondaryButtonTextDisabled
+              styles.plainButtonText,
+              isSavingForLater && styles.plainButtonTextDisabled
             ]}>
               {isSavingForLater ? 'Processing modifications...' : 'Cook later'}
             </Text>
@@ -182,8 +182,8 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
           <View style={styles.centeredButtonContainer}>
             <TouchableOpacity
               style={[
-                styles.miseButtonStyle,
-                buttonDisabled && styles.mainButtonDisabled,
+                styles.plainButton,
+                buttonDisabled && styles.plainButtonDisabled,
               ]}
               onPress={getMainButtonHandler()}
               disabled={buttonDisabled}
@@ -191,11 +191,14 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
               {(isRewriting || isScalingInstructions || isSavingModifications) && (
                 <ActivityIndicator
                   size="small"
-                  color={COLORS.white}
+                  color="black"
                   style={{ marginRight: SPACING.xs }}
                 />
               )}
-              <Text style={styles.mainButtonText}>
+              <Text style={[
+                styles.miseButtonText,
+                buttonDisabled && styles.plainButtonTextDisabled
+              ]}>
                 {getMainButtonText()}
               </Text>
             </TouchableOpacity>
@@ -208,95 +211,89 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
   return (
     <>
       <View style={styles.footer}>
-        {/* Three equal-width buttons in a row */}
         <View style={styles.buttonRow}>
           {/* Cook Now/Update Recipe Button */}
+        <TouchableOpacity
+          style={styles.plainButton}
+          onPress={getMainButtonHandler()}
+          disabled={buttonDisabled}
+        >
+          {(isRewriting || isScalingInstructions || isSavingModifications) && (
+            <ActivityIndicator
+              size="small"
+              color="black"
+              style={{ marginRight: SPACING.xs }}
+            />
+          )}
+          <Text style={[
+            styles.plainButtonText,
+            buttonDisabled && styles.plainButtonTextDisabled
+          ]}>
+            {getMainButtonText()}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Second Button - Either Save Changes (saved+modifications) or Cook Later */}
+        {entryPoint === 'saved' && hasModifications && handleSaveChanges ? (
           <TouchableOpacity
-            style={[
-              styles.equalButton,
-              styles.mainButtonStyle,
-              buttonDisabled && styles.mainButtonDisabled,
-            ]}
-            onPress={getMainButtonHandler()}
-            disabled={buttonDisabled}
+            style={styles.plainButton}
+            onPress={handleSaveChanges}
+            disabled={isSavingChanges}
           >
-            {(isRewriting || isScalingInstructions || isSavingModifications) && (
+            {isSavingChanges && (
               <ActivityIndicator
                 size="small"
-                color={COLORS.white}
+                color="black"
                 style={{ marginRight: SPACING.xs }}
               />
             )}
-            <Text style={styles.mainButtonText}>
-              {getMainButtonText()}
+            <Text style={[
+              styles.plainButtonText,
+              isSavingChanges && styles.plainButtonTextDisabled
+            ]}>
+              {isSavingChanges ? 'Saving...' : 'Save'}
             </Text>
           </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={styles.plainButton}
+            onPress={handleSaveForLaterPress}
+            disabled={isSavingForLater}
+          >
+            {isSavingForLater && (
+              <ActivityIndicator
+                size="small"
+                color="black"
+                style={{ marginRight: SPACING.xs }}
+              />
+            )}
+            <Text style={[
+              styles.plainButtonText,
+              isSavingForLater && styles.plainButtonTextDisabled
+            ]}>
+              {isSavingForLater ? 'Saving...' : 'Save'}
+            </Text>
+          </TouchableOpacity>
+        )}
 
-          {/* Second Button - Either Save Changes (saved+modifications) or Cook Later */}
-          {entryPoint === 'saved' && hasModifications && handleSaveChanges ? (
-            <TouchableOpacity
-              style={[
-                styles.equalButton,
-                styles.secondaryButtonStyle,
-                isSavingChanges && styles.secondaryButtonDisabled
-              ]}
-              onPress={handleSaveChanges}
-              disabled={isSavingChanges}
-            >
-              {isSavingChanges && (
-                <ActivityIndicator
-                  size="small"
-                  color={COLORS.primary}
-                  style={{ marginRight: SPACING.xs }}
-                />
-              )}
-              <Text style={[
-                styles.secondaryButtonText,
-                isSavingChanges && styles.secondaryButtonTextDisabled
-              ]}>
-                {isSavingChanges ? 'Saving...' : 'Save'}
-              </Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={[
-                styles.equalButton,
-                styles.secondaryButtonStyle,
-                isSavingForLater && styles.secondaryButtonDisabled
-              ]}
-              onPress={handleSaveForLaterPress}
-              disabled={isSavingForLater}
-            >
-              {isSavingForLater && (
-                <ActivityIndicator
-                  size="small"
-                  color={COLORS.primary}
-                  style={{ marginRight: SPACING.xs }}
-                />
-              )}
-              <Text style={[
-                styles.secondaryButtonText,
-                isSavingForLater && styles.secondaryButtonTextDisabled
-              ]}>
-                {isSavingForLater ? 'Saving...' : 'Save'}
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Recipe Variations Button */}
-          {onOpenVariations && (
-            <TouchableOpacity
-              style={[
-                styles.equalButton,
-                styles.variationsButtonStyle,
-                (isRewriting || isScalingInstructions || isSavingModifications) && styles.variationsButtonDisabled
-              ]}
-              onPress={onOpenVariations}
-              disabled={isRewriting || isScalingInstructions || isSavingModifications}
-            >
-              <Text style={styles.variationsButtonText}>Remix</Text>
-            </TouchableOpacity>
-          )}
+        {/* Recipe Variations Button */}
+        {onOpenVariations && (
+          <TouchableOpacity
+            style={[
+              styles.plainButton,
+              (isRewriting || isScalingInstructions || isSavingModifications) && styles.plainButtonDisabled
+            ]}
+            onPress={onOpenVariations}
+            disabled={isRewriting || isScalingInstructions || isSavingModifications}
+          >
+            <Text style={[
+              styles.plainButtonText,
+              (isRewriting || isScalingInstructions || isSavingModifications) && styles.plainButtonTextDisabled
+            ]}>
+              Remix
+            </Text>
+          </TouchableOpacity>
+        )}
         </View>
       </View>
 
@@ -320,24 +317,50 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.pageHorizontal,
     paddingTop: SPACING.md,
     paddingBottom: SPACING.xxl,
-    backgroundColor: COLORS.background,
-    borderTopWidth: BORDER_WIDTH.hairline,
-    borderTopColor: COLORS.divider,
+    backgroundColor: COLORS.primary,
+    borderTopWidth: 1,
+    borderTopColor: '#000000',
   } as ViewStyle,
   centeredButtonContainer: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
+    flex: 1,
   } as ViewStyle,
   buttonRow: {
     flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
     gap: SPACING.sm,
-    alignItems: 'stretch',
   } as ViewStyle,
-  equalButton: {
+  plainButton: {
     flex: 1,
-    borderRadius: RADIUS.sm,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: SPACING.sm,
   } as ViewStyle,
+  plainButtonDisabled: {
+    opacity: 0.5,
+  },
+  plainButtonText: {
+    fontFamily: 'Inter',
+    fontSize: FONT.size.bodyMedium + 6,
+    fontWeight: '400',
+    lineHeight: FONT.lineHeight.normal,
+    color: COLORS.textDark,
+    textAlign: 'center',
+  } as TextStyle,
+  plainButtonTextDisabled: {
+    color: COLORS.textMuted,
+  },
+  miseButtonText: {
+    fontFamily: 'Inter',
+    fontSize: FONT.size.bodyMedium + 6,
+    fontWeight: '400',
+    lineHeight: FONT.lineHeight.normal,
+    color: COLORS.textDark,
+    textAlign: 'left',
+  } as TextStyle,
+  // Legacy styles - keeping for compatibility but not used
   mainButtonStyle: {
     backgroundColor: COLORS.primary,
     paddingVertical: SPACING.md,
@@ -351,7 +374,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    minWidth: 200, // Make it wider than the standard button
+    minWidth: 200,
   } as ViewStyle,
   mainButtonDisabled: {
     backgroundColor: COLORS.darkGray,
@@ -381,7 +404,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: COLORS.primary,
-    paddingVertical: SPACING.sm, // 75% of SPACING.md
+    paddingVertical: SPACING.sm,
     flexDirection: 'row',
   } as ViewStyle,
   variationsButtonDisabled: {

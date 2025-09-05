@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextStyle, Animated } from 'react-native';
-import { screenTitleText, FONT } from '@/constants/typography';
+import { sectionHeaderText, FONT } from '@/constants/typography';
 import { COLORS } from '@/constants/theme';
 
 type RecipeHeaderTitleProps = {
@@ -85,12 +85,12 @@ const RecipeHeaderTitle: React.FC<RecipeHeaderTitleProps> = ({
         <Text
           style={[
             {
-              ...screenTitleText,
+              fontFamily: FONT.family.graphikMedium,
+              fontSize: 28,
+              fontWeight: '600',
+              lineHeight: 32,
               color: COLORS.textDark,
               textAlign: 'center',
-              fontSize: 24, // Fixed font size
-              // Ensure consistent line height to prevent jumping
-              lineHeight: FONT.lineHeight.normal,
             },
             baseStyle
           ]}

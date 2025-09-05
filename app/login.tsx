@@ -24,7 +24,7 @@ const LoginScreen = () => {
   const animatedLogo = (
     <Animated.View>
       <Image
-        source={require('@/assets/images/meezblue_underline.png')}
+        source={require('@/assets/images/logo.svg')}
         resizeMode="contain"
         style={{
           width: 120,

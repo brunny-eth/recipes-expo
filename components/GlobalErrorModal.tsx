@@ -161,7 +161,9 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   } as TextStyle,
   button: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#000000',
     paddingVertical: SPACING.smMd,
     paddingHorizontal: 24,
     borderRadius: RADIUS.sm,
@@ -169,7 +171,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   } as ViewStyle,
   buttonText: {
-    color: COLORS.white,
+    color: '#000000',
     fontWeight: FONT.weight.bold,
     fontSize: FONT.size.body,
   } as TextStyle,
@@ -183,7 +185,7 @@ const styles = StyleSheet.create({
     // No extra styles needed, will inherit from .button
   },
   secondaryButtonText: {
-    color: COLORS.white, // Match the primary button text color
+    color: '#000000', // Match the primary button text color
   },
 });
 

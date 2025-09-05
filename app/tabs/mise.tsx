@@ -206,7 +206,7 @@ const mergeManualItemsIntoCategories = (
       preparation: null, // Manual items don't have preparation info
     };
     
-    mergedCategories[categoryName].push(groceryItem);
+    mergedCategories[categoryName].unshift(groceryItem);
   });
   
   // Ensure a catch-all Miscellaneous category always exists, even if empty
@@ -1285,12 +1285,7 @@ export default function MiseScreen() {
           )}
         </View>
 
-        {/* Unchecked items (need to get) */}
-        {uncheckedItems.map((groceryItem, index) => {
-          return renderGroceryItem(groceryItem, index);
-        })}
-
-        {/* Inline add row for this category - only show if there are unchecked items or no items at all */}
+        {/* Inline add row for this category - show at top when editing */}
         {inlineAddCategory === item.name && (
           <View style={[
             styles.groceryItem
@@ -1314,7 +1309,7 @@ export default function MiseScreen() {
                 autoFocus
               />
               <TouchableOpacity onPress={handleConfirmInlineAdd} style={styles.inlineIconButton}>
-                <MaterialCommunityIcons name="check" size={22} color={COLORS.primary} />
+                <MaterialCommunityIcons name="check" size={22} color={COLORS.textMuted} />
               </TouchableOpacity>
               <TouchableOpacity onPress={handleCancelInlineAdd} style={styles.inlineIconButton}>
                 <MaterialCommunityIcons name="close" size={22} color={COLORS.textMuted} />
@@ -1322,6 +1317,11 @@ export default function MiseScreen() {
             </View>
           </View>
         )}
+
+        {/* Unchecked items (need to get) */}
+        {uncheckedItems.map((groceryItem, index) => {
+          return renderGroceryItem(groceryItem, index);
+        })}
 
         {/* Checked items at the bottom */}
         {checkedItems.length > 0 && (

@@ -450,7 +450,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
       animatedLogo={(
         <Animated.View>
           <Image
-            source={require('@/assets/images/meezblue_underline.png')}
+            source={require('@/assets/images/logo.svg')}
             resizeMode="contain"
             style={{
               width: isCompact ? 128 : 150,
@@ -621,7 +621,7 @@ const styles = StyleSheet.create({
   bigCheckmark: {
     fontSize: 72,
     fontWeight: 'bold',
-    color: COLORS.primary,
+    color: COLORS.textDark,
   } as TextStyle,
   readyText: {
     fontSize: 20,
@@ -635,7 +635,7 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     borderWidth: 5,
     borderColor: COLORS.lightGray,
-    borderTopColor: COLORS.primary,
+    borderTopColor: COLORS.textDark,
   } as ViewStyle,
   overlayContainer: {
     ...StyleSheet.absoluteFillObject,

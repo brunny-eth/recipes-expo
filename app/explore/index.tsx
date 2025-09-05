@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import { PanGestureHandler } from 'react-native-gesture-handler';
+import { State } from 'react-native-gesture-handler';
 import FastImage from '@d11/react-native-fast-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { bodyStrongText, bodyText, screenTitleText, FONT, metaText } from '@/constants/typography';
-import ScreenHeader from '@/components/ScreenHeader';
 import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
 import { useAnalytics } from '@/utils/analytics';
 
@@ -86,6 +87,14 @@ export default function ExploreScreen() {
     router.push({ pathname: '/recipe/summary', params: { recipeId: recipe.id?.toString(), entryPoint: 'library' } });
   }, [router, track]);
 
+  const handleSwipe = useCallback((event: any) => {
+    const { translationX, state } = event.nativeEvent;
+    if (state === State.END && translationX < -50) { // Swipe left threshold
+      console.log('Swipe left detected, navigating back');
+      router.back();
+    }
+  }, [router]);
+
   const renderItem = useCallback(({ item }: { item: ParsedRecipe }) => {
     const imageUrl = item.image || item.thumbnailUrl;
     const hasImageError = imageErrors[String(item.id)];
@@ -94,9 +103,7 @@ export default function ExploreScreen() {
         <View style={styles.imageContainer}>
           {imageUrl && !hasImageError ? (
             <FastImage source={{ uri: imageUrl }} style={styles.exploreCardImage} onError={() => handleImageError(item.id || 0)} />
-          ) : (
-            <FastImage source={require('@/assets/images/meezblue_underline.webp')} style={styles.exploreCardImage} />
-          )}
+          ) : null}
         </View>
         <View style={styles.titleContainer}>
           <Text style={styles.exploreCardTitle} numberOfLines={3}>{item.title}</Text>
@@ -106,31 +113,41 @@ export default function ExploreScreen() {
   }, [navigateToRecipe, handleImageError, imageErrors]);
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>        
-      <ScreenHeader title="EXPLORE RECIPES" showBack={true} />
-      {isLoading ? (
-        <ActivityIndicator style={styles.centered} size="large" color={COLORS.primary} />
-      ) : error ? (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={() => fetchFromAPI(false)}>
-            <Text style={styles.retryButtonText}>Try Again</Text>
-          </TouchableOpacity>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <PanGestureHandler
+        onGestureEvent={handleSwipe}
+        activeOffsetX={[-10, 10]} // Only trigger for horizontal swipes
+        failOffsetY={[-5, 5]} // Don't fail on slight vertical movement
+      >
+        <View style={{ flex: 1 }}>
+          <View style={styles.customHeader}>
+          <Text style={styles.customHeaderTitle}>EXPLORE RECIPES</Text>
         </View>
-      ) : (
-        <FlatList
-          data={recipes}
-          renderItem={renderItem}
-          keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={styles.listContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} tintColor={COLORS.primary} />}
-          initialNumToRender={10}
-          windowSize={21}
-          maxToRenderPerBatch={10}
-          updateCellsBatchingPeriod={50}
-          removeClippedSubviews
-        />
-      )}
+        {isLoading ? (
+          <ActivityIndicator style={styles.centered} size="large" color="#000000" />
+        ) : error ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={() => fetchFromAPI(false)}>
+              <Text style={styles.retryButtonText}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <FlatList
+            data={recipes}
+            renderItem={renderItem}
+            keyExtractor={(item) => String(item.id)}
+            contentContainerStyle={styles.listContent}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#000000"]} tintColor="#000000" />}
+            initialNumToRender={10}
+            windowSize={21}
+            maxToRenderPerBatch={10}
+            updateCellsBatchingPeriod={50}
+            removeClippedSubviews
+          />
+        )}
+        </View>
+      </PanGestureHandler>
     </View>
   );
 }
@@ -149,12 +166,34 @@ const styles = StyleSheet.create({
   listContent: { paddingTop: SPACING.sm },
   errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: SPACING.xl },
   errorText: { ...bodyText, color: COLORS.error, textAlign: 'center', marginBottom: SPACING.lg },
-  retryButton: { backgroundColor: COLORS.primary, paddingVertical: 12, paddingHorizontal: 24, borderRadius: RADIUS.sm },
-  retryButtonText: { ...bodyStrongText, color: COLORS.white },
-  exploreCard: { flexDirection: 'row', backgroundColor: COLORS.white, borderRadius: RADIUS.sm, marginBottom: SPACING.md, height: 120, overflow: 'hidden' },
-  imageContainer: { width: '40%', height: '100%', borderRadius: RADIUS.md, overflow: 'hidden' },
+  retryButton: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#000000', paddingVertical: 12, paddingHorizontal: 24, borderRadius: RADIUS.sm },
+  retryButtonText: { ...bodyStrongText, color: '#000000' },
+  exploreCard: { flexDirection: 'row', backgroundColor: 'transparent', marginBottom: SPACING.md, height: 120, overflow: 'hidden' },
+  imageContainer: { width: '40%', height: '100%', overflow: 'hidden' },
   exploreCardImage: { width: '100%', height: '100%' },
-  titleContainer: { width: '60%', height: '100%', paddingLeft: SPACING.md, paddingRight: SPACING.sm, justifyContent: 'center', backgroundColor: COLORS.white },
-  exploreCardTitle: { color: COLORS.textDark, ...bodyStrongText, fontSize: FONT.size.body, lineHeight: FONT.size.body * 1.3 },
+  titleContainer: { width: '60%', height: '100%', paddingLeft: SPACING.md, paddingRight: SPACING.sm, justifyContent: 'center', backgroundColor: 'transparent' },
+  exploreCardTitle: { color: COLORS.textDark, ...bodyText, fontSize: FONT.size.body, lineHeight: FONT.lineHeight.normal },
+  customHeader: {
+    paddingHorizontal: 0,
+    paddingBottom: 0,
+    marginTop: 0,
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    borderTopWidth: 1,
+    borderTopColor: '#000000',
+    borderBottomWidth: 1,
+    borderBottomColor: '#000000',
+    backgroundColor: COLORS.background,
+  },
+  customHeaderTitle: {
+    ...screenTitleText,
+    color: COLORS.textDark,
+    textAlign: 'left',
+    textTransform: 'uppercase' as const,
+    fontSize: 28,
+    paddingLeft: 0,
+  },
 });
 

@@ -19,6 +19,8 @@ import { abbreviateUnit } from '@/utils/format';
 import {
   sectionHeaderText,
   bodyStrongText,
+  bodyText,
+  metaText,
   captionText,
   FONT,
 } from '@/constants/typography';
@@ -94,7 +96,7 @@ export default function IngredientSubstitutionModal({
         ? abbreviateUnit(unit)
         : unit
       : '';
-    return `(approx. ${amountStr}${unitStr ? ' ' + unitStr : ''})`.trim();
+    return `(${amountStr}${unitStr ? ' ' + unitStr : ''})`;
   };
 
   if (!visible) return null;
@@ -130,6 +132,7 @@ export default function IngredientSubstitutionModal({
                   key={`${option.name}-${index}`}
                   style={[
                     styles.optionItem,
+                    index === 0 ? styles.optionItemFirst : null,
                     option.name === 'Remove ingredient'
                       ? styles.optionItemRemove
                       : selectedOption?.name === option.name
@@ -149,22 +152,20 @@ export default function IngredientSubstitutionModal({
                     )}
                   </View>
                   <View style={styles.optionContent}>
-                    <View style={styles.optionNameContainer}>
-                      <Text
-                        style={[
-                          styles.optionName,
-                          option.name === 'Remove ingredient' && styles.optionNameRemove,
-                        ]}
-                        numberOfLines={2}
-                      >
-                        {option.name}
-                      </Text>
+                    <Text
+                      style={[
+                        styles.optionName,
+                        option.name === 'Remove ingredient' && styles.optionNameRemove,
+                      ]}
+                      numberOfLines={2}
+                    >
+                      {option.name}
                       {quantityText && (
-                        <Text style={styles.optionQuantity} numberOfLines={1}>
-                          {quantityText}
+                        <Text style={styles.optionQuantity}>
+                          {` ${quantityText}`}
                         </Text>
                       )}
-                    </View>
+                    </Text>
                     {option.description && (
                       <Text style={styles.optionDescription} numberOfLines={2}>
                         {option.description}
@@ -184,7 +185,12 @@ export default function IngredientSubstitutionModal({
           onPress={handleApply}
           disabled={!selectedOption}
         >
-          <Text style={styles.applyButtonText}>Make changes</Text>
+          <Text style={[
+            styles.applyButtonText,
+            !selectedOption && styles.applyButtonTextDisabled
+          ]}>
+            Make changes
+          </Text>
         </TouchableOpacity>
       </Animated.View>
     </View>
@@ -216,60 +222,60 @@ const styles = StyleSheet.create({
     zIndex: 2001,
   },
   header: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: SPACING.pageHorizontal,
   },
   title: {
     ...sectionHeaderText,
     color: COLORS.textDark,
-    textAlign: 'center',
+    textAlign: 'left',
   },
   ingredientTitle: {
     ...bodyStrongText,
     color: COLORS.textMuted,
-    textAlign: 'center',
+    textAlign: 'left',
     marginTop: SPACING.xs,
+    marginBottom: SPACING.sm,
   },
   optionsList: {
     marginBottom: SPACING.pageHorizontal,
   },
   optionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SPACING.md,
-    borderRadius: RADIUS.md,
-    backgroundColor: COLORS.white,
-    marginBottom: SPACING.base,
-    borderWidth: BORDER_WIDTH.default,
-    borderColor: COLORS.lightGray,
-    minHeight: 72,
+    flexDirection: 'row-reverse',
+    alignItems: 'flex-start',
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.xs,
+    marginBottom: SPACING.xs,
+  },
+  optionItemFirst: {
+    borderTopWidth: 1,
+    borderTopColor: '#000000',
   },
   optionItemSelected: {
-    borderColor: COLORS.primary,
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: 'transparent',
   },
   optionItemRemove: {
-    borderColor: COLORS.error,
-    backgroundColor: COLORS.errorLight,
+    backgroundColor: 'transparent',
+    borderBottomWidth: 1,
+    borderBottomColor: '#000000',
+    marginBottom: SPACING.sm,
+    paddingBottom: SPACING.sm,
   },
   radioButton: {
     width: ICON_SIZE.md,
     height: ICON_SIZE.md,
-    borderRadius: RADIUS.md,
-    borderWidth: BORDER_WIDTH.thick,
-    borderColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: SPACING.md,
+    marginLeft: SPACING.sm,
   },
   radioButtonRemove: {
-    borderColor: COLORS.error,
+    // No special styling needed
   },
   radioButtonInner: {
     width: ICON_SIZE.xs,
     height: ICON_SIZE.xs,
     borderRadius: RADIUS.smAlt,
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#000000',
   },
   radioButtonInnerRemove: {
     backgroundColor: COLORS.error,
@@ -278,14 +284,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   optionNameContainer: {
-    // New container for name + quantity
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start', // Align text top
-    marginBottom: SPACING.xs,
+    alignItems: 'flex-start',
+    marginBottom: SPACING.xxs,
   },
   optionName: {
-    ...bodyStrongText,
+    ...bodyText,
     color: COLORS.textDark,
     flexShrink: 1, // Allow name to wrap
     marginRight: SPACING.sm, // Space between name and quantity
@@ -295,13 +299,13 @@ const styles = StyleSheet.create({
   },
   optionQuantity: {
     // Style for the quantity text
-    ...captionText,
-    color: COLORS.darkGray,
-    textAlign: 'right',
+    ...metaText,
+    color: COLORS.textMuted,
   },
   optionDescription: {
     ...captionText,
-    color: COLORS.darkGray,
+    color: COLORS.textMuted,
+    marginTop: SPACING.xxs,
   },
   noSuggestionsText: {
     ...captionText,
@@ -311,16 +315,20 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.pageHorizontal,
   },
   applyButton: {
-    backgroundColor: COLORS.primary,
-    padding: SPACING.md,
-    borderRadius: RADIUS.md,
-    alignItems: 'center',
+    marginBottom: SPACING.sm,
   },
   applyButtonDisabled: {
-    backgroundColor: COLORS.darkGray,
+    opacity: 0.5,
   },
   applyButtonText: {
-    ...bodyStrongText,
-    color: COLORS.white,
+    fontFamily: 'Inter',
+    fontSize: FONT.size.body,
+    fontWeight: '400',
+    lineHeight: FONT.lineHeight.normal,
+    color: COLORS.textDark,
+    textAlign: 'left',
+  },
+  applyButtonTextDisabled: {
+    color: COLORS.textMuted,
   },
 });

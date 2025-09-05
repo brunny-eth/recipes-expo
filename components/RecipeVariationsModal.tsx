@@ -8,9 +8,9 @@ import {
   TextStyle,
 } from 'react-native';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
-import { bodyStrongText } from '@/constants/typography';
+import { bodyStrongText, FONT } from '@/constants/typography';
 
-export type VariationType = 'low_fat' | 'higher_protein' | 'gluten_free' | 'dairy_free' | 'vegetarian' | 'easier_recipe';
+export type VariationType = 'low_fat' | 'higher_protein' | 'dairy_free' | 'vegetarian' | 'easier_recipe';
 
 interface VariationOption {
   type: VariationType;
@@ -28,11 +28,6 @@ const VARIATION_OPTIONS: VariationOption[] = [
     type: 'higher_protein',
     label: 'High Protein',
     description: 'Boost protein with lean sources'
-  },
-  {
-    type: 'gluten_free',
-    label: 'Gluten-Free',
-    description: 'Remove gluten ingredients'
   },
   {
     type: 'dairy_free',
@@ -125,30 +120,27 @@ const RecipeVariationsModal: React.FC<RecipeVariationsModalProps> = ({
           ))}
         </View>
 
-        <View style={styles.buttonRow}>
-          <TouchableOpacity
-            style={[styles.button, styles.cancelButton]}
-            onPress={handleClose}
-          >
-            <Text style={styles.cancelButtonText}>Cancel</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.button,
-              styles.confirmButton,
-              !selectedVariation && styles.confirmButtonDisabled
-            ]}
-            onPress={handleConfirm}
-            disabled={!selectedVariation}
-          >
-            <Text style={[
-              styles.confirmButtonText,
-              !selectedVariation && styles.confirmButtonTextDisabled
-            ]}>
-              Apply
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={styles.cancelButton}
+          onPress={handleClose}
+        >
+          <Text style={styles.cancelButtonText}>Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.confirmButton,
+            !selectedVariation && styles.confirmButtonDisabled
+          ]}
+          onPress={handleConfirm}
+          disabled={!selectedVariation}
+        >
+          <Text style={[
+            styles.confirmButtonText,
+            !selectedVariation && styles.confirmButtonTextDisabled
+          ]}>
+            Apply
+          </Text>
+        </TouchableOpacity>
         </View>
 
 
@@ -158,7 +150,11 @@ const RecipeVariationsModal: React.FC<RecipeVariationsModalProps> = ({
 
 const styles = StyleSheet.create({
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -171,6 +167,8 @@ const styles = StyleSheet.create({
     width: '90%',
     maxWidth: 350,
     padding: SPACING.lg,
+    borderWidth: 1,
+    borderColor: '#000000',
     shadowColor: COLORS.black,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.25,
@@ -182,8 +180,10 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   } as ViewStyle,
   title: {
-    ...bodyStrongText,
-    fontSize: 20,
+    fontFamily: FONT.family.graphikMedium,
+    fontSize: 28,
+    fontWeight: '600',
+    lineHeight: 32,
     color: COLORS.textDark,
     textAlign: 'center',
   } as TextStyle,
@@ -205,76 +205,75 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: COLORS.lightGray,
+    borderColor: '#000000',
     marginBottom: SPACING.sm,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.white,
   } as ViewStyle,
   optionItemSelected: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: COLORS.surface,
+    borderColor: COLORS.textDark,
   } as ViewStyle,
 
   optionContent: {
     flex: 1,
   } as ViewStyle,
   optionLabel: {
-    ...bodyStrongText,
+    fontFamily: 'Inter',
     fontSize: 16,
+    fontWeight: '400',
+    lineHeight: FONT.lineHeight.normal,
     color: COLORS.textDark,
     marginBottom: 2,
   } as TextStyle,
   optionLabelSelected: {
-    color: COLORS.white,
+    color: COLORS.textDark,
   } as TextStyle,
   optionDescription: {
+    fontFamily: 'Inter',
     fontSize: 12,
+    fontWeight: '400',
+    lineHeight: FONT.lineHeight.tight,
     color: COLORS.textMuted,
   } as TextStyle,
   optionDescriptionSelected: {
-    color: COLORS.white,
+    color: COLORS.textMuted,
   } as TextStyle,
   checkMark: {
     fontSize: 20,
-    color: COLORS.white,
+    color: COLORS.textDark,
     fontWeight: 'bold',
   } as TextStyle,
   buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: SPACING.md,
+    alignItems: 'flex-start',
+    gap: SPACING.sm,
   } as ViewStyle,
   button: {
-    flex: 1,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 44,
+    marginBottom: SPACING.sm,
   } as ViewStyle,
   cancelButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
+    marginBottom: SPACING.sm,
   } as ViewStyle,
   cancelButtonText: {
-    ...bodyStrongText,
-    color: COLORS.textMuted,
-    fontSize: 14,
+    fontFamily: 'Inter',
+    fontSize: FONT.size.body,
+    fontWeight: '400',
+    lineHeight: FONT.lineHeight.normal,
+    color: COLORS.textDark,
+    textAlign: 'left',
   } as TextStyle,
   confirmButton: {
-    backgroundColor: COLORS.primary,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
+    marginBottom: SPACING.sm,
   } as ViewStyle,
   confirmButtonDisabled: {
-    backgroundColor: COLORS.lightGray,
-    borderColor: COLORS.lightGray,
-  } as ViewStyle,
+    opacity: 0.5,
+  },
   confirmButtonText: {
-    ...bodyStrongText,
-    color: COLORS.white,
-    fontSize: 14,
+    fontFamily: 'Inter',
+    fontSize: FONT.size.body,
+    fontWeight: '400',
+    lineHeight: FONT.lineHeight.normal,
+    color: COLORS.textDark,
+    textAlign: 'left',
   } as TextStyle,
   confirmButtonTextDisabled: {
     color: COLORS.textMuted,

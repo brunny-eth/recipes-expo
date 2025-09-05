@@ -313,6 +313,49 @@ export default function RecipeSummaryScreen() {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isSavingTitle, setIsSavingTitle] = useState(false);
   const originalTitleRef = useRef('');
+  const nameInputRef = useRef<TextInput | null>(null);
+
+  // Header action - matches folder-detail exactly
+  const renderHeaderAction = () => {
+    // When editing, show a checkmark to confirm save
+    if (isEditingTitle) {
+      const isSaveDisabled =
+        isSavingTitle || title.trim().length === 0;
+      return (
+        <TouchableOpacity
+          style={styles.selectButton}
+          onPress={handleSaveTitle}
+          disabled={isSaveDisabled}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          {isSavingTitle ? (
+            <ActivityIndicator size="small" color="black" />
+          ) : (
+            <MaterialCommunityIcons
+              name="check"
+              size={20}
+              color={isSaveDisabled ? COLORS.textMuted : COLORS.textDark}
+            />
+          )}
+        </TouchableOpacity>
+      );
+    }
+
+    // When not editing, show a pencil icon to start editing
+    return (
+      <TouchableOpacity
+        style={styles.selectButton}
+        onPress={() => setIsEditingTitle(true)}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      >
+        <MaterialCommunityIcons
+          name="pencil"
+          size={20}
+          color={COLORS.textDark}
+        />
+      </TouchableOpacity>
+    );
+  };
 
   // Folder picker state for title editing
   const [isFolderPickerVisible, setIsFolderPickerVisible] = useState(false);
@@ -1389,6 +1432,16 @@ export default function RecipeSummaryScreen() {
       setIsAlreadyInMise(false);
     }
   }, [selectedScaleFactor, currentUnsavedChanges, persistedChanges]); // Reset when scaling or ingredient changes occur
+
+  // Auto-focus the title input when editing starts
+  useEffect(() => {
+    if (isEditingTitle && nameInputRef.current) {
+      // Small delay to ensure the input is rendered before focusing
+      setTimeout(() => {
+        nameInputRef.current?.focus();
+      }, 100);
+    }
+  }, [isEditingTitle]);
 
   const detectedAllergens = React.useMemo(() => {
     if (!originalRecipe) return [];
@@ -2899,7 +2952,7 @@ export default function RecipeSummaryScreen() {
     console.log('[Summary] ⏳ Showing loading screen');
     return (
       <View style={[styles.centeredStatusContainer, { paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <ActivityIndicator size="large" color="black" />
       </View>
     );
   }
@@ -2920,7 +2973,11 @@ export default function RecipeSummaryScreen() {
   });
 
   return (
-    <PanGestureHandler onHandlerStateChange={onSwipeGesture}>
+    <PanGestureHandler
+      onHandlerStateChange={onSwipeGesture}
+      activeOffsetX={[-10, 10]}
+      failOffsetY={[-5, 5]}
+    >
       <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Modals */}
       {substitutionModalVisible && selectedIngredientOriginalData && (
@@ -2943,34 +3000,22 @@ export default function RecipeSummaryScreen() {
         isLoading={false}
       />
       
-      {/* Custom Header with Editable Title */}
-      <Pressable style={styles.customHeader} onLayout={onHeaderLayout} onPress={isEditingTitle ? handleCancelTitleEdit : undefined}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={24} color={COLORS.textDark} />
-        </TouchableOpacity>
+      {/* Custom Header - matches folder-detail exactly */}
+      <View style={styles.header}>
         {isEditingTitle ? (
-          <TextInput
-            style={[styles.headerTitle, styles.headerTitleInput]}
-            value={title}
-            onChangeText={setTitle}
-            editable={!isSavingTitle}
-            maxLength={60}
-            returnKeyType="done"
-            onSubmitEditing={handleSaveTitle}
-            onBlur={() => {
-              // Cancel editing on blur instead of auto-saving
-              if (!isSavingTitle) {
-                handleCancelTitleEdit();
-              }
-            }}
-            autoFocus={true}
-            multiline={false}
-            numberOfLines={1}
-          />
+          <Pressable onPress={handleCancelTitleEdit} style={styles.titleEditContainer}>
+            <TextInput
+              ref={nameInputRef}
+              style={[styles.headerTitle, styles.headerTitleInput]}
+              value={title}
+              onChangeText={setTitle}
+              // Do not auto-save on blur or submit; rely on the checkmark
+              editable={!isSavingTitle}
+              maxLength={100}
+              returnKeyType="done"
+              blurOnSubmit={false}
+            />
+          </Pressable>
         ) : (
           <TouchableOpacity
             style={styles.headerTitleTouchable}
@@ -2978,44 +3023,28 @@ export default function RecipeSummaryScreen() {
             activeOpacity={0.7}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <RecipeHeaderTitle title={title || 'Recipe'} />
+            <Text style={styles.headerTitle} numberOfLines={1} ellipsizeMode="tail">
+              {((title || 'Recipe').length > 25
+                ? (title || 'Recipe').substring(0, 25) + '...'
+                : (title || 'Recipe')
+              ).toUpperCase()}
+            </Text>
           </TouchableOpacity>
         )}
         <View style={styles.headerRight}>
-          {isEditingTitle && (
-            <TouchableOpacity
-              style={styles.headerActionButton}
-              onPress={handleSaveTitle}
-              disabled={isSavingTitle || title.trim() === originalTitleRef.current.trim()}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              {isSavingTitle ? (
-                <ActivityIndicator size="small" color={COLORS.primary} />
-              ) : (
-                <MaterialCommunityIcons
-                  name="check"
-                  size={24}
-                  color={
-                    title.trim() === originalTitleRef.current.trim() 
-                      ? COLORS.textMuted 
-                      : COLORS.primary
-                  }
-                />
-              )}
-            </TouchableOpacity>
-          )}
+          {renderHeaderAction()}
         </View>
-      </Pressable>
+      </View>
 
-      {/* Sharp divider to separate title from content */}
-      <View style={styles.titleDivider} />
 
-      <Pressable style={{ flex: 1 }} onPress={isEditingTitle ? handleCancelTitleEdit : undefined}>
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          onLayout={onScrollViewLayout}
-        >
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        onLayout={onScrollViewLayout}
+        keyboardShouldPersistTaps="handled"
+        bounces={false}
+      >
         {/* Recipe image - only render if image exists */}
         {(() => {
           const imageUrl = recipe.image || recipe.thumbnailUrl;
@@ -3060,38 +3089,33 @@ export default function RecipeSummaryScreen() {
 
           if (isVideoRecipe) {
             return (
-              <TouchableOpacity onPress={handleOpenSource} activeOpacity={0.8} style={{ marginBottom: SPACING.md }}>
+              <View style={styles.fullWidthImageContainer}>
+                <TouchableOpacity onPress={handleOpenSource} activeOpacity={0.8} style={styles.fullWidthImageTouchable}>
+                  <FastImage
+                    source={{ uri: String(imageUrl) }}
+                    style={styles.fullWidthImage}
+                    resizeMode="cover"
+                    onError={() => {
+                      console.log('[DEBUG] Image failed to load, collapsing image area:', imageUrl);
+                      setImageLoadFailed(true);
+                    }}
+                  />
+                </TouchableOpacity>
+              </View>
+            );
+          } else {
+            return (
+              <View style={styles.fullWidthImageContainer}>
                 <FastImage
                   source={{ uri: String(imageUrl) }}
-                  style={{
-                    width: '100%',
-                    height: 150,
-                    borderRadius: RADIUS.md,
-                  }}
+                  style={styles.fullWidthImage}
                   resizeMode="cover"
                   onError={() => {
                     console.log('[DEBUG] Image failed to load, collapsing image area:', imageUrl);
                     setImageLoadFailed(true);
                   }}
                 />
-              </TouchableOpacity>
-            );
-          } else {
-            return (
-              <FastImage
-                source={{ uri: String(imageUrl) }}
-                style={{
-                  width: '100%',
-                  height: 150,
-                  borderRadius: RADIUS.md,
-                  marginBottom: SPACING.md,
-                }}
-                resizeMode="cover"
-                onError={() => {
-                  console.log('[DEBUG] Image failed to load, collapsing image area:', imageUrl);
-                  setImageLoadFailed(true);
-                }}
-              />
+              </View>
             );
           }
         })()}
@@ -3105,13 +3129,9 @@ export default function RecipeSummaryScreen() {
         )} */}
 
 
-        {/* Divider above Adjust servings */}
-        <View style={{ marginTop: SPACING.lg, marginBottom: SPACING.lg }}>
-          <View style={styles.divider} />
-        </View>
-
-        <View style={{ marginTop: 0 }}>
-          <Text style={styles.sectionTitle}>Adjust servings</Text>
+        <View style={{ marginTop: SPACING.lg }}>
+          <Text style={styles.sectionTitle}>Adjust Servings</Text>
+          <View style={styles.sectionDivider} />
           <ServingScaler
             selectedScaleFactor={selectedScaleFactor}
             handleScaleFactorChange={handleScaleFactorChange}
@@ -3120,12 +3140,9 @@ export default function RecipeSummaryScreen() {
           />
         </View>
 
-        {/* Divider between Adjust servings and Ingredients */}
-        <View style={{ marginTop: SPACING.lg, marginBottom: SPACING.lg }}>
-          <View style={styles.divider} />
-        </View>
-
-        <View style={{ marginTop: 0 }}>
+        <View style={{ marginTop: SPACING.lg }}>
+          <Text style={styles.sectionTitle}>Ingredients</Text>
+          <View style={styles.sectionDivider} />
           <View style={{marginTop: SPACING.xs}}>
             <IngredientList
               ingredientGroups={scaledIngredientGroups}
@@ -3142,14 +3159,11 @@ export default function RecipeSummaryScreen() {
           </View>
         </View>
 
-        {/* Divider between Ingredients and Peek at Instructions */}
-        <View style={{ marginTop: SPACING.lg, marginBottom: SPACING.lg }}>
-          <View style={styles.divider} />
-        </View>
 
         {/* Peek at Instructions Section */}
-        <View style={{ marginTop: 0 }}>
-          <Text style={styles.sectionTitle}>Preview</Text>
+        <View style={{ marginTop: SPACING.lg }}>
+          <Text style={styles.sectionTitle}>Instructions Preview</Text>
+          <View style={styles.sectionDivider} />
 
           {recipe?.instructions && recipe.instructions.length > 0 && (
             <ScrollView
@@ -3189,7 +3203,7 @@ export default function RecipeSummaryScreen() {
 
         {/* Bottom info section - allergens and visit source */}
         {(detectedAllergens.length > 0 || (recipe?.sourceUrl && (params.inputType === 'url' || !params.inputType))) && (
-          <View style={[styles.bottomInfoContainer, { marginBottom: 60 }]}>
+          <View style={[styles.bottomInfoContainer, { marginBottom: 60, paddingBottom: SPACING.sm }]}>
             {/* Allergens info */}
             {detectedAllergens.length > 0 && (
               <Text style={styles.allergensInfoText}>
@@ -3208,8 +3222,6 @@ export default function RecipeSummaryScreen() {
             )}
           </View>
         )}
-        </ScrollView>
-      </Pressable>
 
       {/* Title pop-up modal for long titles */}
       <Modal
@@ -3227,6 +3239,8 @@ export default function RecipeSummaryScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      </ScrollView>
 
       {/* Recipe Variations Modal */}
       <RecipeVariationsModal
@@ -3253,21 +3267,25 @@ export default function RecipeSummaryScreen() {
         isAlreadyInMise={isAlreadyInMise}
         onOpenVariations={handleOpenVariations}
       />
-      
-    </View>
+      </View>
     </PanGestureHandler>
   );
 }
 
 const styles = StyleSheet.create({
-  customHeader: {
+  header: {
+    flex: 0,
+    paddingHorizontal: 0,
+    paddingBottom: 0,
+    marginTop: 0,
+    height: 48,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.pageHorizontal,
-    paddingTop: SPACING.pageHorizontal, // Use paddingTop instead of marginTop for consistent spacing
-    paddingBottom: SPACING.md,
-    minHeight: 44 + SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: '#000000',
+    borderBottomWidth: 1,
+    borderBottomColor: '#000000',
   } as ViewStyle,
   backButton: {
     padding: SPACING.xs,
@@ -3276,53 +3294,83 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   } as ViewStyle,
   headerTitle: {
-    ...screenTitleText,
+    fontFamily: FONT.family.bold,
+    fontSize: 20,
+    fontWeight: '600',
     color: COLORS.textDark,
-    flex: 1,
-    textAlign: 'center',
+    textAlign: 'left',
   } as TextStyle,
   headerTitleInput: {
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
-    borderRadius: RADIUS.sm,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
+    fontFamily: FONT.family.bold,
+    fontSize: 20,
+    fontWeight: '600',
+    color: COLORS.textDark,
+    textAlign: 'left',
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    paddingVertical: 0,
+    paddingLeft: 18, // Match ScreenHeader titleContainer
+    paddingHorizontal: 0,
+    minWidth: 100, // Prevent layout shifts by maintaining minimum width
+    maxWidth: '75%', // Leave space for the checkmark icon while allowing ~22 characters
   } as TextStyle,
   headerTitleTouchable: {
-    flex: 1,
-    alignItems: 'center',
+    flex: 0,
+    alignItems: 'flex-start',
+    paddingLeft: 18, // Match ScreenHeader titleContainer
     justifyContent: 'center',
+    maxWidth: '75%', // Leave space for the icon on the right
   } as ViewStyle,
   headerRight: {
-    width: 44,
-    alignItems: 'flex-end',
+    width: 48, // Fixed width for the edit button
+    alignItems: 'center',
     justifyContent: 'center',
+    paddingRight: SPACING.pageHorizontal, // Match the page horizontal padding
   } as ViewStyle,
   headerActionButton: {
     padding: SPACING.xs,
     alignItems: 'center',
     justifyContent: 'center',
   } as ViewStyle,
-  container: { flex: 1, backgroundColor: COLORS.background },
+  selectButton: {
+    padding: SPACING.xs,
+    justifyContent: 'center',
+    alignItems: 'center',
+  } as ViewStyle,
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    flexDirection: 'column',
+  },
+  fullWidthImageContainer: {
+    marginHorizontal: -SPACING.pageHorizontal,
+  },
+  fullWidthImageTouchable: {
+    width: '100%',
+  },
+  fullWidthImage: {
+    width: '100%',
+    height: 180,
+  },
+  scrollView: {
+    flex: 1,
+  } as ViewStyle,
   scrollContent: {
     paddingHorizontal: SPACING.pageHorizontal,
-    paddingTop: SPACING.sm,
-    paddingBottom: 100,
+    paddingTop: 0,
+    paddingBottom: SPACING.lg, // Reduced since footer is now outside scroll area
   },
 
   infoTable: {
     borderRadius: RADIUS.md,
     borderWidth: 1.5,
-    borderColor: COLORS.primary,
+    borderColor: '#000000',
     backgroundColor: 'transparent',
     marginBottom: SPACING.lg,
   },
   infoRow: {
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.base,
-    borderBottomWidth: BORDER_WIDTH.hairline,
-    borderBottomColor: COLORS.divider,
   },
   infoRowTouchable: {
     flexDirection: 'row',
@@ -3334,35 +3382,48 @@ const styles = StyleSheet.create({
     fontSize: FONT.size.body,
   },
   infoRowContent: {
-    ...bodyText,
+    fontFamily: 'Inter',
+    fontSize: FONT.size.body,
+    fontWeight: '400',
+    lineHeight: FONT.lineHeight.normal,
     marginTop: SPACING.sm,
     color: COLORS.textMuted,
   },
   link: {
-    color: COLORS.primary,
+    color: COLORS.textDark,
     textDecorationLine: 'underline',
   },
   divider: {
-    height: BORDER_WIDTH.default,
-    backgroundColor: COLORS.divider,
+    height: 1,
+    backgroundColor: '#000000',
   },
   mainIngredientsHeader: {
     marginBottom: SPACING.sm,
   } as ViewStyle,
   mainIngredientsTitle: {
-    ...sectionHeaderText,
+    fontFamily: FONT.family.graphikMedium,
+    fontSize: 28,
+    fontWeight: '600',
+    lineHeight: 32,
     color: COLORS.textDark,
     textAlign: 'left',
     textDecorationLine: 'underline',
   } as TextStyle,
   sectionTitle: {
-    ...sectionHeaderText,
-    fontFamily: FONT.family.bold,
+    fontFamily: FONT.family.graphikMedium,
+    fontSize: 28,
+    fontWeight: '600',
+    lineHeight: 32,
     color: COLORS.textDark,
     textAlign: 'left',
     marginBottom: SPACING.xs,
-    textDecorationLine: 'underline',
   } as TextStyle,
+  sectionDivider: {
+    width: '100%',
+    borderBottomWidth: 1,
+    borderBottomColor: '#000000',
+    marginBottom: 18,
+  } as ViewStyle,
   centeredStatusContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -3389,13 +3450,19 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   modalTitle: {
-    ...sectionHeaderText,
+    fontFamily: FONT.family.graphikMedium,
+    fontSize: 28,
+    fontWeight: '600',
+    lineHeight: 32,
     color: COLORS.textDark,
     textAlign: 'center',
     marginBottom: SPACING.sm,
   },
   modalMessage: {
-    ...bodyText,
+    fontFamily: 'Inter',
+    fontSize: FONT.size.body,
+    fontWeight: '400',
+    lineHeight: FONT.lineHeight.normal,
     color: COLORS.textMuted,
     textAlign: 'center',
     marginBottom: SPACING.xl,
@@ -3414,20 +3481,24 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   primaryButton: {
-    backgroundColor: COLORS.primary,
+    marginBottom: SPACING.sm,
   },
   secondaryButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: COLORS.primary,
+    marginBottom: SPACING.sm,
   },
   primaryButtonText: {
-    ...bodyStrongText,
+    fontFamily: 'Inter',
+    fontSize: FONT.size.body,
+    fontWeight: '400',
+    lineHeight: FONT.lineHeight.normal,
     color: COLORS.white,
   },
   secondaryButtonText: {
-    ...bodyStrongText,
-    color: COLORS.primary,
+    fontFamily: 'Inter',
+    fontSize: FONT.size.body,
+    fontWeight: '400',
+    lineHeight: FONT.lineHeight.normal,
+    color: COLORS.textDark,
   },
   descriptionContainer: {
     marginTop: SPACING.sm,
@@ -3437,9 +3508,11 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   readMoreText: {
-    ...bodyStrongText,
-    color: COLORS.primary,
+    fontFamily: 'Inter',
     fontSize: FONT.size.caption,
+    fontWeight: '400',
+    lineHeight: FONT.lineHeight.normal,
+    color: COLORS.textDark,
   },
   saveButtonContainer: {
     paddingHorizontal: SPACING.pageHorizontal,
@@ -3456,18 +3529,24 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm,
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: COLORS.primary,
+    borderColor: '#000000',
     gap: SPACING.sm,
   },
   saveButtonText: {
-    ...bodyStrongText,
-    color: COLORS.primary,
+    fontFamily: 'Inter',
+    fontSize: FONT.size.body,
+    fontWeight: '400',
+    lineHeight: FONT.lineHeight.normal,
+    color: COLORS.textDark,
   },
   titleDivider: {
-    height: BORDER_WIDTH.hairline,
-    backgroundColor: COLORS.divider,
+    height: 1,
+    backgroundColor: '#000000',
     marginHorizontal: 0,
   },
+  titleEditContainer: {
+    flex: 1,
+  } as ViewStyle,
   ingredientsSubtext: {
     fontFamily: FONT.family.body,
     fontSize: FONT.size.caption,
@@ -3527,11 +3606,14 @@ const styles = StyleSheet.create({
   instructionsScrollContainer: {
     maxHeight: 250, // Allow scrolling for long instruction lists
     marginTop: SPACING.sm,
+    borderWidth: 1,
+    borderColor: '#000000',
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.sm,
   } as ViewStyle,
   instructionsContent: {
-    paddingLeft: SPACING.md,
-    paddingRight: SPACING.sm,
-    paddingBottom: SPACING.sm,
+    paddingBottom: SPACING.xs,
   } as ViewStyle,
   instructionItem: {
     flexDirection: 'row',
@@ -3541,7 +3623,7 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   instructionBullet: {
     fontSize: FONT.size.body,
-    color: COLORS.primary,
+    color: COLORS.textDark,
     marginRight: SPACING.sm,
     fontWeight: 'bold',
     marginTop: 2,
@@ -3568,7 +3650,10 @@ const styles = StyleSheet.create({
     maxWidth: '90%',
   },
   titleModalText: {
-    ...sectionHeaderText,
+    fontFamily: FONT.family.graphikMedium,
+    fontSize: 28,
+    fontWeight: '600',
+    lineHeight: 32,
     color: COLORS.textDark,
     textAlign: 'center',
   },

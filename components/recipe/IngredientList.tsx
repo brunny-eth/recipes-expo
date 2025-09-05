@@ -91,16 +91,6 @@ const IngredientList: React.FC<IngredientListProps> = ({
       });
     };
 
-    // If there's only 1 group, don't show group headings - just show ingredients
-    if (!shouldShowGroupToggles) {
-      return (
-        <View key={`group-${groupIndex}`} style={styles.groupContainer}>
-          {renderIngredients()}
-        </View>
-      );
-    }
-
-    // If there are multiple groups, show each group with a toggle
     // Use group name or a default title
     const groupTitle = group.name === 'Main' ? 'Main Ingredients' :
                       (group.name || `Group ${groupIndex + 1}`);
@@ -134,9 +124,6 @@ const IngredientList: React.FC<IngredientListProps> = ({
 
   return (
     <View style={styles.container}>
-      {showTitle && ingredientGroups.length === 1 && (
-        <Text style={styles.mainTitle}>Ingredients</Text>
-      )}
       {ingredientGroups.length === 0 ? (
         <Text style={styles.placeholderText}>No ingredients found.</Text>
       ) : (
@@ -172,7 +159,6 @@ const styles = StyleSheet.create({
     color: COLORS.textDark,
     textAlign: 'left',
     marginBottom: SPACING.xs,
-    textDecorationLine: 'underline',
   } as TextStyle,
   groupContainer: {
     marginBottom: SPACING.lg,

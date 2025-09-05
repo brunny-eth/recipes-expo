@@ -41,7 +41,6 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
   const [inputText, setInputText] = useState('');
   const [showValidation, setShowValidation] = useState(false);
   const [validationError, setValidationError] = useState('');
-  const [buttonsHeight, setButtonsHeight] = useState(0);
 
   console.log('[RecipeMatchSelectionModal] Modal rendered with', matches.length, 'matches.', { visible, debugSource });
   console.log('[RecipeMatchSelectionModal] Matches data:', matches);
@@ -112,24 +111,18 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
         style={styles.recipeCard}
         onPress={() => handleRecipeSelect(recipe.id || 0)}
       >
-        {shouldShowFallback ? (
-          <View style={styles.fallbackImageContainer}>
-            <Image
-              source={require('@/assets/images/meezblue_underline.png')}
-              style={styles.fallbackImage}
-              resizeMode="contain"
+        <View style={styles.imageContainer}>
+          {shouldShowFallback ? null : (
+            <FastImage
+              source={{ uri: imageUrl }}
+              style={styles.exploreCardImage as any}
+              onError={() => handleImageError(imageUrl)}
             />
-          </View>
-        ) : (
-          <FastImage
-            source={{ uri: imageUrl }}
-            style={styles.recipeImage}
-            resizeMode="cover"
-            onError={() => handleImageError(imageUrl)}
-          />
-        )}
-        <View style={styles.recipeTextContainer}>
-          <Text style={styles.recipeTitle} numberOfLines={2}>
+          )}
+        </View>
+
+        <View style={styles.titleContainer}>
+          <Text style={styles.exploreCardTitle} numberOfLines={3}>
             {recipe.title}
           </Text>
         </View>
@@ -152,10 +145,16 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
           {!isCreateExpanded ? (
             <>
               <View style={styles.header}>
-                <Text style={styles.title}>How about one of these?</Text>
-                <Text style={styles.subtitle}>
+                <Text style={styles.mainTitle}>
                   We found {matches.length} similar recipe{matches.length > 1 ? 's' : ''}
                 </Text>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={handleReturnHome}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <MaterialCommunityIcons name="close" size={22} color={COLORS.textMuted} />
+                </TouchableOpacity>
               </View>
 
               <FlatList
@@ -165,26 +164,16 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
                 renderItem={renderRecipeItem}
                 keyExtractor={(item) => item.recipe.id?.toString() || Math.random().toString()}
                 style={styles.recipeList}
-                contentContainerStyle={[
-                  styles.recipeListContent,
-                  { paddingBottom: buttonsHeight + SPACING.md },
-                ]}
+                contentContainerStyle={styles.recipeListContent}
                 showsVerticalScrollIndicator={false}
               />
 
-              <View style={styles.buttonContainer} onLayout={(e) => setButtonsHeight(e.nativeEvent.layout.height)}>
+              <View style={styles.buttonContainer}>
                 <TouchableOpacity
-                  style={[styles.button, styles.primaryButton]}
+                  style={styles.primaryButton}
                   onPress={handleCreateNew}
                 >
                   <Text style={styles.primaryButtonText}>Just make a new recipe for me</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.button, styles.secondaryButton]}
-                  onPress={handleReturnHome}
-                >
-                  <Text style={styles.secondaryButtonText}>Return to Home</Text>
                 </TouchableOpacity>
               </View>
             </>
@@ -199,7 +188,7 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
                 <TextInput
                   style={[styles.textArea, showValidation && inputText.trim().length === 0 && styles.textAreaError]}
                   placeholder="Add ingredients, style, or dietary needs (optional)"
-                  placeholderTextColor="#8D8D8D"
+                  placeholderTextColor={COLORS.textMuted}
                   value={inputText}
                   onChangeText={(t) => {
                     setInputText(t);
@@ -219,9 +208,9 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
                 ) : null}
               </View>
 
-              <View style={styles.buttonContainer} onLayout={(e) => setButtonsHeight(e.nativeEvent.layout.height)}>
+              <View style={styles.buttonContainer}>
                 <TouchableOpacity
-                  style={[styles.button, styles.primaryButton]}
+                  style={styles.primaryButton}
                   onPress={() => {
                     const trimmedInput = inputText.trim();
                     console.log('[RecipeMatchSelectionModal] Confirm create with input text length:', trimmedInput.length);
@@ -240,13 +229,6 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
                   }}
                 >
                   <Text style={styles.primaryButtonText}>Make my recipe</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.button, styles.secondaryButton]}
-                  onPress={() => onAction('returnHome')}
-                >
-                  <Text style={styles.secondaryButtonText}>Back to home</Text>
                 </TouchableOpacity>
               </View>
             </>
@@ -267,6 +249,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderTopLeftRadius: RADIUS.lg,
     borderTopRightRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: '#000000',
     height: '80%', // Changed from maxHeight to height
     paddingHorizontal: SPACING.lg,
     paddingBottom: SPACING.lg,
@@ -275,6 +259,9 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.lg,
     paddingBottom: SPACING.md,
     alignItems: 'center',
+    paddingHorizontal: SPACING.pageHorizontal,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   } as ViewStyle,
   title: {
     ...sectionHeaderText,
@@ -282,6 +269,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: SPACING.xs,
   } as TextStyle,
+  mainTitle: {
+    ...sectionHeaderText,
+    color: COLORS.textDark,
+    textAlign: 'left',
+  } as TextStyle,
+  closeButton: {
+    padding: SPACING.xs,
+    paddingRight: SPACING.sm,
+    justifyContent: 'center',
+    alignItems: 'center',
+  } as ViewStyle,
   subtitle: {
     ...bodyText,
     color: COLORS.textMuted,
@@ -296,31 +294,36 @@ const styles = StyleSheet.create({
   recipeListContent: {
     paddingBottom: SPACING.lg,
   } as ViewStyle,
+  buttonContainer: {
+    backgroundColor: COLORS.primary,
+    padding: SPACING.lg,
+    width: '100%',
+  } as ViewStyle,
   recipeCard: {
     flexDirection: 'row',
-    backgroundColor: COLORS.white,
+    backgroundColor: 'transparent',
     borderRadius: RADIUS.sm,
-    padding: SPACING.md,
     marginBottom: SPACING.md,
     shadowColor: COLORS.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
+    height: 120,
+    overflow: 'hidden',
+    width: '95%',
+    alignSelf: 'flex-start',
+    marginLeft: 0,
+    paddingLeft: 0,
   } as ViewStyle,
-  recipeImage: {
-    width: SPACING.xxxl || 72, // Increase size, fallback if SPACING.xxxl undefined
-    height: SPACING.xxxl || 72,
-    borderRadius: 8, // Slightly more rounded for larger image
-    marginRight: SPACING.md,
+  imageContainer: {
+    width: '40%',
+    height: '100%',
+    overflow: 'hidden',
   },
   fallbackImageContainer: {
     width: SPACING.xxxl || 72,
     height: SPACING.xxxl || 72,
-    borderRadius: 8,
     backgroundColor: COLORS.lightGray,
     justifyContent: 'center',
     alignItems: 'center',
@@ -330,40 +333,44 @@ const styles = StyleSheet.create({
     width: '60%',
     height: '60%',
   } as ImageStyle,
-  recipeTextContainer: {
-    flex: 1,
-    justifyContent: 'center', // Vertically center the title
+  titleContainer: {
+    width: '60%',
+    height: '100%',
+    paddingLeft: SPACING.md,
+    paddingRight: SPACING.sm,
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
   } as ViewStyle,
-  recipeTitle: {
-    ...bodyStrongText,
+  exploreCardImage: {
+    width: '100%',
+    height: '100%',
+  } as ImageStyle,
+  exploreCardTitle: {
     color: COLORS.textDark,
-    lineHeight: 20,
-    marginBottom: SPACING.xs,
+    ...bodyStrongText,
+    fontSize: FONT.size.body,
+    lineHeight: FONT.size.body * 1.3,
   } as TextStyle,
   similarityText: {
     ...bodyText,
     color: COLORS.primary,
     fontSize: FONT.size.smBody,
   } as TextStyle,
-  buttonContainer: {
-    paddingTop: SPACING.md,
-    gap: SPACING.md,
-  } as ViewStyle,
   inputSection: {
     paddingTop: SPACING.sm,
   } as ViewStyle,
   textArea: {
     minHeight: 120,
     borderWidth: 1,
-    borderColor: COLORS.lightGray,
+    borderColor: '#000000',
     borderRadius: RADIUS.sm,
     padding: SPACING.md,
-    backgroundColor: COLORS.surface,
+    backgroundColor: 'transparent',
     color: COLORS.textDark,
     ...bodyText,
   } as TextStyle,
   textAreaError: {
-    borderColor: COLORS.error,
+    borderColor: '#000000',
   } as TextStyle,
   validationText: {
     marginTop: SPACING.xs,
@@ -376,28 +383,38 @@ const styles = StyleSheet.create({
     ...bodyText,
     fontSize: FONT.size.smBody,
   } as TextStyle,
-  button: {
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.sm,
-    alignItems: 'center',
-  } as ViewStyle,
   primaryButton: {
-    backgroundColor: COLORS.primary,
+    height: 20,
+    backgroundColor: 'transparent',
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: 'auto',
   } as ViewStyle,
   secondaryButton: {
+    height: 20,
     backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: COLORS.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: 'auto',
+    marginBottom: SPACING.sm,
   } as ViewStyle,
   primaryButtonText: {
-    ...bodyStrongText,
-    color: COLORS.white,
+    fontFamily: 'Inter',
+    fontSize: 18,
+    fontWeight: '400',
+    lineHeight: 22,
+    color: COLORS.textDark,
+    flex: 1,
+    textAlign: 'left',
   } as TextStyle,
   secondaryButtonText: {
-    ...bodyStrongText,
-    color: COLORS.primary,
-    textAlign: 'center',
+    fontFamily: 'Inter',
+    fontSize: 18,
+    fontWeight: '400',
+    lineHeight: 22,
+    color: COLORS.textDark,
+    flex: 1,
+    textAlign: 'left',
   } as TextStyle,
 });
 

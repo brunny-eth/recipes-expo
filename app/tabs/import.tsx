@@ -807,13 +807,13 @@ export default function ImportScreen() {
   // Get appropriate button text based on submission state
   const getSubmitButtonContent = () => {
     if (submissionState === 'validating') {
-      return <ActivityIndicator size="small" color={COLORS.primary} />;
+      return <ActivityIndicator size="small" color="#000000" />;
     } else if (submissionState === 'checking_cache') {
-      return <ActivityIndicator size="small" color={COLORS.primary} />;
+      return <ActivityIndicator size="small" color="#000000" />;
     } else if (submissionState === 'parsing') {
-      return <ActivityIndicator size="small" color={COLORS.primary} />;
+      return <ActivityIndicator size="small" color="#000000" />;
     } else if (submissionState === 'navigating') {
-      return <ActivityIndicator size="small" color={COLORS.primary} />;
+      return <ActivityIndicator size="small" color="#000000" />;
     } else {
       return <Text style={styles.submitButtonText}>Go</Text>;
     }
@@ -883,10 +883,12 @@ export default function ImportScreen() {
                             returnKeyType="go"
                             blurOnSubmit={false}
                             enablesReturnKeyAutomatically={true}
-                            keyboardType="default"
-                            textContentType="none"
+                            keyboardType="url"
+                            textContentType="URL"
                             underlineColorAndroid="transparent"
                             allowFontScaling={false}
+                            contextMenuHidden={false}
+                            selectTextOnFocus={false}
                           />
                         </View>
                         <TouchableOpacity
@@ -988,6 +990,8 @@ export default function ImportScreen() {
                             onSubmitEditing={handleSubmitText}
                             underlineColorAndroid="transparent"
                             allowFontScaling={false}
+                            contextMenuHidden={false}
+                            selectTextOnFocus={false}
                           />
                         </View>
                         <TouchableOpacity
@@ -1052,6 +1056,8 @@ export default function ImportScreen() {
                             onSubmitEditing={handleSubmitName}
                             underlineColorAndroid="transparent"
                             allowFontScaling={false}
+                            contextMenuHidden={false}
+                            selectTextOnFocus={false}
                           />
                         </View>
                         <TouchableOpacity

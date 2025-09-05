@@ -21,16 +21,13 @@ const screenWidth = Dimensions.get('window').width;
 const contentHorizontalPadding = SPACING.pageHorizontal;
 const servingsContainerGap = SPACING.sm;
 const numButtons = 5;
-const availableWidth = screenWidth - contentHorizontalPadding * 2;
-const buttonTotalGap = servingsContainerGap * (numButtons - 1);
-const buttonWidth = (availableWidth - buttonTotalGap) / numButtons;
 
 const scaleFactorOptions = [
-  { label: 'Half', value: 0.5 },
-  { label: 'Original', value: 1.0 },
-  { label: '1.5x', value: 1.5 },
+  { label: '0.5x', value: 0.5 },
+  { label: '1x', value: 1.0 },
   { label: '2x', value: 2.0 },
   { label: '4x', value: 4.0 },
+  { label: '10x', value: 10.0 },
 ];
 
 type ServingScalerProps = {
@@ -84,6 +81,8 @@ const ServingScaler: React.FC<ServingScalerProps> = ({
                 styles.servingButtonSelected,
             ]}
             onPress={() => handleScaleFactorChange(option.value)}
+            activeOpacity={0.7}
+            hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
           >
             <Text
               style={[
@@ -117,24 +116,25 @@ const styles = StyleSheet.create({
     gap: servingsContainerGap,
   } as ViewStyle,
   servingButton: {
-    width: buttonWidth,
+    flex: 1,
     paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.sm,
-    borderWidth: BORDER_WIDTH.default,
-    borderColor: COLORS.lightGray,
-    backgroundColor: COLORS.white,
     alignItems: 'center',
   } as ViewStyle,
   servingButtonSelected: {
-    backgroundColor: '#d8d8d8',
-    borderColor: COLORS.lightGray,
+    backgroundColor: 'transparent',
   } as ViewStyle,
   servingButtonText: {
-    ...captionStrongText,
-    color: COLORS.textDark,
+    fontFamily: 'Inter',
+    fontSize: 15,
+    fontWeight: '400',
+    lineHeight: 18,
+    color: '#8e8e8e',
+    textAlign: 'center',
   } as TextStyle,
   servingButtonTextSelected: {
-    color: COLORS.textDark,
+    color: '#000000',
+    fontWeight: '600',
+    textAlign: 'center',
   } as TextStyle,
 });
 

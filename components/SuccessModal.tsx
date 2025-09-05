@@ -15,7 +15,7 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { COLORS, OVERLAYS, SPACING, RADIUS } from '../constants/theme';
-import { FONT } from '../constants/typography';
+import { FONT, sectionHeaderText, bodyText } from '../constants/typography';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 interface SuccessModalProps {
@@ -85,17 +85,14 @@ const SuccessModal: React.FC<SuccessModalProps> = ({
         onResponderStart={e => e.stopPropagation()}
       >
         <View style={styles.iconContainer}>
-          <MaterialCommunityIcons 
-            name="check-circle" 
-            size={48} 
-            color={COLORS.primary} 
+          <MaterialCommunityIcons
+            name="check-circle"
+            size={48}
+            color="#000000"
           />
         </View>
         <Text style={styles.title}>{title}</Text>
         <Text style={styles.message}>{message}</Text>
-        <Pressable style={styles.button} onPress={onClose}>
-          <Text style={styles.buttonText}>OK</Text>
-        </Pressable>
       </Animated.View>
     </Pressable>
   );
@@ -115,37 +112,23 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     padding: SPACING.xl,
     borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: '#000000',
     alignItems: 'center',
   } as ViewStyle,
   iconContainer: {
     marginBottom: SPACING.md,
   } as ViewStyle,
   title: {
-    fontSize: FONT.size.lg,
-    fontWeight: FONT.weight.bold,
+    ...sectionHeaderText,
     color: COLORS.textDark,
     marginBottom: SPACING.sm,
     textAlign: 'center',
   } as TextStyle,
   message: {
-    fontSize: FONT.size.body,
+    ...bodyText,
     color: COLORS.textMuted,
-    marginBottom: SPACING.lg,
     textAlign: 'center',
-    lineHeight: 22,
-  } as TextStyle,
-  button: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.xl,
-    borderRadius: RADIUS.md,
-    minWidth: 100,
-    alignItems: 'center',
-  } as ViewStyle,
-  buttonText: {
-    color: COLORS.white,
-    fontWeight: FONT.weight.bold,
-    fontSize: FONT.size.body,
   } as TextStyle,
 });
 

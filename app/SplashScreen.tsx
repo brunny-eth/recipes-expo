@@ -68,7 +68,7 @@ function SplashScreenMeez({ onFinish }: { onFinish: () => void }) {
         ]}
       >
         <Image
-          source={require('@/assets/images/meezblue_underline.png')}
+          source={require('@/assets/images/splash.png')}
           style={styles.logoImage}
           resizeMode="contain"
         />

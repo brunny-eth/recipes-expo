@@ -552,12 +552,7 @@ export default function LibraryScreen() {
               onLoad={() => {}}
               onError={() => handleImageError(item.id || 0)}
             />
-          ) : (
-            <FastImage
-              source={require('@/assets/images/meezblue_underline.webp')}
-              style={styles.exploreCardImage}
-            />
-          )}
+          ) : null}
         </View>
         
         {/* Right half - Recipe title */}
@@ -620,12 +615,7 @@ export default function LibraryScreen() {
               onLoad={() => {}}
               onError={() => handleImageError(item.processed_recipes_cache?.id || item.base_recipe_id)}
             />
-          ) : (
-            <FastImage
-              source={require('@/assets/images/meezblue_underline.webp')}
-              style={styles.exploreCardImage}
-            />
-          )}
+          ) : null}
         </View>
         
         {/* Right half - Recipe title */}

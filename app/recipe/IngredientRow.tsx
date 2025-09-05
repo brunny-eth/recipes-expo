@@ -21,6 +21,7 @@ import {
   bodyText,
   bodyTextLoose,
   captionText,
+  metaText,
   FONT,
 } from '@/constants/typography';
 import { abbreviateUnit } from '@/utils/format';
@@ -228,7 +229,7 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
             <MaterialCommunityIcons
               name="arrow-u-left-top"
               size={FONT.size.lg}
-              color={COLORS.textDark}
+              color={COLORS.darkGray}
             />
           </TouchableOpacity>
         )}
@@ -242,7 +243,7 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
             <MaterialCommunityIcons
               name="arrow-u-left-top"
               size={FONT.size.lg}
-              color={COLORS.textDark}
+              color={COLORS.darkGray}
             />
           </TouchableOpacity>
         )}
@@ -269,8 +270,6 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xs,
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.xs, // Reduced horizontal padding
-    borderBottomWidth: BORDER_WIDTH.hairline,
-    borderBottomColor: COLORS.surface,
   } as ViewStyle,
   checkboxPlaceholder: {
     width: ICON_SIZE.md,
@@ -304,13 +303,12 @@ const styles = StyleSheet.create({
     minHeight: ICON_SIZE.md, // Ensure consistent height for button or no button
   } as ViewStyle,
   ingredientName: {
-    ...bodyStrongText,
-    fontSize: FONT.size.smBody,
+    ...bodyText,
+    fontSize: FONT.size.body,
     color: COLORS.textDark,
     lineHeight: 20,
     flex: 1,
     marginRight: SPACING.sm, // Consistent spacing from text to button area
-    fontWeight: '600', // Make ingredient names bolder
   } as TextStyle,
   ingredientTextRemoved: {
     color: COLORS.darkGray,
@@ -335,10 +333,9 @@ const styles = StyleSheet.create({
     opacity: 0.7, // Make preparation text more subtle
   } as TextStyle,
   ingredientQuantityParenthetical: {
-    ...bodyTextLoose,
-    fontSize: FONT.size.caption - 1, // Slightly smaller than caption
-    color: COLORS.darkGray,
-    opacity: 0.7, // Make quantity text more subtle
+    ...metaText,
+    color: COLORS.textMuted,
+    marginTop: 4,
   } as TextStyle,
   revertButton: {
     paddingHorizontal: SPACING.sm,

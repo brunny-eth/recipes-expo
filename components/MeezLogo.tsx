@@ -4,7 +4,7 @@ import { SPACING } from '@/constants/theme';
 export default function MeezLogo() {
   return (
     <Image
-      source={require('@/assets/images/meezblue_underline.webp')}
+      source={require('@/assets/images/logo.svg')}
       resizeMode="contain"
       style={styles.logo}
     />
