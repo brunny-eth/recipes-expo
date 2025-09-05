@@ -4,15 +4,15 @@
     "slug": "meez",
     "version": "1.1.1",
     "orientation": "portrait",
-    "icon": "./assets/images/meezblue_underline.png",
+    "icon": "./assets/images/icon.png",
     "scheme": "meez",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "jsEngine": "hermes",
     "splash": {
-      "image": "./assets/images/meezblue_underline.png",
+      "image": "./assets/images/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#fefcf7"
+      "backgroundColor": "#DEF6FF"
     },
     "ios": {
       "supportsTablet": true,
@@ -27,9 +27,9 @@
         ]
       },
       "splash": {
-        "image": "./assets/images/meezblue_underline.png",
+        "image": "./assets/images/splash.png",
         "resizeMode": "contain",
-        "backgroundColor": "#fefcf7"
+        "backgroundColor": "#DEF6FF"
       },
       "infoPlist": {
         "CFBundleURLTypes": [
@@ -48,16 +48,16 @@
     "android": {
       "package": "com.meez.recipes",
       "splash": {
-        "image": "./assets/images/meezblue_underline.png",
+        "image": "./assets/images/splash.png",
         "resizeMode": "contain",
-        "backgroundColor": "#fefcf7"
+        "backgroundColor": "#DEF6FF"
       },
       "jsEngine": "hermes"
     },
     "web": {
       "bundler": "metro",
       "output": "single",
-      "favicon": "./assets/images/meezblue_underline.png"
+      "favicon": "./assets/images/icon.png"
     },
     "plugins": [
       "expo-router",
