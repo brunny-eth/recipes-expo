@@ -1,8 +1,7 @@
 import React from 'react';
-import { View, StyleSheet, Image } from 'react-native';
-import Animated from 'react-native-reanimated';
+import { View, StyleSheet } from 'react-native';
 import { SPACING } from '@/constants/theme';
-import MeezLogo from '@/components/MeezLogo';
+import Logo from '@/assets/images/logo.svg';
 
 interface LogoHeaderProps {
   animatedLogo?: React.ReactNode;
@@ -11,7 +10,9 @@ interface LogoHeaderProps {
 const LogoHeader: React.FC<LogoHeaderProps> = React.memo(({ animatedLogo }) => {
   return (
     <View style={styles.logoContainer}>
-      {animatedLogo || <MeezLogo />}
+      {animatedLogo || (
+        <Logo width={220} height={120} style={styles.logo} />
+      )}
     </View>
   );
 });
@@ -23,6 +24,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 0,
     marginBottom: 0,
+  },
+  logo: {
+    width: 220,
+    height: 120,
+    marginBottom: SPACING.md,
+    alignSelf: 'center',
   },
 });
 

@@ -829,16 +829,7 @@ router.get('/grocery-list', async (req: Request, res: Response) => {
     }
 
     // --- NEW: Clean up stale item states ---
-    const currentItemNames = new Set(categorizedItems.map(item => {
-      const normalized = normalizeName(item.item_name);
-      if (item.item_name.toLowerCase().includes('egg')) {
-        console.log('[mise.ts] 🥚 EGG DEBUG - Normalizing for cleanup:', {
-          originalName: item.item_name,
-          normalizedName: normalized
-        });
-      }
-      return normalized;
-    }));
+    const currentItemNames = new Set(categorizedItems.map(item => normalizeName(item.item_name)));
     const staleItemNames = checkedStates
       ?.filter(state => !currentItemNames.has(state.normalized_item_name))
       .map(state => state.normalized_item_name) || [];

@@ -23,6 +23,7 @@ import { CombinedParsedRecipe as ParsedRecipe } from '../../common/types';
 import { useAnalytics } from '@/utils/analytics';
 import { FONT } from '@/constants/typography';
 import { Image } from 'react-native';
+import Logo from '@/assets/images/logo.svg';
 import { getErrorMessage, getNetworkErrorMessage } from '../../utils/errorMessages';
 import { ParseErrorCode } from '../../common/types/errors';
 import LogoHeader from '@/components/LogoHeader';
@@ -449,12 +450,10 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
     <LogoHeader
       animatedLogo={(
         <Animated.View>
-          <Image
-            source={require('@/assets/images/logo.svg')}
-            resizeMode="contain"
+          <Logo
+            width={isCompact ? 300 : 400}
+            height={isCompact ? 150 : 200}
             style={{
-                          width: isCompact ? 300 : 400,
-            height: isCompact ? 150 : 200,
               alignSelf: 'center',
               marginTop: isCompact ? SPACING.lg : SPACING.xl,
               marginBottom: 0,
@@ -639,7 +638,7 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   overlayContainer: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: COLORS.background,
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000, // Reduced from 1000 to ensure GlobalErrorModal (zIndex: 9999) appears above

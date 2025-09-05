@@ -11,6 +11,7 @@ import { Linking } from 'react-native';
 import { FONT, bodyText, bodyTextLoose, bodyStrongText } from '@/constants/typography';
 import LogoHeader from '@/components/LogoHeader';
 import Animated from 'react-native-reanimated';
+import Logo from '@/assets/images/logo.svg';
 
 type AuthProvider = 'google' | 'apple';
 
@@ -23,15 +24,7 @@ const LoginScreen = () => {
   // Create the same animated logo as the index page
   const animatedLogo = (
     <Animated.View>
-      <Image
-        source={require('@/assets/images/logo.svg')}
-        resizeMode="contain"
-        style={{
-          width: 120,
-          height: 60,
-          alignSelf: 'center',
-        }}
-      />
+      <Logo width={120} height={60} style={{ alignSelf: 'center' }} />
     </Animated.View>
   );
 

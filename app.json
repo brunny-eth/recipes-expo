@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Meez",
-    "slug": "meez",
+    "name": "Olea",
+    "slug": "olea",
     "version": "1.1.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "meez",
+    "scheme": "olea",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "jsEngine": "hermes",
@@ -23,7 +23,8 @@
           "Default"
         ],
         "com.apple.developer.associated-domains": [
-          "applinks:meez.app"
+          "applinks:meez.app",
+          "applinks:cookolea.com"
         ]
       },
       "splash": {
@@ -35,13 +36,13 @@
         "CFBundleURLTypes": [
           {
             "CFBundleURLSchemes": [
-              "meez"
+              "olea"
             ]
           }
         ],
         "ITSAppUsesNonExemptEncryption": false,
-        "NSPhotoLibraryUsageDescription": "Allow Meez to access your photo library to select recipe images and PDFs.",
-        "NSCameraUsageDescription": "Allow Meez to access your camera to take photos of recipes."
+        "NSPhotoLibraryUsageDescription": "Allow Olea to access your photo library to select recipe images and PDFs.",
+        "NSCameraUsageDescription": "Allow Olea to access your camera to take photos of recipes."
       },
       "jsEngine": "hermes"
     },
