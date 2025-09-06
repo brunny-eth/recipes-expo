@@ -800,13 +800,15 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   retryButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#000000',
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
     borderRadius: RADIUS.sm,
   },
   retryButtonText: {
-    color: COLORS.white,
+    color: '#000000',
     fontFamily: FONT.family.interSemiBold,
     fontSize: FONT.size.body,
   },

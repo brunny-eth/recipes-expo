@@ -20,6 +20,7 @@ app.get('/api/health', (_req, res) => {
   res.send('🟢 Backend is running')
 })
 
+
 app.use('/api/recipes', recipeRouter)
 app.use('/api/ai', aiRouter)
 app.use('/api/mise', miseRouter)

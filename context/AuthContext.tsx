@@ -9,8 +9,10 @@ import React, {
   useMemo,
   useRef,
 } from 'react';
+import { InteractionManager } from 'react-native';
 import { Session, User } from '@supabase/supabase-js';
 import * as WebBrowser from 'expo-web-browser';
+console.log('[auth-trace] expo-web-browser version?', WebBrowser);
 import * as Linking from 'expo-linking';
 import { supabase } from '@/lib/supabaseClient';
 import { useErrorModal } from './ErrorModalContext';
@@ -19,6 +21,202 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { createLogger } from '@/utils/logger';
 import { useAnalytics } from '@/utils/analytics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Manual PKCE helpers
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!;
+const ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+const REDIRECT = Linking.createURL('auth-callback');
+
+
+const b64url = (bytes: Uint8Array) =>
+  Buffer.from(bytes).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+// ✅ correct random string (no i/closure bug)
+function rand(len = 64) {
+  const cs = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-._~';
+  const bytes = new Uint8Array(len);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, b => cs[b % cs.length]).join('');
+}
+
+async function sha256Base64Url(input: string) {
+  const data = new TextEncoder().encode(input);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return b64url(new Uint8Array(hash));
+}
+
+let inFlight = false;
+export { inFlight as isSignInInFlight };
+
+
+export async function signInWithGoogleManualPkce() {
+  try {
+    const supabaseUrl = SUPABASE_URL;
+    if (!supabaseUrl) throw new Error('MISSING_SUPABASE_URL');
+    if (!/^https:\/\//.test(String(supabaseUrl))) throw new Error('BAD_SUPABASE_URL_EXPECT_HTTPS');
+
+    const codeVerifier = generateCodeVerifier();
+    const codeChallenge = await sha256ToBase64Url(codeVerifier);
+
+    // ✅ Use the same redirect for authorize and token exchange
+    const authorizeUrl =
+      `${supabaseUrl}/auth/v1/authorize?provider=google` +
+      `&redirect_to=${encodeURIComponent(REDIRECT)}` +
+      `&code_challenge=${encodeURIComponent(codeChallenge)}` +
+      `&code_challenge_method=s256`;
+
+    // Persist only code_verifier (PKCE protects the flow)
+    await AsyncStorage.setItem('pkce_code_verifier', codeVerifier);
+
+    // Non-blocking cleanup helper
+    const swallow = (p: Promise<any> | Promise<void> | (() => any) | (() => void), name: string) => {
+      const promise = typeof p === 'function' ? p() : p;
+      return Promise.resolve(promise).then(() => console.log(`[auth][google] ${name}: ok`))
+       .catch(e => console.log(`[auth][google] ${name}: err`, String(e)));
+    };
+
+    let result;
+
+    // Pre-open cleanup (non-blocking, best-effort)
+    swallow(() => WebBrowser.dismissBrowser(), 'dismissBrowser');
+    swallow(() => WebBrowser.dismissAuthSession(), 'dismissAuthSession');
+    swallow(WebBrowser.coolDownAsync(), 'coolDown');
+
+    // Tiny yield only, do NOT block the gesture
+    await new Promise(r => setTimeout(r, 0));
+
+    await InteractionManager.runAfterInteractions(() => Promise.resolve());
+
+    result = await Promise.race([
+      WebBrowser.openAuthSessionAsync(authorizeUrl, REDIRECT, { preferEphemeralSession: false }),
+      new Promise<unknown>(r => setTimeout(() => r({ type: 'timeout' as const }), 15000)),
+    ]);
+
+    // Post-open cleanup
+    await WebBrowser.coolDownAsync().catch(()=>{});
+    await new Promise(r => setTimeout(r, 120));
+
+    let callbackUrl: string | null = null;
+    if (result && typeof result === 'object' && 'type' in result && result.type === 'success' && 'url' in result && typeof result.url === 'string') {
+      callbackUrl = result.url;
+      console.log('[auth][google] callbackUrl via ASWebAuth ✓');
+    } else {
+      const resultType = result && typeof result === 'object' && 'type' in result ? result.type : 'unknown';
+      console.log('[auth][google] ASWebAuth returned', resultType, '— ASWebAuth failed, no fallback enabled');
+      throw new Error(`ASWebAuth failed: ${resultType}`);
+    }
+
+    if (!callbackUrl) throw new Error('NO_CALLBACK_URL');
+
+    console.log('[auth][google] T3 parsing callback…');
+    console.log('[auth][google] full callback URL:', callbackUrl);
+
+    // Parse using Linking.parse
+    const parsed = Linking.parse(callbackUrl);
+    const { code, error: oauthError, error_description } = parsed.queryParams ?? {};
+    console.log('[auth][google] parsed', { hasCode: !!code, oauthError });
+
+    if (oauthError) {
+      console.log('[auth][google] OAuth error:', oauthError, error_description);
+      throw new Error(`OAUTH_ERROR: ${oauthError} - ${error_description}`);
+    }
+
+    if (!code) {
+      console.log('[auth][google] ERROR: Missing authorization code in callback');
+      throw new Error('OAUTH_MISSING_CODE');
+    }
+
+    console.log('[auth][google] T4 exchanging code…');
+
+    // Read persisted code_verifier
+    const persistedVerifier = await AsyncStorage.getItem('pkce_code_verifier');
+    console.log('[auth][google] persisted verifier check', { hasVerifier: !!persistedVerifier });
+    if (!persistedVerifier) throw new Error('MISSING_PERSISTED_VERIFIER');
+
+    const tokenUrl = `${SUPABASE_URL}/auth/v1/token?grant_type=pkce`;
+
+    const body = {
+      auth_code: code,                 // <-- exact key name for Supabase PKCE
+      code_verifier: persistedVerifier,
+      redirect_uri: REDIRECT,          // 'olea://auth-callback'
+    };
+
+    const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!.trim();
+
+    const resp = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'apikey': anonKey,
+        'Authorization': `Bearer ${anonKey}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    const text = await resp.text();
+    if (!resp.ok) {
+      throw new Error(`HTTP ${resp.status}: ${text}`);
+    }
+
+    const json = JSON.parse(text);
+
+    const { access_token, refresh_token } = json;
+    const { data, error } = await supabase.auth.setSession({
+      access_token,
+      refresh_token: refresh_token ?? '',
+    });
+
+    const ex = { session: data?.session, error };
+
+    console.log('[auth][google] exchange result', { ok: !!ex?.session, err: ex?.error });
+
+    if (ex?.error) throw ex.error;
+    if (!ex?.session) throw new Error('OAUTH_NO_SESSION');
+
+    // Clean up persisted PKCE values (single-use)
+    await AsyncStorage.removeItem('pkce_code_verifier');
+
+    return ex.session;
+  } catch (err: any) {
+    throw err;
+  } finally {
+    // GUARANTEE the UI recovers
+    inFlight = false; // Reset inFlight flag
+
+    // Clean up any persisted PKCE values in case of failure
+    try {
+      await AsyncStorage.removeItem('pkce_code_verifier');
+    } catch (e) {
+      // Silent cleanup failure
+    }
+  }
+}
+
+/** Helpers (keep yours if you already have them) */
+function makeState() {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return base64Url(bytes);
+}
+
+function generateCodeVerifier() {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return base64Url(bytes); // length ~43, okay
+}
+
+async function sha256ToBase64Url(verifier: string) {
+  const enc = new TextEncoder();
+  const digest = await crypto.subtle.digest('SHA-256', enc.encode(verifier));
+  return base64Url(new Uint8Array(digest));
+}
+
+function base64Url(bytes: Uint8Array) {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
 
 const logger = createLogger('auth');
 
@@ -71,6 +269,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   const { showError } = useErrorModal();
   const handleError = useHandleError();
   const { maybeIdentifyUser, resetUser } = useAnalytics();
+
 
   // Keep stable references to external callbacks used inside long-lived listeners
   const showErrorRef = useRef(showError);
@@ -379,50 +578,10 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           handleError('Sign In Error', err);
           return false; // Indicate failure
         }
-      } else { // Google OAuth flow
-        const GOOGLE_REDIRECT = 'olea://auth-callback';
-
-        console.log('[auth][google] starting signInWithOAuth');
-        const { data, error } = await supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: { redirectTo: GOOGLE_REDIRECT, skipBrowserRedirect: true },
-        });
-        if (error) { console.log('[auth][google] signInWithOAuth error', error); throw error; }
-
-        console.log('[auth][google] auth url', data?.url);
-        console.log('[auth][google] pkce before open', await AsyncStorage.getItem('supabase.auth.pkce'));
-
-        if (data.url) {
-          const result = await WebBrowser.openAuthSessionAsync(data.url, GOOGLE_REDIRECT);
-          console.log('[auth][google] openAuthSessionAsync result', result);
-
-          if (result.type === 'success' && result.url) {
-            // Minimal visibility: prove "state" exists
-            const hasState = /[?&#]state=/.test(result.url);
-            console.log('[auth][google] callback has state?', hasState, result.url);
-
-            // Also check the PKCE record still exists
-            console.log('[auth][google] pkce before exchange', await AsyncStorage.getItem('supabase.auth.pkce'));
-
-            await handleUrl(result.url);
-            return true; // Indicate that browser flow completed successfully
-          } else if (result.type === 'cancel') {
-            logger.warn('Web browser session cancelled by user', { provider });
-            handleError('Sign In Cancelled', 'You cancelled the sign-in process.');
-            return false; // Indicate cancellation
-          } else {
-            logger.error('Web browser session unknown result type', { 
-              provider, 
-              resultType: result.type 
-            });
-            handleError('Sign In Error', `Sign-in was not completed. Reason: ${result.type}`);
-            return false; // Indicate other failure
-          }
-        } else {
-          logger.error('Sign-in failed: No redirect URL received', { provider });
-          handleError('Sign In Error', 'No redirect URL received. Please try again.');
-          return false; // Indicate failure to get URL
-        }
+      } else { // Google OAuth flow - Manual PKCE
+        console.log('[auth][google] starting manual PKCE sign-in');
+        await signInWithGoogleManualPkce();
+        return true; // Manual PKCE handles everything including session setup
       }
     } catch (err: any) {
       logger.error('Generic Sign-In Error', { error: err.message, provider });

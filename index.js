@@ -1,15 +1,55 @@
-// Polyfills - MUST be first before any other imports (in this exact order)
-import 'react-native-get-random-values';     // provides crypto.getRandomValues
-import 'expo-standard-web-crypto';           // provides crypto.subtle (SHA-256)
-import 'react-native-url-polyfill/auto';     // provides URL, URLSearchParams
+// --- MUST BE FIRST ---
+import 'react-native-get-random-values';
+import 'react-native-url-polyfill/auto';
 
-// Verify polyfills are active (one-time check)
+// Pure-JS WebCrypto subtle.digest (SHA-256) shim so Supabase PKCE works in dev client
+import { sha256 } from 'js-sha256';
+
+(function ensureWebCrypto() {
+  const g = globalThis;
+
+  // Ensure global crypto exists
+  if (!g.crypto) g.crypto = {};
+
+  // Guarantee getRandomValues (react-native-get-random-values provides it)
+  if (typeof g.crypto.getRandomValues !== 'function') {
+    throw new Error('getRandomValues missing (react-native-get-random-values not loaded)');
+  }
+
+  // Provide a minimal subtle with digest('SHA-256', ArrayBuffer)
+  if (!g.crypto.subtle) {
+    g.crypto.subtle = {
+      async digest(algorithm, data) {
+        const algo = typeof algorithm === 'string' ? algorithm : algorithm?.name;
+        if (algo !== 'SHA-256') throw new Error(`Unsupported algorithm: ${algo}`);
+        // Normalize to Uint8Array
+        let bytes;
+        if (data instanceof ArrayBuffer) {
+          bytes = new Uint8Array(data);
+        } else if (ArrayBuffer.isView(data)) {
+          bytes = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+        } else {
+          throw new Error('subtle.digest expects ArrayBuffer or TypedArray');
+        }
+        const buf = sha256.arrayBuffer(bytes); // returns ArrayBuffer
+        return buf;
+      },
+    };
+  }
+})();
+
+// Sanity log: subtle MUST be true now
 console.log('[polyfills]', {
   hasCrypto: !!globalThis.crypto,
-  hasSubtle: !!globalThis.crypto?.subtle,
   hasGetRandomValues: !!globalThis.crypto?.getRandomValues,
+  hasSubtle: !!globalThis.crypto?.subtle,
   URLType: typeof URL,
 });
+
+// Buffer polyfill for React Native (needed for base64url encoding)
+if (typeof global.Buffer === 'undefined') {
+  global.Buffer = require('buffer').Buffer;
+}
 
 // Global Error Handling - MUST be before expo-router/entry
 // This will catch all unhandled JavaScript exceptions in production builds
@@ -75,5 +115,10 @@ try {
 } catch (e) {
   // Non-fatal: continue app startup even if preloading fails
 }
+
+// Ensure maybeCompleteAuthSession runs once at app bootstrap
+import * as WebBrowser from 'expo-web-browser';
+WebBrowser.maybeCompleteAuthSession();
+console.log('[auth-trace] maybeCompleteAuthSession called');
 
 import 'expo-router/entry';

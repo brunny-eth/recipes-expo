@@ -483,14 +483,16 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   } as TextStyle,
   retryButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#000000',
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.sm,
     borderRadius: RADIUS.sm,
   } as ViewStyle,
   retryButtonText: {
     ...bodyStrongText,
-    color: COLORS.white,
+    color: '#000000',
   } as TextStyle,
   emptyContainer: {
     alignItems: 'center',

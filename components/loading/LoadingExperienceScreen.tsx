@@ -289,9 +289,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
         console.log(`[parseRecipe] Preparing to send request to: ${backendUrl}`);
         console.log('[parseRecipe] Input type:', inputType);
 
-        // Temporarily log env vars to verify them at runtime
-        console.log('EXPO_PUBLIC_API_URL:', process.env.EXPO_PUBLIC_API_URL);
-        console.log('EXPO_PUBLIC_AUTH_URL:', process.env.EXPO_PUBLIC_AUTH_URL);
+        // Environment variables loaded (values not logged for security)
       }
 
       const response = await fetch(backendUrl, {

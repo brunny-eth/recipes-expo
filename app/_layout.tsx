@@ -23,7 +23,6 @@ import SplashScreenMeez from './SplashScreen';
 import { AuthNavigationHandler } from '@/components/AuthNavigationHandler';
 import OfflineBanner from '@/components/OfflineBanner';
 import { getNetworkStatus } from '@/utils/networkUtils';
-import { useRenderCounter } from '@/hooks/useRenderCounter';
 
 SplashScreen.preventAutoHideAsync();
 console.log('[GLOBAL] SplashScreen.preventAutoHideAsync called.');
@@ -41,11 +40,6 @@ function RootLayoutNav() {
   const { session, isLoading: isAuthLoading } = useAuth();
   const router = useRouter();
   const segments = useSegments();
-  useRenderCounter('RootLayoutNav', {
-    sessionUserId: session?.user?.id,
-    isAuthLoading,
-    firstSegment: segments[0],
-  });
 
   // Simplified readiness states
   const [isFirstLaunch, setIsFirstLaunch] = useState<boolean | null>(null); // null means not yet determined
@@ -278,12 +272,8 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
-  // Log environment configuration
-  console.log('[Meez] 🌐 ENV CONFIG', {
-    API_URL: process.env.EXPO_PUBLIC_API_URL,
-    NODE_ENV: process.env.NODE_ENV,
-    VERSION: process.env.EXPO_PUBLIC_APP_VERSION,
-  });
+  // Environment configuration loaded (values not logged for security)
+
 
   useFrameworkReady(); // Keep framework-level readiness in RootLayout
 

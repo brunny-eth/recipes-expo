@@ -10,10 +10,6 @@ const { width } = Dimensions.get('window');
 function SplashScreenMeez({ onFinish }: { onFinish: () => void }) {
   const router = useRouter();
   const logoOpacity = useRef(new Animated.Value(0)).current;
-  const renderCount = useRef(0);
-
-  renderCount.current += 1;
-  console.log(`[SplashScreenMeez] Component rendering (render #${renderCount.current})`);
 
   useEffect(() => {
     console.log('[SplashScreenMeez] useEffect - Component mounted, starting animation sequence');

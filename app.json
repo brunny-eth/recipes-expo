@@ -40,6 +40,9 @@
             ]
           }
         ],
+        "LSApplicationQueriesSchemes": [
+          "olea"
+        ],
         "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "Allow Olea to access your photo library to select recipe images and PDFs.",
         "NSCameraUsageDescription": "Allow Olea to access your camera to take photos of recipes."
@@ -70,7 +73,8 @@
       "expo-file-system"
     ],
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": true,
+      "urlScheme": "olea"
     },
     "extra": {
       "router": {},

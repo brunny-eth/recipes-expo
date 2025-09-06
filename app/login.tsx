@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Platform, ViewStyle, TextStyle, Image } from 'react-native';
+import React, { useState, useRef, useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Platform, ViewStyle, TextStyle, Image, InteractionManager } from 'react-native';
 import { useHandleError } from '@/hooks/useHandleError';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
+import { signInWithGoogleManualPkce } from '@/context/AuthContext';
 import { useSuccessModal } from '@/context/SuccessModalContext';
 import { COLORS, SPACING, RADIUS, ICON_SIZE } from '@/constants/theme';
 import { FontAwesome } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Linking } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { FONT, bodyText, bodyTextLoose, bodyStrongText } from '@/constants/typography';
 import ScreenHeader from '@/components/ScreenHeader';
 
@@ -18,35 +20,46 @@ const LoginScreen = () => {
   const handleError = useHandleError();
   const { showSuccess } = useSuccessModal();
   const [isSigningIn, setIsSigningIn] = useState<AuthProvider | null>(null);
+  const inFlightRef = useRef(false);
   const insets = useSafeAreaInsets();
 
+  // Log component render state for debugging
+  console.log('[ui] LoginScreen render, isSigningIn:', isSigningIn, 'isAuthLoading:', isAuthLoading);
+
+
+  const onGooglePress = useCallback(async () => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+    setIsSigningIn('google');
+    try {
+      await signInWithGoogleManualPkce();  // MUST be awaited
+    } finally {
+      inFlightRef.current = false;
+      setIsSigningIn(null);
+    }
+  }, [signInWithGoogleManualPkce]);
 
   const handleSignIn = async (provider: AuthProvider) => {
+    if (provider === 'google') {
+      await onGooglePress();
+      return;
+    }
+
+    // Handle Apple sign-in (existing logic)
     if (isSigningIn) return;
     setIsSigningIn(provider);
-    
-    // Add a timeout to prevent getting stuck on loading
-    const timeoutId = setTimeout(() => {
-      if (isSigningIn === provider) {
-        console.warn(`[LoginScreen] Sign-in timeout for ${provider}`);
-        setIsSigningIn(null);
-        handleError('Sign-in Timeout', 'The sign-in process is taking longer than expected. Please try again.');
-      }
-    }, 30000); // 30 second timeout
-    
+
     try {
-      const success = await signIn(provider); // Get the boolean result
+      const success = await signIn(provider);
       if (success) {
         console.log(`[LoginScreen] Sign-in successful with ${provider}.`);
-        // Success message will be shown by AuthNavigationHandler
       } else {
         console.log(`[LoginScreen] Sign-in flow cancelled or failed for ${provider}.`);
-        // No specific action needed here as AuthContext's error modal already showed
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(`[LoginScreen] Unexpected error during sign-in initiation with ${provider}:`, error);
+      handleError('Sign In Error', error?.message || 'Sign-in failed');
     } finally {
-      clearTimeout(timeoutId);
       setIsSigningIn(null);
     }
   };
@@ -105,7 +118,7 @@ const LoginScreen = () => {
 
           <TouchableOpacity
             style={[styles.button, styles.googleButton]}
-            onPress={() => handleSignIn('google')}
+            onPress={onGooglePress}
             disabled={!!isSigningIn}
           >
             {isSigningIn === 'google' ? (
@@ -125,6 +138,7 @@ const LoginScreen = () => {
               </View>
             )}
           </TouchableOpacity>
+
         </View>
         {/* TOS/Privacy Policy agreement text */}
         <View style={styles.tosSection}>
@@ -231,7 +245,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   } as TextStyle,
   tosLink: {
-    color: COLORS.primary,
+    color: COLORS.textDark,
     textDecorationLine: 'underline',
   } as TextStyle,
 });

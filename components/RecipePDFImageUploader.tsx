@@ -93,9 +93,9 @@ const RecipePDFImageUploader = React.forwardRef<any, Props>(({ onUploadComplete,
       } as any;
 
       if (__DEV__) {
-        console.log('Uploading to:', `${process.env.EXPO_PUBLIC_API_URL}/api/recipes/parse-image`);
+        console.log('Uploading image to backend');
         console.log('Image file info:', {
-          uri: finalImageUri,
+          hasUri: !!finalImageUri,
           type: imageFile.type,
           name: imageFile.name,
           isFromPDF
@@ -175,7 +175,7 @@ const RecipePDFImageUploader = React.forwardRef<any, Props>(({ onUploadComplete,
       }
 
       if (__DEV__) {
-        console.log('Uploading', imageUris.length, 'images to:', `${process.env.EXPO_PUBLIC_API_URL}/api/recipes/parse-images`);
+        console.log('Uploading', imageUris.length, 'images to backend');
       }
 
       const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/recipes/parse-images`, {

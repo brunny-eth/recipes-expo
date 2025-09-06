@@ -1,3 +1,10 @@
+// lib/supabaseClient.ts (TOP)
+console.log('[supabaseClient] loading; crypto?', {
+  hasCrypto: !!globalThis.crypto,
+  hasSubtle: !!globalThis.crypto?.subtle,
+  hasGetRandomValues: !!globalThis.crypto?.getRandomValues,
+});
+
 import { createClient } from '@supabase/supabase-js'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Database } from '../common/types/database.types'
@@ -20,15 +27,22 @@ const log = (msg: string) => {
   _logHistory.push(`[${new Date().toLocaleTimeString()}] ${msg}`)
 }
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
+// Environment variables loaded (values not logged for security)
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!;
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+const AUTH_URL = process.env.EXPO_PUBLIC_AUTH_URL || SUPABASE_URL;
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
-    storage: AsyncStorage,
-    flowType: 'pkce',
-    persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: false, // we handle the return URL ourselves
+    persistSession: true,
+    detectSessionInUrl: false, // we're handling deep links manually
+    flowType: 'pkce',
+    storage: {
+      async getItem(key) { return AsyncStorage.getItem(key); },
+      async setItem(key, value) { return AsyncStorage.setItem(key, value); },
+      async removeItem(key) { return AsyncStorage.removeItem(key); },
+    },
   },
-})
+});

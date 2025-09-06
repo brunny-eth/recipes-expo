@@ -42,7 +42,7 @@ const styles = StyleSheet.create({
 
 // Helper function to create tab bar text only (no icons)
 const createTabBarIcon = (iconName: string, label: string) => {
-  return ({ color, focused }: { color: string; focused: boolean }) => (
+  const TabBarIcon = ({ color, focused }: { color: string; focused: boolean }) => (
     <View style={styles.tabBarItem}>
       <Text style={[
         styles.tabBarText,
@@ -56,6 +56,8 @@ const createTabBarIcon = (iconName: string, label: string) => {
       {focused && <View style={styles.activeTabUnderline} />}
     </View>
   );
+  TabBarIcon.displayName = `TabBarIcon_${label}`;
+  return TabBarIcon;
 };
 
 /**

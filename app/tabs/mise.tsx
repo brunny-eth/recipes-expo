@@ -1788,14 +1788,16 @@ const styles = StyleSheet.create({
   } as TextStyle,
   retryButton: {
     marginTop: SPACING.lg,
-    backgroundColor: COLORS.primary,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#000000',
     paddingVertical: 12,
     paddingHorizontal: 32,
     borderRadius: RADIUS.sm,
   } as ViewStyle,
   retryButtonText: {
     ...bodyStrongText,
-    color: COLORS.white,
+    color: '#000000',
   } as TextStyle,
 
 

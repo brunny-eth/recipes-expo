@@ -642,8 +642,14 @@ export default function LibraryScreen() {
 
     if (exploreError) {
       return (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{exploreError}</Text>
+        <View style={styles.emptyContainer}>
+          <MaterialCommunityIcons
+            name="alert-circle-outline"
+            size={48}
+            color={COLORS.lightGray}
+          />
+          <Text style={styles.emptyText}>Couldn&apos;t load explore recipes</Text>
+          <Text style={styles.emptySubtext}>{exploreError}</Text>
           <TouchableOpacity
             style={styles.retryButton}
             onPress={fetchExploreRecipes}
@@ -709,8 +715,14 @@ export default function LibraryScreen() {
 
     if (savedError) {
       return (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{savedError}</Text>
+        <View style={styles.emptyContainer}>
+          <MaterialCommunityIcons
+            name="alert-circle-outline"
+            size={48}
+            color={COLORS.lightGray}
+          />
+          <Text style={styles.emptyText}>Couldn&apos;t load saved folders</Text>
+          <Text style={styles.emptySubtext}>{savedError}</Text>
           <TouchableOpacity
             style={styles.retryButton}
             onPress={fetchSavedFolders}
@@ -1012,37 +1024,38 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   retryButton: {
-    backgroundColor: COLORS.primary,
+    marginTop: SPACING.lg,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#000000',
     paddingVertical: 12,
-    paddingHorizontal: 24,
+    paddingHorizontal: 32,
     borderRadius: RADIUS.sm,
   },
   retryButtonText: {
     ...bodyStrongText,
-    color: COLORS.white,
+    color: '#000000',
   },
   emptyContainer: {
-    flexGrow: 1,
-    justifyContent: 'flex-start',
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.xl,
-    paddingTop: '30%',
+    paddingBottom: SPACING.xxl,
   },
   emptyText: {
-    ...bodyStrongText,
-    fontSize: FONT.size.body,
+    fontFamily: FONT.family.heading,
+    fontSize: 18,
     color: COLORS.textDark,
     marginTop: SPACING.md,
     marginBottom: SPACING.sm,
-    textAlign: 'left',
   },
   emptySubtext: {
-    ...bodyStrongText,
-    fontSize: FONT.size.body,
-    color: COLORS.textDark,
-    textAlign: 'left',
-    marginTop: SPACING.xs,
+    ...bodyText,
+    color: COLORS.darkGray,
+    textAlign: 'center',
+    marginTop: SPACING.sm,
+    fontStyle: 'italic',
   },
   loginButton: {
     marginTop: SPACING.lg,

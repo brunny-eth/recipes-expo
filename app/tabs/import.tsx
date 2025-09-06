@@ -17,6 +17,7 @@ import {
   ScrollView,
   useWindowDimensions,
   Easing,
+  Platform,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -823,12 +824,18 @@ export default function ImportScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScreenHeader title="IMPORT" showBack={false} />
 
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top - 20 : 0} // Reduce gap by 20px on iOS
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
             <View style={styles.sectionsContainer}>
               {/* Header moved up near the top */}
               <View style={styles.pageHeaderContainer}>
@@ -1122,8 +1129,9 @@ export default function ImportScreen() {
 
 
             </View>
-        </ScrollView>
-      </TouchableWithoutFeedback>
+          </ScrollView>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
 
 
       {/* Hidden uploader anchor for image/PDF selection (driven by modal actions) */}
@@ -1170,6 +1178,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  keyboardAvoidingView: {
+    flex: 1,
   },
   scrollView: {
     flex: 1,
