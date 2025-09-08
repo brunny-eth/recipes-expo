@@ -128,6 +128,7 @@ export default function CookScreen() {
 
   // --- Recipe Tips Modal State ---
   const [isRecipeTipsModalVisible, setIsRecipeTipsModalVisible] = useState(false);
+  const [activeRecipeInfoTab, setActiveRecipeInfoTab] = useState<'tips' | 'ingredients'>('ingredients');
   // --- End Recipe Tips Modal State ---
 
   // NEW: State to store the current scroll Y position
@@ -1323,16 +1324,23 @@ export default function CookScreen() {
   };
   // --- End Timer Modal Functions ---
 
-  // --- Recipe Tips Functions ---
+  // --- Recipe Info Functions ---
   const handleRecipeTipsPress = () => {
     const currentRecipe = cookingContext.state.activeRecipes.find(
       recipe => recipe.recipeId === cookingContext.state.activeRecipeId
     );
-    if (currentRecipe?.recipe?.tips) {
+    if (currentRecipe?.recipe) {
       setIsRecipeTipsModalVisible(true);
     }
   };
-  // --- End Recipe Tips Functions ---
+
+  // Ensure Ingredients tab is active when modal opens
+  useEffect(() => {
+    if (isRecipeTipsModalVisible) {
+      setActiveRecipeInfoTab('ingredients');
+    }
+  }, [isRecipeTipsModalVisible]);
+  // --- End Recipe Info Functions ---
 
   if (isLoading) {
     return (
@@ -1528,7 +1536,6 @@ export default function CookScreen() {
         <StepsFooterButtons
           onTimersPress={handleTimersPress}
           onRecipeTipsPress={handleRecipeTipsPress}
-          hasRecipeTips={!!currentRecipeData?.tips}
           onEndCookingSessions={handleEndCookingSessions}
           hasChanges={hasChanges}
           isSaving={isSaving}
@@ -1555,7 +1562,7 @@ export default function CookScreen() {
           />
         )}
 
-        {/* Recipe Tips Modal */}
+        {/* Recipe Info Modal */}
         <Modal
           visible={isRecipeTipsModalVisible}
           animationType="fade"
@@ -1567,14 +1574,10 @@ export default function CookScreen() {
             onPress={() => setIsRecipeTipsModalVisible(false)}
           >
             <Pressable style={styles.recipeTipsModalContent}>
+              {/* Header */}
               <View style={styles.recipeTipsHeader}>
                 <View style={styles.recipeTipsHeaderContent}>
-                  <MaterialCommunityIcons
-                    name="lightbulb-outline"
-                    size={24}
-                    color={COLORS.textDark}
-                  />
-                  <Text style={styles.recipeTipsTitle}>Recipe Tips</Text>
+                  <Text style={styles.recipeTipsTitle}>Recipe Info</Text>
                 </View>
                 <TouchableOpacity
                   style={styles.closeButton}
@@ -1587,26 +1590,85 @@ export default function CookScreen() {
                   />
                 </TouchableOpacity>
               </View>
-              
-              <FlatList
-                style={styles.recipeTipsList}
-                data={currentRecipeData?.tips?.split(/\.\s+|\n+/).filter(tip => tip.trim()) || []}
-                keyExtractor={(item, index) => index.toString()}
-                renderItem={({ item, index }) => (
-                  <View style={styles.tipItem}>
-                    <View style={styles.tipNumberContainer}>
-                      <Text style={styles.tipNumber}>{index + 1}</Text>
+
+              {/* Tab Navigation */}
+              <View style={styles.tabContainer}>
+                <TouchableOpacity
+                  style={[styles.tabButton, activeRecipeInfoTab === 'ingredients' && styles.tabButtonActive]}
+                  onPress={() => setActiveRecipeInfoTab('ingredients')}
+                >
+                  <Text style={[styles.tabButtonText, activeRecipeInfoTab === 'ingredients' && styles.tabButtonTextActive]}>
+                    Ingredients
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.tabButton, activeRecipeInfoTab === 'tips' && styles.tabButtonActive]}
+                  onPress={() => setActiveRecipeInfoTab('tips')}
+                >
+                  <Text style={[styles.tabButtonText, activeRecipeInfoTab === 'tips' && styles.tabButtonTextActive]}>
+                    Tips
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Tab Content */}
+              {activeRecipeInfoTab === 'tips' ? (
+                <FlatList
+                  style={styles.recipeTipsList}
+                  data={currentRecipeData?.tips?.split(/\.\s+|\n+/).filter(tip => tip.trim()) || []}
+                  keyExtractor={(item, index) => index.toString()}
+                  renderItem={({ item, index }) => (
+                    <View style={styles.tipItem}>
+                      <View style={styles.tipNumberContainer}>
+                        <Text style={styles.tipNumber}>{index + 1}</Text>
+                      </View>
+                      <View style={styles.tipContent}>
+                        <Text style={styles.recipeTipsText}>
+                          {item.trim()}
+                        </Text>
+                      </View>
                     </View>
-                    <View style={styles.tipContent}>
-                      <Text style={styles.recipeTipsText}>
-                        {item.trim()}
+                  )}
+                  showsVerticalScrollIndicator={true}
+                  contentContainerStyle={styles.recipeTipsListContent}
+                />
+              ) : (
+                <FlatList
+                  style={styles.recipeTipsList}
+                  data={currentRecipeData?.ingredientGroups?.flatMap(group =>
+                    group.ingredients || []
+                  ) || []}
+                  keyExtractor={(item, index) => `${item.name}-${index}`}
+                  renderItem={({ item }) => (
+                    <View style={styles.ingredientItem}>
+                      <Text style={styles.ingredientText}>
+                        {(() => {
+                          const ingredientName = item.name.toLowerCase();
+                          const amountText = item.amount || '';
+                          const unitText = abbreviateUnit(item.unit || '');
+                          const preparationText = item.preparation || '';
+
+                          // Build the combined text following mise.tsx pattern
+                          const amountPart = `${amountText}${unitText ? ' ' + unitText : ''}`.trim();
+                          let combinedText = ingredientName;
+
+                          if (amountPart && preparationText) {
+                            combinedText = `${ingredientName} - ${amountPart}, ${preparationText}`;
+                          } else if (amountPart) {
+                            combinedText = `${ingredientName} - ${amountPart}`;
+                          } else if (preparationText) {
+                            combinedText = `${ingredientName} - ${preparationText}`;
+                          }
+
+                          return combinedText;
+                        })()}
                       </Text>
                     </View>
-                  </View>
-                )}
-                showsVerticalScrollIndicator={true}
-                contentContainerStyle={styles.recipeTipsListContent}
-              />
+                  )}
+                  showsVerticalScrollIndicator={true}
+                  contentContainerStyle={styles.recipeTipsListContent}
+                />
+              )}
             </Pressable>
           </Pressable>
         </Modal>
@@ -1924,7 +1986,7 @@ const styles = StyleSheet.create({
   recipeTipsHeaderContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
+    justifyContent: 'center',
   },
   recipeTipsTitle: {
     fontFamily: FONT.family.graphikMedium,
@@ -1974,6 +2036,51 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   recipeTipsText: {
+    fontFamily: 'Inter',
+    fontSize: 16,
+    fontWeight: '400',
+    lineHeight: 24,
+    color: COLORS.textDark,
+  },
+
+  // --- Tab Navigation Styles ---
+  tabContainer: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.divider,
+    marginHorizontal: SPACING.lg,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: SPACING.md,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabButtonActive: {
+    borderBottomColor: COLORS.textDark,
+  },
+  tabButtonText: {
+    fontFamily: 'Inter',
+    fontSize: 16,
+    fontWeight: '400',
+    color: COLORS.textMuted,
+  },
+  tabButtonTextActive: {
+    fontWeight: '600',
+    color: COLORS.textDark,
+  },
+
+  // --- Ingredient Item Styles ---
+  ingredientItem: {
+    marginBottom: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    backgroundColor: 'transparent',
+    borderTopWidth: 1,
+    borderTopColor: 'transparent',
+    width: '100%',
+  },
+  ingredientText: {
     fontFamily: 'Inter',
     fontSize: 16,
     fontWeight: '400',
@@ -2038,11 +2145,10 @@ const styles = StyleSheet.create({
   },
   highlightedText: {
     fontFamily: 'Inter',
-    fontWeight: '400',
+    fontWeight: '700',
     color: COLORS.textDark,
     fontSize: FONT.size.body,
     lineHeight: FONT.lineHeight.normal,
-    textDecorationLine: 'underline',
   },
 
   stepControlsTopRight: {

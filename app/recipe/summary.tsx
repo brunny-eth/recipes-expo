@@ -3087,10 +3087,49 @@ export default function RecipeSummaryScreen() {
             }
           };
 
+          const handleOpenMediaViewer = () => {
+            if (!imageUrl) return;
+            router.push({
+              pathname: "/media-viewer",
+              params: {
+                uri: String(imageUrl),
+                mime: recipe.imageMime ?? ""
+              }
+            });
+          };
+
           if (isVideoRecipe) {
             return (
               <View style={styles.fullWidthImageContainer}>
                 <TouchableOpacity onPress={handleOpenSource} activeOpacity={0.8} style={styles.fullWidthImageTouchable}>
+                  <Pressable
+                    onPress={handleOpenMediaViewer}
+                    accessibilityRole="imagebutton"
+                    accessibilityLabel="Open recipe image full screen"
+                    testID="open-media-viewer"
+                  >
+                    <FastImage
+                      source={{ uri: String(imageUrl) }}
+                      style={styles.fullWidthImage}
+                      resizeMode="cover"
+                      onError={() => {
+                        console.log('[DEBUG] Image failed to load, collapsing image area:', imageUrl);
+                        setImageLoadFailed(true);
+                      }}
+                    />
+                  </Pressable>
+                </TouchableOpacity>
+              </View>
+            );
+          } else {
+            return (
+              <View style={styles.fullWidthImageContainer}>
+                <Pressable
+                  onPress={handleOpenMediaViewer}
+                  accessibilityRole="imagebutton"
+                  accessibilityLabel="Open recipe image full screen"
+                  testID="open-media-viewer"
+                >
                   <FastImage
                     source={{ uri: String(imageUrl) }}
                     style={styles.fullWidthImage}
@@ -3100,21 +3139,7 @@ export default function RecipeSummaryScreen() {
                       setImageLoadFailed(true);
                     }}
                   />
-                </TouchableOpacity>
-              </View>
-            );
-          } else {
-            return (
-              <View style={styles.fullWidthImageContainer}>
-                <FastImage
-                  source={{ uri: String(imageUrl) }}
-                  style={styles.fullWidthImage}
-                  resizeMode="cover"
-                  onError={() => {
-                    console.log('[DEBUG] Image failed to load, collapsing image area:', imageUrl);
-                    setImageLoadFailed(true);
-                  }}
-                />
+                </Pressable>
               </View>
             );
           }

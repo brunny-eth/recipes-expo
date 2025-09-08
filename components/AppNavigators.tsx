@@ -34,6 +34,14 @@ const AppNavigators = React.memo(() => {
         name="settings"
         options={{ headerShown: false }}
       />
+      <Stack.Screen
+        name="media-viewer"
+        options={{
+          presentation: "modal",
+          headerShown: false,
+          animation: "fade"
+        }}
+      />
     </Stack>
   );
 });

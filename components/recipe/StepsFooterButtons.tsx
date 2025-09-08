@@ -13,7 +13,6 @@ import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
 type StepsFooterButtonsProps = {
   onTimersPress: () => void;
   onRecipeTipsPress: () => void;
-  hasRecipeTips?: boolean;
   onEndCookingSessions?: () => void;
   // Save button props
   hasChanges?: boolean;
@@ -24,7 +23,6 @@ type StepsFooterButtonsProps = {
 const StepsFooterButtons: React.FC<StepsFooterButtonsProps> = ({
   onTimersPress,
   onRecipeTipsPress,
-  hasRecipeTips = false,
   onEndCookingSessions,
   hasChanges = false,
   isSaving = false,
@@ -52,14 +50,12 @@ const StepsFooterButtons: React.FC<StepsFooterButtonsProps> = ({
         <Text style={styles.timerButtonText}>Timer</Text>
       </TouchableOpacity>
 
-      {hasRecipeTips && (
-        <TouchableOpacity
-          style={styles.recipeTipsButton}
-          onPress={onRecipeTipsPress}
-        >
-          <Text style={styles.recipeTipsButtonText}>Recipe Tips</Text>
-        </TouchableOpacity>
-      )}
+      <TouchableOpacity
+        style={styles.recipeTipsButton}
+        onPress={onRecipeTipsPress}
+      >
+        <Text style={styles.recipeTipsButtonText}>Recipe Info</Text>
+      </TouchableOpacity>
 
       {onEndCookingSessions && (
         <TouchableOpacity
