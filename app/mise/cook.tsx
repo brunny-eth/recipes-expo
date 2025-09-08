@@ -1018,81 +1018,82 @@ export default function CookScreen() {
     const textSegments = parseTextSegments(item.text, ingredientSpans);
 
     return (
-      <View 
+      <View
         style={[
           styles.stepItemContainer,
           isActive && styles.stepItemActive
         ]}
       >
-        <View style={styles.stepContent}>
-          {/* Left side drag handle */}
+        {/* Top row with drag handle on left and controls on right */}
+        <View style={styles.stepHeader}>
           <TouchableOpacity
-            style={styles.dragHandleLeft}
+            style={styles.dragHandleTopLeft}
             onLongPress={drag}
             disabled={isActive}
           >
             <MaterialCommunityIcons
-              name="drag-vertical"
-              size={20}
+              name="menu"
+              size={14}
               color={COLORS.textMuted}
             />
           </TouchableOpacity>
 
-          {/* Clickable step text container */}
-          <TouchableOpacity
-            style={styles.stepTextContainer}
-            onPress={() => toggleStepCompleted(currentRecipeSession?.recipeId || '', stepIndex)}
-            activeOpacity={0.7}
-          >
-            {/* Render highlighted text with ingredient spans */}
-            <Text style={[
-              styles.stepText,
-              stepIsCompleted && styles.stepTextCompleted
-            ]}>
-              {textSegments.map((segment, segmentIndex) => (
-                <Text
-                  key={`segment-${segmentIndex}`}
-                  style={segment.isHighlighted ? styles.highlightedText : undefined}
-                  onPress={
-                    segment.isHighlighted && !stepIsCompleted && segment.ingredientId
-                      ? () => {
-                          const ingredient = flatIngredients.find(ing => ing.name === segment.ingredientId);
-                          if (ingredient) {
-                            handleIngredientPress(ingredient);
-                          }
-                        }
-                      : undefined
-                  }
-                >
-                  {segment.text}
-                </Text>
-              ))}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Right side controls */}
-          <View style={styles.stepControls}>
-            {/* Edit icon */}
+          <View style={styles.stepControlsTopRight}>
             <TouchableOpacity
               style={styles.editButton}
               onPress={() => openEditModal(item.id)}
             >
               <MaterialCommunityIcons
                 name="pencil"
-                size={16}
+                size={14}
                 color={COLORS.textMuted}
+                style={{ opacity: 0.6 }}
               />
             </TouchableOpacity>
 
-            {/* Delete icon */}
             <TouchableOpacity
               style={styles.deleteButton}
               onPress={() => deleteStep(item.id)}
             >
-              <Text style={styles.deleteIcon}>×</Text>
+              <Text style={[styles.deleteIcon, { opacity: 0.6 }]}>×</Text>
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Divider line */}
+        <View style={styles.stepDivider} />
+
+        {/* Clickable step text container */}
+        <TouchableOpacity
+          style={styles.stepTextContainer}
+          onPress={() => toggleStepCompleted(currentRecipeSession?.recipeId || '', stepIndex)}
+          activeOpacity={0.7}
+        >
+          {/* Render highlighted text with ingredient spans */}
+          <Text style={[
+            styles.stepText,
+            stepIsCompleted && styles.stepTextCompleted
+          ]}>
+            {textSegments.map((segment, segmentIndex) => (
+              <Text
+                key={`segment-${segmentIndex}`}
+                style={segment.isHighlighted ? styles.highlightedText : undefined}
+                onPress={
+                  segment.isHighlighted && !stepIsCompleted && segment.ingredientId
+                    ? () => {
+                        const ingredient = flatIngredients.find(ing => ing.name === segment.ingredientId);
+                        if (ingredient) {
+                          handleIngredientPress(ingredient);
+                        }
+                      }
+                    : undefined
+                }
+              >
+                {segment.text}
+              </Text>
+            ))}
+          </Text>
+        </TouchableOpacity>
       </View>
     );
   }, [steps, currentRecipeSession, currentRecipeData, toggleStepCompleted, openEditModal, deleteStep, handleIngredientPress]);
@@ -1761,14 +1762,14 @@ export default function CookScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.primary,
   },
   centeredStatusContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.primary,
   },
 
   recipeSwitcherContainer: {
@@ -1985,10 +1986,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   stepItemContainer: {
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.md,
-    marginBottom: SPACING.sm,
-    padding: SPACING.md,
+    backgroundColor: COLORS.background,
+    borderRadius: RADIUS.sm, // Lighter border radius for checklist feel
+    marginBottom: 4, // Reduced from SPACING.sm (8px) to 4px
+    paddingHorizontal: SPACING.sm, // Keep horizontal padding
+    paddingTop: SPACING.xs, // Reduced top padding (4px instead of 8px)
+    paddingBottom: SPACING.xs, // Reduced bottom padding (4px instead of 8px)
     borderWidth: 1,
     borderColor: '#000000',
     ...SHADOWS.small,
@@ -1996,12 +1999,13 @@ const styles = StyleSheet.create({
   stepItemActive: {
     backgroundColor: COLORS.surface,
     borderColor: COLORS.textDark,
-    ...SHADOWS.medium,
+    ...SHADOWS.small, // Reduced shadow for checklist feel
   },
-  stepContent: {
+  stepHeader: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: SPACING.sm,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 1, // Even more compact (1px instead of 2px)
   },
   stepToggle: {
     width: 24,
@@ -2018,8 +2022,7 @@ const styles = StyleSheet.create({
   },
   stepTextContainer: {
     flex: 1,
-    paddingVertical: SPACING.xs,
-    paddingLeft: SPACING.sm,
+    paddingVertical: 2, // Even tighter (2px instead of 4px)
   },
   stepText: {
     fontFamily: 'Inter',
@@ -2034,43 +2037,51 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
   },
   highlightedText: {
-    fontFamily: FONT.family.graphikMedium,
-    fontWeight: '600',
+    fontFamily: 'Inter',
+    fontWeight: '400',
     color: COLORS.textDark,
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: FONT.size.body,
+    lineHeight: FONT.lineHeight.normal,
     textDecorationLine: 'underline',
   },
 
-  stepControls: {
+  stepControlsTopRight: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.xs,
-    flexDirection: 'column',
+    gap: 2, // Reduced from SPACING.xs (4px) to 2px for more compact layout
   },
   editButton: {
-    padding: SPACING.sm,
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.white,
   },
   deleteButton: {
-    padding: SPACING.sm,
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.white,
   },
   deleteIcon: {
     fontFamily: FONT.family.graphikMedium,
-    fontSize: FONT.size.lg,
+    fontSize: FONT.size.body,
     fontWeight: '600',
     lineHeight: FONT.lineHeight.normal,
     color: COLORS.textMuted,
     textAlign: 'center',
   },
-  dragHandleLeft: {
-    padding: 2,
+  dragHandleTopLeft: {
+    width: 28,
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 2,
-    width: 24,
+  },
+  stepDivider: {
+    height: 1,
+    backgroundColor: COLORS.divider,
+    marginBottom: 1, // Even more compact (1px instead of 2px)
   },
 
 
@@ -2157,7 +2168,7 @@ const styles = StyleSheet.create({
 
   // --- Add Step Button Styles ---
   addStepButton: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.background,
     borderRadius: RADIUS.md,
     marginBottom: SPACING.sm,
     padding: SPACING.sm,

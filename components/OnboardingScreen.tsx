@@ -1,7 +1,7 @@
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, SafeAreaView } from 'react-native';
 import FastImage from '@d11/react-native-fast-image';
-import { COLORS } from '@/constants/theme';
-import { FONT } from '@/constants/typography';
+import { COLORS, SPACING, RADIUS } from '@/constants/theme';
+import { FONT, screenTitleText, bodyText, bodyStrongText } from '@/constants/typography';
 import Animated, { FadeIn, FadeOut, SlideInRight, SlideOutLeft, useSharedValue, useAnimatedStyle, withSpring, runOnJS } from 'react-native-reanimated';
 import { useState, useEffect } from 'react';
 import { PanGestureHandler, GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -261,10 +261,10 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: COLORS.lightGray,
+    backgroundColor: COLORS.primary, // Blue for inactive dots
   },
   stepDotActive: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.lightGray, // Grey for active dot
   },
   textContent: {
     width: '100%',
@@ -273,18 +273,16 @@ const styles = StyleSheet.create({
     marginTop: 40,
   },
   stepTitle: {
-    fontSize: 24,
-    fontFamily: FONT.family.interSemiBold,
+    ...screenTitleText,
     color: COLORS.textDark,
     textAlign: 'center',
     marginBottom: 12,
+    fontSize: FONT.size.xl, // Use consistent large size
   },
   stepDescription: {
-    fontSize: 16,
-    fontFamily: FONT.family.ubuntu,
+    ...bodyText,
     color: COLORS.textDark,
     textAlign: 'center',
-    lineHeight: 22,
     paddingHorizontal: 20,
   },
   buttonContainer: {
@@ -295,25 +293,18 @@ const styles = StyleSheet.create({
     height: 50,
   },
   startButton: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: 16,
-    paddingHorizontal: 40,
-    borderRadius: 16,
-    width: '80%', // Reduced from 100% to make it less wide
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#000000',
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.sm,
+    marginHorizontal: SPACING.lg,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
-    height: 60, // Increased from 50 to make it taller
+    minHeight: 44,
   },
   startButtonText: {
-    color: COLORS.white,
-    fontSize: 18,
-    fontFamily: FONT.family.interSemiBold,
+    ...bodyStrongText,
+    color: '#000000',
   },
 });

@@ -575,7 +575,7 @@ export default function LibraryScreen() {
         index === 0 && { borderTopWidth: 1, borderTopColor: '#000000' } // Add top border to first folder
       ]}
       onPress={() => navigateToFolder(item)}
-      underlayColor="#EEF6FF" // Use light blue for press state
+      underlayColor="transparent" // Match folder-detail button behavior
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
     >
       <View style={styles.folderRowContent}>
@@ -785,7 +785,7 @@ export default function LibraryScreen() {
           <TouchableHighlight
             style={styles.addFolderRow}
             onPress={() => setShowAddFolderModal(true)}
-            underlayColor="#EEF6FF"
+            underlayColor="transparent"
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <View style={styles.searchToolbarContent}>
@@ -856,7 +856,7 @@ export default function LibraryScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScreenHeader title="LIBRARY" showBack={false} />
+      <ScreenHeader title="LIBRARY" showBack={false} backgroundColor="#DEF6FF" />
       
       {/* Content: Saved only */}
       {renderSavedContent()}
@@ -1083,18 +1083,20 @@ const styles = StyleSheet.create({
   folderRowContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end', // Right-align chevron
     height: '100%',
     paddingLeft: 0, // Remove left padding for true left alignment
-    paddingRight: 18, // Keep some right padding
+    paddingRight: 0, // Remove padding to push chevron to right edge
   },
   folderRowName: {
-    fontFamily: 'Inter',
-    fontSize: 30,
-    fontWeight: '500',
-    lineHeight: 30,
+    fontFamily: FONT.family.graphikMedium,
+    fontSize: 28,
+    fontWeight: '600',
+    lineHeight: 32,
     color: COLORS.textDark,
-    flex: 1,
+    position: 'absolute',
+    left: 0,
+    top: 18, // Position to balance spacing above and below text
     textAlign: 'left', // Ensure left alignment
   },
   chevronText: {
@@ -1172,10 +1174,11 @@ const styles = StyleSheet.create({
   
   // Add new folder styles - now looks like search text
   addFolderRow: {
-    height: 24, 
+    height: 24,
     width: '90%',
     alignSelf: 'flex-start', // Left align to screen edge
     marginLeft: '5%', // Offset to account for 90% width
+    marginTop: SPACING.sm, // Consistent with subheading top margin
     marginBottom: SPACING.xxxl + SPACING.contentTopMargin, // Big bottom margin for spacing from folders plus content top margin
   },
   addFolderRowContent: {
@@ -1191,6 +1194,7 @@ const styles = StyleSheet.create({
   // New styles for saved content
   savedContent: {
     flex: 1,
+    paddingTop: SPACING.md, // Match other pages' scroll content padding
   } as ViewStyle,
 
   // Modal styles
@@ -1259,13 +1263,13 @@ const styles = StyleSheet.create({
      ...bodyStrongText,
      color: COLORS.white,
    },
-  // New styles for search - minimal height
+  // New styles for search - matches subheading spacing
   searchToolbar: {
-    height: 24, // Just bigger than font size (18px + 6px)
+    height: 24, // Just bigger than font size (22px + 2px)
     width: '90%',
     alignSelf: 'flex-start', // Left align to screen edge
     marginLeft: '5%', // Offset to account for 90% width
-    marginTop: 8, // Small top margin
+    marginTop: SPACING.sm, // Consistent with subheading top margin
   },
 
   searchToolbarContent: {
@@ -1286,12 +1290,12 @@ const styles = StyleSheet.create({
     textAlignVertical: 'center',
     paddingVertical: 0,
   },
-  // Shared text style for search and add folder - non-bold
+  // Shared text style for search and add folder - matches subheading style
   headerText: {
     fontFamily: 'Inter',
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '400', // Non-bold variant
-    lineHeight: 22,
+    lineHeight: 28,
     color: COLORS.textDark,
     flex: 1,
     textAlign: 'left', // Ensure left alignment

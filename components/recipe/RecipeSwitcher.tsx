@@ -1,9 +1,18 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Modal, Pressable } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Modal, Pressable, Dimensions } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, SHADOWS, BORDER_WIDTH } from '@/constants/theme';
 import { bodyStrongText, bodyText, FONT } from '@/constants/typography';
 import { RecipeSession } from '@/context/CookingContext';
+
+// Helper function to calculate dynamic maxWidth for chips based on screen size
+const getChipMaxWidth = () => {
+  const { width: screenWidth } = Dimensions.get('window');
+  // Use 75% of screen width, but cap at 360px for larger screens and floor at 280px for smaller screens
+  const calculatedWidth = screenWidth * 0.75;
+  return Math.min(Math.max(calculatedWidth, 280), 360);
+};
+
 
 interface RecipeSwitcherProps {
   recipes: RecipeSession[];
@@ -27,19 +36,21 @@ export default function RecipeSwitcher({
   const [isPopupVisible, setIsPopupVisible] = useState(false);
   const [popupText, setPopupText] = useState('');
 
-  // Auto-scroll to active tab when activeRecipeId changes
+  // Auto-scroll to make active chip fully visible when activeRecipeId changes
   useEffect(() => {
     if (recipes.length > 1 && activeRecipeId && scrollViewRef.current) {
       const activeIndex = recipes.findIndex(r => r.recipeId === activeRecipeId);
       if (activeIndex !== -1) {
-        // Ultra-simple approach: position active tab near the left
-        const tabWidth = 84;
-        const targetScrollX = Math.max(0, (activeIndex * tabWidth) - 40); // 40px from left edge
-        
+        // Simple approach: just ensure the active chip is visible
+        // Position it with some left padding so it's not cut off
+        const estimatedChipWidth = 140;
+        const leftPadding = SPACING.pageHorizontal;
+        const targetScrollX = Math.max(0, activeIndex * estimatedChipWidth - leftPadding);
+
         setTimeout(() => {
-          scrollViewRef.current?.scrollTo({ 
-            x: targetScrollX, 
-            animated: true 
+          scrollViewRef.current?.scrollTo({
+            x: targetScrollX,
+            animated: true
           });
         }, 100);
       }
@@ -104,7 +115,7 @@ export default function RecipeSwitcher({
 
     return (
       <View style={styles.container}>
-        <View style={styles.singleRecipeContainer}>
+        <View style={[styles.singleRecipeContainer, styles.singleRecipeActive]}>
           <TouchableOpacity
             onPress={() => showRecipeNamePopup(recipeTitle)}
             activeOpacity={0.8}
@@ -113,7 +124,6 @@ export default function RecipeSwitcher({
               {truncatedTitle}
             </Text>
           </TouchableOpacity>
-          <View style={styles.singleRecipeUnderline} />
         </View>
         
         {/* Popup for single recipe */}
@@ -133,37 +143,44 @@ export default function RecipeSwitcher({
     );
   }
 
-  // Multiple recipes case - horizontal scrolling with underlines
+  // Multiple recipes case - expanded active chip + compact chips
+  const activeRecipe = recipes.find(r => r.recipeId === activeRecipeId);
+  const activeRecipeTitle = activeRecipe?.recipe?.title || 'Loading...';
+
   return (
     <View style={styles.container}>
-      <View style={styles.tabContainer}>
-        <ScrollView 
+      {/* Chips with expanded active chip */}
+      <View style={styles.chipsContainer}>
+        <ScrollView
           ref={scrollViewRef}
-          horizontal 
+          horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContainer}
+          contentContainerStyle={styles.chipsScrollContainer}
         >
           {recipes.map((recipe, index) => {
             const isActive = recipe.recipeId === activeRecipeId;
             const recipeTitle = recipe.recipe?.title || 'Loading...';
-            const truncatedTitle = truncateTitle(recipeTitle);
+            const displayTitle = isActive ? recipeTitle : truncateTitle(recipeTitle, 12);
 
             return (
               <TouchableOpacity
                 key={recipe.recipeId}
-                style={styles.tabButton}
+                style={[
+                  styles.chip,
+                  isActive && styles.chipActive
+                ]}
                 onPress={() => handleRecipePress(recipe)}
                 activeOpacity={0.8}
               >
-                <Text 
+                <Text
                   style={[
-                    styles.tabButtonText,
-                    isActive && styles.tabButtonTextActive,
+                    styles.chipText,
+                    isActive && styles.chipTextActive,
                   ]}
+                  numberOfLines={isActive ? 2 : 1}
                 >
-                  {truncatedTitle}
+                  {displayTitle}
                 </Text>
-                {isActive && <View style={styles.tabUnderline} />}
               </TouchableOpacity>
             );
           })}
@@ -199,6 +216,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     position: 'relative',
   },
+  singleRecipeActive: {
+    backgroundColor: '#DEF6FF', // Add blue background for active single recipe
+  },
   singleRecipeTitle: {
     ...bodyStrongText,
     color: COLORS.textDark,
@@ -207,52 +227,47 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase' as const,
     textAlign: 'center',
   },
-  singleRecipeUnderline: {
-    position: 'absolute',
-    bottom: -2,
-    height: 2,
-    width: '60%',
-    backgroundColor: COLORS.primary,
-    borderRadius: 1,
-  },
   
-  // Multiple recipes styles - underline style like ESPN+
-  tabContainer: {
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.surface,
-    backgroundColor: COLORS.background,
-  },
-  scrollContainer: {
-    paddingLeft: SPACING.pageHorizontal, // Start with standard page padding on left
-    paddingRight: SPACING.sm, // Smaller padding on right to show overflow
-  },
-  tabButton: {
-    paddingVertical: 16,
-    paddingHorizontal: 12, // Reduced from 16 to make tabs tighter
-    alignItems: 'center',
-    position: 'relative',
-    backgroundColor: COLORS.background,
-    minWidth: 60, // Reduced from 80 to allow more tabs visible
-  },
-  tabUnderline: {
-    position: 'absolute',
-    bottom: 2,
-    height: 2,
-    width: '100%', // Fill entire tab width instead of 60%
+  // Chips container for multiple recipes
+  chipsContainer: {
     backgroundColor: COLORS.primary,
-    borderRadius: 1,
+    paddingVertical: 2, // Reduced from SPACING.xs (4px) to 2px
   },
-  tabButtonText: {
-    ...bodyStrongText,
+  chipsScrollContainer: {
+    paddingLeft: SPACING.pageHorizontal,
+    paddingRight: SPACING.sm,
+    alignItems: 'center',
+  },
+  chip: {
+    borderRadius: RADIUS.lg,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    marginRight: SPACING.sm,
+    minWidth: 70,
+    maxWidth: getChipMaxWidth(), // Dynamic maxWidth based on screen size
+    minHeight: 44, // Base height for inactive chips
+  },
+  chipActive: {
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: COLORS.textDark,
+    minHeight: 60, // Taller height for active chips with 2 lines
+    paddingVertical: SPACING.md, // More padding for active chips
+  },
+  chipText: {
+    ...bodyText,
     color: COLORS.textMuted,
     fontSize: FONT.size.body,
+    lineHeight: 19,
     letterSpacing: 0.5,
-    textTransform: 'uppercase' as const,
     textAlign: 'center',
   },
-  tabButtonTextActive: {
+  chipTextActive: {
     color: COLORS.textDark,
+    fontSize: FONT.size.sectionHeader, // Larger text for active chips
+    lineHeight: 22, // Adjusted line height for larger text
   },
+
 
   // Popup styles
   popupBackdrop: {

@@ -1,26 +1,24 @@
 import { View, Text, TouchableOpacity, SafeAreaView, TextStyle, ViewStyle, StyleSheet } from 'react-native';
-import { COLORS, SPACING, RADIUS } from '@/constants/theme';
-import { FONT } from '@/constants/typography';
+import { COLORS, SPACING, RADIUS, BORDER_WIDTH, SHADOWS } from '@/constants/theme';
+import { FONT, bodyStrongText, screenTitleText, bodyText } from '@/constants/typography';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useState } from 'react';
 import OnboardingScreen from './OnboardingScreen';
+import ScreenHeader from './ScreenHeader';
 
 type WelcomeScreenState = 'welcome' | 'onboarding';
 
 export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) {
   const [currentScreen, setCurrentScreen] = useState<WelcomeScreenState>('welcome');
-  const features: { verb: string; rest: string }[] = [
+  const features: { text: string }[] = [
     {
-      verb: 'Import',
-      rest: ' and save any recipe from any source'
+      text: 'Import, customize, and save any recipe from any source.'
     },
     {
-      verb: 'Customize',
-      rest: ' recipes to your taste and diet, then save for later'
+      text: 'Remix recipes to your taste, diet, and cooking style.'
     },
     {
-      verb: 'Generate shopping lists',
-      rest: ' and cook multiple recipes at once'
+      text: 'Generate shopping lists and follow multiple recipes at once.'
     },
   ];
 
@@ -44,51 +42,51 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
       <SafeAreaView style={{
         flex: 1,
       }}>
+        {/* OLEA Header Section - mimicking index.tsx */}
+        <ScreenHeader
+          title="OLEA"
+          showBack={false}
+          titleStyle={{ fontSize: 32, fontWeight: '800' }}
+          backgroundColor="#DEF6FF"
+        />
+
         <View style={{
           flex: 1,
           justifyContent: 'space-between',
-          paddingTop: '20%',
-          paddingHorizontal: SPACING.pageHorizontal,
+          paddingTop: SPACING.md, // Match index.tsx ScrollView paddingTop
+          paddingHorizontal: 0, // Remove since taglineSection handles its own padding
         }}>
           {/* Top content container */}
-          <View style={{ width: '100%', alignItems: 'center' }}>
+          <View style={{ width: '100%', alignItems: 'flex-start' }}>
             <Animated.View
               entering={FadeIn.duration(1200)}
-              style={{
-                width: '100%',
-                alignItems: 'center'
-              }}
+              style={styles.taglineSection}
             >
-              <Text style={styles.mainTitle}>
-                Every recipe, your way.
-              </Text>
-              <Text style={styles.subtitle}>
-                Customize it. Shop it. Cook it.
+              <Text style={[styles.taglineText, styles.taglineYourRecipe]}>
+                Turn any recipe into{' '}
+                <Text style={styles.taglineBold}>your{'\u00A0'}recipe.</Text>
               </Text>
             </Animated.View>
 
             {/* Numbered list */}
-            <View style={styles.listContainer}>
+            <Animated.View
+              entering={FadeIn.duration(800).delay(1500)}
+              style={styles.listContainer}
+            >
               {features.map((item, index) => (
                 <View key={index} style={styles.listItem}>
-                  <View style={styles.listNumber}>
-                    <Text style={styles.listNumberText}>{index + 1}</Text>
-                  </View>
-                  <View style={styles.listContent}>
-                    <Text style={styles.listText}>
-                      <Text style={styles.listVerb}>{item.verb}</Text>
-                      {item.rest}
-                    </Text>
-                  </View>
+                  <Text style={styles.listText}>
+                    {item.text}
+                  </Text>
                 </View>
               ))}
-            </View>
+            </Animated.View>
           </View>
 
           {/* Button container - positioned using rule of thirds */}
           <View style={styles.buttonContainer}>
-            <Animated.View entering={FadeIn.duration(1000).delay(1000)}>
-              <TouchableOpacity 
+            <Animated.View entering={FadeIn.duration(1000).delay(1500)}>
+              <TouchableOpacity
                 style={styles.getStartedButton}
                 onPress={onDismiss}
               >
@@ -105,99 +103,70 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
 }
 
 const styles = StyleSheet.create({
-  mainTitle: {
-    fontSize: FONT.size.screenTitle,
-    marginBottom: SPACING.lg,
-    textAlign: 'center',
+  taglineSection: {
+    alignItems: 'flex-start',
+    paddingHorizontal: SPACING.pageHorizontal,
+    marginTop: SPACING.sm, // Reduced from SPACING.xl to bring it closer to header
+    marginBottom: SPACING.xl, // Increased to create more space before cards
+  } as ViewStyle,
+  taglineText: {
+    fontFamily: 'Inter',
+    fontSize: 22,
+    fontWeight: '400',
+    lineHeight: 28,
     color: COLORS.textDark,
-    lineHeight: FONT.lineHeight.relaxed,
-    paddingTop: SPACING.xl,
-    fontFamily: FONT.family.interSemiBold, // Semi-bold for better readability
-    paddingHorizontal: SPACING.md, // Add horizontal padding for better text containment
+    textAlign: 'left',
+    marginBottom: 0,
   } as TextStyle,
-  subtitle: {
-    fontSize: FONT.size.sectionHeader,
-    marginBottom: SPACING.xxxl,
-    textAlign: 'center',
-    color: COLORS.textMuted,
-    lineHeight: FONT.lineHeight.normal,
-    fontFamily: FONT.family.inter,
-    paddingHorizontal: SPACING.md,
+  taglineYourRecipe: {
+    marginBottom: SPACING.xxxl * 1.5, // Even more spacing below the main title
+  } as TextStyle,
+  taglineBold: {
+    fontFamily: 'Inter',
+    fontSize: 22,
+    fontWeight: '700',
+    lineHeight: 28,
+    color: COLORS.textDark,
   } as TextStyle,
   listContainer: {
     width: '100%',
-    paddingLeft: SPACING.sm, // Consistent left margin for the list
+    paddingHorizontal: SPACING.pageHorizontal, // Add horizontal padding for proper margins
   } as ViewStyle,
   listItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: SPACING.xxl, // Increased spacing between list items
+    marginBottom: SPACING.md, // Spacing between list items
     width: '100%',
   } as ViewStyle,
-  listNumber: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: COLORS.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.sm,
-    marginTop: 1,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 3,
-    flexShrink: 0, // Prevent number from shrinking
-  } as ViewStyle,
-  listNumberText: {
-    color: COLORS.white,
-    fontSize: 14,
-    fontFamily: FONT.family.interSemiBold,
-    textAlign: 'center',
-    lineHeight: 16,
-  } as TextStyle,
-  listContent: {
-    flex: 1,
-    paddingRight: SPACING.pageHorizontal, // Add right padding to prevent text from extending to screen edge
-  } as ViewStyle,
   listText: {
-    fontSize: FONT.size.sectionHeader,
+    fontFamily: 'Inter',
+    fontSize: 22,
+    fontWeight: '400',
+    lineHeight: 28,
     color: COLORS.textDark,
-    lineHeight: FONT.lineHeight.normal,
-    marginTop: 2,
-    paddingRight: SPACING.sm, // Right padding for text
-    fontFamily: FONT.family.interSemiBold, // Semi-bold for main bullet text
-  } as TextStyle,
-
-  listVerb: {
-    fontFamily: FONT.family.interSemiBold, // Semi-bold for sub-headers
-    color: COLORS.textDark,
+    textAlign: 'left',
+    marginBottom: SPACING.lg, // Add spacing between list items
   } as TextStyle,
   buttonContainer: {
     width: '100%',
-    alignItems: 'center',
-    marginBottom: '33%', // Rule of thirds - button positioned at 2/3 from top
+    height: 46, // Fixed height container like fullWidthRow in Import.tsx
+    paddingHorizontal: SPACING.pageHorizontal, // Add horizontal padding for proper margins
+    marginBottom: '10%', // Bring button up even closer to content
   } as ViewStyle,
   getStartedButton: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.xxl,
-    borderRadius: RADIUS.lg,
     width: '100%',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
+    height: '100%', // Fill the container height
+    backgroundColor: COLORS.primary,
+    borderWidth: 1,
+    borderColor: '#000000',
+    borderRadius: RADIUS.lg,
+    justifyContent: 'center',
+    alignItems: 'flex-start', // Left align content
+    paddingLeft: 16, // Match INPUT_LEFT_PAD from Import.tsx
+    ...SHADOWS.medium,
   } as ViewStyle,
   buttonText: {
-    color: COLORS.white, 
-    fontSize: FONT.size.sectionHeader, 
-    fontFamily: FONT.family.interSemiBold 
+    ...bodyText, // Changed from bodyStrongText to bodyText to remove bold
+    color: '#000000',
+    textAlign: 'left',
   } as TextStyle,
   // Legacy styles kept for reference
   bullet: {

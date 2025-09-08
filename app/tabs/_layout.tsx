@@ -10,9 +10,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     borderTopWidth: 1,
     borderTopColor: '#000000',
-    height: 80,
+    height: 70, // Reduced from 80 to make border appear lower
     paddingBottom: Platform.OS === 'ios' ? 26 : 12,
-    paddingTop: 14,
+    paddingTop: 5, // Reduced to maintain button positioning with smaller height
   },
   tabBarLabel: {
     ...captionText,
@@ -34,7 +34,7 @@ const styles = StyleSheet.create({
     bottom: -2,
     left: 12,
     right: 12,
-    height: 2,
+    height: 3, // Increased from 2 to make the underline thicker
     backgroundColor: COLORS.primary,
     borderRadius: 1,
   },
@@ -48,7 +48,8 @@ const createTabBarIcon = (iconName: string, label: string) => {
         styles.tabBarText,
         {
           color: focused ? COLORS.textDark : COLORS.textMuted,
-          fontWeight: focused ? '700' : '400'
+          fontWeight: focused ? '700' : '400', // Bold when active
+          fontFamily: focused ? 'Inter-SemiBold' : 'Inter-Regular' // Ensure proper font family for bold
         }
       ]} numberOfLines={1}>
         {label}

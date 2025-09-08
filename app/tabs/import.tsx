@@ -822,7 +822,7 @@ export default function ImportScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScreenHeader title="IMPORT" showBack={false} />
+      <ScreenHeader title="IMPORT" showBack={false} backgroundColor="#DEF6FF" />
 
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingView}
@@ -839,7 +839,7 @@ export default function ImportScreen() {
             <View style={styles.sectionsContainer}>
               {/* Header moved up near the top */}
               <View style={styles.pageHeaderContainer}>
-                <Text style={styles.pageHeader}>To start customizing, import a recipe from anywhere or find one of our curated recipes. </Text>
+                <Text style={styles.pageHeader}>To start customizing, import a recipe from anywhere or find a recipe in our collection. </Text>
               </View>
 
               {/* Cards section pushed down */}
@@ -1027,7 +1027,7 @@ export default function ImportScreen() {
                   >
                     <View style={styles.sectionContent}>
                       <View style={styles.cardTextContainer}>
-                        <Text style={styles.sectionTitle}>Dish name</Text>
+                        <Text style={styles.sectionTitle}>Dish</Text>
                         <Text style={styles.sectionSubtext}>Type in the name of a dish</Text>
                       </View>
                       <Animated.Text
@@ -1197,7 +1197,7 @@ const styles = StyleSheet.create({
   },
   importSection: {
     gap: 0,
-    marginTop: SPACING.xxxl, // Increased from SPACING.lg to push cards down further
+    marginTop: 0, // No margin needed - spacing handled by pageHeaderContainer
   },
   secondCardSection: {
     gap: 0,
@@ -1288,7 +1288,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     paddingHorizontal: SPACING.pageHorizontal,
     marginTop: SPACING.sm, // Reduced from SPACING.xl to bring it closer to header
-    marginBottom: SPACING.xl, // Increased to create more space before cards
+    marginBottom: SPACING.subheadingMargin - SPACING.md, // Use consistent subheading margin minus scrollContent paddingTop
   },
   sectionWrapper: {
     marginBottom: 0,
@@ -1305,12 +1305,12 @@ const styles = StyleSheet.create({
   sectionContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-start',
+    justifyContent: 'flex-end', // Right-align chevron like in library.tsx
     paddingLeft: 0, // Remove left padding for true left alignment
-    paddingRight: 18, // Keep some right padding
+    paddingRight: 0, // Remove padding to push chevron to right edge
   },
   sectionChevron: {
-    fontSize: 24,
+    fontSize: 20,
     color: COLORS.textMuted,
     fontWeight: '400',
   },
@@ -1471,7 +1471,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: RADIUS.lg,
     borderBottomLeftRadius: RADIUS.lg,
     borderRightWidth: 0, // Remove right border since button will be attached
-    backgroundColor: 'transparent',
+    backgroundColor: '#DEF6FF', // Changed to light blue background
   },
   input: {
     flex: 1,
@@ -1491,7 +1491,7 @@ const styles = StyleSheet.create({
     height: '100%',
     minWidth: 60,
     paddingHorizontal: SPACING.sm,
-    backgroundColor: 'transparent',
+    backgroundColor: '#DEF6FF', // Match the input bar background
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
@@ -1508,7 +1508,7 @@ const styles = StyleSheet.create({
   },
   submitButtonText: {
     ...bodyStrongText,
-    color: '#000000',
+    color: '#000000', // Back to black text
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -1576,7 +1576,7 @@ const styles = StyleSheet.create({
     paddingLeft: INPUT_LEFT_PAD, // Match input left padding
   },
   fullWidthPrimaryButtonText: {
-    ...bodyStrongText,
+    ...bodyText, // Changed from bodyStrongText to bodyText to remove bold
     color: '#000000',
     textAlign: 'left',
   },

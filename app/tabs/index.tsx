@@ -88,10 +88,10 @@ export default function HomeScreen() {
           >
         {/* Tagline */}
         <View style={styles.taglineSection}>
-          <Text style={[styles.taglineText, styles.taglineFirstLine]}>
+          <Text style={[styles.taglineText, styles.taglineYourRecipe]}>
             Turn any recipe into{' '}
-            <Text style={styles.taglineBold}>your recipe.</Text>
-                      </Text>
+            <Text style={styles.taglineBold}>your{'\u00A0'}recipe.</Text>
+          </Text>
           <Text style={[styles.taglineText, styles.taglineBullet]}>
             Remix your recipes.{'\n'}Swap ingredients.{'\n'}Personalize instructions.{'\n'}Cook your way.
                       </Text>
@@ -214,6 +214,9 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   taglineFirstLine: {
+    marginBottom: 0, // No space since "your recipe" is now on its own line
+  },
+  taglineYourRecipe: {
     marginBottom: SPACING.lg, // 2 lines of space (lg is typically 16px)
   },
   taglineBold: {
@@ -228,7 +231,7 @@ const styles = StyleSheet.create({
   },
   sectionsContainer: {
     gap: 0,
-    marginTop: SPACING.xxxl, // Match import page spacing
+    marginTop: SPACING.xxxl - 6, // Move up 6px from original spacing
   },
   sectionWrapper: {
     marginBottom: 0,
@@ -275,17 +278,15 @@ const styles = StyleSheet.create({
 
   bottomButtonsContainer: {
     position: 'absolute',
-    bottom: 20, // Above tab bar
-    left: 0,
-    right: 0,
-    paddingLeft: SPACING.pageHorizontal,
-    paddingRight: SPACING.pageHorizontal,
+    bottom: 20, // Above tab bar - back to original position
+    left: SPACING.pageHorizontal, // Use left positioning instead of paddingLeft
+    alignItems: 'flex-start', // Align buttons to start (left)
     gap: 2, // Space between buttons
   },
   bottomButton: {
     height: 24, // Match Library.tsx searchToolbar height
-    width: '100%', // Full width within container
     backgroundColor: 'transparent',
+    alignSelf: 'flex-start', // Only take up space needed for content
   },
   bottomButtonContent: {
     flexDirection: 'row',
@@ -293,7 +294,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     height: '100%',
     paddingLeft: 0, // Remove left padding for true left alignment
-    paddingRight: 18, // Keep some right padding
+    paddingRight: 0, // Remove right padding since button is now text-width only
   },
   bottomButtonText: {
     fontFamily: 'Inter',
@@ -301,7 +302,6 @@ const styles = StyleSheet.create({
     fontWeight: '400', // Match Library.tsx headerText
     lineHeight: 22,
     color: COLORS.textDark,
-    flex: 1,
     textAlign: 'left',
     textAlignVertical: 'center',
     paddingVertical: 0,

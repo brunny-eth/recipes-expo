@@ -739,9 +739,6 @@ export default function SavedFolderDetailScreen() {
 
     return (
       <>
-        {/* Placeholder header to maintain consistent spacing */}
-        <View style={styles.headerPlaceholder} />
-
         <FlatList
           data={filteredRecipes}
           renderItem={({ item, index }) => renderRecipeItem({ item, index })}
@@ -768,7 +765,7 @@ export default function SavedFolderDetailScreen() {
           >
             <View style={styles.bulkActionsHeader}>
               <Text style={styles.selectedCountText}>
-                {selectedRecipes.size} recipe{selectedRecipes.size !== 1 ? 's' : ''} selected
+                Recipes selected ({selectedRecipes.size})
               </Text>
               <TouchableOpacity
                 style={styles.closeSelectionButton}
@@ -788,7 +785,7 @@ export default function SavedFolderDetailScreen() {
                 disabled={selectedRecipes.size === 0}
               >
                 <Text style={styles.primaryActionButtonText}>
-                  Cook now {selectedRecipes.size > 1 ? `(${selectedRecipes.size})` : ''}
+                  Cook now
                 </Text>
               </TouchableOpacity>
 
@@ -1035,6 +1032,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#000000',
     borderBottomWidth: 1,
     borderBottomColor: '#000000',
+    backgroundColor: '#DEF6FF', // Add light blue background to match other headers
   },
   headerTitle: {
     ...screenTitleText,
@@ -1136,21 +1134,23 @@ const styles = StyleSheet.create({
   // Toolbar styles
   toolbarContainer: {
     flexDirection: 'column', // Stack vertically
-    height: 72, // 24px (first button) + 8px + 24px (second button) + 8px + 24px (third button)
+    height: 88, // 24px (first button) + 8px + 24px (second button) + 8px + 24px (third button)
     backgroundColor: 'transparent',
     width: '90%',
     alignSelf: 'flex-start', // Left align to screen edge
     marginLeft: '5%', // Offset to account for 90% width
-    marginTop: 8, // Small top margin to match library.tsx SEARCH positioning
-    marginBottom: SPACING.xxxl - 24 + SPACING.contentTopMargin, // Adjusted margin to compensate for extra button height plus content top margin
+    marginTop: SPACING.md, // Match other pages' content padding (16px) for consistent 24px total spacing
+    marginBottom: SPACING.xxxl + SPACING.contentTopMargin, // Match library.tsx spacing between buttons and content
   },
   toolbarButton: {
     height: 24, // Match library.tsx button height
     backgroundColor: 'transparent',
+    marginBottom: SPACING.sm, // Add spacing between buttons like library.tsx
   },
   deleteButton: {
     width: '45%', // Smaller width for DELETE FOLDER button
     alignSelf: 'flex-start', // Left align the button
+    marginBottom: 0, // Remove bottom margin for last button
   },
 
   toolbarButtonContent: {
@@ -1162,9 +1162,9 @@ const styles = StyleSheet.create({
   },
   toolbarButtonText: {
     fontFamily: 'Inter',
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '400', // Non-bold variant to match library.tsx
-    lineHeight: 22,
+    lineHeight: 28,
     color: COLORS.textDark,
     flex: 1,
     textAlign: 'left', // Ensure left alignment
@@ -1213,13 +1213,13 @@ const styles = StyleSheet.create({
     fontSize: FONT.size.body,
     color: COLORS.textDark,
     lineHeight: 19,
+    marginBottom: SPACING.xs,
   },
   servingsText: {
     ...bodyText,
     fontSize: FONT.size.caption,
     color: COLORS.textMuted,
     fontWeight: '400',
-    marginTop: SPACING.xs,
   },
   selectionIndicator: {
     marginRight: SPACING.md,
@@ -1272,11 +1272,11 @@ const styles = StyleSheet.create({
     marginLeft: '5%', // Offset to account for 90% width
     paddingLeft: 0, // Remove left padding for true left alignment
     paddingRight: 18, // Keep some right padding like toolbar buttons
-    height: 64, // Adjusted for 20px buttons (20*3 + spacing = ~64px)
+    height: 80, // Adjusted for 24px buttons (24*3 + spacing = ~80px)
     justifyContent: 'space-between', // Distribute space evenly like toolbar
   },
   primaryActionButton: {
-    height: 20, // Reduced from 24px for more compact appearance
+    height: 24, // Match toolbar button height for consistency
     backgroundColor: 'transparent',
     flexDirection: 'row',
     alignItems: 'center',
@@ -1311,7 +1311,7 @@ const styles = StyleSheet.create({
     textAlign: 'left', // Match SEARCH/SELECT left alignment
   },
   dangerOutlineButton: {
-    height: 20, // Reduced from 24px for more compact appearance
+    height: 24, // Match toolbar button height for consistency
     backgroundColor: 'transparent',
     flexDirection: 'row',
     alignItems: 'center',

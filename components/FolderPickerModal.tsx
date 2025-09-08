@@ -13,7 +13,7 @@ import {
   TextInput,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS } from '@/constants/theme';
+import { COLORS, SPACING, RADIUS, SHADOWS } from '@/constants/theme';
 import { bodyStrongText, bodyText, captionText, FONT, screenTitleText } from '@/constants/typography';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/context/AuthContext';
@@ -199,24 +199,27 @@ export default function FolderPickerModal({
     }
   }, [visible, session?.user?.id]);
 
-  const renderFolderItem = ({ item }: { item: SavedFolder }) => (
+  const renderFolderItem = ({ item, index }: { item: SavedFolder; index: number }) => (
     <TouchableOpacity
-      style={styles.folderItem}
+      style={[
+        styles.folderRow,
+        { backgroundColor: 'transparent' },
+        index === 0 && { marginTop: 8 }, // Add top margin to first folder
+        index === 0 && { borderTopWidth: 1, borderTopColor: '#000000' } // Add top border to first folder
+      ]}
       onPress={() => onSelectFolder(item.id)}
       disabled={isLoading}
     >
-      <View style={styles.folderIcon}>
-        <MaterialCommunityIcons
-          name="folder"
-          size={20}
-          color={item.color || COLORS.primary}
-        />
-      </View>
-      <View style={styles.folderInfo}>
-        <Text style={styles.folderName}>{item.name}</Text>
-        <Text style={styles.folderCount}>
-          {item.recipe_count} recipe{item.recipe_count !== 1 ? 's' : ''}
+      <View style={styles.folderRowContent}>
+        <Text
+          style={styles.folderRowName}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+          maxFontSizeMultiplier={1.2}
+        >
+          {item.name.replace(/\b\w/g, (l) => l.toUpperCase())}
         </Text>
+        <Text style={styles.chevronText}>›</Text>
       </View>
       {isLoading && (
         <ActivityIndicator size="small" color={COLORS.primary} />
@@ -272,7 +275,7 @@ export default function FolderPickerModal({
     return (
       <FlatList
         data={folders}
-        renderItem={renderFolderItem}
+        renderItem={({ item, index }) => renderFolderItem({ item, index })}
         keyExtractor={(item) => item.id.toString()}
         style={styles.foldersList}
         showsVerticalScrollIndicator={false}
@@ -386,11 +389,13 @@ export default function FolderPickerModal({
           {mode === 'select' && (
             <>
               <TouchableOpacity
-                style={styles.addFolderButton}
+                style={styles.addFolderRow}
                 onPress={handleShowCreateMode}
                 disabled={isLoading}
               >
-                <Text style={styles.addFolderText}>Add new folder</Text>
+                <View style={styles.searchToolbarContent}>
+                  <Text style={styles.headerText}>Add New Folder</Text>
+                </View>
               </TouchableOpacity>
 
               {/* Start Cooking Button - only show when option is enabled */}
@@ -451,7 +456,8 @@ const styles = StyleSheet.create({
     fontSize: FONT.size.xl,
     color: COLORS.textDark,
     flex: 1,
-    textAlign: 'center',
+    textAlign: 'left', // Changed from center to left
+    paddingLeft: '5%', // Added left padding to match folder indentation
   } as TextStyle,
   closeButton: {
     padding: SPACING.xs,
@@ -514,54 +520,67 @@ const styles = StyleSheet.create({
     flexGrow: 0,
     maxHeight: 300,
   } as ViewStyle,
-  folderItem: {
+  // Folder row styles matching library.tsx
+  folderRow: {
+    height: 64,
+    borderBottomWidth: 1,
+    borderBottomColor: '#000000',
+    width: '90%',
+    alignSelf: 'flex-start', // Left align to screen edge
+    marginLeft: '5%', // Offset to account for 90% width
+  },
+  folderRowContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.sm,
-    backgroundColor: COLORS.background,
-    borderRadius: RADIUS.sm,
-    marginBottom: SPACING.sm,
-    borderWidth: 1,
-    borderColor: COLORS.lightGray,
-  } as ViewStyle,
-  folderIcon: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: SPACING.md,
-  } as ViewStyle,
-  folderInfo: {
-    flex: 1,
-  } as ViewStyle,
-  folderName: {
-    ...bodyStrongText,
+    justifyContent: 'flex-end', // Right-align chevron
+    height: '100%',
+    paddingLeft: 0, // Remove left padding for true left alignment
+    paddingRight: 0, // Remove padding to push chevron to right edge
+  },
+  folderRowName: {
+    fontFamily: 'GraphikMedium',
+    fontSize: 24, // Reduced by 4px for smaller text
+    fontWeight: '600',
+    lineHeight: 28, // Adjusted lineHeight to match
     color: COLORS.textDark,
-  } as TextStyle,
-  folderCount: {
-    ...captionText,
+    position: 'absolute',
+    left: 0,
+    top: 18, // Position to balance spacing above and below text
+    textAlign: 'left', // Ensure left alignment
+  },
+  chevronText: {
+    fontSize: 20,
     color: COLORS.textMuted,
-    marginTop: 2,
-  } as TextStyle,
-  addFolderButton: {
+    fontWeight: '400',
+  },
+  // Add new folder styles matching library.tsx
+  addFolderRow: {
+    height: 24,
+    width: '90%',
+    alignSelf: 'flex-start', // Left align to screen edge
+    marginLeft: '5%', // Offset to account for 90% width
+    marginTop: SPACING.xl, // Increased top margin for more space
+    marginBottom: SPACING.lg, // Reduced bottom margin for lower positioning
+    paddingLeft: SPACING.lg, // Add padding to match content container padding
+  },
+  searchToolbarContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    backgroundColor: 'transparent',
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-    marginHorizontal: SPACING.lg,
-    marginTop: SPACING.sm,
-    marginBottom: SPACING.xs,
-  } as ViewStyle,
-  addFolderText: {
-    ...bodyStrongText,
-    color: COLORS.primary,
-  } as TextStyle,
+    height: '100%',
+    paddingLeft: 0, // Remove left padding for true left alignment
+    paddingRight: 18, // Keep some right padding
+  },
+  headerText: {
+    fontFamily: 'Inter',
+    fontSize: 22,
+    fontWeight: '400', // Non-bold variant
+    lineHeight: 28,
+    color: COLORS.textDark,
+    position: 'absolute',
+    left: 0,
+    top: 0, // Position at top since container height is 24px
+    textAlign: 'left', // Ensure left alignment
+  },
   startCookingButton: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1156,7 +1156,7 @@ export default function MiseScreen() {
       >
         <View style={styles.cardContent}>
           <View style={styles.cardTextContainer}>
-            <Text style={styles.cardTitle} numberOfLines={1} ellipsizeMode="tail">
+            <Text style={styles.cardTitle} numberOfLines={2} ellipsizeMode="tail">
               {displayTitle}
             </Text>
             {(() => {
@@ -1206,7 +1206,7 @@ export default function MiseScreen() {
         <View style={styles.groceryItemCheckbox}>
           <MaterialCommunityIcons
             name={groceryItem.checked ? "circle" : "circle-outline"}
-            size={24}
+            size={20}
             color={groceryItem.checked ? COLORS.textDark : COLORS.textMuted}
           />
         </View>
@@ -1218,18 +1218,12 @@ export default function MiseScreen() {
               groceryItem.checked && styles.groceryItemChecked
             ]}
           >
-            {groceryItem.name.toLowerCase()}
-          </Text>
-          <Text
-            style={[
-              styles.groceryItemSubtext,
-              groceryItem.checked && styles.groceryItemChecked
-            ]}
-          >
             {(() => {
+              const ingredientName = groceryItem.name.toLowerCase();
+
               // Manual items: show a consistent subtext
               if (groceryItem.isManual) {
-                return '(manually added)';
+                return `${ingredientName} (manually added)`;
               }
 
               const amountText = groceryItem.amount ? formatAmountForGroceryDisplay(groceryItem.amount) : '';
@@ -1243,18 +1237,18 @@ export default function MiseScreen() {
               const preparationPart = groceryItem.preparation || '';
 
               // Combine with proper comma handling
-              let subtext = '';
+              let combinedText = ingredientName;
               if (amountPart && preparationPart) {
-                subtext = `${amountPart}, ${preparationPart}`;
+                combinedText = `${ingredientName} - ${amountPart}, ${preparationPart}`;
               } else if (amountPart) {
-                subtext = amountPart;
+                combinedText = `${ingredientName} - ${amountPart}`;
               } else if (preparationPart) {
-                subtext = preparationPart;
+                combinedText = `${ingredientName} - ${preparationPart}`;
               } else if (asNeededText) {
-                subtext = asNeededText;
+                combinedText = `${ingredientName} - ${asNeededText}`;
               }
 
-              return subtext;
+              return combinedText;
             })()}
           </Text>
         </View>
@@ -1293,11 +1287,11 @@ export default function MiseScreen() {
             <View style={styles.groceryItemCheckbox}>
               <MaterialCommunityIcons
                 name="circle-outline"
-                size={24}
+                size={20}
                 color={COLORS.textMuted}
               />
             </View>
-            <View style={[styles.groceryItemTextContainer, { flexDirection: 'row', alignItems: 'center' }] }>
+            <View style={[styles.groceryItemTextContainer, { flexDirection: 'row', alignItems: 'flex-start' }] }>
               <TextInput
                 style={[styles.inlineTextInput, inlineAddText.length > 0 && styles.inlineTextInputTyped]}
                 value={inlineAddText}
@@ -1409,18 +1403,18 @@ export default function MiseScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.miseToolbarButton}
+            style={[styles.miseToolbarButton, styles.miseToolbarButtonLast]}
             onPress={handleOpenStaplesModal}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Text style={styles.miseToolbarButtonText}>Pantry</Text>
+            <Text style={styles.miseToolbarButtonText}>Edit Pantry</Text>
           </TouchableOpacity>
         </View>
 
         {/* Menu Section */}
-        <View style={styles.sectionContainer}>
+        <View style={styles.menuSectionContainer}>
           <View style={styles.sectionHeaderWithControls}>
-            <Text style={styles.sectionTitle}>MENU</Text>
+            <Text style={styles.sectionTitle}>Menu</Text>
           </View>
           <View style={styles.sectionDivider} />
           {miseRecipes.length === 0 ? (
@@ -1454,7 +1448,7 @@ export default function MiseScreen() {
         {/* Groceries Section */}
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeaderWithControls}>
-            <Text style={styles.sectionTitle}>GROCERIES</Text>
+            <Text style={styles.sectionTitle}>Groceries</Text>
           </View>
           <View style={styles.sectionDivider} />
           
@@ -1512,7 +1506,7 @@ export default function MiseScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-        <ScreenHeader title="PREP STATION" showBack={false} />
+        <ScreenHeader title="PREP & COOK" showBack={false} backgroundColor="#DEF6FF" />
       
 
 
@@ -1591,16 +1585,21 @@ const styles = StyleSheet.create({
   // Combined content styles
   combinedContent: {
     flex: 1,
+    paddingTop: SPACING.md, // Match library.tsx savedContent padding for consistent spacing
   },
   sectionContainer: {
     marginBottom: SPACING.lg,
+  },
+  menuSectionContainer: {
+    marginBottom: SPACING.lg,
+    paddingBottom: 18, // Add extra 10px padding under Menu section
   },
   sectionDivider: {
     width: '90%',
     alignSelf: 'flex-start',
     marginLeft: '5%',
     borderBottomWidth: 1,
-    borderBottomColor: '#000000',
+    borderBottomColor: 'transparent', // Make border invisible but keep spacing
     marginBottom: 18,
   },
   sectionTitle: {
@@ -1668,23 +1667,28 @@ const styles = StyleSheet.create({
   miseToolbarContainer: {
     flexDirection: 'column', // Stack vertically
     justifyContent: 'space-between', // Distribute space between buttons
-    height: 72, // Fixed height for three buttons
+    height: 92, // Adjusted for spacing between buttons (24+8+24+8+28)
     backgroundColor: 'transparent',
     width: '90%',
     alignSelf: 'flex-start', // Left align to screen edge
     marginLeft: '5%', // Offset to account for 90% width
-    marginTop: 8, // Small top margin to match library.tsx SEARCH positioning
+    marginTop: SPACING.sm, // Match library.tsx SEARCH positioning
     marginBottom: SPACING.xxxl, // Add bottom margin to match library.tsx
   },
   miseToolbarButton: {
     height: 24, // Match library.tsx button height
     backgroundColor: 'transparent',
+    marginBottom: SPACING.sm, // Add spacing between buttons like library.tsx
+  },
+  miseToolbarButtonLast: {
+    height: 28, // Make the last button slightly taller for more breathing room
+    marginBottom: 0, // Remove bottom margin for last button
   },
   miseToolbarButtonText: {
     fontFamily: 'Inter',
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '400', // Non-bold variant to match library.tsx
-    lineHeight: 22,
+    lineHeight: 28,
     color: COLORS.textDark,
     flex: 1,
     textAlign: 'left', // Ensure left alignment
@@ -1814,16 +1818,15 @@ const styles = StyleSheet.create({
   cardContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    height: '100%',
+    justifyContent: 'flex-end', // Right-align content like chevrons
     paddingLeft: 0, // Remove left padding for true left alignment
-    paddingRight: 18, // Keep some right padding
+    paddingRight: 0, // Remove padding to push content to right edge
   } as ViewStyle,
   trashIcon: {
     position: 'absolute',
-    bottom: 4,
-    right: 8,
-    padding: 4,
+    top: 4, // Align with top of card content
+    right: 0, // Push to right edge
+    padding: 0, // No padding around the X
   } as ViewStyle,
   deleteIcon: {
     ...bodyStrongText,
@@ -1832,7 +1835,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   } as TextStyle,
   cardWithMinHeight: {
-    height: 64,
+    minHeight: 64, // Allow dynamic height for multi-line titles but maintain minimum
   } as ViewStyle,
   cardImage: {
     width: SPACING.xxl + 8,
@@ -1842,6 +1845,8 @@ const styles = StyleSheet.create({
   },
   cardTextContainer: {
     flex: 1,
+    paddingVertical: SPACING.sm, // Add vertical padding to match the fixed height spacing
+    justifyContent: 'center', // Center content vertically
   } as ViewStyle,
   cardTitle: {
     ...bodyText,
@@ -1872,18 +1877,19 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   groceryCategoryHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-between', // Keep title left, "+" button right
     alignItems: 'center',
     marginBottom: 2, // Minimal spacing to sit on top of first row
     width: '90%',
     alignSelf: 'flex-start', // Left align to screen edge
     marginLeft: '5%', // Offset to account for 90% width
+    paddingRight: 0, // Remove right padding to push "+" to right edge
     borderBottomWidth: 1,
     borderBottomColor: '#000000',
   } as ViewStyle,
   groceryCategoryTitle: {
     fontFamily: FONT.family.graphikMedium,
-    fontSize: FONT.size.body,
+    fontSize: 20, // Slightly larger for better readability
     fontWeight: '600',
     lineHeight: FONT.lineHeight.normal,
     color: COLORS.textDark,
@@ -1891,16 +1897,16 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   } as TextStyle,
   addButton: {
-    padding: SPACING.xs,
+    padding: 0, // Remove padding to push button to right edge
     borderRadius: RADIUS.sm,
   } as ViewStyle,
   groceryItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: SPACING.md, // Increased padding for even spacing
+    paddingVertical: SPACING.sm, // Reduced padding to make rows smaller
     backgroundColor: 'transparent',
-    borderBottomWidth: 1,
-    borderBottomColor: '#000000',
+    borderTopWidth: 1,
+    borderTopColor: 'transparent',
     width: '90%',
     alignSelf: 'flex-start', // Left align to screen edge
     marginLeft: '5%', // Offset to account for 90% width
@@ -1908,7 +1914,7 @@ const styles = StyleSheet.create({
 
   groceryItemCheckbox: {
     marginRight: SPACING.sm,
-    alignSelf: 'center',
+    alignSelf: 'flex-start',
   } as ViewStyle,
 
   groceryItemTextContainer: {
@@ -1919,11 +1925,15 @@ const styles = StyleSheet.create({
     ...bodyText,
     fontSize: FONT.size.body,
     color: COLORS.textDark,
+    lineHeight: 19, // Match recipe title lineHeight
   } as TextStyle,
   groceryItemSubtext: {
-    ...metaText,
+    ...bodyText, // Match recipe subtext base styles
+    fontSize: FONT.size.caption, // Match recipe subtext fontSize
     color: COLORS.textMuted,
-    marginTop: 4,
+    fontWeight: '400', // Match recipe subtext fontWeight
+    marginTop: SPACING.xs, // Match recipe subtext marginTop
+    textAlign: 'left', // Match recipe subtext textAlign
   } as TextStyle,
   groceryItemPreparation: {
     ...bodyText,
@@ -1937,29 +1947,27 @@ const styles = StyleSheet.create({
     color: COLORS.darkGray,
   } as TextStyle,
   deleteManualButton: {
-    padding: SPACING.xs,
+    padding: 0, 
     marginLeft: SPACING.xs,
   } as ViewStyle,
   inlineTextInput: {
     flex: 1,
     fontFamily: FONT.family.body,
     fontSize: FONT.size.body,
-    lineHeight: 22, // iOS optical alignment for Inter 16
-    height: 28, // match checkbox size for vertical alignment
+    lineHeight: 19, 
     borderWidth: 0,
     borderColor: 'transparent',
     borderRadius: 0,
-    paddingTop: 2,
+    paddingTop: 0,
     paddingBottom: 0,
     paddingHorizontal: 0,
     color: COLORS.textDark,
     backgroundColor: 'transparent',
-    textAlignVertical: 'center' as any,
+    textAlignVertical: 'top' as any, // Align to top like regular text
   } as TextStyle,
-  // Nudge baseline by 1px only once text is present to eliminate the tiny perceived droop
+  // Style applied when text is present in inline input
   inlineTextInputTyped: {
     paddingTop: 0,
-    transform: [{ translateY: -1 }],
   } as TextStyle,
   inlineIconButton: {
     padding: SPACING.xs,

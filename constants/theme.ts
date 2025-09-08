@@ -57,6 +57,7 @@ export const SPACING = {
   xxxl: 48,
   xxxlAlt: 35,
   contentTopMargin: 48, // Additional top margin for content sections
+  subheadingMargin: 96, // Consistent margin from subheading to content start
   footerHeight: 80,
 };
 

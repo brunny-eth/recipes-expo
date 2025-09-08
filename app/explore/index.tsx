@@ -121,31 +121,39 @@ export default function ExploreScreen() {
       >
         <View style={{ flex: 1 }}>
           <View style={styles.customHeader}>
-          <Text style={styles.customHeaderTitle}>EXPLORE RECIPES</Text>
+          <Text style={styles.customHeaderTitle}>DISCOVER</Text>
         </View>
-        {isLoading ? (
-          <ActivityIndicator style={styles.centered} size="large" color="#000000" />
-        ) : error ? (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={() => fetchFromAPI(false)}>
-              <Text style={styles.retryButtonText}>Try Again</Text>
-            </TouchableOpacity>
+        
+        <View style={styles.sectionsContainer}>
+          {/* Subheading matching import.tsx structure */}
+          <View style={styles.pageHeaderContainer}>
+            <Text style={styles.pageHeader}>Browse our curated collection of recipes and find your next favorite dish to customize.</Text>
           </View>
-        ) : (
-          <FlatList
-            data={recipes}
-            renderItem={renderItem}
-            keyExtractor={(item) => String(item.id)}
-            contentContainerStyle={styles.listContent}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#000000"]} tintColor="#000000" />}
-            initialNumToRender={10}
-            windowSize={21}
-            maxToRenderPerBatch={10}
-            updateCellsBatchingPeriod={50}
-            removeClippedSubviews
-          />
-        )}
+          
+          {isLoading ? (
+            <ActivityIndicator style={styles.centered} size="large" color="#000000" />
+          ) : error ? (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{error}</Text>
+              <TouchableOpacity style={styles.retryButton} onPress={() => fetchFromAPI(false)}>
+                <Text style={styles.retryButtonText}>Try Again</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <FlatList
+              data={recipes}
+              renderItem={renderItem}
+              keyExtractor={(item) => String(item.id)}
+              contentContainerStyle={styles.listContent}
+              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#000000"]} tintColor="#000000" />}
+              initialNumToRender={10}
+              windowSize={21}
+              maxToRenderPerBatch={10}
+              updateCellsBatchingPeriod={50}
+              removeClippedSubviews
+            />
+          )}
+        </View>
         </View>
       </PanGestureHandler>
     </View>
@@ -164,18 +172,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.pageHorizontal,
   },
   listContent: {
-    paddingTop: SPACING.sm,
+    paddingTop: 0, // Reduced since we now have subheading spacing
     paddingHorizontal: SPACING.pageHorizontal,
+    paddingBottom: 225, // Add bottom padding to prevent tab bar overlap
   },
   errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: SPACING.pageHorizontal },
   errorText: { ...bodyText, color: COLORS.error, textAlign: 'center', marginBottom: SPACING.lg },
   retryButton: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#000000', paddingVertical: 12, paddingHorizontal: 24, borderRadius: RADIUS.sm },
   retryButtonText: { ...bodyStrongText, color: '#000000' },
   exploreCard: { flexDirection: 'row', backgroundColor: 'transparent', marginBottom: SPACING.md, height: 120, overflow: 'hidden' },
-  imageContainer: { width: '40%', height: '100%', overflow: 'hidden' },
-  exploreCardImage: { width: '100%', height: '100%' },
-  titleContainer: { width: '60%', height: '100%', paddingLeft: SPACING.md, paddingRight: SPACING.sm, justifyContent: 'center', backgroundColor: 'transparent' },
-  exploreCardTitle: { color: COLORS.textDark, ...bodyText, fontSize: FONT.size.body, lineHeight: FONT.lineHeight.normal },
+  imageContainer: { width: '50%', height: '100%', overflow: 'hidden' }, // Increased from 40% to 50%
+  exploreCardImage: { width: '100%', height: '100%', borderRadius: 8 }, // Added border radius for rectangular look
+  titleContainer: { width: '50%', height: '100%', paddingLeft: SPACING.md, paddingRight: SPACING.sm, justifyContent: 'flex-start', alignItems: 'flex-start', paddingTop: 0, backgroundColor: 'transparent' }, // Changed width to 50%, aligned to top-left
+  exploreCardTitle: { color: COLORS.textDark, ...bodyText, fontSize: FONT.size.body, lineHeight: FONT.lineHeight.normal, textAlign: 'left' }, // Added left text alignment
   customHeader: {
     paddingHorizontal: 0,
     paddingBottom: 0,
@@ -188,7 +197,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#000000',
     borderBottomWidth: 1,
     borderBottomColor: '#000000',
-    backgroundColor: COLORS.background,
+    backgroundColor: '#DEF6FF', // Add light blue background to match other headers
   },
   customHeaderTitle: {
     ...screenTitleText,
@@ -197,6 +206,25 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase' as const,
     fontSize: 28,
     paddingLeft: SPACING.pageHorizontal,
+  },
+  pageHeaderContainer: {
+    alignItems: 'flex-start',
+    paddingHorizontal: SPACING.pageHorizontal,
+    marginTop: SPACING.sm, // Reduced from SPACING.xl to bring it closer to header
+    marginBottom: SPACING.subheadingMargin - SPACING.md, // Use consistent subheading margin minus sectionsContainer paddingTop
+  },
+  pageHeader: {
+    fontFamily: 'Inter',
+    fontSize: 22,
+    fontWeight: '400',
+    lineHeight: 28,
+    color: COLORS.textDark,
+    textAlign: 'left',
+  },
+  sectionsContainer: {
+    gap: 0,
+    flexGrow: 1,
+    paddingTop: SPACING.md, // Add the same padding as import.tsx scrollContent
   },
 });
 

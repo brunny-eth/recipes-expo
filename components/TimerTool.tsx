@@ -211,18 +211,15 @@ export default function TimerTool({
                 <MaterialCommunityIcons
                   name={timer.isActive ? "pause" : "play"}
                   size={20}
-                  color={COLORS.primary}
+                  color={COLORS.textMuted}
+                  style={{ opacity: 0.6 }}
                 />
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.controlButton} 
+              <TouchableOpacity
+                style={styles.controlButton}
                 onPress={() => handleDeleteTimer(timer.id)}
               >
-                <MaterialCommunityIcons
-                  name="delete"
-                  size={20}
-                  color={COLORS.error || '#ff4444'}
-                />
+                <Text style={[styles.deleteIcon, { opacity: 0.6 }]}>×</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -237,7 +234,8 @@ export default function TimerTool({
             <MaterialCommunityIcons
               name="plus"
               size={20}
-              color={COLORS.primary}
+              color={COLORS.textMuted}
+              style={{ opacity: 0.6 }}
             />
             <Text style={styles.addTimerButtonText}>Add New Timer</Text>
           </TouchableOpacity>
@@ -365,22 +363,21 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
   },
   wheelItemTextSelected: {
-    color: COLORS.primary,
+    color: COLORS.textDark,
     fontWeight: '600',
   },
   startButton: {
-    backgroundColor: COLORS.primary,
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.xl,
     borderRadius: RADIUS.pill,
     minWidth: 120,
   },
   startButtonDisabled: {
-    backgroundColor: COLORS.lightGray,
+    opacity: 0.5,
   },
   startButtonText: {
     ...bodyStrongText,
-    color: COLORS.white,
+    color: COLORS.textDark,
     textAlign: 'center',
     fontSize: 16,
   },
@@ -404,13 +401,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.md,
-    marginBottom: SPACING.sm,
+    backgroundColor: COLORS.background,
+    borderRadius: RADIUS.sm,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.sm,
+    marginBottom: 4,
     borderWidth: 1,
-    borderColor: COLORS.lightGray,
+    borderColor: '#000000',
+    ...SHADOWS.small,
   },
   timerInfo: {
     flex: 1,
@@ -432,10 +430,19 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
   },
   controlButton: {
-    backgroundColor: COLORS.white,
-    padding: SPACING.xs,
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: RADIUS.sm,
-    ...SHADOWS.small,
+  },
+  deleteIcon: {
+    fontFamily: FONT.family.graphikMedium,
+    fontSize: FONT.size.body,
+    fontWeight: '600',
+    lineHeight: FONT.lineHeight.normal,
+    color: COLORS.textMuted,
+    textAlign: 'center',
   },
 
   // Add Timer Button
@@ -443,9 +450,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.surface,
-    borderWidth: BORDER_WIDTH.default,
-    borderColor: COLORS.primary,
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: '#000000',
     borderStyle: 'dashed',
     borderRadius: RADIUS.md,
     paddingVertical: SPACING.lg,
@@ -455,7 +462,7 @@ const styles = StyleSheet.create({
   },
   addTimerButtonText: {
     ...bodyText,
-    color: COLORS.primary,
+    color: COLORS.textDark,
   },
 
   // Limit Reached Styles
