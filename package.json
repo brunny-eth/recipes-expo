@@ -114,5 +114,8 @@
     "metro-react-native-babel-transformer": "^0.77.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
+  },
+  "overrides": {
+    "simple-swizzle": "0.2.2"
   }
 }

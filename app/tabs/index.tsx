@@ -206,9 +206,9 @@ const styles = StyleSheet.create({
   },
   taglineText: {
     fontFamily: 'Inter',
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '400',
-    lineHeight: 28,
+    lineHeight: 24,
     color: COLORS.textDark,
     textAlign: 'left',
     marginBottom: 0,
@@ -221,9 +221,9 @@ const styles = StyleSheet.create({
   },
   taglineBold: {
     fontFamily: 'Inter',
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
-    lineHeight: 28,
+    lineHeight: 24,
     color: COLORS.textDark,
   },
   taglineBullet: {

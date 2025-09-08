@@ -229,13 +229,13 @@ export default function AccountScreen() {
           <View style={styles.legalSection}>
             <TouchableOpacity
               style={styles.legalLink}
-              onPress={() => Linking.openURL('https://meez.app/privacy.html')}
+              onPress={() => Linking.openURL('https://cookolea.com/privacy.html')}
             >
               <Text style={styles.legalLinkText}>Privacy Policy</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.legalLink}
-              onPress={() => Linking.openURL('https://meez.app/tos.html')}
+              onPress={() => Linking.openURL('https://cookolea.com/tos.html')}
             >
               <Text style={styles.legalLinkText}>Terms of Service</Text>
             </TouchableOpacity>

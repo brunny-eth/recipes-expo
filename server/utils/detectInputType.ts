@@ -210,22 +210,34 @@ export function detectInputType(input: string): InputType {
       // A simple, yet effective, check for a valid domain:
       // - It must contain at least one dot in the hostname (e.g., example.com)
       // - All parts separated by dots must have some length (e.g., not 'a..b')
+      // - It must have either a path (after /) or query parameters (after ?)
       // This helps filter out hostnames like 'invalid' or 'localhost' from being treated as remote URLs.
       if (urlObj.hostname.includes('.') && urlObj.hostname.split('.').every(part => part.length > 0)) {
+          // Additional validation: must have a path or query parameters
+          const hasPath = urlObj.pathname && urlObj.pathname.length > 1; // More than just "/"
+          const hasQuery = urlObj.search && urlObj.search.length > 0; // Has query parameters
+          const hasFragment = urlObj.hash && urlObj.hash.length > 0; // Has fragment
+
+          if (!hasPath && !hasQuery && !hasFragment) {
+              console.log(`[detectInputType] URL "${input}" has valid domain but no path/query/fragment. Classifying as 'invalid' for URL mode.`);
+              console.log(`[detectInputType] Classification result: 'invalid' for input: '${input}' (bare domain without path)`);
+              return 'invalid';
+          }
+
           // Check if this is a video URL from supported platforms
           const videoPatterns = [
             /^(www\.)?(youtube\.com|youtu\.be)/i,
             /^(www\.)?(instagram\.com)/i,
             /^(www\.)?(tiktok\.com)/i
           ];
-          
+
           const isVideoUrl = videoPatterns.some(pattern => pattern.test(urlObj.hostname));
-          
+
           if (isVideoUrl) {
               console.log(`[detectInputType] Classification result: 'video' for input: '${input}' (video URL detected)`);
               return 'video';
           } else {
-              console.log(`[detectInputType] Classification result: 'url' for input: '${input}' (valid URL with proper domain)`);
+              console.log(`[detectInputType] Classification result: 'url' for input: '${input}' (valid URL with proper domain and path)`);
               return 'url';
           }
       } else {

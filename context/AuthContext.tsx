@@ -409,26 +409,58 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           // Identify user in PostHog
           maybeIdentifyUserRef.current(session.user);
           
-          // Check if user is new and update metadata accordingly
+          // For Apple login, the metadata might already be updated by the signIn function
+          // For Google login, we need to update it here
+          let updatedMetadata = session.user.user_metadata as UserMetadata;
           const isNew = !session.user.user_metadata?.first_login_at;
+
           if (isNew) {
             logger.info('New user detected, updating metadata', { userId: session.user.id });
-            const { error: metadataError } = await supabase.auth.updateUser({
-              data: { 
-                first_login_at: new Date().toISOString(),
-              },
-            });
-            
-            if (metadataError) {
-              logger.error('Error updating new user metadata', { 
-                userId: session.user.id, 
-                error: metadataError.message 
+
+            // For Apple login, check if metadata was already updated by the signIn function
+            if (session.user.app_metadata?.provider === 'apple') {
+              // Give Apple login flow a moment to complete metadata update
+              await new Promise(resolve => setTimeout(resolve, 200));
+
+              // Refresh user data to get latest metadata
+              const { data: refreshedUser } = await supabase.auth.getUser();
+              if (refreshedUser.user?.user_metadata?.first_login_at) {
+                updatedMetadata = refreshedUser.user.user_metadata as UserMetadata;
+                logger.info('Apple user metadata already updated by signIn flow', { userId: session.user.id });
+              } else {
+                // Fallback: update metadata if it wasn't set
+                const { error: metadataError } = await supabase.auth.updateUser({
+                  data: { first_login_at: new Date().toISOString() },
+                });
+                if (!metadataError) {
+                  updatedMetadata = {
+                    ...session.user.user_metadata,
+                    first_login_at: new Date().toISOString(),
+                  } as UserMetadata;
+                }
+              }
+            } else {
+              // For Google and other providers, update metadata normally
+              const { error: metadataError } = await supabase.auth.updateUser({
+                data: { first_login_at: new Date().toISOString() },
               });
+
+              if (metadataError) {
+                logger.error('Error updating new user metadata', {
+                  userId: session.user.id,
+                  error: metadataError.message
+                });
+              } else {
+                updatedMetadata = {
+                  ...session.user.user_metadata,
+                  first_login_at: new Date().toISOString(),
+                } as UserMetadata;
+              }
             }
           }
-          
-          // Emit navigation event
-          emitNavigationEvent({ type: 'SIGNED_IN', userId: session.user.id, userMetadata: session.user.user_metadata as UserMetadata });
+
+          // Emit navigation event with the correct metadata
+          emitNavigationEvent({ type: 'SIGNED_IN', userId: session.user.id, userMetadata: updatedMetadata });
         } else if (event === 'SIGNED_OUT') {
           logger.info('User signed out', { userId: session?.user?.id || 'unknown' });
           setSession(null);
@@ -538,7 +570,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
             throw error;
           }
 
-          if (data?.user && (email || fullName)) {
+          if (data?.user) {
             const fullNameStr = fullName
               ? [fullName.givenName, fullName.familyName]
                   .filter(Boolean)
@@ -549,8 +581,14 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
             if (email) metadataUpdate.email = email;
             if (fullNameStr) metadataUpdate.full_name = fullNameStr;
 
+            // Check if user is new (no first_login_at in metadata) and add it
+            if (!data.user.user_metadata?.first_login_at) {
+              metadataUpdate.first_login_at = new Date().toISOString();
+              logger.info('New Apple user detected, setting first_login_at', { userId: data.user.id });
+            }
+
             if (Object.keys(metadataUpdate).length > 0) {
-              logger.info('Updating user metadata with Apple-provided values', { 
+              logger.info('Updating user metadata with Apple-provided values', {
                 userId: data.user.id,
                 metadataKeys: Object.keys(metadataUpdate)
               });
@@ -558,9 +596,9 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
                 data: metadataUpdate,
               });
               if (metadataError) {
-                logger.error('Apple Sign-In Error: Failed to update user metadata', { 
+                logger.error('Apple Sign-In Error: Failed to update user metadata', {
                   userId: data.user.id,
-                  error: metadataError.message 
+                  error: metadataError.message
                 });
               }
             }

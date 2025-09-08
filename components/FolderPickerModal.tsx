@@ -547,6 +547,7 @@ const styles = StyleSheet.create({
     left: 0,
     top: 18, // Position to balance spacing above and below text
     textAlign: 'left', // Ensure left alignment
+    maxWidth: '85%', // Prevent overflow into chevron area
   },
   chevronText: {
     fontSize: 20,
@@ -559,8 +560,8 @@ const styles = StyleSheet.create({
     width: '90%',
     alignSelf: 'flex-start', // Left align to screen edge
     marginLeft: '5%', // Offset to account for 90% width
-    marginTop: SPACING.xl, // Increased top margin for more space
-    marginBottom: SPACING.lg, // Reduced bottom margin for lower positioning
+    marginTop: SPACING.xxl, // Increased top margin for more space
+    marginBottom: SPACING.xxl, // Increased bottom margin for more space
     paddingLeft: SPACING.lg, // Add padding to match content container padding
   },
   searchToolbarContent: {

@@ -930,7 +930,7 @@ export default function MiseScreen() {
       });
 
       // Add footer
-      plainText += '\nMade with help from Meez';
+      plainText += '\nMade with help from Olea';
 
       await Share.share({
         message: plainText,
@@ -1384,6 +1384,9 @@ export default function MiseScreen() {
 
     return (
       <ScrollView style={styles.combinedContent} showsVerticalScrollIndicator={false}>
+        {/* Fixed spacer for consistent top padding */}
+        <View style={{ height: 24 }} />
+
         {/* Action Buttons */}
         <View style={styles.miseToolbarContainer}>
           <TouchableOpacity
@@ -1585,7 +1588,6 @@ const styles = StyleSheet.create({
   // Combined content styles
   combinedContent: {
     flex: 1,
-    paddingTop: SPACING.md, // Match library.tsx savedContent padding for consistent spacing
   },
   sectionContainer: {
     marginBottom: SPACING.lg,
@@ -1667,32 +1669,32 @@ const styles = StyleSheet.create({
   miseToolbarContainer: {
     flexDirection: 'column', // Stack vertically
     justifyContent: 'space-between', // Distribute space between buttons
-    height: 92, // Adjusted for spacing between buttons (24+8+24+8+28)
+    height: 116, // Adjusted for 16px spacing + bottom margin: (28+16+28+16+28) = 116px
     backgroundColor: 'transparent',
     width: '90%',
     alignSelf: 'flex-start', // Left align to screen edge
     marginLeft: '5%', // Offset to account for 90% width
-    marginTop: SPACING.sm, // Match library.tsx SEARCH positioning
     marginBottom: SPACING.xxxl, // Add bottom margin to match library.tsx
   },
   miseToolbarButton: {
-    height: 24, // Match library.tsx button height
+    height: 28, // Increased to 28px for accessibility (28+16 hitSlop = 44px minimum)
     backgroundColor: 'transparent',
-    marginBottom: SPACING.sm, // Add spacing between buttons like library.tsx
+    marginBottom: SPACING.md, // Increased to 16px for consistent spacing across toolbars
   },
   miseToolbarButtonLast: {
     height: 28, // Make the last button slightly taller for more breathing room
-    marginBottom: 0, // Remove bottom margin for last button
+    marginBottom: SPACING.md, // Add 16px bottom margin for breathing room after Edit Pantry
   },
   miseToolbarButtonText: {
     fontFamily: 'Inter',
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '400', // Non-bold variant to match library.tsx
-    lineHeight: 28,
+    lineHeight: 24,
     color: COLORS.textDark,
     flex: 1,
     textAlign: 'left', // Ensure left alignment
-    textTransform: 'none' as const, // Match library.tsx - no uppercase transformation
+    textAlignVertical: 'center',
+    paddingVertical: 0,
   },
   recipeListContainer: {
     // No horizontal padding to keep cards full width

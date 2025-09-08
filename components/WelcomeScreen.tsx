@@ -111,9 +111,9 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   taglineText: {
     fontFamily: 'Inter',
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '400',
-    lineHeight: 28,
+    lineHeight: 24,
     color: COLORS.textDark,
     textAlign: 'left',
     marginBottom: 0,
@@ -123,9 +123,9 @@ const styles = StyleSheet.create({
   } as TextStyle,
   taglineBold: {
     fontFamily: 'Inter',
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
-    lineHeight: 28,
+    lineHeight: 24,
     color: COLORS.textDark,
   } as TextStyle,
   listContainer: {
@@ -138,9 +138,9 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   listText: {
     fontFamily: 'Inter',
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '400',
-    lineHeight: 28,
+    lineHeight: 24,
     color: COLORS.textDark,
     textAlign: 'left',
     marginBottom: SPACING.lg, // Add spacing between list items
@@ -164,7 +164,10 @@ const styles = StyleSheet.create({
     ...SHADOWS.medium,
   } as ViewStyle,
   buttonText: {
-    ...bodyText, // Changed from bodyStrongText to bodyText to remove bold
+    fontFamily: 'Inter',
+    fontSize: 20,
+    fontWeight: '400',
+    lineHeight: 24,
     color: '#000000',
     textAlign: 'left',
   } as TextStyle,

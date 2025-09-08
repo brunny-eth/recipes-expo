@@ -618,12 +618,13 @@ const styles = StyleSheet.create({
   bigCheckmark: {
     fontSize: 72,
     fontWeight: 'bold',
-    color: COLORS.textDark,
+    color: COLORS.black,
   } as TextStyle,
   readyText: {
+    fontFamily: 'Inter',
     fontSize: 20,
-    fontWeight: '600',
-    color: COLORS.textDark,
+    fontWeight: '400',
+    color: COLORS.black,
     marginTop: 12,
   } as TextStyle,
   spinner: {

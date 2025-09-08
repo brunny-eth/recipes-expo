@@ -1174,11 +1174,11 @@ const styles = StyleSheet.create({
   
   // Add new folder styles - now looks like search text
   addFolderRow: {
-    height: 24,
+    height: 32, // Increased for better fit with 20px font
     width: '90%',
     alignSelf: 'flex-start', // Left align to screen edge
     marginLeft: '5%', // Offset to account for 90% width
-    marginTop: SPACING.sm, // Consistent with subheading top margin
+    marginTop: SPACING.md, // Increased to 16px for consistent spacing across toolbars
     marginBottom: SPACING.xxxl + SPACING.contentTopMargin, // Big bottom margin for spacing from folders plus content top margin
   },
   addFolderRowContent: {
@@ -1194,7 +1194,7 @@ const styles = StyleSheet.create({
   // New styles for saved content
   savedContent: {
     flex: 1,
-    paddingTop: SPACING.md, // Match other pages' scroll content padding
+    paddingTop: SPACING.md,
   } as ViewStyle,
 
   // Modal styles
@@ -1265,11 +1265,10 @@ const styles = StyleSheet.create({
    },
   // New styles for search - matches subheading spacing
   searchToolbar: {
-    height: 24, // Just bigger than font size (22px + 2px)
+    height: 32, // Increased for better fit with 20px font
     width: '90%',
     alignSelf: 'flex-start', // Left align to screen edge
     marginLeft: '5%', // Offset to account for 90% width
-    marginTop: SPACING.sm, // Consistent with subheading top margin
   },
 
   searchToolbarContent: {
@@ -1293,9 +1292,9 @@ const styles = StyleSheet.create({
   // Shared text style for search and add folder - matches subheading style
   headerText: {
     fontFamily: 'Inter',
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '400', // Non-bold variant
-    lineHeight: 28,
+    lineHeight: 24,
     color: COLORS.textDark,
     flex: 1,
     textAlign: 'left', // Ensure left alignment

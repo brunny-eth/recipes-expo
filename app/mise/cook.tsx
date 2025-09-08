@@ -42,6 +42,7 @@ import StepItem from '@/components/recipe/StepItem';
 import MiniTimerDisplay from '@/components/MiniTimerDisplay';
 import StepsFooterButtons from '@/components/recipe/StepsFooterButtons';
 import TimerTool, { Timer } from '@/components/TimerTool';
+import RecipeInfoModal from '@/components/RecipeInfoModal';
 
 import { 
   StepCompletionState, 
@@ -111,6 +112,9 @@ export default function CookScreen() {
   const appState = useRef(AppState.currentState);
   const scrollViewRef = useRef<ScrollView>(null);
   const flatListRef = useRef<any>(null);
+
+  // PanGestureHandler ref for modal scroll cooperation
+  const panGestureRef = useRef(null);
 
   // --- Ingredient Tooltip State ---
   const [selectedIngredient, setSelectedIngredient] = useState<StructuredIngredient | null>(null);
@@ -1022,7 +1026,8 @@ export default function CookScreen() {
       <View
         style={[
           styles.stepItemContainer,
-          isActive && styles.stepItemActive
+          isActive && styles.stepItemActive,
+          stepIsCompleted && styles.stepItemCompleted
         ]}
       >
         {/* Top row with drag handle on left and controls on right */}
@@ -1369,7 +1374,7 @@ export default function CookScreen() {
   }
 
   return (
-    <PanGestureHandler onHandlerStateChange={handleSwipeGesture}>
+    <PanGestureHandler ref={panGestureRef} onHandlerStateChange={handleSwipeGesture}>
       <SafeAreaView style={styles.container}>
         {/* Recipe Switcher */}
         <View style={styles.recipeSwitcherContainer}>
@@ -1563,115 +1568,91 @@ export default function CookScreen() {
         )}
 
         {/* Recipe Info Modal */}
-        <Modal
+        <RecipeInfoModal
           visible={isRecipeTipsModalVisible}
-          animationType="fade"
-          transparent={true}
-          onRequestClose={() => setIsRecipeTipsModalVisible(false)}
+          onClose={() => setIsRecipeTipsModalVisible(false)}
+          panGestureRef={panGestureRef}
+          tabs={
+            <View style={styles.tabContainer}>
+              <TouchableOpacity
+                style={[styles.tabButton, activeRecipeInfoTab === 'ingredients' && styles.tabButtonActive]}
+                onPress={() => setActiveRecipeInfoTab('ingredients')}
+              >
+                <Text style={[styles.tabButtonText, activeRecipeInfoTab === 'ingredients' && styles.tabButtonTextActive]}>
+                  Ingredients
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.tabButton, activeRecipeInfoTab === 'tips' && styles.tabButtonActive]}
+                onPress={() => setActiveRecipeInfoTab('tips')}
+              >
+                <Text style={[styles.tabButtonText, activeRecipeInfoTab === 'tips' && styles.tabButtonTextActive]}>
+                  Tips
+                </Text>
+              </TouchableOpacity>
+            </View>
+          }
         >
-          <Pressable
-            style={styles.recipeTipsModalOverlay}
-            onPress={() => setIsRecipeTipsModalVisible(false)}
-          >
-            <Pressable style={styles.recipeTipsModalContent}>
-              {/* Header */}
-              <View style={styles.recipeTipsHeader}>
-                <View style={styles.recipeTipsHeaderContent}>
-                  <Text style={styles.recipeTipsTitle}>Recipe Info</Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.closeButton}
-                  onPress={() => setIsRecipeTipsModalVisible(false)}
-                >
-                  <MaterialCommunityIcons
-                    name="close"
-                    size={24}
-                    color={COLORS.textMuted}
-                  />
-                </TouchableOpacity>
-              </View>
-
-              {/* Tab Navigation */}
-              <View style={styles.tabContainer}>
-                <TouchableOpacity
-                  style={[styles.tabButton, activeRecipeInfoTab === 'ingredients' && styles.tabButtonActive]}
-                  onPress={() => setActiveRecipeInfoTab('ingredients')}
-                >
-                  <Text style={[styles.tabButtonText, activeRecipeInfoTab === 'ingredients' && styles.tabButtonTextActive]}>
-                    Ingredients
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.tabButton, activeRecipeInfoTab === 'tips' && styles.tabButtonActive]}
-                  onPress={() => setActiveRecipeInfoTab('tips')}
-                >
-                  <Text style={[styles.tabButtonText, activeRecipeInfoTab === 'tips' && styles.tabButtonTextActive]}>
-                    Tips
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Tab Content */}
-              {activeRecipeInfoTab === 'tips' ? (
-                <FlatList
-                  style={styles.recipeTipsList}
-                  data={currentRecipeData?.tips?.split(/\.\s+|\n+/).filter(tip => tip.trim()) || []}
-                  keyExtractor={(item, index) => index.toString()}
-                  renderItem={({ item, index }) => (
-                    <View style={styles.tipItem}>
+          {/* Tab Content - only this scrolls */}
+          {activeRecipeInfoTab === 'tips' ? (
+            <View>
+              {(() => {
+                const filteredTips = currentRecipeData?.tips?.split(/\.\s+|\n+/).filter(tip => tip.trim()) || [];
+                return filteredTips.length > 0 ? (
+                  filteredTips.map((tip, index) => (
+                    <View key={index} style={styles.tipItem}>
                       <View style={styles.tipNumberContainer}>
                         <Text style={styles.tipNumber}>{index + 1}</Text>
                       </View>
                       <View style={styles.tipContent}>
                         <Text style={styles.recipeTipsText}>
-                          {item.trim()}
+                          {tip.trim()}
                         </Text>
                       </View>
                     </View>
-                  )}
-                  showsVerticalScrollIndicator={true}
-                  contentContainerStyle={styles.recipeTipsListContent}
-                />
-              ) : (
-                <FlatList
-                  style={styles.recipeTipsList}
-                  data={currentRecipeData?.ingredientGroups?.flatMap(group =>
-                    group.ingredients || []
-                  ) || []}
-                  keyExtractor={(item, index) => `${item.name}-${index}`}
-                  renderItem={({ item }) => (
-                    <View style={styles.ingredientItem}>
-                      <Text style={styles.ingredientText}>
-                        {(() => {
-                          const ingredientName = item.name.toLowerCase();
-                          const amountText = item.amount || '';
-                          const unitText = abbreviateUnit(item.unit || '');
-                          const preparationText = item.preparation || '';
+                  ))
+                ) : (
+                  <View style={styles.emptyTipsContainer}>
+                    <Text style={styles.emptyTipsText}>
+                      Unfortunately, this recipe author didn't leave any tips. Add your own tips in as an instruction step!
+                    </Text>
+                  </View>
+                );
+              })()}
+            </View>
+          ) : (
+            <View>
+              {(currentRecipeData?.ingredientGroups?.flatMap(group =>
+                group.ingredients || []
+              ) || []).map((item, index) => (
+                <View key={`${item.name}-${index}`} style={styles.ingredientItem}>
+                  <Text style={styles.ingredientText}>
+                    {(() => {
+                      const ingredientName = item.name.toLowerCase();
+                      const amountText = item.amount || '';
+                      const unitText = abbreviateUnit(item.unit || '');
+                      const preparationText = item.preparation || '';
 
-                          // Build the combined text following mise.tsx pattern
-                          const amountPart = `${amountText}${unitText ? ' ' + unitText : ''}`.trim();
-                          let combinedText = ingredientName;
+                      // Build the combined text following mise.tsx pattern
+                      const amountPart = `${amountText}${unitText ? ' ' + unitText : ''}`.trim();
+                      let combinedText = ingredientName;
 
-                          if (amountPart && preparationText) {
-                            combinedText = `${ingredientName} - ${amountPart}, ${preparationText}`;
-                          } else if (amountPart) {
-                            combinedText = `${ingredientName} - ${amountPart}`;
-                          } else if (preparationText) {
-                            combinedText = `${ingredientName} - ${preparationText}`;
-                          }
+                      if (amountPart && preparationText) {
+                        combinedText = `${ingredientName} - ${amountPart}, ${preparationText}`;
+                      } else if (amountPart) {
+                        combinedText = `${ingredientName} - ${amountPart}`;
+                      } else if (preparationText) {
+                        combinedText = `${ingredientName} - ${preparationText}`;
+                      }
 
-                          return combinedText;
-                        })()}
-                      </Text>
-                    </View>
-                  )}
-                  showsVerticalScrollIndicator={true}
-                  contentContainerStyle={styles.recipeTipsListContent}
-                />
-              )}
-            </Pressable>
-          </Pressable>
-        </Modal>
+                      return combinedText;
+                    })()}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </RecipeInfoModal>
 
         {/* Folder Picker Modal for saving modified recipes */}
         <FolderPickerModal
@@ -2043,6 +2024,22 @@ const styles = StyleSheet.create({
     color: COLORS.textDark,
   },
 
+  // --- Empty Tips Styles ---
+  emptyTipsContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.xl,
+    paddingHorizontal: SPACING.lg,
+  },
+  emptyTipsText: {
+    fontFamily: 'Inter',
+    fontSize: 16,
+    fontWeight: '400',
+    lineHeight: 24,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+  },
+
   // --- Tab Navigation Styles ---
   tabContainer: {
     flexDirection: 'row',
@@ -2107,6 +2104,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
     borderColor: COLORS.textDark,
     ...SHADOWS.small, // Reduced shadow for checklist feel
+  },
+  stepItemCompleted: {
+    backgroundColor: '#F5F5F5',
+    opacity: 0.8,
   },
   stepHeader: {
     flexDirection: 'row',
@@ -2300,3 +2301,4 @@ const styles = StyleSheet.create({
   },
 
 });
+

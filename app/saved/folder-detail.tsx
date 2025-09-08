@@ -899,6 +899,7 @@ export default function SavedFolderDetailScreen() {
           {renderHeaderAction()}
         </View>
       </View>
+
       {/* Search and Select toolbar */}
       <View style={styles.toolbarContainer}>
         <TouchableOpacity
@@ -1134,18 +1135,18 @@ const styles = StyleSheet.create({
   // Toolbar styles
   toolbarContainer: {
     flexDirection: 'column', // Stack vertically
-    height: 88, // 24px (first button) + 8px + 24px (second button) + 8px + 24px (third button)
+    height: 112, // Updated for 16px spacing: 32px + 16px + 32px + 16px + 16px = 112px
     backgroundColor: 'transparent',
     width: '90%',
     alignSelf: 'flex-start', // Left align to screen edge
     marginLeft: '5%', // Offset to account for 90% width
-    marginTop: SPACING.md, // Match other pages' content padding (16px) for consistent 24px total spacing
+    marginTop: SPACING.md, // Consistent with other screens
     marginBottom: SPACING.xxxl + SPACING.contentTopMargin, // Match library.tsx spacing between buttons and content
   },
   toolbarButton: {
-    height: 24, // Match library.tsx button height
+    height: 32, // Increased for better fit with 20px font
     backgroundColor: 'transparent',
-    marginBottom: SPACING.sm, // Add spacing between buttons like library.tsx
+    marginBottom: SPACING.md, // Increased to 16px for consistent spacing across toolbars
   },
   deleteButton: {
     width: '45%', // Smaller width for DELETE FOLDER button
@@ -1162,12 +1163,14 @@ const styles = StyleSheet.create({
   },
   toolbarButtonText: {
     fontFamily: 'Inter',
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '400', // Non-bold variant to match library.tsx
-    lineHeight: 28,
+    lineHeight: 24,
     color: COLORS.textDark,
     flex: 1,
     textAlign: 'left', // Ensure left alignment
+    textAlignVertical: 'center',
+    paddingVertical: 0,
   },
 
   toolbarDivider: {

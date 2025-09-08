@@ -248,13 +248,14 @@ const styles = StyleSheet.create({
   checkmark: {
     fontSize: 72,
     fontWeight: 'bold',
-    color: COLORS.primary,
+    color: COLORS.black,
     marginBottom: SPACING.md,
   } as TextStyle,
   readyText: {
-    ...bodyStrongText,
+    fontFamily: 'Inter',
     fontSize: 20,
-    color: COLORS.textDark,
+    fontWeight: '400',
+    color: COLORS.black,
     textAlign: 'center',
   } as TextStyle,
 });

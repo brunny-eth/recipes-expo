@@ -78,11 +78,11 @@ const TEXT_STEPS = [
   },
   {
     label: 'Finding the best references',
-    subtext: 'Scanning trusted recipes and techniques',
+    subtext: 'Scanning trusted recipes',
   },
   {
     label: 'Building an ingredient list',
-    subtext: 'Only the best ingredients for a Meez-er',
+    subtext: 'Only the best ingredients for Olea',
   },
   {
     label: 'Writing clean, step‑by‑step directions',

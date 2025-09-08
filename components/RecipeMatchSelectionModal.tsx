@@ -115,7 +115,7 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
           {shouldShowFallback ? (
             <View style={styles.fallbackImageContainer}>
               <Image
-                source={require('@/assets/images/Olea.png')}
+                source={require('@/assets/images/icon.png')}
                 resizeMode="contain"
                 style={styles.fallbackImage}
               />
@@ -178,10 +178,11 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
 
               <View style={styles.buttonContainer}>
                 <TouchableOpacity
-                  style={styles.primaryButton}
+                  style={styles.textButtonContainer}
                   onPress={handleCreateNew}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                  <Text style={styles.primaryButtonText}>Just make a new recipe for me</Text>
+                  <Text style={styles.textButton}>Just make a new recipe for me</Text>
                 </TouchableOpacity>
               </View>
             </>
@@ -229,35 +230,34 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
                 {validationError ? (
                   <Text style={styles.validationErrorText}>{validationError}</Text>
                 ) : null}
+
+                {/* Text button positioned immediately below the input */}
+                <TouchableOpacity
+                  style={styles.textButtonContainer}
+                  onPress={() => {
+                    const trimmedInput = inputText.trim();
+                    console.log('[RecipeMatchSelectionModal] Confirm create with input text length:', trimmedInput.length);
+
+                    // Validate dish name inputs
+                    if (looksLikeDishName(trimmedInput) && !isDescriptiveDishName(trimmedInput)) {
+                      setValidationError('Please be a bit more descriptive so we can make you the best recipe!');
+                      setLastValidatedInput(trimmedInput);
+                      return;
+                    }
+
+                    // Clear any previous validation error and proceed
+                    setValidationError('');
+                    setLastValidatedInput('');
+                    onAction('createNew', trimmedInput);
+                  }}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Text style={styles.textButton}>Make my recipe</Text>
+                </TouchableOpacity>
               </View>
             </>
           )}
 
-          {isCreateExpanded && (
-            <View style={styles.buttonContainerBottom}>
-              <TouchableOpacity
-                style={styles.primaryButton}
-                onPress={() => {
-                  const trimmedInput = inputText.trim();
-                  console.log('[RecipeMatchSelectionModal] Confirm create with input text length:', trimmedInput.length);
-
-                  // Validate dish name inputs
-                  if (looksLikeDishName(trimmedInput) && !isDescriptiveDishName(trimmedInput)) {
-                    setValidationError('Please be a bit more descriptive so we can make you the best recipe!');
-                    setLastValidatedInput(trimmedInput);
-                    return;
-                  }
-
-                  // Clear any previous validation error and proceed
-                  setValidationError('');
-                  setLastValidatedInput('');
-                  onAction('createNew', trimmedInput);
-                }}
-              >
-                <Text style={styles.primaryButtonText}>Make my recipe</Text>
-              </TouchableOpacity>
-            </View>
-          )}
         </SafeAreaView>
       </View>
     </Modal>
@@ -346,38 +346,20 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.lg,
   } as ViewStyle,
   buttonContainer: {
-    backgroundColor: COLORS.primary,
-    padding: SPACING.lg,
+    padding: SPACING.sm,
     width: '100%',
-  } as ViewStyle,
-  buttonContainerBottom: {
-    backgroundColor: COLORS.primary,
-    padding: SPACING.lg,
-    width: '100%',
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    alignItems: 'flex-start',
   } as ViewStyle,
   recipeCard: {
     flexDirection: 'row',
     backgroundColor: 'transparent',
-    borderRadius: RADIUS.sm,
     marginBottom: SPACING.md,
-    shadowColor: COLORS.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
     height: 120,
     overflow: 'hidden',
-    width: '95%',
-    alignSelf: 'flex-start',
-    marginLeft: 0,
-    paddingLeft: 0,
+    paddingLeft: SPACING.pageHorizontal,
   } as ViewStyle,
   imageContainer: {
-    width: '40%',
+    width: '50%',
     height: '100%',
     overflow: 'hidden',
   },
@@ -394,22 +376,26 @@ const styles = StyleSheet.create({
     height: '80%',
   } as ImageStyle,
   titleContainer: {
-    width: '60%',
+    width: '50%',
     height: '100%',
     paddingLeft: SPACING.md,
     paddingRight: SPACING.sm,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
+    paddingTop: 0,
     backgroundColor: 'transparent',
   } as ViewStyle,
   exploreCardImage: {
     width: '100%',
     height: '100%',
+    borderRadius: 8,
   } as ImageStyle,
   exploreCardTitle: {
     color: COLORS.textDark,
-    ...bodyStrongText,
+    ...bodyText,
     fontSize: FONT.size.body,
-    lineHeight: FONT.size.body * 1.3,
+    lineHeight: FONT.lineHeight.normal,
+    textAlign: 'left',
   } as TextStyle,
   similarityText: {
     ...bodyText,
@@ -447,39 +433,20 @@ const styles = StyleSheet.create({
     ...bodyText,
     fontSize: FONT.size.smBody,
   } as TextStyle,
-  primaryButton: {
-    height: 20,
-    backgroundColor: 'transparent',
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: 'auto',
+  textButtonContainer: {
+    marginTop: SPACING.sm,
+    alignSelf: 'flex-start',
+    paddingLeft: SPACING.pageHorizontal,
   } as ViewStyle,
-  secondaryButton: {
-    height: 20,
-    backgroundColor: 'transparent',
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: 'auto',
-    marginBottom: SPACING.sm,
-  } as ViewStyle,
-  primaryButtonText: {
+  textButton: {
     fontFamily: 'Inter',
     fontSize: 18,
     fontWeight: '400',
     lineHeight: 22,
     color: COLORS.textDark,
-    flex: 1,
     textAlign: 'left',
-    paddingBottom: SPACING.xs,
-  } as TextStyle,
-  secondaryButtonText: {
-    fontFamily: 'Inter',
-    fontSize: 18,
-    fontWeight: '400',
-    lineHeight: 22,
-    color: COLORS.textDark,
-    flex: 1,
-    textAlign: 'left',
+    textTransform: 'none' as const,
+    textDecorationLine: 'none',
   } as TextStyle,
 });
 

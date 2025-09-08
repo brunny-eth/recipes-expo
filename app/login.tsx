@@ -144,9 +144,9 @@ const LoginScreen = () => {
         <View style={styles.tosSection}>
           <Text style={styles.tosText}>
             By logging in, you agree to the{' '}
-            <Text style={styles.tosLink} onPress={() => Linking.openURL('https://meez.app/tos.html')}>TOS</Text>
+            <Text style={styles.tosLink} onPress={() => Linking.openURL('https://cookolea.com/tos.html')}>TOS</Text>
             {' '}and{' '}
-            <Text style={styles.tosLink} onPress={() => Linking.openURL('https://meez.app/privacy.html')}>Privacy Policy</Text>
+            <Text style={styles.tosLink} onPress={() => Linking.openURL('https://cookolea.com/privacy.html')}>Privacy Policy</Text>
           </Text>
         </View>
       </View>
