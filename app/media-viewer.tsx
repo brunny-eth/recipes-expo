@@ -81,7 +81,7 @@ export default function MediaViewer() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar style="light" />
       <Pressable
         onPress={handleClose}
         style={[styles.closeButton, { top: insets.top + 8, left: 12 }]}

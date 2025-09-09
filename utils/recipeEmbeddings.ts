@@ -1,6 +1,7 @@
 import { embedText } from './embedText';
 import { supabase } from '../server/lib/supabase'; 
 import logger from '../server/lib/logger';
+import type { ProcessedRecipesCacheUpdate } from '../common/types/dbOverrides';
 
 /**
  * Embeds a recipe and stores it in processed_recipes_cache.
@@ -28,9 +29,16 @@ export const generateAndSaveEmbedding = async (
       return;
     }
 
+    // Convert number[] embedding to string for database storage
+    const embeddingString = JSON.stringify(embedding);
+    
+    const updateData: ProcessedRecipesCacheUpdate = {
+      embedding: embeddingString
+    };
+
     const { error } = await supabase
       .from('processed_recipes_cache')
-      .update({ embedding })
+      .update(updateData as any) // Cast to bypass auto-generated type mismatch
       .eq('id', recipeId);
 
     if (error) {

@@ -1,6 +1,14 @@
 import pino from 'pino';
 import { Logtail } from '@logtail/node';
 
+// Logger interface with flexible method signatures
+export interface Logger {
+  info: (msgOrObj: string | Record<string, unknown>, msg?: string) => void;
+  warn: (msgOrObj: string | Record<string, unknown>, msg?: string) => void;
+  error: (msgOrObj: string | Record<string, unknown>, msg?: string) => void;
+  debug: (msgOrObj: string | Record<string, unknown>, msg?: string) => void;
+}
+
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
 // Initialize Logtail only in production and only if token is available
@@ -20,73 +28,135 @@ const logger = pino({
   }),
 });
 
+// Export the base Pino logger for use with pino-http
+export const baseLogger = logger;
+
 // Simple logger factory that adds scope
-export const createLogger = (scope: string) => {
+export const createLogger = (scope: string): Logger => {
   return {
-    info: (obj: any, msg?: string) => {
-      if (typeof obj === 'string') {
-        logger.info({ scope, msg: obj });
+    info: (msgOrObj: string | Record<string, unknown>, msg?: string) => {
+      if (typeof msgOrObj === 'string') {
+        logger.info({ scope, msg: msgOrObj });
         // Also send to Logtail in production
         if (!isDevelopment && logtail) {
-          logtail.info(`[${scope}] ${obj}`);
+          logtail.info(`[${scope}] ${msgOrObj}`);
         }
       } else {
-        logger.info({ scope, ...obj }, msg);
+        logger.info({ scope, ...msgOrObj }, msg);
         // Also send to Logtail in production
         if (!isDevelopment && logtail) {
-          logtail.info(msg || 'Info log', { scope, ...obj });
+          logtail.info(msg || 'Info log', { scope, ...msgOrObj });
         }
       }
     },
 
-    warn: (obj: any, msg?: string) => {
-      if (typeof obj === 'string') {
-        logger.warn({ scope, msg: obj });
+    warn: (msgOrObj: string | Record<string, unknown>, msg?: string) => {
+      if (typeof msgOrObj === 'string') {
+        logger.warn({ scope, msg: msgOrObj });
         // Also send to Logtail in production
         if (!isDevelopment && logtail) {
-          logtail.warn(`[${scope}] ${obj}`);
+          logtail.warn(`[${scope}] ${msgOrObj}`);
         }
       } else {
-        logger.warn({ scope, ...obj }, msg);
+        logger.warn({ scope, ...msgOrObj }, msg);
         // Also send to Logtail in production
         if (!isDevelopment && logtail) {
-          logtail.warn(msg || 'Warning log', { scope, ...obj });
+          logtail.warn(msg || 'Warning log', { scope, ...msgOrObj });
         }
       }
     },
 
-    error: (obj: any, msg?: string) => {
-      if (typeof obj === 'string') {
-        logger.error({ scope, msg: obj });
+    error: (msgOrObj: string | Record<string, unknown>, msg?: string) => {
+      if (typeof msgOrObj === 'string') {
+        logger.error({ scope, msg: msgOrObj });
         // Also send to Logtail in production
         if (!isDevelopment && logtail) {
-          logtail.error(`[${scope}] ${obj}`);
+          logtail.error(`[${scope}] ${msgOrObj}`);
         }
       } else {
-        logger.error({ scope, ...obj }, msg);
+        logger.error({ scope, ...msgOrObj }, msg);
         // Also send to Logtail in production
         if (!isDevelopment && logtail) {
-          logtail.error(msg || 'Error log', { scope, ...obj });
+          logtail.error(msg || 'Error log', { scope, ...msgOrObj });
         }
       }
     },
 
-    debug: (obj: any, msg?: string) => {
-      if (typeof obj === 'string') {
-        logger.debug({ scope, msg: obj });
+    debug: (msgOrObj: string | Record<string, unknown>, msg?: string) => {
+      if (typeof msgOrObj === 'string') {
+        logger.debug({ scope, msg: msgOrObj });
         // Also send to Logtail in production
         if (!isDevelopment && logtail) {
-          logtail.debug(`[${scope}] ${obj}`);
+          logtail.debug(`[${scope}] ${msgOrObj}`);
         }
       } else {
-        logger.debug({ scope, ...obj }, msg);
+        logger.debug({ scope, ...msgOrObj }, msg);
         // Also send to Logtail in production
         if (!isDevelopment && logtail) {
-          logtail.debug(msg || 'Debug log', { scope, ...obj });
+          logtail.debug(msg || 'Debug log', { scope, ...msgOrObj });
         }
       }
     },
   };
 };
 
-export default logger; 
+// Create a default logger instance that matches the Logger interface
+const defaultLogger: Logger = {
+  info: (msgOrObj: string | Record<string, unknown>, msg?: string) => {
+    if (typeof msgOrObj === 'string') {
+      logger.info({ msg: msgOrObj });
+      if (!isDevelopment && logtail) {
+        logtail.info(msgOrObj);
+      }
+    } else {
+      logger.info(msgOrObj, msg);
+      if (!isDevelopment && logtail) {
+        logtail.info(msg || 'Info log', msgOrObj);
+      }
+    }
+  },
+
+  warn: (msgOrObj: string | Record<string, unknown>, msg?: string) => {
+    if (typeof msgOrObj === 'string') {
+      logger.warn({ msg: msgOrObj });
+      if (!isDevelopment && logtail) {
+        logtail.warn(msgOrObj);
+      }
+    } else {
+      logger.warn(msgOrObj, msg);
+      if (!isDevelopment && logtail) {
+        logtail.warn(msg || 'Warning log', msgOrObj);
+      }
+    }
+  },
+
+  error: (msgOrObj: string | Record<string, unknown>, msg?: string) => {
+    if (typeof msgOrObj === 'string') {
+      logger.error({ msg: msgOrObj });
+      if (!isDevelopment && logtail) {
+        logtail.error(msgOrObj);
+      }
+    } else {
+      logger.error(msgOrObj, msg);
+      if (!isDevelopment && logtail) {
+        logtail.error(msg || 'Error log', msgOrObj);
+      }
+    }
+  },
+
+  debug: (msgOrObj: string | Record<string, unknown>, msg?: string) => {
+    if (typeof msgOrObj === 'string') {
+      logger.debug({ msg: msgOrObj });
+      if (!isDevelopment && logtail) {
+        logtail.debug(msgOrObj);
+      }
+    } else {
+      logger.debug(msgOrObj, msg);
+      if (!isDevelopment && logtail) {
+        logtail.debug(msg || 'Debug log', msgOrObj);
+      }
+    }
+  },
+};
+
+export default defaultLogger; 

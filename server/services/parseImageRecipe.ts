@@ -1,4 +1,4 @@
-import { CombinedParsedRecipe } from '../../common/types';
+import { CombinedParsedRecipe } from '../../common/types/dbOverrides';
 import { createHash } from 'crypto';
 import { detectInputType } from '../utils/detectInputType';
 import { generateCacheKeyHash } from '../utils/hash';

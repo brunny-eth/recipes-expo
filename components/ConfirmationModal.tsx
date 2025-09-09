@@ -97,7 +97,10 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             ]} 
             onPress={onConfirm}
           >
-            <Text style={styles.confirmButtonText}>{confirmLabel}</Text>
+            <Text style={[
+              styles.confirmButtonText,
+              destructive && styles.destructiveButtonText
+            ]}>{confirmLabel}</Text>
           </Pressable>
         </View>
       </Animated.View>
@@ -151,29 +154,32 @@ const styles = StyleSheet.create({
     minHeight: 48,
   } as ViewStyle,
   cancelButton: {
-    backgroundColor: COLORS.white,
+    backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: COLORS.lightGray,
+    borderColor: '#000000',
   } as ViewStyle,
   cancelButtonText: {
     ...bodyStrongText,
-    color: COLORS.textMuted,
+    color: '#000000',
     fontSize: FONT.size.body,
   } as TextStyle,
   confirmButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: COLORS.primary,
+    borderColor: '#000000',
   } as ViewStyle,
   confirmButtonText: {
     ...bodyStrongText,
-    color: COLORS.white,
+    color: '#000000',
     fontSize: FONT.size.body,
   } as TextStyle,
   destructiveButton: {
-    backgroundColor: COLORS.error,
+    backgroundColor: 'transparent',
     borderColor: COLORS.error,
   } as ViewStyle,
+  destructiveButtonText: {
+    color: COLORS.error,
+  } as TextStyle,
   singleButton: {
     flex: 1,
   } as ViewStyle,

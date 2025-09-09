@@ -1,4 +1,5 @@
-import { GeminiModel, CombinedParsedRecipe, GeminiHandlerResponse } from '../../common/types';
+import { GeminiModel, GeminiHandlerResponse } from '../../common/types';
+import { CombinedParsedRecipe } from '../../common/types/dbOverrides';
 import { supabase } from '../lib/supabase';
 import { createHash } from 'crypto';
 import { detectInputType } from '../utils/detectInputType';

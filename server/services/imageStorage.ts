@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '../lib/supabaseAdmin';
 import { createLogger } from '../lib/logger';
 import { createHash } from 'crypto';
+import { CombinedParsedRecipe } from '../../common/types/dbOverrides';
 
 const logger = createLogger('imageStorage');
 
@@ -194,7 +195,7 @@ export async function updateRecipeCoverImage(
         const updatedRecipeData = {
             ...currentData.recipe_data,
             image: coverImageUrl // Store as 'image' field in the recipe data
-        };
+        } as CombinedParsedRecipe;
 
         const { error } = await supabaseAdmin
             .from('processed_recipes_cache')

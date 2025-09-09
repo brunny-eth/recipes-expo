@@ -74,7 +74,7 @@ router.get('/folders/:id', async (req: Request, res: Response) => {
     const { data: folderData, error: folderError } = await supabaseAdmin
       .from('user_saved_folders')
       .select('id, name, color, icon, display_order')
-      .eq('id', id)
+      .eq('id', parseInt(id, 10))
       .eq('user_id', userId)
       .single();
 
@@ -119,7 +119,7 @@ router.get('/folders/:id/recipes', async (req: Request, res: Response) => {
     const { data: folderData, error: folderError } = await supabaseAdmin
       .from('user_saved_folders')
       .select('id')
-      .eq('id', id)
+      .eq('id', parseInt(id, 10))
       .eq('user_id', userId)
       .single();
 
@@ -146,7 +146,7 @@ router.get('/folders/:id/recipes', async (req: Request, res: Response) => {
         )
       `)
       .eq('user_id', userId)
-      .eq('folder_id', id)
+      .eq('folder_id', parseInt(id, 10))
       .order('created_at', { ascending: false }); // Most recently created first
       // TODO: Add updated_at column to user_saved_recipes table for better sorting
       // ALTER TABLE user_saved_recipes ADD COLUMN updated_at timestamptz DEFAULT now();
@@ -193,7 +193,7 @@ router.delete('/folders/:id', async (req: Request, res: Response) => {
       .from('user_saved_recipes')
       .delete()
       .eq('user_id', userId)
-      .eq('folder_id', id);
+      .eq('folder_id', parseInt(id, 10));
 
     if (recipesDeleteError) {
       logger.error({ requestId, err: recipesDeleteError }, 'Failed to delete saved recipes before folder deletion');
@@ -205,7 +205,7 @@ router.delete('/folders/:id', async (req: Request, res: Response) => {
       .from('user_saved_folders')
       .delete()
       .eq('user_id', userId)
-      .eq('id', id);
+      .eq('id', parseInt(id, 10));
 
     if (folderDeleteError) {
       logger.error({ requestId, err: folderDeleteError }, 'Failed to delete folder after removing recipes');
@@ -251,7 +251,7 @@ router.put('/folders/:id', async (req: Request, res: Response) => {
       .from('user_saved_folders')
       .update(updateData)
       .eq('user_id', userId)
-      .eq('id', id);
+      .eq('id', parseInt(id, 10));
 
     if (updateError) {
       logger.error({ requestId, err: updateError }, 'Failed to update folder');
@@ -397,8 +397,8 @@ router.get('/recipes', async (req: Request, res: Response) => {
   try {
     const { userId, baseRecipeId } = req.query;
 
-    if (!userId) {
-      return res.status(400).json({ error: 'Missing userId parameter' });
+    if (!userId || typeof userId !== 'string') {
+      return res.status(400).json({ error: 'Missing or invalid userId parameter' });
     }
 
     logger.info({ requestId, userId, baseRecipeId }, 'Fetching saved recipes');
@@ -422,8 +422,8 @@ router.get('/recipes', async (req: Request, res: Response) => {
       .eq('user_id', userId);
 
     // If baseRecipeId is provided, filter by it
-    if (baseRecipeId) {
-      query = query.eq('base_recipe_id', baseRecipeId);
+    if (baseRecipeId && typeof baseRecipeId === 'string') {
+      query = query.eq('base_recipe_id', parseInt(baseRecipeId, 10));
     }
 
     const { data, error: fetchError } = await query

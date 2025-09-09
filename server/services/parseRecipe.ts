@@ -1,4 +1,5 @@
-import { GeminiModel, CombinedParsedRecipe } from '../../common/types';
+import { GeminiModel } from '../../common/types';
+import { CombinedParsedRecipe } from '../../common/types/dbOverrides';
 import { createHash } from 'crypto';
 import { detectInputType, InputType } from '../utils/detectInputType';
 import { generateCacheKeyHash } from '../utils/hash';

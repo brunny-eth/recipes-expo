@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { supabaseAdmin } from '../lib/supabaseAdmin';
 import logger from '../lib/logger';
-import { CombinedParsedRecipe, IngredientGroup, StructuredIngredient } from '../../common/types';
+import { CombinedParsedRecipe, IngredientGroup, StructuredIngredient } from '../../common/types/dbOverrides';
 import { formatIngredientsForGroceryList, categorizeIngredients, getBasicGroceryCategory, aggregateGroceryList, normalizeName } from '../../utils/groceryHelpers';
 import { runDefaultLLM } from '../llm/adapters';
 import { stripMarkdownFences } from '../utils/stripMarkdownFences';
@@ -418,8 +418,8 @@ router.get('/recipes', async (req: Request, res: Response) => {
   try {
     const { userId } = req.query;
 
-    if (!userId) {
-      return res.status(400).json({ error: 'Missing userId parameter' });
+    if (!userId || typeof userId !== 'string') {
+      return res.status(400).json({ error: 'Missing or invalid userId parameter' });
     }
 
     logger.info({ requestId, userId }, 'Fetching mise recipes');
@@ -471,8 +471,8 @@ router.get('/recipes/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
     const { userId } = req.query;
 
-    if (!userId) {
-      return res.status(400).json({ error: 'Missing userId parameter' });
+    if (!userId || typeof userId !== 'string') {
+      return res.status(400).json({ error: 'Missing or invalid userId parameter' });
     }
 
     logger.info({ requestId, miseRecipeId: id, userId }, 'Fetching single mise recipe');
@@ -493,7 +493,7 @@ router.get('/recipes/:id', async (req: Request, res: Response) => {
         created_at,
         updated_at
       `)
-      .eq('id', id)
+      .eq('id', parseInt(id, 10))
       .eq('user_id', userId) // Ensure user owns this recipe
       .single();
 
@@ -595,7 +595,7 @@ router.put('/recipes/:id', async (req: Request, res: Response) => {
     const { data: updatedRecipe, error: updateError } = await supabaseAdmin
       .from('user_mise_recipes')
       .update(updates)
-      .eq('id', id)
+      .eq('id', parseInt(id, 10))
       .eq('user_id', userId) // Ensure user owns this recipe
       .select('id, title_override, final_yield, is_completed, updated_at')
       .single();
@@ -627,8 +627,8 @@ router.delete('/recipes/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
     const { userId } = req.query;
 
-    if (!userId) {
-      return res.status(400).json({ error: 'Missing userId parameter' });
+    if (!userId || typeof userId !== 'string') {
+      return res.status(400).json({ error: 'Missing or invalid userId parameter' });
     }
 
     logger.info({ requestId, miseRecipeId: id, userId }, 'Removing recipe from mise');
@@ -636,7 +636,7 @@ router.delete('/recipes/:id', async (req: Request, res: Response) => {
     const { error: deleteError } = await supabaseAdmin
       .from('user_mise_recipes')
       .delete()
-      .eq('id', id)
+      .eq('id', parseInt(id, 10))
       .eq('user_id', userId); // Ensure user owns this recipe
 
     if (deleteError) {
@@ -694,7 +694,7 @@ router.get('/grocery-list', async (req: Request, res: Response) => {
         user_id: recipe.user_id,
         is_completed: recipe.is_completed,
         created_at: recipe.created_at,
-        title: recipe.prepared_recipe_data?.title || 'Unknown'
+        title: (recipe.prepared_recipe_data as any)?.title || 'Unknown'
       })) || []
     }, 'Found mise recipes for grocery list generation');
 

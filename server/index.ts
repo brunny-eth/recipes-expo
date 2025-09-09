@@ -3,7 +3,7 @@ dotenv.config();
 
 import express from 'express'
 import pinoHttp from 'pino-http'
-import logger from './lib/logger'
+import logger, { baseLogger } from './lib/logger'
 import { recipeRouter } from './routes/recipes'
 import { aiRouter } from './routes/ai'
 import { miseRouter } from './routes/mise'
@@ -12,7 +12,7 @@ import savedRouter from './routes/saved'
 
 const app = express()
 
-app.use(pinoHttp({ logger }))
+app.use(pinoHttp({ logger: baseLogger }))
 app.use(express.json())
 
 // Health check

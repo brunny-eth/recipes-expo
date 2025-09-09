@@ -1,4 +1,4 @@
-import { CombinedParsedRecipe } from '../../common/types';
+import { CombinedParsedRecipe } from '../../common/types/dbOverrides';
 import { createLogger } from '../lib/logger';
 
 const logger = createLogger('finalValidateRecipe');

@@ -16,6 +16,6 @@ export async function getRecipeById(id: string) {
   return supabase
     .from('processed_recipes_cache')
     .select('*')
-    .eq('id', id)
+    .eq('id', parseInt(id, 10))
     .single();
 }

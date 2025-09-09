@@ -10,7 +10,7 @@ import { upload, uploadMultiple } from '../lib/multer';
 import { modifyInstructions } from '../services/instructionModification';
 import { getAllRecipes, getRecipeById } from '../services/recipeDB';
 import { generateAndSaveEmbedding } from '../../utils/recipeEmbeddings';
-import { CombinedParsedRecipe } from '../../common/types';
+import { CombinedParsedRecipe, RecipeData, Json, asRecipeData, asRecipeDataOrNull } from '../../common/types/dbOverrides';
 import { IngredientChange, buildVariationPrompt, VariationType } from '../llm/modificationPrompts';
 import { runDefaultLLM } from '../llm/adapters';
 import logger from '../lib/logger'; 
@@ -102,7 +102,7 @@ function wasIngredientChanged(modifiedIngredient: any, originalIngredient: any, 
 interface SaveModifiedRecipeRequestBody {
   originalRecipeId: number;
   userId: string;
-  modifiedRecipeData: CombinedParsedRecipe;
+  modifiedRecipeData: RecipeData;
   appliedChanges: { // Ensure this matches the exact structure from frontend
     ingredientChanges: IngredientChange[];
     scalingFactor: number;
@@ -454,10 +454,13 @@ router.get('/explore-random', async (req: Request, res: Response) => {
     logger.info({ requestId, recipeCount, route: req.originalUrl, method: req.method }, `Successfully fetched ${recipeCount} random recipes for explore`);
 
     // Transform data to return just the recipe_data with ids
-    const recipes = data?.map((item: any) => ({
-      ...item.recipe_data,
-      id: item.id
-    })) || [];
+    const recipes = data?.map((item: any) => {
+      const recipeData = asRecipeData(item.recipe_data);
+      return {
+        ...recipeData,
+        id: item.id
+      };
+    }) || [];
 
     res.json(recipes);
   } catch (err) {
@@ -697,7 +700,7 @@ router.post('/save-modified', async (req: Request<any, any, SaveModifiedRecipeRe
         id: newModifiedRecipeRows.id,
         is_user_modified: newModifiedRecipeRows.is_user_modified,
         parent_recipe_id: newModifiedRecipeRows.parent_recipe_id,
-        recipe_data: newModifiedRecipeRows.recipe_data
+        recipe_data: asRecipeData(newModifiedRecipeRows.recipe_data)
       },
       userSavedRecordId: userSavedEntry?.id || null,
     });
@@ -721,23 +724,28 @@ router.patch('/:id(\\d+)', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Missing or invalid patch data' });
     }
 
-    logger.info({ requestId, recipeId: id, patchFields: Object.keys(patch) }, 'Patching recipe');
+    const numericId = parseInt(id, 10);
+    if (isNaN(numericId)) {
+      return res.status(400).json({ error: 'Invalid recipe ID' });
+    }
+
+    logger.info({ requestId, recipeId: numericId, patchFields: Object.keys(patch) }, 'Patching recipe');
 
     // Get the current recipe from processed_recipes_cache only
     const { data: currentRecipe, error: fetchError } = await supabaseAdmin
       .from('processed_recipes_cache')
       .select('*')
-      .eq('id', id)
+      .eq('id', numericId)
       .single();
 
     if (fetchError || !currentRecipe) {
-      logger.error({ requestId, recipeId: id, err: fetchError }, 'Recipe not found in processed_recipes_cache');
+      logger.error({ requestId, recipeId: numericId, err: fetchError }, 'Recipe not found in processed_recipes_cache');
       return res.status(404).json({ error: 'Recipe not found' });
     }
 
     // Only allow PATCHing user-modified recipes (forks)
     if (!currentRecipe.is_user_modified) {
-      logger.warn({ requestId, recipeId: id }, 'Attempted to PATCH non-user-modified recipe');
+      logger.warn({ requestId, recipeId: numericId }, 'Attempted to PATCH non-user-modified recipe');
       return res.status(400).json({ 
         error: 'Cannot modify original recipe. Please fork first.',
         code: 'NEEDS_FORK' 
@@ -761,8 +769,14 @@ router.patch('/:id(\\d+)', async (req: Request, res: Response) => {
     }
 
     // Merge the patch with existing recipe data
+    const currentRecipeData = asRecipeData(currentRecipe.recipe_data);
+    if (!currentRecipeData) {
+      logger.error({ requestId, recipeId: numericId }, 'Current recipe data is null');
+      return res.status(500).json({ error: 'Recipe data is invalid' });
+    }
+    
     const merged = {
-      ...currentRecipe.recipe_data,
+      ...currentRecipeData,
       ...patch,
     };
 
@@ -778,19 +792,19 @@ router.patch('/:id(\\d+)', async (req: Request, res: Response) => {
     // Update the recipe in processed_recipes_cache
     const { data: updatedRecipe, error: updateError } = await supabaseAdmin
       .from('processed_recipes_cache')
-      .update({ 
-        recipe_data: merged 
+      .update({
+        recipe_data: merged
       })
-      .eq('id', id)
+      .eq('id', idNum)
       .select('*')
       .single();
 
     if (updateError) {
-      logger.error({ requestId, recipeId: id, err: updateError }, 'Failed to update recipe');
+      logger.error({ requestId, recipeId: idNum, err: updateError }, 'Failed to update recipe');
       return res.status(500).json({ error: 'Failed to update recipe' });
     }
 
-    logger.info({ requestId, recipeId: id }, 'Successfully patched recipe');
+    logger.info({ requestId, recipeId: idNum }, 'Successfully patched recipe');
 
     // Return the full updated canonical recipe row
     res.json({
@@ -799,7 +813,7 @@ router.patch('/:id(\\d+)', async (req: Request, res: Response) => {
         id: updatedRecipe.id,
         is_user_modified: updatedRecipe.is_user_modified,
         parent_recipe_id: updatedRecipe.parent_recipe_id,
-        recipe_data: updatedRecipe.recipe_data
+        recipe_data: asRecipeData(updatedRecipe.recipe_data)
       }
     });
 
@@ -860,7 +874,12 @@ router.post('/variations', async (req: Request, res: Response) => {
         logger.info({ requestId, recipeId, variationType }, '[variations] Calling LLM for recipe variation');
 
         // Build the variation prompt
-        const prompt = buildVariationPrompt(originalRecipe.recipe_data, variationType as VariationType);
+        const recipeData = asRecipeData(originalRecipe.recipe_data);
+        if (!recipeData) {
+          logger.error({ requestId, recipeId }, '[variations] Recipe data is null');
+          return res.status(500).json({ error: 'Recipe data is invalid' });
+        }
+        const prompt = buildVariationPrompt(recipeData, variationType as VariationType);
 
         // Add metadata to the prompt
         prompt.metadata = {
@@ -931,9 +950,10 @@ router.post('/variations', async (req: Request, res: Response) => {
         }
 
         // Merge substitutions: LLM only generates for changed ingredients, we copy originals for unchanged
-        if (originalRecipe?.recipe_data?.ingredientGroups) {
+        const originalRecipeData = asRecipeData(originalRecipe?.recipe_data);
+        if (originalRecipeData?.ingredientGroups) {
           parsedResponse.ingredientGroups = mergeSubstitutions(
-            originalRecipe.recipe_data.ingredientGroups,
+            originalRecipeData.ingredientGroups,
             parsedResponse.ingredientGroups,
             variationType as VariationType
           );
@@ -1028,8 +1048,9 @@ router.post('/variations', async (req: Request, res: Response) => {
     const { id: _jsonIdDrop, ...cleanModified } = finalModifiedRecipe ?? {};
 
     // B) Preserve image from parent recipe if it exists
-    const parentImage = originalRecipe?.recipe_data?.image;
-    const parentThumbnailUrl = originalRecipe?.recipe_data?.thumbnailUrl;
+    const originalRecipeData = asRecipeData(originalRecipe?.recipe_data);
+    const parentImage = originalRecipeData?.image;
+    const parentThumbnailUrl = originalRecipeData?.thumbnailUrl;
 
     // C) Merge parent images with modified recipe data
     const finalRecipeData = {
@@ -1087,7 +1108,7 @@ router.post('/variations', async (req: Request, res: Response) => {
       id: newModifiedRecipeRows.id,
       is_user_modified: newModifiedRecipeRows.is_user_modified,
       parent_recipe_id: newModifiedRecipeRows.parent_recipe_id,
-      recipe_data: newModifiedRecipeRows.recipe_data
+      recipe_data: asRecipeData(newModifiedRecipeRows.recipe_data)
     };
 
     logger.info({ requestId, recipeId, variationType }, '[variations] Returning modified recipe response');

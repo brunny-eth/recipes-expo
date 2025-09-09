@@ -2,6 +2,25 @@ export * from './recipes';
 export * from './llm';
 export * from './database.types';
 export * from './errors';
+// Export stable database type overrides for direct use (excluding Json to avoid conflict)
+export {
+  type CombinedParsedRecipe,
+  type InstructionStep,
+  type StructuredIngredient,
+  type IngredientGroup,
+  type SubstitutionSuggestion,
+  type RecipeData,
+  type ProcessedRecipesCacheRow,
+  type ProcessedRecipesCacheInsert,
+  type ProcessedRecipesCacheUpdate,
+  type UserSavedRecipesRow,
+  type UserSavedRecipesInsert,
+  type UserSavedRecipesUpdate,
+  type RecipeWithEmbedding,
+  type RecipeWithDates,
+  asRecipeData,
+  asRecipeDataOrNull
+} from './dbOverrides';
 
 // Import types that we need to reference in this file
 import { CombinedParsedRecipe } from './recipes';

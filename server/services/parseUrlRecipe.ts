@@ -1,4 +1,5 @@
-import { GeminiModel, CombinedParsedRecipe, GeminiHandlerResponse } from '../../common/types';
+import { GeminiModel, GeminiHandlerResponse } from '../../common/types';
+import { CombinedParsedRecipe, ProcessedRecipesCacheInsert, ProcessedRecipesCacheRow } from '../../common/types/dbOverrides';
 import { supabase } from '../lib/supabase';
 import { createHash } from 'crypto';
 import { detectInputType } from '../utils/detectInputType';
@@ -256,8 +257,12 @@ export async function parseUrlRecipe(
                     console.log('[parseUrlRecipe] queryData:', queryData);
                     console.log('[parseUrlRecipe] queryError:', queryError);
                     
-                    if (queryData && queryData.id) {
-                        insertData = queryData;
+                    if (queryData && queryData.id && queryData.created_at && queryData.last_processed_at) {
+                        insertData = {
+                            id: queryData.id,
+                            created_at: queryData.created_at,
+                            last_processed_at: queryData.last_processed_at
+                        };
                         insertedId = queryData.id;
                         logger.info({ requestId, cacheKey, id: insertedId, dbInsertMs: Date.now() - dbInsertStartTime }, `Successfully cached new recipe.`);
                         console.log('[parseUrlRecipe] Found inserted recipe with ID:', insertedId);

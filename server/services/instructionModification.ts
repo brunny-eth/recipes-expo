@@ -115,7 +115,7 @@ export async function modifyInstructions(
                     needsScaling 
                 }, '[MODIFY] Success');
                 
-                logger.debug('[MODIFY] Modified instructions', { instructions: parsedResult.modifiedInstructions });
+                logger.debug({ instructions: parsedResult.modifiedInstructions }, '[MODIFY] Modified instructions');
                 
                 return {
                     modifiedInstructions: parsedResult.modifiedInstructions.filter((step: any) => typeof step === 'string'),
