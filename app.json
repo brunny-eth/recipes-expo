@@ -70,7 +70,8 @@
       "expo-localization",
       "expo-image-picker",
       "expo-document-picker",
-      "expo-file-system"
+      "expo-file-system",
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true,

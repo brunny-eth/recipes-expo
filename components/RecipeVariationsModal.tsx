@@ -138,7 +138,7 @@ const RecipeVariationsModal: React.FC<RecipeVariationsModalProps> = ({
             styles.confirmButtonText,
             !selectedVariation && styles.confirmButtonTextDisabled
           ]}>
-            Apply
+            Start Remixing
           </Text>
         </TouchableOpacity>
         </View>

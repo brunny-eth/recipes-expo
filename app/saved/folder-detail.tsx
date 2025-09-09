@@ -275,6 +275,12 @@ export default function SavedFolderDetailScreen() {
     });
   }, []);
 
+  // Dismiss search (used by X button in search results)
+  const dismissSearch = useCallback(() => {
+    setIsSearchActive(false);
+    setSearchQuery('');
+  }, []);
+
   // Toggle selection mode
   const toggleSelection = useCallback(() => {
     setIsSelectionMode(prev => {
@@ -708,9 +714,18 @@ export default function SavedFolderDetailScreen() {
         <>
           {filteredRecipes.length > 0 ? (
             <>
-              <Text style={styles.searchResultsHeader}>
-                Search results ({filteredRecipes.length})
-              </Text>
+              <View style={styles.searchResultsHeader}>
+                <Text style={styles.searchResultsHeaderText}>
+                  Search results ({filteredRecipes.length})
+                </Text>
+                <TouchableOpacity
+                  style={styles.searchResultsDismissButton}
+                  onPress={dismissSearch}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <MaterialCommunityIcons name="close" size={20} color="#000000" />
+                </TouchableOpacity>
+              </View>
               <FlatList
                 data={filteredRecipes}
                 renderItem={({ item, index }) => renderRecipeItem({ item, index })}
@@ -724,9 +739,18 @@ export default function SavedFolderDetailScreen() {
             </>
           ) : (
             <>
-              <Text style={styles.searchResultsHeader}>
-                Search results ({filteredRecipes.length})
-              </Text>
+              <View style={styles.searchResultsHeader}>
+                <Text style={styles.searchResultsHeaderText}>
+                  Search results ({filteredRecipes.length})
+                </Text>
+                <TouchableOpacity
+                  style={styles.searchResultsDismissButton}
+                  onPress={dismissSearch}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <MaterialCommunityIcons name="close" size={20} color="#000000" />
+                </TouchableOpacity>
+              </View>
                           <View style={styles.noSearchResults}>
               <Text style={styles.emptyText}>No matches.</Text>
               <Text style={styles.emptySubtext}>Try a different search term.</Text>
@@ -920,8 +944,8 @@ export default function SavedFolderDetailScreen() {
                 autoCorrect={false}
                 autoFocus={true}
                 onBlur={() => {
-                  setIsSearchActive(false);
-                  setSearchQuery('');
+                  // Keep search active on blur to show results without keyboard
+                  // Don't clear search query to allow recipe selection
                 }}
               />
             ) : (
@@ -1349,7 +1373,7 @@ const styles = StyleSheet.create({
   // New styles for search
   searchResultsWrapper: {
     paddingLeft: 0, // Remove left padding for true left alignment
-    paddingRight: SPACING.pageHorizontal, // Keep right padding
+    paddingRight: 0, // Remove right padding to match folder rows
     paddingTop: 0,
     paddingBottom: SPACING.md,
     width: '90%',
@@ -1364,15 +1388,26 @@ const styles = StyleSheet.create({
     maxHeight: '90%', // Allow more height while still preventing cutoff by tab bar
   } as ViewStyle,
   searchResultsHeader: {
-    ...bodyStrongText,
-    fontSize: FONT.size.body,
-    color: COLORS.textDark,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: SPACING.sm,
+    paddingLeft: 0, // Remove left padding for perfect alignment
+    paddingRight: 0, // Remove right padding to allow X button at edge
+    borderBottomWidth: 1,
+    borderBottomColor: '#000000',
     width: '90%',
     alignSelf: 'flex-start', // Left align to screen edge
     marginLeft: '5%', // Offset to account for 90% width
-    paddingLeft: 0, // Remove left padding for perfect alignment
-    paddingRight: 18, // Match other elements' right padding
+  },
+  searchResultsHeaderText: {
+    ...bodyStrongText,
+    fontSize: FONT.size.body,
+    color: COLORS.textDark,
+  },
+  searchResultsDismissButton: {
+    padding: 4,
+    marginRight: 0,
   },
   headerPlaceholder: {
     // Invisible placeholder to maintain consistent spacing when search is not active

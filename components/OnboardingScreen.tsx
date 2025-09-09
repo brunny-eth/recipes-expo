@@ -1,5 +1,5 @@
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, SafeAreaView } from 'react-native';
-import FastImage from '@d11/react-native-fast-image';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { FONT, screenTitleText, bodyText, bodyStrongText } from '@/constants/typography';
 import Animated, { FadeIn, FadeOut, SlideInRight, SlideOutLeft, useSharedValue, useAnimatedStyle, withSpring, runOnJS } from 'react-native-reanimated';
@@ -19,25 +19,25 @@ const onboardingSteps = [
     id: 1,
     title: "Transform any recipe",
     description: "Turn messy recipes into clean, customizable formats",
-    gifSource: require('@/assets/gifs/FirstScreen.gif'),
+    videoSource: require('@/assets/videos/FirstScreen.mp4'),
   },
   {
     id: 2,
-    title: "Prep and cook with ease",
+    title: "Remix to your taste",
     description: "Use the prep station to prepare for cooking multiple meals at once",
-    gifSource: require('@/assets/gifs/SecondScreen.gif'),
+    videoSource: require('@/assets/videos/SecondScreen.mp4'),
   },
   {
     id: 3,
     title: "Make multiple meals",
     description: "Multi-recipe cooking \n made easy",
-    gifSource: require('@/assets/gifs/ThirdScreen.gif'),
+    videoSource: require('@/assets/videos/ThirdScreen.mp4'),
   },
   {
     id: 4,
-    title: "Save and discover",
+    title: "Follow steps easily",
     description: "Build your recipe library and explore community favorites",
-    gifSource: require('@/assets/gifs/FourthScreen.gif'),
+    videoSource: require('@/assets/videos/FourthScreen.mp4'),
   }
 ];
 
@@ -48,23 +48,32 @@ export default function OnboardingScreen({ onComplete, onBack }: OnboardingScree
   const translateX = useSharedValue(0);
   const { track } = useAnalytics();
 
-  // Preload all onboarding GIFs for smooth playback
+  // Create video player for current step
+  const videoPlayer = useVideoPlayer(currentStepData.videoSource || '', player => {
+    if (currentStepData.videoSource) {
+      player.loop = true;
+      player.muted = true;
+      player.play();
+    }
+  });
+
+  // Update video when step changes
   useEffect(() => {
-    const preloadGifs = async () => {
-      try {
-        await FastImage.preload([
-          require('@/assets/gifs/FirstScreen.gif'),
-          require('@/assets/gifs/SecondScreen.gif'),
-          require('@/assets/gifs/ThirdScreen.gif'),
-          require('@/assets/gifs/FourthScreen.gif'),
-        ]);
-      } catch (error) {
-        console.warn('Failed to preload onboarding GIFs:', error);
+    const updateVideo = async () => {
+      if (currentStepData.videoSource) {
+        try {
+          await videoPlayer.replaceAsync(currentStepData.videoSource);
+          videoPlayer.loop = true;
+          videoPlayer.muted = true;
+          videoPlayer.play();
+        } catch (error) {
+          console.warn('Failed to replace video:', error);
+        }
       }
     };
-    
-    preloadGifs();
-  }, []);
+
+    updateVideo();
+  }, [currentStep, videoPlayer, currentStepData.videoSource]);
 
   const handleSwipe = (direction: 'left' | 'right') => {
     if (isSwiping) return; // Prevent multiple swipes
@@ -121,24 +130,24 @@ export default function OnboardingScreen({ onComplete, onBack }: OnboardingScree
                 style={styles.textContent}
               >
                 <Text style={styles.stepTitle}>{currentStepData.title}</Text>
-                <Text
-                  style={styles.stepDescription}
-                >{currentStepData.description}</Text>
               </Animated.View>
 
-              {/* GIF Container - now below the text */}
+              {/* Video Container - now below the text */}
               <View style={styles.videoContainer}>
-                {currentStepData.gifSource ? (
-                  <FastImage
-                    source={currentStepData.gifSource}
-                    style={styles.gifImage}
-                    resizeMode="contain"
+                {currentStepData.videoSource ? (
+                  <VideoView
+                    player={videoPlayer}
+                    style={styles.video}
+                    contentFit="cover"
+                    allowsFullscreen={false}
+                    allowsPictureInPicture={false}
                   />
                 ) : (
-                  <View style={styles.gifPlaceholder}>
+                  <View style={styles.videoPlaceholder}>
                     <Text style={styles.placeholderText}>
-                      GIF {currentStep}{'\n'}
-                      ({currentStepData.title})
+                      VIDEO {currentStep}{'\n'}
+                      ({currentStepData.title}){'\n'}
+                      {currentStepData.videoSource ? 'VIDEO LOADED' : 'WAITING FOR MP4'}
                     </Text>
                   </View>
                 )}
@@ -209,36 +218,41 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 30,
     justifyContent: 'space-between',
+    alignItems: 'center', // Center the video container horizontally
   },
   videoContainer: {
-    flex: 4, // Reduced from 5 since text is now above
-    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 20, // Reduced margin since text is above
+    marginTop: 10, // Further reduced to maximize GIF container size
+    marginBottom: 20, // Add bottom padding between video and step indicators
+    overflow: 'visible', // Allow bleed to show
   },
-  gifPlaceholder: {
-    width: '100%',
-    height: '100%', // Changed from 90%
+  videoPlaceholder: {
+    width: '90%',
+    maxWidth: 360, // Prevent exploding on tablets
+    aspectRatio: 9 / 16, // iPhone portrait aspect ratio
     backgroundColor: '#f5f5f5',
-    borderRadius: 20,
+    borderRadius: 0, // Rectangular edges
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#e0e0e0',
-    borderStyle: 'dashed',
+    borderWidth: 1, // Thin border
+    borderColor: '#000000', // Black border
+    borderStyle: 'solid', // Solid border for cleaner look
+    overflow: 'hidden', // Clean cropping
   },
-  gifImage: {
-    width: '100%',
-    height: '110%', // Changed from 90%
-    borderRadius: 20,
-    resizeMode: 'stretch',
-    borderWidth: 2,
-    borderColor: '#5C6B73',
+  video: {
+    width: '90%',
+    maxWidth: 360, // Prevent exploding on tablets
+    aspectRatio: 9 / 16, // iPhone portrait aspect ratio
+    borderRadius: 0, // Rectangular edges
+    borderWidth: 1, // Thin border
+    borderColor: '#000000', // Black border
+    // Tiny overscan to hide 0.5px seams from rounding - increased for visibility
+    transform: [{ scale: 1.08 }],
   },
   controlsContainer: {
-    flex: 2, // Decreased from 3 to give more space to GIF
+    flex: 1, // Restored to balance layout with fixed aspect ratio video container
     justifyContent: 'center',
-    marginTop: 20, // Add top margin to push controls down
+    marginTop: 10, // Reduced from 20 to maximize GIF container size
   },
   placeholderText: {
     color: '#999',
@@ -250,12 +264,12 @@ const styles = StyleSheet.create({
   stepIndicator: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 30, 
+    marginBottom: 15, // Reduced from 30 to maximize GIF container size
     gap: 10,
   },
   buttonArea: {
     alignItems: 'center',
-    minHeight: 80, // Fixed height to maintain consistent spacing
+    minHeight: 60, // Reduced from 80 to maximize GIF container size
   },
   stepDot: {
     width: 10,
@@ -269,15 +283,14 @@ const styles = StyleSheet.create({
   textContent: {
     width: '100%',
     alignItems: 'center',
-    marginBottom: 40,
-    marginTop: 40,
+    marginBottom: 15, // Further reduced since no description text
+    marginTop: 25, // Adjusted for cleaner spacing with title only
   },
   stepTitle: {
     ...screenTitleText,
     color: COLORS.textDark,
     textAlign: 'center',
-    marginBottom: 12,
-    fontSize: FONT.size.xl, // Use consistent large size
+    marginBottom: 25, // Add more space between title and video container
   },
   stepDescription: {
     ...bodyText,
@@ -294,8 +307,6 @@ const styles = StyleSheet.create({
   },
   startButton: {
     backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#000000',
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.lg,
     borderRadius: RADIUS.sm,

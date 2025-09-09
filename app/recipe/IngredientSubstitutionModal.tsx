@@ -189,7 +189,7 @@ export default function IngredientSubstitutionModal({
             styles.applyButtonText,
             !selectedOption && styles.applyButtonTextDisabled
           ]}>
-            Make changes
+            Apply Changes
           </Text>
         </TouchableOpacity>
       </Animated.View>

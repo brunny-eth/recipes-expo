@@ -87,6 +87,7 @@ export const testIngredientHighlighting = () => {
   });
 };
 
+
 // Debug function to help visualize generated search terms
 export const debugIngredientSearchTerms = (ingredients: StructuredIngredient[]) => {
   const searchTerms = generateIngredientSearchTerms(ingredients);
@@ -139,9 +140,9 @@ export const generateIngredientSearchTerms = (ingredients: StructuredIngredient[
           }
         }
         
-        // Add individual meaningful words (longer than 3 characters)
+        // Add individual meaningful words (longer than 3 characters) but check for conflicts
         words.forEach((word) => {
-          if (word.length > 3) {
+          if (word.length > 3 && !wouldCauseConflict(word, baseName, ingredients)) {
             terms.add(word);
           }
         });
@@ -177,9 +178,27 @@ export const getUniqueSearchTermItems = (searchTermsWithIng: Array<{ ingredient:
       searchTermsWithIng.map((item) => [item.searchTerm.toLowerCase(), item])
     ).values()
   );
-  uniqueSearchTermItems.sort(
-    (a, b) => b.searchTerm.length - a.searchTerm.length
-  );
+  
+  // Sort by length first (longest first), then by specificity (full ingredient names first)
+  uniqueSearchTermItems.sort((a, b) => {
+    // Remove word boundary markers for length comparison
+    const aClean = a.searchTerm.replace(/\\b/g, '');
+    const bClean = b.searchTerm.replace(/\\b/g, '');
+    
+    if (aClean.length !== bClean.length) {
+      return bClean.length - aClean.length;
+    }
+    
+    // If same length, prefer full ingredient names over partial matches
+    const aIsFullName = aClean === a.ingredient.name;
+    const bIsFullName = bClean === b.ingredient.name;
+    
+    if (aIsFullName && !bIsFullName) return -1;
+    if (!aIsFullName && bIsFullName) return 1;
+    
+    return 0;
+  });
+  
   return uniqueSearchTermItems;
 };
 
@@ -258,8 +277,8 @@ const isStoplisted = (word: string): boolean => {
   return STOPLIST_DESCRIPTORS.has(normalized);
 };
 
-// Generate smart aliases for an ingredient
-const generateSmartAliases = (ingredientName: string): string[] => {
+// Generate smart aliases for an ingredient with improved conflict resolution
+const generateSmartAliases = (ingredientName: string, allIngredients?: StructuredIngredient[]): string[] => {
   const aliases = new Set<string>();
   const words = ingredientName.split(' ').filter(word => word.trim());
   
@@ -292,9 +311,14 @@ const generateSmartAliases = (ingredientName: string): string[] => {
       }
     }
     
-    // Add individual words only if they're safe and not stoplisted
+    // Add individual words only if they're safe, not stoplisted, AND don't cause conflicts
     words.forEach(word => {
       if (word.length > 3 && isSafeSingleWord(word) && !isStoplisted(word)) {
+        // Check if this word would cause conflicts with other ingredients
+        if (allIngredients && wouldCauseConflict(word, ingredientName, allIngredients)) {
+          // Skip this word to avoid conflicts
+          return;
+        }
         aliases.add(word);
       }
     });
@@ -320,16 +344,43 @@ const generateSmartAliases = (ingredientName: string): string[] => {
   return Array.from(finalAliases);
 };
 
-// Find all non-overlapping ingredient spans in text
+// Check if a word would cause conflicts with other ingredients
+const wouldCauseConflict = (word: string, currentIngredient: string, allIngredients: StructuredIngredient[]): boolean => {
+  const normalizedWord = normalizeText(word);
+  const normalizedCurrent = normalizeText(currentIngredient);
+  
+  // Check if any other ingredient contains this word and would be a better match
+  return allIngredients.some(ingredient => {
+    const normalizedIngredient = normalizeText(ingredient.name);
+    
+    // Skip the current ingredient
+    if (normalizedIngredient === normalizedCurrent) {
+      return false;
+    }
+    
+    // Check if the other ingredient contains this word
+    if (normalizedIngredient.includes(normalizedWord)) {
+      // If the other ingredient is longer and more specific, this would cause a conflict
+      // For example: "curry" in "curry powder" vs "red curry paste"
+      // "red curry paste" is more specific when matching "curry" in context
+      return normalizedIngredient.length > normalizedCurrent.length;
+    }
+    
+    return false;
+  });
+};
+
+// Find all non-overlapping ingredient spans in text with improved conflict resolution
 export const findIngredientSpans = (
   text: string,
   ingredients: StructuredIngredient[]
 ): IngredientSpan[] => {
-  const spans: IngredientSpan[] = [];
+  const potentialSpans: IngredientSpan[] = [];
   const textLower = normalizeText(text);
   
+  // First, collect all potential matches
   ingredients.forEach((ingredient, ingredientIndex) => {
-    const aliases = generateSmartAliases(ingredient.name);
+    const aliases = generateSmartAliases(ingredient.name, ingredients);
     
     // Sort aliases by length (longest first) to prioritize longer matches
     aliases.sort((a, b) => b.length - a.length);
@@ -356,23 +407,13 @@ export const findIngredientSpans = (
         const isAtEnd = index + normalizedAlias.length >= text.length;
         
         if ((isTokenBoundaryBefore || isAtStart) && (isTokenBoundaryAfter || isAtEnd)) {
-          // Check for overlaps with existing spans
-          const newSpan: IngredientSpan = {
+          potentialSpans.push({
             start: index,
             end: index + normalizedAlias.length,
-            ingredientId: ingredient.name, // Use name as ID for now
+            ingredientId: ingredient.name,
             occurrenceIndex,
             searchTerm: alias
-          };
-          
-          // Only add if it doesn't overlap with existing spans
-          const hasOverlap = spans.some(span => 
-            (newSpan.start < span.end && newSpan.end > span.start)
-          );
-          
-          if (!hasOverlap) {
-            spans.push(newSpan);
-          }
+          });
         }
         
         startIndex = index + 1;
@@ -381,10 +422,36 @@ export const findIngredientSpans = (
     });
   });
   
-  // Sort spans by start position
-  spans.sort((a, b) => a.start - b.start);
+  // Now resolve conflicts by choosing the best match for each position
+  const finalSpans: IngredientSpan[] = [];
   
-  return spans;
+  // Sort potential spans by start position, then by length (longest first), then by specificity
+  potentialSpans.sort((a, b) => {
+    if (a.start !== b.start) return a.start - b.start;
+    if (a.end - a.start !== b.end - b.start) return (b.end - b.start) - (a.end - a.start);
+    // Prefer full ingredient names over partial matches
+    const aIsFullName = a.searchTerm === a.ingredientId;
+    const bIsFullName = b.searchTerm === b.ingredientId;
+    if (aIsFullName && !bIsFullName) return -1;
+    if (!aIsFullName && bIsFullName) return 1;
+    return 0;
+  });
+  
+  // Select non-overlapping spans, preferring longer and more specific matches
+  for (const span of potentialSpans) {
+    const hasOverlap = finalSpans.some(existingSpan => 
+      (span.start < existingSpan.end && span.end > existingSpan.start)
+    );
+    
+    if (!hasOverlap) {
+      finalSpans.push(span);
+    }
+  }
+  
+  // Sort final spans by start position
+  finalSpans.sort((a, b) => a.start - b.start);
+  
+  return finalSpans;
 };
 
 // Parse text into segments for highlighting

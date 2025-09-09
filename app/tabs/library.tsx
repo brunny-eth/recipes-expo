@@ -173,6 +173,12 @@ export default function LibraryScreen() {
     });
   }, []);
 
+  // Dismiss search (used by X button in search results)
+  const dismissSearch = useCallback(() => {
+    setIsSearchActive(false);
+    setSearchQuery('');
+  }, []);
+
   // Build indexed list for search
   const indexedRecipes = useMemo(() => {
     return savedRecipes.map((r) => ({ recipe: r, blob: buildSearchBlob(r) }));
@@ -767,10 +773,10 @@ export default function LibraryScreen() {
                   returnKeyType="search"
                   autoCorrect={false}
                   autoFocus={true}
-                  onBlur={() => {
-                    setIsSearchActive(false);
-                    setSearchQuery('');
-                  }}
+                onBlur={() => {
+                  // Keep search active on blur to show results without keyboard
+                  // Don't clear search query to allow recipe selection
+                }}
                 />
               ) : (
                 <Text style={[
@@ -799,9 +805,18 @@ export default function LibraryScreen() {
         {((isSearchActive && searchQuery.length > 0) || isNavigating) && (
           <View style={styles.searchResultsWrapper}>
             <View style={styles.searchResultsContainer}>
-              <Text style={styles.searchResultsHeader}>
-                {isNavigating ? 'Loading recipe...' : `Search results (${filteredRecipes.length})`}
-              </Text>
+              <View style={styles.searchResultsHeader}>
+                <Text style={styles.searchResultsHeaderText}>
+                  {isNavigating ? 'Loading recipe...' : `Search results (${filteredRecipes.length})`}
+                </Text>
+                <TouchableOpacity
+                  style={styles.searchResultsDismissButton}
+                  onPress={dismissSearch}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <MaterialCommunityIcons name="close" size={20} color="#000000" />
+                </TouchableOpacity>
+              </View>
               {filteredRecipes.length > 0 ? (
                 <FlatList
                   data={filteredRecipes}
@@ -1312,7 +1327,7 @@ const styles = StyleSheet.create({
 
   searchResultsWrapper: {
     paddingLeft: 0, // Remove left padding for true left alignment
-    paddingRight: SPACING.pageHorizontal, // Keep right padding
+    paddingRight: 0, // Remove right padding to match folder rows
     paddingTop: 0,
     paddingBottom: SPACING.md,
     width: '90%',
@@ -1328,12 +1343,23 @@ const styles = StyleSheet.create({
     width: '100%',
   } as ViewStyle,
   searchResultsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.sm,
+    paddingLeft: 0, // Remove left padding for perfect alignment
+    paddingRight: 0, // Remove right padding to allow X button at edge
+    borderBottomWidth: 1,
+    borderBottomColor: '#000000',
+  },
+  searchResultsHeaderText: {
     ...bodyStrongText,
     fontSize: FONT.size.body,
     color: COLORS.textDark,
-    marginBottom: SPACING.sm,
-    paddingLeft: 0, // Remove left padding for perfect alignment
-    paddingRight: 18, // Match other elements' right padding
+  },
+  searchResultsDismissButton: {
+    padding: 4,
+    marginRight: 0,
   },
   searchResultsList: {
     paddingLeft: 0, // Match other elements' left padding

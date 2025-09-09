@@ -3092,8 +3092,7 @@ export default function RecipeSummaryScreen() {
             router.push({
               pathname: "/media-viewer",
               params: {
-                uri: String(imageUrl),
-                mime: recipe.imageMime ?? ""
+                uri: String(imageUrl)
               }
             });
           };
@@ -3307,6 +3306,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    backgroundColor: '#DEF6FF', // Light blue background to match other pages
     borderTopWidth: 1,
     borderTopColor: '#000000',
     borderBottomWidth: 1,
