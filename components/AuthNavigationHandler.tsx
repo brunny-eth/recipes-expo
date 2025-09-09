@@ -1,19 +1,23 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useRevenueCat } from '@/context/RevenueCatContext';
 import { useSuccessModal } from '@/context/SuccessModalContext';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import { useHandleError } from '@/hooks/useHandleError';
 import { createLogger } from '@/utils/logger';
+import PaywallModal from '@/components/PaywallModal';
 
 const logger = createLogger('auth-navigation');
 
 export function AuthNavigationHandler() {
   const router = useRouter();
   const { onAuthNavigation } = useAuth();
+  const { isPremium, isLoading: isRevenueCatLoading, checkEntitlements } = useRevenueCat();
   const { showSuccess } = useSuccessModal();
   const { showError } = useErrorModal();
   const handleError = useHandleError();
+  const [showPaywall, setShowPaywall] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthNavigation((event) => {
@@ -43,9 +47,23 @@ export function AuthNavigationHandler() {
             );
           }
           
-          // Delay navigation to allow modal to show
-          setTimeout(() => {
-            router.replace('/tabs');
+          // Check premium status after authentication
+          setTimeout(async () => {
+            try {
+              await checkEntitlements();
+              
+              if (!isPremium && !isRevenueCatLoading) {
+                logger.info('User not premium, showing paywall', { userId: event.userId });
+                setShowPaywall(true);
+              } else {
+                logger.info('User has premium access, navigating to tabs', { userId: event.userId, isPremium });
+                router.replace('/tabs');
+              }
+            } catch (error) {
+              logger.error('Error checking entitlements after sign in', { error, userId: event.userId });
+              // On error, allow user to proceed to avoid blocking access
+              router.replace('/tabs');
+            }
           }, 500);
           break;
         
@@ -66,8 +84,24 @@ export function AuthNavigationHandler() {
     });
 
     return unsubscribe;
-  }, [onAuthNavigation, router, showSuccess, showError, handleError]);
+  }, [onAuthNavigation, router, showSuccess, showError, handleError, isPremium, isRevenueCatLoading, checkEntitlements]);
 
-  // This component doesn't render anything
-  return null;
+  const handlePaywallClose = () => {
+    setShowPaywall(false);
+    // Navigate to tabs even if user dismisses paywall
+    router.replace('/tabs');
+  };
+
+  const handleSubscribed = () => {
+    setShowPaywall(false);
+    router.replace('/tabs');
+  };
+
+  return (
+    <PaywallModal
+      visible={showPaywall}
+      onClose={handlePaywallClose}
+      onSubscribed={handleSubscribed}
+    />
+  );
 } 

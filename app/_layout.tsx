@@ -14,6 +14,7 @@ import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { ErrorModalProvider } from '@/context/ErrorModalContext';
 import { SuccessModalProvider } from '@/context/SuccessModalContext';
 import { CookingProvider } from '@/context/CookingContext';
+import { RevenueCatProvider } from '@/context/RevenueCatContext';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import WelcomeScreen from '@/components/WelcomeScreen';
 import AppNavigators from '@/components/AppNavigators';
@@ -164,10 +165,12 @@ export default function RootLayout() {
         <ErrorModalProvider>
           <SuccessModalProvider>
             <AuthProvider>
-              <CookingProvider>
-                <AuthNavigationHandler />
-                <RootLayoutNav />
-              </CookingProvider>
+              <RevenueCatProvider>
+                <CookingProvider>
+                  <AuthNavigationHandler />
+                  <RootLayoutNav />
+                </CookingProvider>
+              </RevenueCatProvider>
             </AuthProvider>
           </SuccessModalProvider>
         </ErrorModalProvider>
