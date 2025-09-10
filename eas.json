@@ -31,11 +31,12 @@
       "autoIncrement": true,
       "env": {
         "BUNDLE_ID": "com.meez.recipes",
-        "EXPO_DEBUG": "1"
+        "EXPO_PUBLIC_ENV": "production"
       },
       "ios": {
-        "simulator": false
-        }
+        "simulator": false,
+        "image": "latest"
+      }
     }
   },
   "submit": {

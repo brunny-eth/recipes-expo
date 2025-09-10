@@ -120,6 +120,8 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
         customerInfo = await Purchases.getCustomerInfo();
         logger.info('[RevenueCat] Purchases.getCustomerInfo() succeeded');
         console.log('[RevenueCat] entitlements:', customerInfo.entitlements.active);
+        console.log('[RevenueCat] raw entitlements', customerInfo.entitlements);
+        console.log('[Paywall] shouldShow =', Object.keys(customerInfo.entitlements.active || {}).length === 0);
       } catch (entitlementError: any) {
         logger.error('Purchases.getCustomerInfo() failed', {
           error: entitlementError?.message || 'Unknown entitlement error',
@@ -151,7 +153,10 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
       }
 
       // Check if user has premium access
-      if (customerInfo.entitlements.active?.["premium_access"]) {
+      const hasPremiumAccess = customerInfo.entitlements.active?.["premium_access"];
+      console.log('[RevenueCat] hasPremiumAccess:', hasPremiumAccess);
+      
+      if (hasPremiumAccess) {
         logger.info('User has premium access - unlocking app');
         unlockApp();
       } else {
@@ -201,6 +206,7 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
       // Wrap the actual API call with try/catch
       try {
         offeringsData = await Purchases.getOfferings();
+        console.log('[RevenueCat] offerings', offeringsData);
       } catch (apiError: any) {
         logger.error('Purchases.getOfferings() failed', {
           error: apiError?.message || 'Unknown API error',
@@ -424,12 +430,14 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
   // Unlock the app (grant premium access)
   const unlockApp = useCallback(() => {
     logger.info('Unlocking premium features');
+    console.log('[RevenueCat] unlockApp() called - setting isPremium to true');
     setIsPremium(true);
   }, []);
 
   // Show paywall (revoke premium access)
   const showPaywall = useCallback(() => {
     logger.info('Showing paywall - premium access revoked');
+    console.log('[RevenueCat] showPaywall() called - setting isPremium to false');
     setIsPremium(false);
   }, []);
 

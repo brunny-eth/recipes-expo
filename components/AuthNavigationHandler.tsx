@@ -19,6 +19,17 @@ export function AuthNavigationHandler() {
   const handleError = useHandleError();
   const [showPaywall, setShowPaywall] = useState(false);
 
+  // Show paywall when user doesn't have premium access
+  useEffect(() => {
+    if (!isRevenueCatLoading && !isPremium) {
+      console.log('[AuthNavigationHandler] User does not have premium access, showing paywall');
+      setShowPaywall(true);
+    } else if (isPremium) {
+      console.log('[AuthNavigationHandler] User has premium access, hiding paywall');
+      setShowPaywall(false);
+    }
+  }, [isPremium, isRevenueCatLoading]);
+
   useEffect(() => {
     const unsubscribe = onAuthNavigation((event) => {
       logger.info('Handling auth navigation event', { 
