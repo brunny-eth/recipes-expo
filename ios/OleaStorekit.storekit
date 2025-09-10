@@ -1,0 +1,169 @@
+{
+  "appPolicies" : {
+    "eula" : "",
+    "policies" : [
+      {
+        "locale" : "en_US",
+        "policyText" : "",
+        "policyURL" : ""
+      }
+    ]
+  },
+  "identifier" : "041A1964",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "50.0",
+      "familyShareable" : false,
+      "internalID" : "6752309268",
+      "localizations" : [
+        {
+          "description" : "Full access to Olea for as long as you want!",
+          "displayName" : "Olea Lifetime",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "olea.lifetime",
+      "referenceName" : "Olea Lifetime",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "6749007215",
+    "_developerTeamID" : "QN3PZD4P5S",
+    "_failTransactionsEnabled" : false,
+    "_lastSynchronizedDate" : 779211031.04995096,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Store Sync"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Transaction"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Manage Subscriptions Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Refund Request Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Offer Code Redeem Sheet"
+      }
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21777097",
+      "localizations" : [
+
+      ],
+      "name" : "Olea Premium",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "30.0",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "6752307134",
+          "introductoryOffer" : {
+            "internalID" : "7A006BD9",
+            "numberOfPeriods" : 1,
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P1M"
+          },
+          "localizations" : [
+            {
+              "description" : "Full access to Olea with a 1 month free trial",
+              "displayName" : "Olea Annual",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "olea.annual",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Olea Annual",
+          "subscriptionGroupID" : "21777097",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "4.0",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6752309260",
+          "introductoryOffer" : {
+            "internalID" : "D55E4570",
+            "numberOfPeriods" : 1,
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P1M"
+          },
+          "localizations" : [
+            {
+              "description" : "Monthly subscription with 1 month free trial",
+              "displayName" : "Olea Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "olea.month",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Olea Monthly",
+          "subscriptionGroupID" : "21777097",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

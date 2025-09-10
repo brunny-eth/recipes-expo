@@ -24,14 +24,10 @@ interface RevenueCatContextType {
 
 const RevenueCatContext = createContext<RevenueCatContextType | undefined>(undefined);
 
+// Global flag to ensure SDK is only initialized once across the entire app
+let globalSdkInitialized = false;
+
 export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
-  const renderCount = React.useRef(0);
-  renderCount.current += 1;
-
-  React.useEffect(() => {
-    console.log(`🔄 RevenueCatProvider rendered (count: ${renderCount.current})`);
-  });
-
   const { isAuthenticated } = useAuth();
   const { showError } = useErrorModal();
 
@@ -40,6 +36,7 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
   const [isLoading, setIsLoading] = useState(true);
   const [offerings, setOfferings] = useState<any>(null);
   const [isPurchaseInProgress, setIsPurchaseInProgress] = useState(false);
+  const [sdkInitialized, setSdkInitialized] = useState(globalSdkInitialized);
 
   // Keep stable reference to showError
   const showErrorRef = React.useRef(showError);
@@ -47,31 +44,59 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
     showErrorRef.current = showError;
   }, [showError]);
 
-  // Track if SDK has been initialized to prevent multiple initializations
-  const sdkInitializedRef = React.useRef(false);
-
-  // Initialize RevenueCat SDK once
+  // Initialize RevenueCat SDK once globally
   React.useEffect(() => {
-    if (!sdkInitializedRef.current) {
+    if (!globalSdkInitialized) {
       const revenueCatApiKey = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY;
+      logger.info('[RevenueCat] Initialization starting...', {
+        hasApiKey: !!revenueCatApiKey,
+        keyPrefix: revenueCatApiKey ? revenueCatApiKey.substring(0, 5) + '...' : 'none',
+        keyStartsWithAppl: revenueCatApiKey?.startsWith('appl_')
+      });
+      
       if (revenueCatApiKey && revenueCatApiKey.startsWith('appl_')) {
         try {
+          logger.info('[RevenueCat] Starting Purchases.configure()');
           Purchases.configure({ apiKey: revenueCatApiKey });
-          sdkInitializedRef.current = true;
+          logger.info('[RevenueCat] Purchases.configure() finished');
+          globalSdkInitialized = true;
+          setSdkInitialized(true);
           logger.info('[RevenueCat] SDK initialized successfully');
         } catch (error) {
           logger.error('[RevenueCat] Failed to initialize SDK:', error as any);
+          setSdkInitialized(false);
         }
       } else {
-        logger.warn('[RevenueCat] No valid API key found, SDK not initialized');
+        logger.error('[RevenueCat] Missing or invalid API key', {
+          hasKey: !!revenueCatApiKey,
+          keyValue: revenueCatApiKey || 'undefined'
+        });
+        setSdkInitialized(false);
       }
+    } else {
+      // SDK already initialized globally, just update local state
+      setSdkInitialized(true);
     }
   }, []);
 
   // Check user entitlements with defensive error handling
   const checkEntitlements = useCallback(async () => {
+    logger.info('[RevenueCat] checkEntitlements called', {
+      isAuthenticated,
+      sdkInitialized,
+      timestamp: new Date().toISOString()
+    });
+
     if (!isAuthenticated) {
+      logger.info('[RevenueCat] User not authenticated, skipping entitlements check');
       setIsPremium(false);
+      setIsLoading(false);
+      return;
+    }
+
+    // Don't check entitlements until SDK is initialized
+    if (!sdkInitialized) {
+      logger.info('[RevenueCat] Waiting for RevenueCat SDK initialization before checking entitlements');
       setIsLoading(false);
       return;
     }
@@ -87,12 +112,14 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
         return;
       }
 
-      logger.info('Checking user entitlements');
+      logger.info('[RevenueCat] About to call Purchases.getCustomerInfo()');
 
       // Wrap the actual customer info call
       let customerInfo: CustomerInfo;
       try {
         customerInfo = await Purchases.getCustomerInfo();
+        logger.info('[RevenueCat] Purchases.getCustomerInfo() succeeded');
+        console.log('[RevenueCat] entitlements:', customerInfo.entitlements.active);
       } catch (entitlementError: any) {
         logger.error('Purchases.getCustomerInfo() failed', {
           error: entitlementError?.message || 'Unknown entitlement error',
@@ -149,10 +176,16 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated]); // Remove showError from dependencies
+  }, [isAuthenticated, sdkInitialized]); // Remove showError from dependencies
 
   // Fetch available offerings/products with defensive error handling
   const fetchOfferings = useCallback(async () => {
+    // Don't fetch offerings until SDK is initialized
+    if (!sdkInitialized) {
+      logger.info('Waiting for RevenueCat SDK initialization before fetching offerings');
+      return;
+    }
+
     let offeringsData;
 
     try {
@@ -229,10 +262,16 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
         );
       }
     }
-  }, []); // Remove showError from dependencies
+  }, [sdkInitialized]); // Remove showError from dependencies
 
-  // Purchase a package with defensive error handling
+  // Purchase a package with defensive error handling and debouncing
   const purchasePackage = useCallback(async (pkg: PurchasesPackage): Promise<boolean> => {
+    // Prevent concurrent purchases
+    if (isPurchaseInProgress) {
+      logger.warn('Purchase already in progress, ignoring duplicate request', { packageId: pkg?.identifier });
+      return false;
+    }
+
     try {
       setIsPurchaseInProgress(true);
 
@@ -307,10 +346,16 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
     } finally {
       setIsPurchaseInProgress(false);
     }
-  }, []); // Remove showError from dependencies
+  }, [isPurchaseInProgress]); // Add isPurchaseInProgress to dependencies for debouncing
 
-  // Restore purchases with defensive error handling
+  // Restore purchases with defensive error handling and debouncing
   const restorePurchases = useCallback(async (): Promise<boolean> => {
+    // Prevent concurrent restore operations
+    if (isLoading) {
+      logger.warn('Restore already in progress, ignoring duplicate request');
+      return false;
+    }
+
     try {
       setIsLoading(true);
 
@@ -374,7 +419,7 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
     } finally {
       setIsLoading(false);
     }
-  }, []); // Remove showError from dependencies
+  }, [isLoading]); // Add isLoading to dependencies for debouncing
 
   // Unlock the app (grant premium access)
   const unlockApp = useCallback(() => {
@@ -388,15 +433,32 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
     setIsPremium(false);
   }, []);
 
-  // Check entitlements when auth state changes
+  // Trigger checkEntitlements when SDK becomes ready
   useEffect(() => {
-    checkEntitlements();
-  }, [checkEntitlements]);
+    if (sdkInitialized) {
+      logger.info('[RevenueCat] SDK ready, now running checkEntitlements()');
+      checkEntitlements();
+    }
+  }, [sdkInitialized, checkEntitlements]);
 
-  // Fetch offerings on mount
+  // Check entitlements when auth state changes (but only if SDK is ready)
   useEffect(() => {
-    fetchOfferings();
-  }, [fetchOfferings]);
+    if (sdkInitialized) {
+      logger.info('[RevenueCat] Auth state changed, checking entitlements', {
+        isAuthenticated,
+        sdkInitialized
+      });
+      checkEntitlements();
+    }
+  }, [isAuthenticated, sdkInitialized, checkEntitlements]);
+
+  // Fetch offerings when SDK is ready
+  useEffect(() => {
+    if (sdkInitialized) {
+      logger.info('[RevenueCat] SDK ready, fetching offerings');
+      fetchOfferings();
+    }
+  }, [sdkInitialized, fetchOfferings]);
 
   const value = {
     isPremium,

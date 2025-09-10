@@ -26,6 +26,11 @@ export default function PaywallModal({ visible, onClose, onSubscribed }: Paywall
   const [selectedPackage, setSelectedPackage] = useState<PurchasesPackage | null>(null);
 
   const handlePurchase = async (pkg: PurchasesPackage) => {
+    // Prevent multiple rapid button presses
+    if (isPurchaseInProgress) {
+      return;
+    }
+
     setSelectedPackage(pkg);
 
     const success = await purchasePackage(pkg);
