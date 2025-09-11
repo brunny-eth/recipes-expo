@@ -136,6 +136,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     async (url: string | null) => {
       if (!url) return;
 
+      console.log("[auth][handleUrl]", url);
       logger.info('Handling deep link URL', { url });
 
       // Extract tokens from URL fragment and set session explicitly using setSession()
@@ -153,6 +154,11 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       const params = new URLSearchParams(fragment);
       const accessToken = params.get('access_token');
       const refreshToken = params.get('refresh_token');
+
+      console.log("[auth][tokens]", {
+        access: accessToken?.slice(0, 8),
+        refresh: refreshToken ? "present" : "missing",
+      });
 
       if (accessToken && refreshToken) {
         logger.info('Tokens found in deep link URL', { 
@@ -207,9 +213,13 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   useEffect(() => {
     logger.info('Setting up auth state change listener and URL listener');
 
-    // Temporary debug logging for auth events
-    supabase.auth.onAuthStateChange((_event, session) => {
-      console.log('[auth] event=', _event, 'hasSession=', !!session);
+    // Debug logging for auth events at app startup
+    supabase.auth.onAuthStateChange((event, session) => {
+      console.log("[auth][event]", event, {
+        userId: session?.user.id,
+        expiresAt: session?.expires_at,
+        hasRefresh: !!session?.refresh_token,
+      });
     });
 
     // Set up auth state change listener
