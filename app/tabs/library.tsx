@@ -26,9 +26,11 @@ import { COLORS, SPACING, RADIUS, BORDER_WIDTH, SHADOWS } from '@/constants/them
 import { bodyText, screenTitleText, FONT, bodyStrongText, captionText, metaText } from '@/constants/typography';
 import { useAuth } from '@/context/AuthContext';
 import { useErrorModal } from '@/context/ErrorModalContext';
+import { useRevenueCat } from '@/context/RevenueCatContext';
 import ScreenHeader from '@/components/ScreenHeader';
 import AddNewFolderModal from '@/components/AddNewFolderModal';
 import ConfirmationModal from '@/components/ConfirmationModal';
+import PaywallModal from '@/components/PaywallModal';
 import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
 import { useAnalytics } from '@/utils/analytics';
 import { useRenderCounter } from '@/hooks/useRenderCounter';
@@ -106,6 +108,7 @@ export default function LibraryScreen() {
   const { showError } = useErrorModal();
   const handleError = useHandleError();
   const { track } = useAnalytics();
+  const { isPremium } = useRevenueCat();
   
   // Tab state
   const [selectedTab, setSelectedTab] = useState<'explore' | 'saved'>(
@@ -147,6 +150,9 @@ export default function LibraryScreen() {
   // Confirmation modal state
   const [showDeleteFolderModal, setShowDeleteFolderModal] = useState(false);
   const [folderToDelete, setFolderToDelete] = useState<SavedFolder | null>(null);
+  
+  // Paywall modal state
+  const [showPaywallModal, setShowPaywallModal] = useState(false);
 
   // Color picker modal state
   const [showColorPickerModal, setShowColorPickerModal] = useState(false);
@@ -873,8 +879,26 @@ export default function LibraryScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScreenHeader title="LIBRARY" showBack={false} backgroundColor="#DEF6FF" />
       
-      {/* Content: Saved only */}
-      {renderSavedContent()}
+      {/* Content: Show paywall for non-premium users */}
+      {isPremium ? renderSavedContent() : (
+        <View style={styles.paywallContainer}>
+          <View style={styles.paywallContent}>
+            <View style={styles.paywallIconContainer}>
+              <MaterialCommunityIcons name="lock" size={48} color={COLORS.textMuted} />
+            </View>
+            <Text style={styles.paywallTitle}>🔒 Premium Feature</Text>
+            <Text style={styles.paywallDescription}>
+              Unlock your recipe library to save, organize, and access your favorite recipes anytime.
+            </Text>
+            <TouchableOpacity
+              style={styles.paywallButton}
+              onPress={() => setShowPaywallModal(true)}
+            >
+              <Text style={styles.paywallButtonText}>Upgrade to Premium</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* Add New Folder Modal */}
       <AddNewFolderModal
@@ -976,6 +1000,13 @@ export default function LibraryScreen() {
            </TouchableOpacity>
          </Modal>
        )}
+
+      {/* Paywall Modal */}
+      <PaywallModal
+        visible={showPaywallModal}
+        onClose={() => setShowPaywallModal(false)}
+        onSubscribed={() => setShowPaywallModal(false)}
+      />
     </View>
   );
 }
@@ -1376,4 +1407,44 @@ const styles = StyleSheet.create({
     paddingLeft: 0, // Remove left padding for perfect alignment
     paddingRight: 18, // Match other elements' right padding
   },
+
+  // Paywall styles
+  paywallContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.xl,
+  } as ViewStyle,
+  paywallContent: {
+    alignItems: 'center',
+    maxWidth: 300,
+  } as ViewStyle,
+  paywallIconContainer: {
+    marginBottom: SPACING.lg,
+  } as ViewStyle,
+  paywallTitle: {
+    ...bodyStrongText,
+    fontSize: FONT.size.body,
+    color: COLORS.textDark,
+    marginBottom: SPACING.sm,
+    textAlign: 'center',
+  } as TextStyle,
+  paywallDescription: {
+    ...bodyText,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: SPACING.xl,
+  } as TextStyle,
+  paywallButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.xl,
+    borderRadius: RADIUS.sm,
+  } as ViewStyle,
+  paywallButtonText: {
+    ...bodyStrongText,
+    color: COLORS.white,
+    textAlign: 'center',
+  } as TextStyle,
 }); 

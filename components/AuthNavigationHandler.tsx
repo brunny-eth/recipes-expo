@@ -19,25 +19,48 @@ export function AuthNavigationHandler() {
   const handleError = useHandleError();
   const [showPaywall, setShowPaywall] = useState(false);
 
-  // Check if paywall is enabled
+  // Check if paywall is enabled (use same logic as RevenueCatContext)
   const enablePaywall = process.env.EXPO_PUBLIC_ENABLE_PAYWALL === "true";
+  
+  // TESTING: Disable main app paywall for testing selective paywall (remove this in production)
+  const TESTING_PAYWALL = false; // Set to false to disable main app paywall
+  const forceEnablePaywall = enablePaywall && !TESTING_PAYWALL;
+  
+  console.log('🔍 [AuthNavigationHandler] Paywall configuration:', {
+    enablePaywall,
+    TESTING_PAYWALL,
+    forceEnablePaywall,
+    envValue: process.env.EXPO_PUBLIC_ENABLE_PAYWALL,
+    isPremium,
+    isRevenueCatLoading
+  });
+  
+  // Force visible log for debugging
+  console.warn('🚨 AUTH NAV DEBUG - Paywall enabled:', forceEnablePaywall, 'isPremium:', isPremium, 'isLoading:', isRevenueCatLoading);
 
   // Show paywall when user doesn't have premium access (only if paywall is enabled)
   useEffect(() => {
-    if (!enablePaywall) {
+    console.warn('🚨 AUTH NAV useEffect triggered:', {
+      forceEnablePaywall,
+      isRevenueCatLoading,
+      isPremium,
+      showPaywall
+    });
+    
+    if (!forceEnablePaywall) {
       console.log('[AuthNavigationHandler] Paywall disabled, hiding paywall');
       setShowPaywall(false);
       return;
     }
 
     if (!isRevenueCatLoading && !isPremium) {
-      console.log('[AuthNavigationHandler] User does not have premium access, showing paywall');
+      console.warn('🚨 SHOWING PAYWALL - User does not have premium access');
       setShowPaywall(true);
     } else if (isPremium) {
       console.log('[AuthNavigationHandler] User has premium access, hiding paywall');
       setShowPaywall(false);
     }
-  }, [isPremium, isRevenueCatLoading, enablePaywall]);
+  }, [isPremium, isRevenueCatLoading, forceEnablePaywall]);
 
   useEffect(() => {
     const unsubscribe = onAuthNavigation((event) => {
@@ -70,7 +93,7 @@ export function AuthNavigationHandler() {
           // Check premium status after authentication (only if paywall is enabled)
           setTimeout(async () => {
             try {
-              if (enablePaywall) {
+              if (forceEnablePaywall) {
                 await checkEntitlements();
                 
                 if (!isPremium && !isRevenueCatLoading) {

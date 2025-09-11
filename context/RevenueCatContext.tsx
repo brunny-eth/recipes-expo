@@ -33,13 +33,28 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
 
   // Check if paywall is enabled
   const enablePaywall = process.env.EXPO_PUBLIC_ENABLE_PAYWALL === "true";
+  
+  // TESTING: Disable main app paywall but keep selective paywall for testing (remove this in production)
+  const TESTING_PAYWALL = false; // Set to false to disable main app paywall
+  const forceEnablePaywall = enablePaywall && !TESTING_PAYWALL;
+  
+  console.log('🔍 [RevenueCat] Paywall configuration:', {
+    enablePaywall,
+    TESTING_PAYWALL,
+    forceEnablePaywall,
+    envValue: process.env.EXPO_PUBLIC_ENABLE_PAYWALL,
+    nodeEnv: process.env.NODE_ENV
+  });
+  
+  // Force visible log for debugging
+  console.warn('🚨 REVENUECAT DEBUG - Paywall enabled:', forceEnablePaywall, 'isPremium:', !forceEnablePaywall);
 
   // State
-  const [isPremium, setIsPremium] = useState(!enablePaywall); // Always premium if paywall disabled
-  const [isLoading, setIsLoading] = useState(enablePaywall); // Only loading if paywall enabled
+  const [isPremium, setIsPremium] = useState(!forceEnablePaywall); // Always premium if paywall disabled
+  const [isLoading, setIsLoading] = useState<boolean>(forceEnablePaywall); // Only loading if paywall enabled
   const [offerings, setOfferings] = useState<any>(null);
   const [isPurchaseInProgress, setIsPurchaseInProgress] = useState(false);
-  const [sdkInitialized, setSdkInitialized] = useState(globalSdkInitialized);
+  const [sdkInitialized, setSdkInitialized] = useState<boolean>(globalSdkInitialized);
 
   // Keep stable reference to showError
   const showErrorRef = React.useRef(showError);
@@ -49,7 +64,7 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
 
   // Initialize RevenueCat SDK once globally (only if paywall is enabled)
   React.useEffect(() => {
-    if (!enablePaywall) {
+    if (!forceEnablePaywall) {
       logger.info('[RevenueCat] Paywall disabled, skipping SDK initialization');
       setSdkInitialized(true);
       setIsLoading(false);
@@ -57,7 +72,8 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
     }
 
     if (!globalSdkInitialized) {
-      const revenueCatApiKey = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY;
+      const revenueCatApiKey = process.env.EXPO_PUBLIC_REVENUECAT_KEY;
+      console.log("[RevenueCat] API key at runtime:", process.env.EXPO_PUBLIC_REVENUECAT_KEY);
       logger.info('[RevenueCat] Initialization starting...', {
         hasApiKey: !!revenueCatApiKey,
         keyPrefix: revenueCatApiKey ? revenueCatApiKey.substring(0, 5) + '...' : 'none',
@@ -87,19 +103,19 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
       // SDK already initialized globally, just update local state
       setSdkInitialized(true);
     }
-  }, [enablePaywall]);
+  }, [forceEnablePaywall]);
 
   // Check user entitlements with defensive error handling
   const checkEntitlements = useCallback(async () => {
     logger.info('[RevenueCat] checkEntitlements called', {
       isAuthenticated,
       sdkInitialized,
-      enablePaywall,
+      enablePaywall: forceEnablePaywall,
       timestamp: new Date().toISOString()
     });
 
     // If paywall is disabled, always grant premium access
-    if (!enablePaywall) {
+    if (!forceEnablePaywall) {
       logger.info('[RevenueCat] Paywall disabled, granting premium access');
       setIsPremium(true);
       setIsLoading(false);
@@ -136,7 +152,7 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
       // Wrap the actual customer info call
       let customerInfo: CustomerInfo;
       try {
-        if (process.env.EXPO_PUBLIC_ENABLE_PAYWALL === "true") {
+        if (forceEnablePaywall) {
           customerInfo = await Purchases.getCustomerInfo();
           logger.info('[RevenueCat] Purchases.getCustomerInfo() succeeded');
           console.log('[RevenueCat] entitlements:', customerInfo.entitlements.active);
@@ -198,13 +214,19 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
 
       // Check if user has premium access
       const hasPremiumAccess = customerInfo.entitlements.active?.["premium_access"];
-      console.log('[RevenueCat] hasPremiumAccess:', hasPremiumAccess);
+      console.warn('🚨 REVENUECAT ENTITLEMENTS CHECK:', {
+        hasPremiumAccess,
+        activeEntitlements: customerInfo.entitlements.active,
+        allEntitlements: customerInfo.entitlements
+      });
       
       if (hasPremiumAccess) {
         logger.info('User has premium access - unlocking app');
+        console.warn('🚨 CALLING UNLOCK APP');
         unlockApp();
       } else {
         logger.info('User does not have premium access - showing paywall');
+        console.warn('🚨 CALLING SHOW PAYWALL');
         showPaywall();
       }
 
@@ -230,7 +252,7 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
   // Fetch available offerings/products with defensive error handling
   const fetchOfferings = useCallback(async () => {
     // Don't fetch offerings if paywall is disabled
-    if (!enablePaywall) {
+    if (!forceEnablePaywall) {
       logger.info('Paywall disabled, skipping offerings fetch');
       return;
     }
@@ -255,7 +277,7 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
 
       // Wrap the actual API call with try/catch
       try {
-        if (process.env.EXPO_PUBLIC_ENABLE_PAYWALL === "true") {
+        if (forceEnablePaywall) {
           offeringsData = await Purchases.getOfferings();
           console.log('[RevenueCat] offerings', offeringsData);
         }
@@ -320,7 +342,7 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
         );
       }
     }
-  }, [sdkInitialized, enablePaywall]); // Remove showError from dependencies
+  }, [sdkInitialized, forceEnablePaywall]); // Remove showError from dependencies
 
   // Purchase a package with defensive error handling and debouncing
   const purchasePackage = useCallback(async (pkg: PurchasesPackage): Promise<boolean> => {
@@ -351,7 +373,7 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
       // Wrap the actual purchase call
       let purchaseResult;
       try {
-        if (process.env.EXPO_PUBLIC_ENABLE_PAYWALL === "true") {
+        if (forceEnablePaywall) {
           purchaseResult = await Purchases.purchasePackage(pkg);
         } else {
           throw new Error('Paywall is disabled - purchases not available');
@@ -433,7 +455,7 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
       // Wrap the actual restore call
       let customerInfo: CustomerInfo;
       try {
-        if (process.env.EXPO_PUBLIC_ENABLE_PAYWALL === "true") {
+        if (forceEnablePaywall) {
           customerInfo = await Purchases.restorePurchases();
         } else {
           throw new Error('Paywall is disabled - restore purchases not available');
@@ -490,14 +512,14 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
   // Unlock the app (grant premium access)
   const unlockApp = useCallback(() => {
     logger.info('Unlocking premium features');
-    console.log('[RevenueCat] unlockApp() called - setting isPremium to true');
+    console.warn('🚨 UNLOCK APP CALLED - setting isPremium to true');
     setIsPremium(true);
   }, []);
 
   // Show paywall (revoke premium access)
   const showPaywall = useCallback(() => {
     logger.info('Showing paywall - premium access revoked');
-    console.log('[RevenueCat] showPaywall() called - setting isPremium to false');
+    console.warn('🚨 SHOW PAYWALL CALLED - setting isPremium to false');
     setIsPremium(false);
   }, []);
 
@@ -522,11 +544,11 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
 
   // Fetch offerings when SDK is ready (only if paywall is enabled)
   useEffect(() => {
-    if (sdkInitialized && enablePaywall) {
+    if (sdkInitialized && forceEnablePaywall) {
       logger.info('[RevenueCat] SDK ready, fetching offerings');
       fetchOfferings();
     }
-  }, [sdkInitialized, enablePaywall, fetchOfferings]);
+  }, [sdkInitialized, forceEnablePaywall, fetchOfferings]);
 
   const value = {
     isPremium,

@@ -42,6 +42,7 @@ import ScreenHeader from '@/components/ScreenHeader';
 import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
 import { parseServingsValue } from '@/utils/recipeUtils';
 import { useCooking } from '@/context/CookingContext';
+import { useRevenueCat } from '@/context/RevenueCatContext';
 import { formatIngredientsForGroceryList, getBasicGroceryCategory, formatAmountForGroceryDisplay } from '@/utils/groceryHelpers';
 import { getUnitDisplayName } from '@/utils/units';
 import { 
@@ -52,6 +53,7 @@ import {
   ManualGroceryItem 
 } from '@/utils/manualGroceryStorage';
 import HouseholdStaplesModal from '@/components/HouseholdStaplesModal';
+import PaywallModal from '@/components/PaywallModal';
 
 // Cache removed - always fetch fresh data for consistency
 
@@ -323,6 +325,7 @@ export default function MiseScreen() {
   const handleError = useHandleError();
   const { track } = useAnalytics();
   const { hasResumableSession, state: cookingState, invalidateSession, initializeSessions, selectMiseRecipe } = useCooking();
+  const { isPremium } = useRevenueCat();
   const [miseRecipes, setMiseRecipes] = useState<MiseRecipe[]>([]);
   const [groceryList, setGroceryList] = useState<GroceryCategory[]>([]);
   const [manualItems, setManualItems] = useState<ManualGroceryItem[]>([]);
@@ -336,6 +339,9 @@ export default function MiseScreen() {
   const [staplesModalVisible, setStaplesModalVisible] = useState(false);
   const [staplesEnabled, setStaplesEnabled] = useState(false);
   const [selectedStaples, setSelectedStaples] = useState<string[]>([]);
+  
+  // Paywall modal state
+  const [showPaywallModal, setShowPaywallModal] = useState(false);
 
   // Removed caching strategy - always fetch fresh data for consistency
 
@@ -1387,10 +1393,12 @@ export default function MiseScreen() {
         {/* Action Buttons */}
         <TouchableOpacity
           style={styles.miseToolbarButton}
-          onPress={handleCookMyRecipes}
+          onPress={isPremium ? handleCookMyRecipes : () => setShowPaywallModal(true)}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Text style={styles.miseToolbarButtonText}>Cook Recipes</Text>
+          <Text style={styles.miseToolbarButtonText}>
+            {isPremium ? 'Cook Recipes' : '🔒 Cook Recipes (Premium)'}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -1439,43 +1447,63 @@ export default function MiseScreen() {
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeaderWithControls}>
             <Text style={styles.sectionTitle}>Groceries</Text>
-            <TouchableOpacity
-              onPress={handleShareGrocery}
-              style={styles.shareIconButton}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <MaterialCommunityIcons name="share" size={16} color={COLORS.textDark} />
-            </TouchableOpacity>
+            {isPremium && (
+              <TouchableOpacity
+                onPress={handleShareGrocery}
+                style={styles.shareIconButton}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <MaterialCommunityIcons name="share" size={16} color={COLORS.textDark} />
+              </TouchableOpacity>
+            )}
           </View>
           <View style={styles.sectionDivider} />
           
-          {(() => {
-            // Determine which data to use based on sort mode and staples filter
-            let displayGroceryList = groceryList;
-            
-            // First apply staples filtering if enabled
-            displayGroceryList = filterHouseholdStaples(displayGroceryList, staplesEnabled, selectedStaples);
-            
-            // Then apply sorting if alphabetical mode
-            if (sortMode === 'alphabetical') {
-              displayGroceryList = sortGroceryItemsAlphabetically(displayGroceryList);
-            }
+          {isPremium ? (
+            (() => {
+              // Determine which data to use based on sort mode and staples filter
+              let displayGroceryList = groceryList;
+              
+              // First apply staples filtering if enabled
+              displayGroceryList = filterHouseholdStaples(displayGroceryList, staplesEnabled, selectedStaples);
+              
+              // Then apply sorting if alphabetical mode
+              if (sortMode === 'alphabetical') {
+                displayGroceryList = sortGroceryItemsAlphabetically(displayGroceryList);
+              }
 
-            // Always render the grocery list; ensure there's always a Miscellaneous category
-            if (displayGroceryList.length === 0) {
-              displayGroceryList = [{ name: 'Miscellaneous', items: [] }];
-            }
+              // Always render the grocery list; ensure there's always a Miscellaneous category
+              if (displayGroceryList.length === 0) {
+                displayGroceryList = [{ name: 'Miscellaneous', items: [] }];
+              }
 
-            return (
-              <View style={styles.groceryListContainer}>
-                {displayGroceryList.map((category) => (
-                  <View key={`category-${category.name}-${category.items.length}`}>
-                    {renderGroceryCategory({ item: category })}
-                  </View>
-                ))}
+              return (
+                <View style={styles.groceryListContainer}>
+                  {displayGroceryList.map((category) => (
+                    <View key={`category-${category.name}-${category.items.length}`}>
+                      {renderGroceryCategory({ item: category })}
+                    </View>
+                  ))}
+                </View>
+              );
+            })()
+          ) : (
+            <View style={styles.paywallSection}>
+              <View style={styles.paywallIconContainer}>
+                <MaterialCommunityIcons name="lock" size={32} color={COLORS.textMuted} />
               </View>
-            );
-          })()}
+              <Text style={styles.paywallTitle}>🔒 Premium Feature</Text>
+              <Text style={styles.paywallDescription}>
+                Unlock your personalized grocery list to organize ingredients and streamline your shopping.
+              </Text>
+              <TouchableOpacity
+                style={styles.paywallButton}
+                onPress={() => setShowPaywallModal(true)}
+              >
+                <Text style={styles.paywallButtonText}>Upgrade to Premium</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </ScrollView>
     );
@@ -1525,6 +1553,13 @@ export default function MiseScreen() {
         onStaplesChange={handleStaplesChange}
         staplesEnabled={staplesEnabled}
         onStaplesToggle={handleToggleStaples}
+      />
+
+      {/* Paywall Modal */}
+      <PaywallModal
+        visible={showPaywallModal}
+        onClose={() => setShowPaywallModal(false)}
+        onSubscribed={() => setShowPaywallModal(false)}
       />
 
     </View>
@@ -2087,5 +2122,40 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 0,
   } as ViewStyle,
+
+  // Paywall styles
+  paywallSection: {
+    alignItems: 'center',
+    paddingVertical: SPACING.xl,
+    paddingHorizontal: SPACING.lg,
+  } as ViewStyle,
+  paywallIconContainer: {
+    marginBottom: SPACING.md,
+  } as ViewStyle,
+  paywallTitle: {
+    ...bodyStrongText,
+    fontSize: FONT.size.body,
+    color: COLORS.textDark,
+    marginBottom: SPACING.sm,
+    textAlign: 'center',
+  } as TextStyle,
+  paywallDescription: {
+    ...bodyText,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: SPACING.lg,
+  } as TextStyle,
+  paywallButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.sm,
+  } as ViewStyle,
+  paywallButtonText: {
+    ...bodyStrongText,
+    color: COLORS.white,
+    textAlign: 'center',
+  } as TextStyle,
 
 }); 

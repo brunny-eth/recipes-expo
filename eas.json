@@ -11,10 +11,11 @@
       "env": {
         "BUNDLE_ID": "com.meez.recipes",
         "EXPO_DEBUG": "1",
-        "EXPO_PUBLIC_ENABLE_PAYWALL": "true"
+        "EXPO_PUBLIC_ENABLE_PAYWALL": "true",
+        "EXPO_PUBLIC_REVENUECAT_KEY": "appl_gSwOLBSPbTBxfJyeoLVdVSInSZd"
       },
       "ios": {
-        "simulator": true
+        "simulator": false
       }
     },
     "preview": {
@@ -22,7 +23,8 @@
       "channel": "preview",
       "env": {
         "BUNDLE_ID": "com.meez.recipes",
-        "EXPO_PUBLIC_ENABLE_PAYWALL": "true"
+        "EXPO_PUBLIC_ENABLE_PAYWALL": "true",
+        "EXPO_PUBLIC_REVENUECAT_KEY":"appl_gSwOLBSPbTBxfJyeoLVdVSInSZd"
       },
       "ios": { "simulator": false }
     },
