@@ -11,6 +11,8 @@ import {
 import { bodyStrongText, FONT } from '@/constants/typography';
 import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
 import FolderPickerModal from '@/components/FolderPickerModal';
+import { useRevenueCat } from '@/context/RevenueCatContext';
+import PaywallModal from '@/components/PaywallModal';
 
 type RecipeFooterButtonsProps = {
   handleGoToSteps: () => void;
@@ -48,6 +50,8 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
   onOpenVariations,
 }) => {
   const [showFolderPicker, setShowFolderPicker] = useState(false);
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const { isPremium } = useRevenueCat();
 
   const handleFolderPickerSelect = (folderId: number) => {
     setShowFolderPicker(false);
@@ -55,6 +59,12 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
   };
 
   const handleSaveForLaterPress = () => {
+    // Check premium status first
+    if (!isPremium) {
+      setShowPremiumModal(true);
+      return;
+    }
+    
     setShowFolderPicker(true);
   };
 
@@ -303,6 +313,12 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
         onClose={() => setShowFolderPicker(false)}
         onSelectFolder={handleFolderPickerSelect}
         isLoading={isSavingForLater}
+      />
+      
+      {/* Premium Modal */}
+      <PaywallModal
+        visible={showPremiumModal}
+        onClose={() => setShowPremiumModal(false)}
       />
     </>
   );

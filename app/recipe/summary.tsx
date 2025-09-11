@@ -77,6 +77,8 @@ import RecipeStepsHeader from '@/components/recipe/RecipeStepsHeader';
 import ScreenHeader from '@/components/ScreenHeader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCooking } from '@/context/CookingContext';
+import { useRevenueCat } from '@/context/RevenueCatContext';
+import PaywallModal from '@/components/PaywallModal';
 
 // Type for a change (substitution or removal)
 type AppliedChange = {
@@ -253,6 +255,10 @@ export default function RecipeSummaryScreen() {
   const { session } = useAuth();
   const { showError, hideError } = useErrorModal();
   const { showSuccess } = useSuccessModal();
+  const { isPremium } = useRevenueCat();
+  
+  // Premium modal state
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
   const handleError = useHandleError();
   const { track } = useAnalytics();
   const insets = useSafeAreaInsets();
@@ -1217,6 +1223,12 @@ export default function RecipeSummaryScreen() {
 
   // Main title save handler
   const handleSaveTitle = useCallback(async () => {
+    // Check premium status
+    if (!isPremium) {
+      setShowPremiumModal(true);
+      return;
+    }
+    
     const cleanTitle = title.trim();
     const originalTitle = (originalTitleRef.current || '').trim();
     const userId = session?.user?.id;
@@ -1948,6 +1960,12 @@ export default function RecipeSummaryScreen() {
 
   const handleOpenVariations = () => {
     try {
+      // Check premium status
+      if (!isPremium) {
+        setShowPremiumModal(true);
+        return;
+      }
+      
       // Check if there are unsaved modifications and warn the user
       if (hasModifications) {
         showError(
@@ -1997,7 +2015,7 @@ export default function RecipeSummaryScreen() {
   };
 
   const handleSaveToFolder = async (folderId: number) => {
-  if (!recipe?.id || !session?.user) {
+    if (!recipe?.id || !session?.user) {
       handleError('Authentication Required', 'You need an account to save recipes.', undefined, {
         onButtonPress: () => router.push('/login')
       });
@@ -2288,6 +2306,12 @@ export default function RecipeSummaryScreen() {
 
   const handleCookNow = async () => {
     console.log('[Summary] Cook now button pressed');
+    
+    // Check premium status
+    if (!isPremium) {
+      setShowPremiumModal(true);
+      return;
+    }
     
     // Cook now available from all entry points now that we use unified mise flow
     
@@ -2626,6 +2650,12 @@ export default function RecipeSummaryScreen() {
 
   // Handle saving changes on saved recipes (single source of truth architecture)
   const handleSaveChanges = async () => {
+    // Check premium status
+    if (!isPremium) {
+      setShowPremiumModal(true);
+      return;
+    }
+    
     if (!recipe || !session?.user) {
       handleError('Authentication Required', 'You need an account to save changes.');
       return;
@@ -3290,6 +3320,12 @@ export default function RecipeSummaryScreen() {
         hasModifications={hasModifications}
         isAlreadyInMise={isAlreadyInMise}
         onOpenVariations={handleOpenVariations}
+      />
+      
+      {/* Premium Modal */}
+      <PaywallModal
+        visible={showPremiumModal}
+        onClose={() => setShowPremiumModal(false)}
       />
       </View>
     </PanGestureHandler>

@@ -20,6 +20,10 @@ interface RevenueCatContextType {
   restorePurchases: () => Promise<boolean>;
   unlockApp: () => void;
   showPaywall: () => void;
+  
+  // TESTING: Manual toggle for testing (remove this in production)
+  togglePremiumStatus: () => void;
+  manualPremiumToggle: boolean;
 }
 
 const RevenueCatContext = createContext<RevenueCatContextType | undefined>(undefined);
@@ -36,7 +40,10 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
   
   // TESTING: Disable main app paywall but keep selective paywall for testing (remove this in production)
   const TESTING_PAYWALL = false; // Set to false to disable main app paywall
-  const forceEnablePaywall = enablePaywall && !TESTING_PAYWALL;
+  const forceEnablePaywall = enablePaywall && TESTING_PAYWALL;
+  
+  // TESTING: Manual premium toggle for testing selective paywall (remove this in production)
+  const [manualPremiumToggle, setManualPremiumToggle] = useState(true); // Start as premium for testing
   
   console.log('🔍 [RevenueCat] Paywall configuration:', {
     enablePaywall,
@@ -50,7 +57,7 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
   console.warn('🚨 REVENUECAT DEBUG - Paywall enabled:', forceEnablePaywall, 'isPremium:', !forceEnablePaywall);
 
   // State
-  const [isPremium, setIsPremium] = useState(!forceEnablePaywall); // Always premium if paywall disabled
+  const [isPremium, setIsPremium] = useState(manualPremiumToggle); // Use manual toggle for testing
   const [isLoading, setIsLoading] = useState<boolean>(forceEnablePaywall); // Only loading if paywall enabled
   const [offerings, setOfferings] = useState<any>(null);
   const [isPurchaseInProgress, setIsPurchaseInProgress] = useState(false);
@@ -514,6 +521,7 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
     logger.info('Unlocking premium features');
     console.warn('🚨 UNLOCK APP CALLED - setting isPremium to true');
     setIsPremium(true);
+    setManualPremiumToggle(true);
   }, []);
 
   // Show paywall (revoke premium access)
@@ -521,7 +529,16 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
     logger.info('Showing paywall - premium access revoked');
     console.warn('🚨 SHOW PAYWALL CALLED - setting isPremium to false');
     setIsPremium(false);
+    setManualPremiumToggle(false);
   }, []);
+
+  // TESTING: Manual toggle for testing selective paywall (remove this in production)
+  const togglePremiumStatus = useCallback(() => {
+    const newStatus = !manualPremiumToggle;
+    setManualPremiumToggle(newStatus);
+    setIsPremium(newStatus);
+    console.warn('🚨 MANUAL TOGGLE - Premium status changed to:', newStatus);
+  }, [manualPremiumToggle]);
 
   // Trigger checkEntitlements when SDK becomes ready
   useEffect(() => {
@@ -561,6 +578,9 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
     restorePurchases,
     unlockApp,
     showPaywall,
+    // TESTING: Manual toggle for testing (remove this in production)
+    togglePremiumStatus,
+    manualPremiumToggle,
   };
 
   return (

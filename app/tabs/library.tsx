@@ -710,16 +710,15 @@ export default function LibraryScreen() {
     if (!session) {
       return (
         <View style={styles.emptyContainer}>
-          <MaterialCommunityIcons name="login" size={48} color={COLORS.lightGray} />
-          <Text style={styles.emptyText}>Log in to see your recipe folders</Text>
+          <Text style={styles.emptyText}>Log in to see your recipe library.</Text>
           <Text style={styles.emptySubtext}>
             Your saved recipe folders will appear here once you&apos;re logged in.
           </Text>
           <TouchableOpacity
-            style={styles.loginButton}
+            style={styles.retryButton}
             onPress={() => router.push('/login')}
           >
-            <Text style={styles.loginButtonText}>Log In</Text>
+            <Text style={styles.retryButtonText}>Log In</Text>
           </TouchableOpacity>
         </View>
       );
@@ -881,22 +880,17 @@ export default function LibraryScreen() {
       
       {/* Content: Show paywall for non-premium users */}
       {isPremium ? renderSavedContent() : (
-        <View style={styles.paywallContainer}>
-          <View style={styles.paywallContent}>
-            <View style={styles.paywallIconContainer}>
-              <MaterialCommunityIcons name="lock" size={48} color={COLORS.textMuted} />
-            </View>
-            <Text style={styles.paywallTitle}>🔒 Premium Feature</Text>
-            <Text style={styles.paywallDescription}>
-              Unlock your recipe library to save, organize, and access your favorite recipes anytime.
-            </Text>
-            <TouchableOpacity
-              style={styles.paywallButton}
-              onPress={() => setShowPaywallModal(true)}
-            >
-              <Text style={styles.paywallButtonText}>Upgrade to Premium</Text>
-            </TouchableOpacity>
-          </View>
+        <View style={styles.premiumFeatureContainer}>
+          <Text style={styles.premiumFeatureTitle}>Premium Features</Text>
+          <Text style={styles.premiumFeatureDescription}>
+            Unlock your recipe library to save, organize, and access your favorite recipes anytime.
+          </Text>
+          <TouchableOpacity
+            style={styles.premiumFeatureButton}
+            onPress={() => setShowPaywallModal(true)}
+          >
+            <Text style={styles.premiumFeatureButtonText}>Upgrade to Premium</Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -1070,7 +1064,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   retryButton: {
-    marginTop: SPACING.lg,
+    marginTop: 72,
     backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: '#000000',
@@ -1095,13 +1089,13 @@ const styles = StyleSheet.create({
     color: COLORS.textDark,
     marginTop: SPACING.md,
     marginBottom: SPACING.sm,
-    textAlign: 'left',
+    textAlign: 'center',
   },
   emptySubtext: {
     ...bodyStrongText,
     fontSize: FONT.size.body,
     color: COLORS.textDark,
-    textAlign: 'left',
+    textAlign: 'center',
     marginTop: SPACING.xs,
   },
   loginButton: {
@@ -1437,14 +1431,57 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xl,
   } as TextStyle,
   paywallButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: COLORS.textDark,
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.xl,
     borderRadius: RADIUS.sm,
   } as ViewStyle,
   paywallButtonText: {
     ...bodyStrongText,
-    color: COLORS.white,
+    color: COLORS.textDark,
+    textAlign: 'center',
+  } as TextStyle,
+
+  // Premium feature styles
+  premiumFeatureContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.xl,
+    paddingTop: SPACING.xxl,
+    paddingBottom: SPACING.xxl,
+    marginTop: SPACING.lg,
+  } as ViewStyle,
+  premiumFeatureTitle: {
+    ...bodyStrongText,
+    fontSize: FONT.size.screenTitle,
+    lineHeight: FONT.size.screenTitle + 8,
+    color: COLORS.textDark,
+    marginBottom: SPACING.md,
+    textAlign: 'center',
+  } as TextStyle,
+  premiumFeatureDescription: {
+    ...bodyText,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    lineHeight: 24,
+    fontSize: FONT.size.body,
+    maxWidth: 320,
+    marginBottom: SPACING.xl,
+  } as TextStyle,
+  premiumFeatureButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: COLORS.textDark,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.xl,
+    borderRadius: RADIUS.sm,
+  } as ViewStyle,
+  premiumFeatureButtonText: {
+    ...bodyStrongText,
+    color: COLORS.textDark,
     textAlign: 'center',
   } as TextStyle,
 }); 

@@ -24,7 +24,7 @@ export function AuthNavigationHandler() {
   
   // TESTING: Disable main app paywall for testing selective paywall (remove this in production)
   const TESTING_PAYWALL = false; // Set to false to disable main app paywall
-  const forceEnablePaywall = enablePaywall && !TESTING_PAYWALL;
+  const forceEnablePaywall = enablePaywall && TESTING_PAYWALL;
   
   console.log('🔍 [AuthNavigationHandler] Paywall configuration:', {
     enablePaywall,

@@ -1349,14 +1349,9 @@ export default function MiseScreen() {
     if (!session) {
       return (
         <View style={styles.emptyContainer}>
-          <MaterialCommunityIcons
-            name="login"
-            size={48}
-            color={COLORS.lightGray}
-          />
-          <Text style={styles.emptyText}>Log in to see your mise</Text>
+          <Text style={styles.emptyText}>Log in to see your prep station</Text>
           <Text style={styles.emptySubtext}>
-            Your mise recipes and shopping list will appear here once you&apos;re logged in.
+            Your ready to cook recipes and shopping list will appear here once you&apos;re logged in.
           </Text>
           <TouchableOpacity
             style={styles.retryButton}
@@ -1388,66 +1383,65 @@ export default function MiseScreen() {
       );
     }
 
-    return (
-      <ScrollView style={styles.combinedContent} showsVerticalScrollIndicator={false}>
-        {/* Action Buttons */}
-        <TouchableOpacity
-          style={styles.miseToolbarButton}
-          onPress={isPremium ? handleCookMyRecipes : () => setShowPaywallModal(true)}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Text style={styles.miseToolbarButtonText}>
-            {isPremium ? 'Cook Recipes' : '🔒 Cook Recipes (Premium)'}
-          </Text>
-        </TouchableOpacity>
+    // Show premium content if user is premium
+    if (isPremium) {
+      return (
+        <ScrollView style={styles.combinedContent} showsVerticalScrollIndicator={false}>
+          {/* Action Buttons */}
+          <TouchableOpacity
+            style={styles.miseToolbarButton}
+            onPress={handleCookMyRecipes}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.miseToolbarButtonText}>Cook Recipes</Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.miseToolbarButtonSecond}
-          onPress={handleOpenStaplesModal}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Text style={styles.miseToolbarButtonText}>Edit Pantry</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.miseToolbarButtonSecond}
+            onPress={handleOpenStaplesModal}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.miseToolbarButtonText}>Edit Pantry</Text>
+          </TouchableOpacity>
 
-        {/* Menu Section */}
-        <View style={styles.menuSectionContainer}>
-          <View style={styles.sectionHeaderWithControls}>
-            <Text style={styles.sectionTitle}>Menu</Text>
+          {/* Menu Section */}
+          <View style={styles.menuSectionContainer}>
+            <View style={styles.sectionHeaderWithControls}>
+              <Text style={styles.sectionTitle}>Menu</Text>
+            </View>
+            <View style={styles.sectionDivider} />
+            {miseRecipes.length === 0 ? (
+              <View style={styles.emptySection}>
+                <Text style={styles.emptySectionText}>No recipes in your menu.</Text>
+                <Text style={styles.emptySectionSubtext}>
+                  Add recipes to build a grocery list and start cooking.
+                </Text>
+                <TouchableOpacity
+                  onPress={() => router.push('/tabs/library')}
+                >
+                  <Text style={styles.emptyActionText}>Go to my recipe library.</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => router.push('/tabs/import')}
+                >
+                  <Text style={styles.emptyActionText}>Go to the import recipe page.</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.recipeListContainer}>
+                {miseRecipes.map((item, index) => (
+                  <View key={item.id}>
+                    {renderRecipeItem({ item, index })}
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
-          <View style={styles.sectionDivider} />
-          {miseRecipes.length === 0 ? (
-            <View style={styles.emptySection}>
-              <Text style={styles.emptySectionText}>No recipes in your menu.</Text>
-              <Text style={styles.emptySectionSubtext}>
-                Add recipes to build a grocery list and start cooking.
-              </Text>
-              <TouchableOpacity
-                onPress={() => router.push('/tabs/library')}
-              >
-                <Text style={styles.emptyActionText}>Go to my recipe library.</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => router.push('/tabs/import')}
-              >
-                <Text style={styles.emptyActionText}>Go to the import recipe page.</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.recipeListContainer}>
-              {miseRecipes.map((item, index) => (
-                <View key={item.id}>
-                  {renderRecipeItem({ item, index })}
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
 
-        {/* Groceries Section */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.sectionHeaderWithControls}>
-            <Text style={styles.sectionTitle}>Groceries</Text>
-            {isPremium && (
+          {/* Groceries Section */}
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeaderWithControls}>
+              <Text style={styles.sectionTitle}>Groceries</Text>
               <TouchableOpacity
                 onPress={handleShareGrocery}
                 style={styles.shareIconButton}
@@ -1455,12 +1449,10 @@ export default function MiseScreen() {
               >
                 <MaterialCommunityIcons name="share" size={16} color={COLORS.textDark} />
               </TouchableOpacity>
-            )}
-          </View>
-          <View style={styles.sectionDivider} />
-          
-          {isPremium ? (
-            (() => {
+            </View>
+            <View style={styles.sectionDivider} />
+            
+            {(() => {
               // Determine which data to use based on sort mode and staples filter
               let displayGroceryList = groceryList;
               
@@ -1486,26 +1478,26 @@ export default function MiseScreen() {
                   ))}
                 </View>
               );
-            })()
-          ) : (
-            <View style={styles.paywallSection}>
-              <View style={styles.paywallIconContainer}>
-                <MaterialCommunityIcons name="lock" size={32} color={COLORS.textMuted} />
-              </View>
-              <Text style={styles.paywallTitle}>🔒 Premium Feature</Text>
-              <Text style={styles.paywallDescription}>
-                Unlock your personalized grocery list to organize ingredients and streamline your shopping.
-              </Text>
-              <TouchableOpacity
-                style={styles.paywallButton}
-                onPress={() => setShowPaywallModal(true)}
-              >
-                <Text style={styles.paywallButtonText}>Upgrade to Premium</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-      </ScrollView>
+            })()}
+          </View>
+        </ScrollView>
+      );
+    }
+
+    // Show premium feature message for non-premium users
+    return (
+      <View style={styles.premiumFeatureContainer}>
+        <Text style={styles.premiumFeatureTitle}>Premium Features</Text>
+        <Text style={styles.premiumFeatureDescription}>
+          Unlock your personalized cooking experience with grocery lists, recipe organization, and streamlined meal prep.
+        </Text>
+        <TouchableOpacity
+          style={styles.premiumFeatureButton}
+          onPress={() => setShowPaywallModal(true)}
+        >
+          <Text style={styles.premiumFeatureButtonText}>Upgrade to Premium</Text>
+        </TouchableOpacity>
+      </View>
     );
   };
 
@@ -1806,21 +1798,22 @@ const styles = StyleSheet.create({
   } as TextStyle,
 
   emptyText: {
-            fontFamily: FONT.family.heading,
-    fontSize: 18,
+    ...bodyStrongText,
+    fontSize: FONT.size.body,
     color: COLORS.textDark,
     marginTop: SPACING.md,
     marginBottom: SPACING.sm,
+    textAlign: 'center',
   } as TextStyle,
   emptySubtext: {
-    ...bodyText,
-    color: COLORS.darkGray,
+    ...bodyStrongText,
+    fontSize: FONT.size.body,
+    color: COLORS.textDark,
     textAlign: 'center',
-    marginTop: SPACING.sm,
-    fontStyle: 'italic',
+    marginTop: SPACING.xs,
   } as TextStyle,
   retryButton: {
-    marginTop: SPACING.lg,
+    marginTop: 72,
     backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: '#000000',
@@ -2147,14 +2140,57 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   } as TextStyle,
   paywallButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: COLORS.textDark,
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.lg,
     borderRadius: RADIUS.sm,
   } as ViewStyle,
   paywallButtonText: {
     ...bodyStrongText,
-    color: COLORS.white,
+    color: COLORS.textDark,
+    textAlign: 'center',
+  } as TextStyle,
+
+  // Premium feature styles
+  premiumFeatureContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.xl,
+    paddingTop: SPACING.xxl,
+    paddingBottom: SPACING.xxl,
+    marginTop: SPACING.lg,
+  } as ViewStyle,
+  premiumFeatureTitle: {
+    ...bodyStrongText,
+    fontSize: FONT.size.screenTitle,
+    lineHeight: FONT.size.screenTitle + 8,
+    color: COLORS.textDark,
+    marginBottom: SPACING.md,
+    textAlign: 'center',
+  } as TextStyle,
+  premiumFeatureDescription: {
+    ...bodyText,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    lineHeight: 24,
+    fontSize: FONT.size.body,
+    maxWidth: 320,
+    marginBottom: SPACING.xl,
+  } as TextStyle,
+  premiumFeatureButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: COLORS.textDark,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.xl,
+    borderRadius: RADIUS.sm,
+  } as ViewStyle,
+  premiumFeatureButtonText: {
+    ...bodyStrongText,
+    color: COLORS.textDark,
     textAlign: 'center',
   } as TextStyle,
 

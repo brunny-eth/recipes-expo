@@ -951,72 +951,6 @@ export default function ImportScreen() {
                   )}
                 </View>
 
-                {/* Raw Text Button */}
-                <View style={styles.sectionWrapper}>
-                  <TouchableHighlight
-                    style={[styles.sectionCard, styles.importTextCard]}
-                    onPress={() => toggleImportOption('rawText')}
-                    underlayColor="#EEF6FF"
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <View style={styles.sectionContent}>
-                      <View style={styles.cardTextContainer}>
-                        <Text style={styles.sectionTitle}>Text</Text>
-                        <Text style={styles.sectionSubtext}>Write in your own recipe</Text>
-                      </View>
-                      <Animated.Text
-                        style={[
-                          styles.sectionChevron,
-                          {
-                            transform: [{ rotate: getChevronRotation('rawText') }]
-                          }
-                        ]}
-                      >
-                        ›
-                      </Animated.Text>
-                    </View>
-                  </TouchableHighlight>
-
-                  {expandedImportOption === 'rawText' && (
-                    <View style={styles.expandedContent}>
-                      <View style={styles.inputContainer}>
-                        <View style={styles.inputWrapper}>
-                          <TextInput
-                            style={styles.input}
-                            placeholder={textDisplayedPlaceholder}
-                            placeholderTextColor={COLORS.darkGray}
-                            value={recipeText}
-                            onChangeText={setRecipeText}
-                            autoCapitalize="sentences"
-                            autoCorrect={true}
-                            editable={true}
-                            returnKeyType="search"
-                            blurOnSubmit={true}
-                            enablesReturnKeyAutomatically={true}
-                            keyboardType="default"
-                            onSubmitEditing={handleSubmitText}
-                            underlineColorAndroid="transparent"
-                            allowFontScaling={false}
-                            contextMenuHidden={false}
-                            selectTextOnFocus={false}
-                          />
-                        </View>
-                        <TouchableOpacity
-                          style={[
-                            styles.submitButton,
-                            styles.submitButtonConnected,
-                            isSubmitting && styles.submitButtonDisabled,
-                          ]}
-                          onPress={handleSubmitText}
-                          disabled={isSubmitting}
-                        >
-                          {getSubmitButtonContent()}
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  )}
-                </View>
-
                 {/* Dish Name Button */}
                 <View style={styles.sectionWrapper}>
                   <TouchableHighlight
@@ -1074,6 +1008,72 @@ export default function ImportScreen() {
                             isSubmitting && styles.submitButtonDisabled,
                           ]}
                           onPress={handleSubmitName}
+                          disabled={isSubmitting}
+                        >
+                          {getSubmitButtonContent()}
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+                </View>
+
+                {/* Raw Text Button */}
+                <View style={styles.sectionWrapper}>
+                  <TouchableHighlight
+                    style={[styles.sectionCard, styles.importTextCard]}
+                    onPress={() => toggleImportOption('rawText')}
+                    underlayColor="#EEF6FF"
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <View style={styles.sectionContent}>
+                      <View style={styles.cardTextContainer}>
+                        <Text style={styles.sectionTitle}>Text</Text>
+                        <Text style={styles.sectionSubtext}>Write in your own recipe</Text>
+                      </View>
+                      <Animated.Text
+                        style={[
+                          styles.sectionChevron,
+                          {
+                            transform: [{ rotate: getChevronRotation('rawText') }]
+                          }
+                        ]}
+                      >
+                        ›
+                      </Animated.Text>
+                    </View>
+                  </TouchableHighlight>
+
+                  {expandedImportOption === 'rawText' && (
+                    <View style={styles.expandedContent}>
+                      <View style={styles.inputContainer}>
+                        <View style={styles.inputWrapper}>
+                          <TextInput
+                            style={styles.input}
+                            placeholder={textDisplayedPlaceholder}
+                            placeholderTextColor={COLORS.darkGray}
+                            value={recipeText}
+                            onChangeText={setRecipeText}
+                            autoCapitalize="sentences"
+                            autoCorrect={true}
+                            editable={true}
+                            returnKeyType="search"
+                            blurOnSubmit={true}
+                            enablesReturnKeyAutomatically={true}
+                            keyboardType="default"
+                            onSubmitEditing={handleSubmitText}
+                            underlineColorAndroid="transparent"
+                            allowFontScaling={false}
+                            contextMenuHidden={false}
+                            selectTextOnFocus={false}
+                          />
+                        </View>
+                        <TouchableOpacity
+                          style={[
+                            styles.submitButton,
+                            styles.submitButtonConnected,
+                            isSubmitting && styles.submitButtonDisabled,
+                          ]}
+                          onPress={handleSubmitText}
                           disabled={isSubmitting}
                         >
                           {getSubmitButtonContent()}
