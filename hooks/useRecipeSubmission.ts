@@ -196,13 +196,18 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
 
         console.log('[useRecipeSubmission] Making backend request to:', `${backendUrl}/api/recipes/parse`);
         console.log('[useRecipeSubmission] Request payload:', { input: normalizedInput, isDishNameSearch });
+        console.log("Parse request userId:", session?.user?.id);
 
         const response = await fetch(`${backendUrl}/api/recipes/parse`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ input: normalizedInput, isDishNameSearch }),
+          body: JSON.stringify({ 
+            input: normalizedInput, 
+            isDishNameSearch,
+            userId: session?.user?.id ?? null
+          }),
         });
 
         console.log('[useRecipeSubmission] Backend response status:', response.status);

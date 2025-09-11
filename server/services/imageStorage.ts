@@ -192,10 +192,20 @@ export async function updateRecipeCoverImage(
         }
 
         // Update the recipe_data JSONB with the cover image URL
-        const updatedRecipeData = {
-            ...currentData.recipe_data,
-            image: coverImageUrl // Store as 'image' field in the recipe data
-        } as CombinedParsedRecipe;
+        const baseRecipeData = currentData.recipe_data || {};
+        let updatedRecipeData: CombinedParsedRecipe;
+        
+        if (baseRecipeData && typeof baseRecipeData === "object" && !Array.isArray(baseRecipeData)) {
+            updatedRecipeData = {
+                ...baseRecipeData,
+                image: coverImageUrl // Store as 'image' field in the recipe data
+            } as CombinedParsedRecipe;
+        } else {
+            // Fallback if recipe_data is not a valid object
+            updatedRecipeData = {
+                image: coverImageUrl
+            } as CombinedParsedRecipe;
+        }
 
         const { error } = await supabaseAdmin
             .from('processed_recipes_cache')

@@ -10,6 +10,7 @@ import { upload, uploadMultiple } from '../lib/multer';
 import { modifyInstructions } from '../services/instructionModification';
 import { getAllRecipes, getRecipeById } from '../services/recipeDB';
 import { generateAndSaveEmbedding } from '../../utils/recipeEmbeddings';
+import { saveToImported } from '../services/saveToImported';
 import { CombinedParsedRecipe, RecipeData, Json, asRecipeData, asRecipeDataOrNull } from '../../common/types/dbOverrides';
 import { IngredientChange, buildVariationPrompt, VariationType } from '../llm/modificationPrompts';
 import { runDefaultLLM } from '../llm/adapters';
@@ -146,7 +147,7 @@ router.post('/parse', async (req: Request, res: Response) => {
   // Add logging for incoming request body
   logger.info({ body: req.body, requestId: (req as any).id, route: req.originalUrl, method: req.method }, '[parse] Incoming request');
   try {
-    const { input, forceNewParse, isDishNameSearch } = req.body;
+    const { input, forceNewParse, isDishNameSearch, userId } = req.body;
     const requestId = (req as any).id;
 
     logger.info({ input, forceNewParse, isDishNameSearch, requestId }, '[parse] Processing');
@@ -173,6 +174,12 @@ router.post('/parse', async (req: Request, res: Response) => {
         default:
           return res.status(500).json({ error: parseError });
       }
+    }
+
+    // Save to imported folder if user is authenticated
+    console.log("[parse route] userId received:", req.body.userId);
+    if (userId && recipe?.id) {
+      await saveToImported(userId, recipe.id);
     }
 
     res.json({
@@ -218,6 +225,7 @@ router.post('/parse-image', upload.single('image'), async (req: Request, res: Re
   }, 'Starting /parse-image request processing');
   
   try {
+    const { userId } = req.body;
     const file = (req as any).file;
     if (!file) {
       logger.warn({ 
@@ -256,6 +264,12 @@ router.post('/parse-image', upload.single('image'), async (req: Request, res: Re
         default:
           return res.status(500).json({ error: parseError });
       }
+    }
+
+    // Save to imported folder if user is authenticated
+    console.log("[parse-image route] userId received:", req.body.userId);
+    if (userId && recipe?.id) {
+      await saveToImported(userId, recipe.id);
     }
 
     res.json({
@@ -343,6 +357,7 @@ router.post('/parse-images', (req: Request, res: Response, next: Function) => {
   }, 'Starting /parse-images request processing');
   
   try {
+    const { userId } = req.body;
     const files = (req as any).files;
     if (!files || files.length === 0) {
       logger.warn({ requestId, route: req.originalUrl, method: req.method }, 'No image files uploaded for /parse-images');
@@ -379,6 +394,12 @@ router.post('/parse-images', (req: Request, res: Response, next: Function) => {
         default:
           return res.status(500).json({ error: parseError });
       }
+    }
+
+    // Save to imported folder if user is authenticated
+    console.log("[parse-images route] userId received:", req.body.userId);
+    if (userId && recipe?.id) {
+      await saveToImported(userId, recipe.id);
     }
 
     res.json({
@@ -457,7 +478,7 @@ router.get('/explore-random', async (req: Request, res: Response) => {
     const recipes = data?.map((item: any) => {
       const recipeData = asRecipeData(item.recipe_data);
       return {
-        ...recipeData,
+        ...(recipeData as Record<string, any>),
         id: item.id
       };
     }) || [];
@@ -776,7 +797,7 @@ router.patch('/:id(\\d+)', async (req: Request, res: Response) => {
     }
     
     const merged = {
-      ...currentRecipeData,
+      ...(currentRecipeData as Record<string, any>),
       ...patch,
     };
 
@@ -1083,7 +1104,7 @@ router.post('/variations', async (req: Request, res: Response) => {
     const { error: updateError } = await supabaseAdmin
       .from('processed_recipes_cache')
       .update({
-        recipe_data: { ...finalRecipeData, id: newModifiedRecipeId },
+        recipe_data: { ...(finalRecipeData as Record<string, any>), id: newModifiedRecipeId },
       })
       .eq('id', newModifiedRecipeId);
 

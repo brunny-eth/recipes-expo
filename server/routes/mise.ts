@@ -359,7 +359,7 @@ router.post('/save-recipe', async (req: Request, res: Response) => {
         
         // Update the prepared recipe data with categorized ingredients
         const updatedRecipeData = {
-          ...preparedRecipeData,
+          ...(preparedRecipeData as Record<string, any>),
           ingredientGroups: preparedRecipeData.ingredientGroups?.map((group: IngredientGroup) => ({
             ...group,
             ingredients: group.ingredients?.map((ingredient: StructuredIngredient) => {
@@ -531,7 +531,7 @@ router.get('/recipes/:id', async (req: Request, res: Response) => {
         is_user_modified: canonicalRecipe.is_user_modified,
         parent_recipe_id: canonicalRecipe.parent_recipe_id,
         source_type: canonicalRecipe.source_type,
-        ...recipeData
+        ...(recipeData as Record<string, any>)
       }
     });
 

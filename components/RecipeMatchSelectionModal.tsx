@@ -148,7 +148,7 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
                   onPress={handleReturnHome}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                  <MaterialCommunityIcons name="close" size={22} color={COLORS.textMuted} />
+                  <MaterialCommunityIcons name="close" size={20} color="#000000" />
                 </TouchableOpacity>
               </View>
 
@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   } as ViewStyle,
   modalContent: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.background, // Nice cream color like library.tsx
     borderTopLeftRadius: RADIUS.lg,
     borderTopRightRadius: RADIUS.lg,
     borderWidth: 1,
@@ -269,9 +269,16 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.lg,
     paddingBottom: SPACING.md,
     alignItems: 'center',
-    paddingHorizontal: SPACING.pageHorizontal,
+    paddingLeft: 0, // Remove left padding for perfect alignment
+    paddingRight: 0, // Remove right padding to allow X button at edge
     flexDirection: 'row',
     justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: '#000000',
+    marginBottom: SPACING.sm,
+    width: '90%',
+    alignSelf: 'flex-start', // Left align to screen edge
+    marginLeft: '5%', // Offset to account for 90% width
   } as ViewStyle,
   headerExpanded: {
     paddingTop: SPACING.lg,
@@ -301,15 +308,13 @@ const styles = StyleSheet.create({
   } as TextStyle,
   mainTitle: {
     ...bodyStrongText,
-    fontSize: 20,
+    fontSize: FONT.size.body,
     color: COLORS.textDark,
     textAlign: 'left',
   } as TextStyle,
   closeButton: {
-    padding: SPACING.xs,
-    paddingRight: SPACING.sm,
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: 4,
+    marginRight: 0,
   } as ViewStyle,
   subtitle: {
     ...bodyText,
@@ -329,13 +334,22 @@ const styles = StyleSheet.create({
   recipeList: {
     flex: 1,
     paddingVertical: SPACING.md,
+    paddingLeft: 0, // Remove left padding for true left alignment
+    paddingRight: 0, // Remove right padding to match folder rows
+    width: '90%',
+    alignSelf: 'flex-start', // Left align to screen edge
+    marginLeft: '5%', // Offset to account for 90% width
   } as ViewStyle,
   recipeListContent: {
     paddingBottom: SPACING.lg,
+    paddingLeft: 0, // Match other elements' left padding
+    paddingRight: 18, // Match other elements' right padding
   } as ViewStyle,
   buttonContainer: {
     padding: SPACING.sm,
-    width: '100%',
+    width: '90%',
+    alignSelf: 'flex-start', // Left align to screen edge
+    marginLeft: '5%', // Offset to account for 90% width
     alignItems: 'flex-start',
     borderTopWidth: 1,
     borderTopColor: '#000000',
@@ -344,14 +358,24 @@ const styles = StyleSheet.create({
   recipeCard: {
     flexDirection: 'row',
     backgroundColor: 'transparent',
+    borderRadius: RADIUS.sm,
     marginBottom: SPACING.md,
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
     height: 120,
     overflow: 'hidden',
-    paddingLeft: SPACING.pageHorizontal,
+    width: '100%', // Increased width to give more space for text
+    alignSelf: 'flex-start', // Left align to screen edge
+    marginLeft: 0, // Start from absolute left edge
+    paddingLeft: 0, // Ensure no internal left padding
   } as ViewStyle,
   imageContainer: {
-    width: '50%',
+    width: '40%', // Keep original image size
     height: '100%',
+    borderRadius: RADIUS.md,
     overflow: 'hidden',
   },
   fallbackImageContainer: {
@@ -367,11 +391,11 @@ const styles = StyleSheet.create({
     height: '80%',
   } as ImageStyle,
   titleContainer: {
-    width: '50%',
+    flex: 1, // Use remaining space after image takes 40%
     height: '100%',
-    paddingLeft: SPACING.md,
+    paddingLeft: SPACING.md, // Add padding to separate from image
     paddingRight: SPACING.sm,
-    justifyContent: 'flex-start',
+    justifyContent: 'center', // Center vertically like library.tsx
     alignItems: 'flex-start',
     paddingTop: 0,
     backgroundColor: 'transparent',
@@ -384,8 +408,8 @@ const styles = StyleSheet.create({
   exploreCardTitle: {
     color: COLORS.textDark,
     ...bodyText,
-    fontSize: FONT.size.body,
-    lineHeight: FONT.lineHeight.normal,
+    fontSize: FONT.size.body + 2, // Make text bigger
+    lineHeight: FONT.lineHeight.normal + 2, // Adjust line height proportionally
     textAlign: 'left',
   } as TextStyle,
   similarityText: {
@@ -428,7 +452,7 @@ const styles = StyleSheet.create({
   textButtonContainer: {
     marginTop: SPACING.sm,
     alignSelf: 'flex-start',
-    paddingLeft: SPACING.pageHorizontal,
+    paddingLeft: 0, // Remove left padding for perfect alignment
   } as ViewStyle,
   textButton: {
     ...bodyStrongText,

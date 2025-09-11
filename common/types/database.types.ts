@@ -1,5 +1,3 @@
-import { CombinedParsedRecipe } from './recipes';
-
 export type Json =
   | string
   | number
@@ -37,39 +35,39 @@ export type Database = {
       processed_recipes_cache: {
         Row: {
           created_at: string | null
-          embedding: number[] | null
+          embedding: string | null
           id: number
           is_user_modified: boolean | null
           last_processed_at: string | null
           normalized_url: string | null
           parent_recipe_id: number | null
-          recipe_data: CombinedParsedRecipe | null
+          recipe_data: Json
           source_type: string | null
           updated_at: string | null
           url: string
         }
         Insert: {
           created_at?: string | null
-          embedding?: number[] | null
+          embedding?: string | null
           id?: number
           is_user_modified?: boolean | null
           last_processed_at?: string | null
           normalized_url?: string | null
           parent_recipe_id?: number | null
-          recipe_data?: CombinedParsedRecipe | null
+          recipe_data: Json
           source_type?: string | null
           updated_at?: string | null
           url: string
         }
         Update: {
           created_at?: string | null
-          embedding?: number[] | null
+          embedding?: string | null
           id?: number
           is_user_modified?: boolean | null
           last_processed_at?: string | null
           normalized_url?: string | null
           parent_recipe_id?: number | null
-          recipe_data?: CombinedParsedRecipe | null
+          recipe_data?: Json
           source_type?: string | null
           updated_at?: string | null
           url?: string
@@ -171,6 +169,7 @@ export type Database = {
           display_order: number | null
           icon: string | null
           id: number
+          is_system: boolean
           name: string
           updated_at: string | null
           user_id: string
@@ -181,6 +180,7 @@ export type Database = {
           display_order?: number | null
           icon?: string | null
           id?: number
+          is_system?: boolean
           name: string
           updated_at?: string | null
           user_id: string
@@ -191,6 +191,7 @@ export type Database = {
           display_order?: number | null
           icon?: string | null
           id?: number
+          is_system?: boolean
           name?: string
           updated_at?: string | null
           user_id?: string
@@ -200,36 +201,36 @@ export type Database = {
       user_saved_recipes: {
         Row: {
           applied_changes: Json | null
-          base_recipe_id: number
+          base_recipe_id: number | null
           created_at: string | null
           display_order: number | null
-          folder_id: number | null
+          folder_id: number
           id: string
           notes: string | null
           title_override: string | null
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           applied_changes?: Json | null
-          base_recipe_id: number
+          base_recipe_id?: number | null
           created_at?: string | null
           display_order?: number | null
-          folder_id?: number | null
+          folder_id: number
           id?: string
           notes?: string | null
           title_override?: string | null
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           applied_changes?: Json | null
-          base_recipe_id?: number
+          base_recipe_id?: number | null
           created_at?: string | null
           display_order?: number | null
-          folder_id?: number | null
+          folder_id?: number
           id?: string
           notes?: string | null
           title_override?: string | null
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -277,24 +278,24 @@ export type Database = {
       }
       user_shopping_list_item_states: {
         Row: {
-          created_at: string | null
+          created_at: string
           is_checked: boolean
           normalized_item_name: string
-          updated_at: string | null
+          updated_at: string
           user_id: string
         }
         Insert: {
-          created_at?: string | null
+          created_at?: string
           is_checked?: boolean
           normalized_item_name: string
-          updated_at?: string | null
+          updated_at?: string
           user_id: string
         }
         Update: {
-          created_at?: string | null
+          created_at?: string
           is_checked?: boolean
           normalized_item_name?: string
-          updated_at?: string | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -314,7 +315,7 @@ export type Database = {
           created_at: string
           id: number
           original_url: string
-          recipe_data: CombinedParsedRecipe | null
+          recipe_data: Json
           title: string
         }[]
       }
@@ -322,13 +323,13 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: {
           created_at: string | null
-          embedding: number[] | null
+          embedding: string | null
           id: number
           is_user_modified: boolean | null
           last_processed_at: string | null
           normalized_url: string | null
           parent_recipe_id: number | null
-          recipe_data: CombinedParsedRecipe | null
+          recipe_data: Json
           source_type: string | null
           updated_at: string | null
           url: string
@@ -394,7 +395,7 @@ export type Database = {
         }
         Returns: {
           id: number
-          recipe_data: CombinedParsedRecipe | null
+          recipe_data: Json
           similarity: number
         }[]
       }

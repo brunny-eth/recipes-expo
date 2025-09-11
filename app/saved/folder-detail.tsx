@@ -84,6 +84,7 @@ export default function SavedFolderDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [folderName, setFolderName] = useState<string>('Folder'); // State for actual folder name
+  const [isSystemFolder, setIsSystemFolder] = useState<boolean>(false); // State for system folder status
   const [isRenaming, setIsRenaming] = useState<boolean>(false);
   const [editedFolderName, setEditedFolderName] = useState<string>('');
   const [isSavingFolderName, setIsSavingFolderName] = useState<boolean>(false);
@@ -138,6 +139,7 @@ export default function SavedFolderDetailScreen() {
       if (folder) {
         console.log('[SavedFolderDetailScreen] Fetched folder name:', folder.name);
         setFolderName(folder.name);
+        setIsSystemFolder(folder.is_system === true);
       }
     } catch (err) {
       console.error('[SavedFolderDetailScreen] Unexpected error fetching folder name:', err);
@@ -848,6 +850,11 @@ export default function SavedFolderDetailScreen() {
 
   // Header action - only for renaming
   const renderHeaderAction = () => {
+    // Don't show any header action for system folders
+    if (isSystemFolder) {
+      return null;
+    }
+
     // When renaming, show a checkmark to confirm save
     if (isRenaming) {
       const isSaveDisabled =
@@ -912,9 +919,10 @@ export default function SavedFolderDetailScreen() {
         ) : (
           <TouchableOpacity
             style={styles.headerTitleTouchable}
-            onPress={handleStartRenaming}
-            activeOpacity={0.7}
+            onPress={isSystemFolder ? undefined : handleStartRenaming}
+            activeOpacity={isSystemFolder ? 1 : 0.7}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            disabled={isSystemFolder}
           >
             <Text style={styles.headerTitle} numberOfLines={1}>{folderName.toUpperCase()}</Text>
           </TouchableOpacity>
@@ -956,7 +964,11 @@ export default function SavedFolderDetailScreen() {
 
         {/* Select button */}
         <TouchableHighlight
-          style={[styles.toolbarRow, styles.selectButtonRow]}
+          style={[
+            styles.toolbarRow, 
+            styles.selectButtonRow,
+            isSystemFolder && styles.selectButtonRowLast
+          ]}
           onPress={toggleSelection}
           underlayColor="transparent"
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -966,17 +978,19 @@ export default function SavedFolderDetailScreen() {
           </View>
         </TouchableHighlight>
 
-        {/* Delete Folder button */}
-        <TouchableHighlight
-          style={[styles.toolbarRow, styles.deleteButtonRow]}
-          onPress={handleDeleteFolder}
-          underlayColor="transparent"
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <View style={styles.searchToolbarContent}>
-            <Text style={styles.headerText}>Delete Folder</Text>
-          </View>
-        </TouchableHighlight>
+        {/* Delete Folder button - only show for non-system folders */}
+        {!isSystemFolder && (
+          <TouchableHighlight
+            style={[styles.toolbarRow, styles.deleteButtonRow]}
+            onPress={handleDeleteFolder}
+            underlayColor="transparent"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <View style={styles.searchToolbarContent}>
+              <Text style={styles.headerText}>Delete Folder</Text>
+            </View>
+          </TouchableHighlight>
+        )}
         
         {renameError ? <Text style={styles.renameErrorText}>{renameError}</Text> : null}
         
@@ -1177,6 +1191,9 @@ const styles = StyleSheet.create({
   },
   selectButtonRow: {
     marginTop: SPACING.md, // Match addFolderRow marginTop for 16px spacing
+  },
+  selectButtonRowLast: {
+    marginBottom: SPACING.xxxl + SPACING.contentTopMargin, // Same bottom margin as deleteButtonRow when it's the last toolbar element
   },
   deleteButtonRow: {
     width: '45%', // Smaller width for DELETE FOLDER button

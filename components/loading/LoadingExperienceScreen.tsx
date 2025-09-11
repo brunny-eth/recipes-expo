@@ -29,6 +29,7 @@ import { ParseErrorCode } from '../../common/types/errors';
 import LogoHeader from '@/components/LogoHeader';
 import { useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '@/context/AuthContext';
 
 interface LoadingExperienceScreenProps {
   recipeInput: string;
@@ -47,6 +48,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
   inputType = 'url',
   forceNewParse,
 }) => {
+  const { session } = useAuth();
       if (__DEV__) {
       console.log(`[${new Date().toISOString()}] [LoadingExperienceScreen] render/mount with input: ${recipeInput}`);
     }
@@ -256,6 +258,11 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
         name: isPDFFile ? 'recipe.pdf' : 'recipe-image.jpg',
       } as any;
       formData.append('image', imageFile);
+      
+      // Add userId to FormData
+      console.log("Parse request userId:", session?.user?.id);
+      formData.append("userId", session?.user?.id ?? "");
+      
       requestBody = formData;
     } else if (isImages) {
       // Multiple images processing
@@ -274,12 +281,21 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
         formData.append('images', imageFile);
       });
       
+      // Add userId to FormData
+      console.log("Parse request userId:", session?.user?.id);
+      formData.append("userId", session?.user?.id ?? "");
+      
       requestBody = formData;
     } else {
       // URL/text processing (existing logic)
       endpoint = '/api/recipes/parse';
       headers['Content-Type'] = 'application/json';
-      requestBody = JSON.stringify({ input: recipeInput, forceNewParse });
+      console.log("Parse request userId:", session?.user?.id);
+      requestBody = JSON.stringify({ 
+        input: recipeInput, 
+        forceNewParse,
+        userId: session?.user?.id ?? null
+      });
     }
     
     const backendUrl = `${baseBackendUrl}${endpoint}`;

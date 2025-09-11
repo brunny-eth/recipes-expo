@@ -228,7 +228,7 @@ export async function parseUrlRecipe(
                 console.log('[parseUrlRecipe] attempting insert with cacheKey:', cacheKey);
                 
                 // A) Strip any incoming id field to prevent ID pollution from LLM outputs
-                const { id: _jsonIdDrop, ...cleanFinalRecipeData } = finalRecipeData ?? {};
+                const { id: _jsonIdDrop, ...cleanFinalRecipeData } = (finalRecipeData as Record<string, any>) ?? {};
                 
                 // B) Insert without ID field to ensure clean data
                 const { error: insertError } = await supabase
@@ -271,7 +271,7 @@ export async function parseUrlRecipe(
                         const { error: updateError } = await supabase
                             .from('processed_recipes_cache')
                             .update({
-                                recipe_data: { ...cleanFinalRecipeData, id: insertedId },
+                                recipe_data: { ...(cleanFinalRecipeData as Record<string, any>), id: insertedId },
                             })
                             .eq('id', insertedId);
 

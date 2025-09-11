@@ -471,7 +471,7 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
         const dbInsertStartTime = Date.now();
         try {
           // A) Strip any incoming id field to prevent ID pollution from LLM outputs
-          const { id: _jsonIdDrop, ...cleanParsedRecipe } = parsedRecipe ?? {};
+          const { id: _jsonIdDrop, ...cleanParsedRecipe } = (parsedRecipe as Record<string, any>) ?? {};
           
           // B) Insert without ID field to ensure clean data
           const { data: insertData, error: insertError } = await supabase
@@ -496,7 +496,7 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
             const { error: updateError } = await supabase
               .from('processed_recipes_cache')
               .update({
-                recipe_data: { ...cleanParsedRecipe, id: insertedId },
+                recipe_data: { ...(cleanParsedRecipe as Record<string, any>), id: insertedId },
               })
               .eq('id', insertedId);
 

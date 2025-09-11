@@ -25,6 +25,7 @@ router.get('/folders', async (req: Request, res: Response) => {
         color,
         icon,
         display_order,
+        is_system,
         user_saved_recipes!folder_id(count)
       `)
       .eq('user_id', userId)
@@ -73,7 +74,7 @@ router.get('/folders/:id', async (req: Request, res: Response) => {
 
     const { data: folderData, error: folderError } = await supabaseAdmin
       .from('user_saved_folders')
-      .select('id, name, color, icon, display_order')
+      .select('id, name, color, icon, display_order, is_system')
       .eq('id', parseInt(id, 10))
       .eq('user_id', userId)
       .single();
