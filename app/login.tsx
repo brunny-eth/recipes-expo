@@ -3,7 +3,6 @@ import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Platform, 
 import { useHandleError } from '@/hooks/useHandleError';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
-import { signInWithGoogleManualPkce } from '@/context/AuthContext';
 import { useSuccessModal } from '@/context/SuccessModalContext';
 import { COLORS, SPACING, RADIUS, ICON_SIZE } from '@/constants/theme';
 import { FontAwesome } from '@expo/vector-icons';
@@ -32,12 +31,12 @@ const LoginScreen = () => {
     inFlightRef.current = true;
     setIsSigningIn('google');
     try {
-      await signInWithGoogleManualPkce();  // MUST be awaited
+      await signIn('google');
     } finally {
       inFlightRef.current = false;
       setIsSigningIn(null);
     }
-  }, [signInWithGoogleManualPkce]);
+  }, [signIn]);
 
   const handleSignIn = async (provider: AuthProvider) => {
     if (provider === 'google') {

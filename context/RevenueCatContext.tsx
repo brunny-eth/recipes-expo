@@ -136,11 +136,36 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
       // Wrap the actual customer info call
       let customerInfo: CustomerInfo;
       try {
-        customerInfo = await Purchases.getCustomerInfo();
-        logger.info('[RevenueCat] Purchases.getCustomerInfo() succeeded');
-        console.log('[RevenueCat] entitlements:', customerInfo.entitlements.active);
-        console.log('[RevenueCat] raw entitlements', customerInfo.entitlements);
-        console.log('[Paywall] shouldShow =', Object.keys(customerInfo.entitlements.active || {}).length === 0);
+        if (process.env.EXPO_PUBLIC_ENABLE_PAYWALL === "true") {
+          customerInfo = await Purchases.getCustomerInfo();
+          logger.info('[RevenueCat] Purchases.getCustomerInfo() succeeded');
+          console.log('[RevenueCat] entitlements:', customerInfo.entitlements.active);
+          console.log('[RevenueCat] raw entitlements', customerInfo.entitlements);
+          console.log('[Paywall] shouldShow =', Object.keys(customerInfo.entitlements.active || {}).length === 0);
+        } else {
+          // If paywall is disabled, create a mock customer info with no entitlements
+          customerInfo = {
+            entitlements: { 
+              active: {},
+              all: {},
+              verification: 'NOT_REQUESTED'
+            },
+            activeSubscriptions: [],
+            allPurchaseDates: {},
+            allExpirationDates: {},
+            allPurchasedProductIdentifiers: [],
+            latestExpirationDate: null,
+            originalAppUserId: '',
+            originalApplicationVersion: '',
+            originalPurchaseDate: null,
+            requestDate: new Date().toISOString(),
+            firstSeen: new Date().toISOString(),
+            nonSubscriptionTransactions: [],
+            managementURL: null,
+            user: null,
+            subscriptionsByProductIdentifier: {}
+          } as CustomerInfo;
+        }
       } catch (entitlementError: any) {
         logger.error('Purchases.getCustomerInfo() failed', {
           error: entitlementError?.message || 'Unknown entitlement error',
@@ -204,6 +229,12 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
 
   // Fetch available offerings/products with defensive error handling
   const fetchOfferings = useCallback(async () => {
+    // Don't fetch offerings if paywall is disabled
+    if (!enablePaywall) {
+      logger.info('Paywall disabled, skipping offerings fetch');
+      return;
+    }
+
     // Don't fetch offerings until SDK is initialized
     if (!sdkInitialized) {
       logger.info('Waiting for RevenueCat SDK initialization before fetching offerings');
@@ -224,8 +255,10 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
 
       // Wrap the actual API call with try/catch
       try {
-        offeringsData = await Purchases.getOfferings();
-        console.log('[RevenueCat] offerings', offeringsData);
+        if (process.env.EXPO_PUBLIC_ENABLE_PAYWALL === "true") {
+          offeringsData = await Purchases.getOfferings();
+          console.log('[RevenueCat] offerings', offeringsData);
+        }
       } catch (apiError: any) {
         logger.error('Purchases.getOfferings() failed', {
           error: apiError?.message || 'Unknown API error',
@@ -287,7 +320,7 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
         );
       }
     }
-  }, [sdkInitialized]); // Remove showError from dependencies
+  }, [sdkInitialized, enablePaywall]); // Remove showError from dependencies
 
   // Purchase a package with defensive error handling and debouncing
   const purchasePackage = useCallback(async (pkg: PurchasesPackage): Promise<boolean> => {
@@ -318,7 +351,11 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
       // Wrap the actual purchase call
       let purchaseResult;
       try {
-        purchaseResult = await Purchases.purchasePackage(pkg);
+        if (process.env.EXPO_PUBLIC_ENABLE_PAYWALL === "true") {
+          purchaseResult = await Purchases.purchasePackage(pkg);
+        } else {
+          throw new Error('Paywall is disabled - purchases not available');
+        }
       } catch (purchaseError: any) {
         logger.error('Purchases.purchasePackage() failed', {
           error: purchaseError?.message || 'Unknown purchase error',
@@ -396,7 +433,11 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
       // Wrap the actual restore call
       let customerInfo: CustomerInfo;
       try {
-        customerInfo = await Purchases.restorePurchases();
+        if (process.env.EXPO_PUBLIC_ENABLE_PAYWALL === "true") {
+          customerInfo = await Purchases.restorePurchases();
+        } else {
+          throw new Error('Paywall is disabled - restore purchases not available');
+        }
       } catch (restoreError: any) {
         logger.error('Purchases.restorePurchases() failed', {
           error: restoreError?.message || 'Unknown restore error',
@@ -479,13 +520,13 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
     }
   }, [isAuthenticated, sdkInitialized, checkEntitlements]);
 
-  // Fetch offerings when SDK is ready
+  // Fetch offerings when SDK is ready (only if paywall is enabled)
   useEffect(() => {
-    if (sdkInitialized) {
+    if (sdkInitialized && enablePaywall) {
       logger.info('[RevenueCat] SDK ready, fetching offerings');
       fetchOfferings();
     }
-  }, [sdkInitialized, fetchOfferings]);
+  }, [sdkInitialized, enablePaywall, fetchOfferings]);
 
   const value = {
     isPremium,

@@ -14,7 +14,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Session, User } from '@supabase/supabase-js';
 
 import { useAuth } from '@/context/AuthContext';
-import { getSecureStoreLogs, supabase } from '@/lib/supabaseClient';
+import { supabase } from '@/lib/supabaseClient';
 import { COLORS } from '@/constants/theme';
 import {
   bodyStrongText,
@@ -97,7 +97,7 @@ export default function SessionDebugScreen() {
       setStoredToken(token);
 
       // 4. Get SecureStore logs
-      setSecureStoreLogs(getSecureStoreLogs());
+      setSecureStoreLogs(['getSecureStoreLogs function removed']);
     } catch (error: any) {
       Alert.alert('Rehydration Failed', error.message);
     } finally {
