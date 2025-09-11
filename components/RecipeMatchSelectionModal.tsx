@@ -42,9 +42,6 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
   const [showValidation, setShowValidation] = useState(false);
   const [validationError, setValidationError] = useState('');
 
-  console.log('[RecipeMatchSelectionModal] Modal rendered with', matches.length, 'matches.', { visible, debugSource });
-  console.log('[RecipeMatchSelectionModal] Matches data:', matches);
-  console.log('[RecipeMatchSelectionModal] First match sample:', matches[0]);
 
   React.useEffect(() => {
     // Seed input when modal becomes visible or initial text changes
@@ -67,22 +64,18 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
 
   const handleRecipeSelect = (recipeId: string | number) => {
     const selectedRecipeId = recipeId.toString();
-    console.log('[RecipeMatchSelectionModal] User selected recipe ID:', selectedRecipeId);
     onAction('select', selectedRecipeId);
   };
 
   const handleCreateNew = () => {
-    console.log('[RecipeMatchSelectionModal] User clicked "Create a new recipe". Expanding input.');
     setIsCreateExpanded(true);
   };
 
   const handleReturnHome = () => {
-    console.log('[RecipeMatchSelectionModal] User clicked "Return to Home".');
     onAction('returnHome');
   };
 
   const handleImageError = (imageUrl: string) => {
-    console.log('[RecipeMatchSelectionModal] Image failed to load:', imageUrl);
     setFailedImages(prev => new Set(prev).add(imageUrl));
   };
 
@@ -98,13 +91,10 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
   };
 
   const renderRecipeItem = ({ item }: { item: { recipe: CombinedParsedRecipe; similarity: number; } }) => {
-    console.log('[RecipeMatchSelectionModal] Rendering item:', item);
     const recipe = item.recipe;
     const imageUrl = recipe.image || null;
     const hasImageFailed = imageUrl ? failedImages.has(imageUrl) : true;
     const shouldShowFallback = !imageUrl || hasImageFailed;
-    
-    console.log('[RecipeMatchSelectionModal] Recipe title:', recipe.title, 'Image URL:', imageUrl, 'Show fallback:', shouldShowFallback);
     
     return (
       <TouchableOpacity
@@ -144,9 +134,6 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
       animationType="slide"
       transparent={true}
       onRequestClose={handleReturnHome}
-      onShow={() => {
-        if (__DEV__) console.log('[RecipeMatchSelectionModal] onShow fired', { debugSource });
-      }}
     >
       <View style={styles.modalOverlay}>
         <SafeAreaView style={styles.modalContent}>
@@ -196,7 +183,6 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
                 <TouchableOpacity
                   style={styles.closeButtonExpanded}
                   onPress={() => {
-                    console.log('[RecipeMatchSelectionModal] User clicked close X');
                     setIsCreateExpanded(false);
                     setInputText('');
                     setShowValidation(false);
@@ -236,7 +222,6 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
                   style={styles.textButtonContainer}
                   onPress={() => {
                     const trimmedInput = inputText.trim();
-                    console.log('[RecipeMatchSelectionModal] Confirm create with input text length:', trimmedInput.length);
 
                     // Validate dish name inputs
                     if (looksLikeDishName(trimmedInput) && !isDescriptiveDishName(trimmedInput)) {
@@ -308,13 +293,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   } as ViewStyle,
   title: {
-    ...sectionHeaderText,
+    ...bodyStrongText,
+    fontSize: 20,
     color: COLORS.textDark,
     textAlign: 'left',
     marginBottom: SPACING.xs,
   } as TextStyle,
   mainTitle: {
-    ...sectionHeaderText,
+    ...bodyStrongText,
+    fontSize: 20,
     color: COLORS.textDark,
     textAlign: 'left',
   } as TextStyle,
@@ -337,6 +324,7 @@ const styles = StyleSheet.create({
     textAlign: 'left',
     maxWidth: 280,
     alignSelf: 'flex-start',
+    fontSize: FONT.size.body,
   } as TextStyle,
   recipeList: {
     flex: 1,
@@ -349,6 +337,9 @@ const styles = StyleSheet.create({
     padding: SPACING.sm,
     width: '100%',
     alignItems: 'flex-start',
+    borderTopWidth: 1,
+    borderTopColor: '#000000',
+    marginTop: SPACING.sm,
   } as ViewStyle,
   recipeCard: {
     flexDirection: 'row',
@@ -426,12 +417,13 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xs,
     color: COLORS.darkGray,
     ...bodyText,
+    fontSize: FONT.size.caption,
   } as TextStyle,
   validationErrorText: {
     marginTop: SPACING.xs,
     color: COLORS.error || '#E74C3C',
     ...bodyText,
-    fontSize: FONT.size.smBody,
+    fontSize: FONT.size.caption,
   } as TextStyle,
   textButtonContainer: {
     marginTop: SPACING.sm,
@@ -439,14 +431,12 @@ const styles = StyleSheet.create({
     paddingLeft: SPACING.pageHorizontal,
   } as ViewStyle,
   textButton: {
-    fontFamily: 'Inter',
-    fontSize: 18,
-    fontWeight: '400',
-    lineHeight: 22,
+    ...bodyStrongText,
     color: COLORS.textDark,
     textAlign: 'left',
     textTransform: 'none' as const,
     textDecorationLine: 'none',
+    fontSize: FONT.size.body,
   } as TextStyle,
 });
 

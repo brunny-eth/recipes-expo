@@ -1059,18 +1059,19 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.xxl,
   },
   emptyText: {
-    fontFamily: FONT.family.heading,
-    fontSize: 18,
+    ...bodyStrongText,
+    fontSize: FONT.size.body,
     color: COLORS.textDark,
     marginTop: SPACING.md,
     marginBottom: SPACING.sm,
+    textAlign: 'left',
   },
   emptySubtext: {
-    ...bodyText,
-    color: COLORS.darkGray,
-    textAlign: 'center',
-    marginTop: SPACING.sm,
-    fontStyle: 'italic',
+    ...bodyStrongText,
+    fontSize: FONT.size.body,
+    color: COLORS.textDark,
+    textAlign: 'left',
+    marginTop: SPACING.xs,
   },
   loginButton: {
     marginTop: SPACING.lg,
@@ -1189,7 +1190,7 @@ const styles = StyleSheet.create({
   
   // Add new folder styles - now looks like search text
   addFolderRow: {
-    height: 32, // Increased for better fit with 20px font
+    height: 40, // Increased height to prevent text cutoff
     width: '90%',
     alignSelf: 'flex-start', // Left align to screen edge
     marginLeft: '5%', // Offset to account for 90% width
@@ -1309,12 +1310,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     fontSize: 20,
     fontWeight: '400', // Non-bold variant
-    lineHeight: 24,
+    lineHeight: 26, // Increased line height to prevent descender cutoff
     color: COLORS.textDark,
     flex: 1,
     textAlign: 'left', // Ensure left alignment
     textAlignVertical: 'center',
-    paddingVertical: 0,
+    paddingVertical: 2, // Add vertical padding for better text positioning
   },
   // Active state for search (matches folder-detail.tsx)
   headerTextActive: {

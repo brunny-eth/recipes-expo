@@ -1384,35 +1384,22 @@ export default function MiseScreen() {
 
     return (
       <ScrollView style={styles.combinedContent} showsVerticalScrollIndicator={false}>
-        {/* Fixed spacer for consistent top padding */}
-        <View style={{ height: 24 }} />
-
         {/* Action Buttons */}
-        <View style={styles.miseToolbarContainer}>
-          <TouchableOpacity
-            style={styles.miseToolbarButton}
-            onPress={handleCookMyRecipes}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Text style={styles.miseToolbarButtonText}>Cook Recipes</Text>
-          </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.miseToolbarButton}
+          onPress={handleCookMyRecipes}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={styles.miseToolbarButtonText}>Cook Recipes</Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.miseToolbarButton}
-            onPress={handleShareGrocery}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Text style={styles.miseToolbarButtonText}>Share List</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.miseToolbarButton, styles.miseToolbarButtonLast]}
-            onPress={handleOpenStaplesModal}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Text style={styles.miseToolbarButtonText}>Edit Pantry</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={styles.miseToolbarButtonSecond}
+          onPress={handleOpenStaplesModal}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={styles.miseToolbarButtonText}>Edit Pantry</Text>
+        </TouchableOpacity>
 
         {/* Menu Section */}
         <View style={styles.menuSectionContainer}>
@@ -1452,6 +1439,13 @@ export default function MiseScreen() {
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeaderWithControls}>
             <Text style={styles.sectionTitle}>Groceries</Text>
+            <TouchableOpacity
+              onPress={handleShareGrocery}
+              style={styles.shareIconButton}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <MaterialCommunityIcons name="share" size={16} color={COLORS.textDark} />
+            </TouchableOpacity>
           </View>
           <View style={styles.sectionDivider} />
           
@@ -1588,6 +1582,7 @@ const styles = StyleSheet.create({
   // Combined content styles
   combinedContent: {
     flex: 1,
+    paddingTop: SPACING.md, // Match library.tsx savedContent paddingTop (16px)
   },
   sectionContainer: {
     marginBottom: SPACING.lg,
@@ -1665,36 +1660,33 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
     textDecorationLine: 'underline',
   },
-  // Toolbar styles matching library.tsx and folder-detail.tsx
-  miseToolbarContainer: {
-    flexDirection: 'column', // Stack vertically
-    justifyContent: 'space-between', // Distribute space between buttons
-    height: 116, // Adjusted for 16px spacing + bottom margin: (28+16+28+16+28) = 116px
-    backgroundColor: 'transparent',
+  // Toolbar styles matching library.tsx exactly
+  miseToolbarButton: {
+    height: 32, // Match library.tsx searchToolbar height
     width: '90%',
     alignSelf: 'flex-start', // Left align to screen edge
     marginLeft: '5%', // Offset to account for 90% width
-    marginBottom: SPACING.xxxl, // Add bottom margin to match library.tsx
-  },
-  miseToolbarButton: {
-    height: 28, // Increased to 28px for accessibility (28+16 hitSlop = 44px minimum)
     backgroundColor: 'transparent',
-    marginBottom: SPACING.md, // Increased to 16px for consistent spacing across toolbars
   },
-  miseToolbarButtonLast: {
-    height: 28, // Make the last button slightly taller for more breathing room
-    marginBottom: SPACING.md, // Add 16px bottom margin for breathing room after Edit Pantry
+  miseToolbarButtonSecond: {
+    height: 40, // Match library.tsx addFolderRow height
+    width: '90%',
+    alignSelf: 'flex-start', // Left align to screen edge
+    marginLeft: '5%', // Offset to account for 90% width
+    marginTop: SPACING.md, // Match library.tsx addFolderRow marginTop (16px)
+    marginBottom: SPACING.xxxl, // Match library.tsx addFolderRow marginBottom
+    backgroundColor: 'transparent',
   },
   miseToolbarButtonText: {
     fontFamily: 'Inter',
     fontSize: 20,
     fontWeight: '400', // Non-bold variant to match library.tsx
-    lineHeight: 24,
+    lineHeight: 26, // Match library.tsx headerText lineHeight
     color: COLORS.textDark,
     flex: 1,
     textAlign: 'left', // Ensure left alignment
     textAlignVertical: 'center',
-    paddingVertical: 0,
+    paddingVertical: 2, // Match library.tsx headerText paddingVertical
   },
   recipeListContainer: {
     // No horizontal padding to keep cards full width
@@ -2083,6 +2075,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: SPACING.xs,
+  } as ViewStyle,
+  shareIconButton: {
+    height: 24,
+    width: 24,
+    borderRadius: RADIUS.sm,
+    borderWidth: 0,
+    borderColor: 'transparent',
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 0,
   } as ViewStyle,
 
 }); 

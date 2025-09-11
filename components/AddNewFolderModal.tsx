@@ -132,7 +132,7 @@ export default function AddNewFolderModal({
           activeOpacity={1}
           onPress={(e) => e.stopPropagation()} // Prevent closing when tapping inside modal
         >
-          <Text style={styles.title}>Add new folder</Text>
+          <Text style={styles.title}>Add New Folder</Text>
 
           {error && (
             <View style={styles.errorContainer}>
@@ -277,22 +277,25 @@ const styles = StyleSheet.create({
   cancelButton: {
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: COLORS.lightGray,
+    borderColor: '#000000',
   } as ViewStyle,
   cancelButtonText: {
     ...bodyStrongText,
-    color: COLORS.textMuted,
+    color: '#000000',
     fontSize: 14,
   } as TextStyle,
   createButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#000000',
   } as ViewStyle,
   createButtonDisabled: {
-    backgroundColor: COLORS.lightGray,
+    backgroundColor: 'transparent',
+    borderColor: COLORS.lightGray,
   } as ViewStyle,
   createButtonText: {
     ...bodyStrongText,
-    color: COLORS.white,
+    color: '#000000',
     fontSize: 14, // Fixed font size to prevent layout shifts
     fontWeight: '600', // Fixed weight to prevent metric changes
   } as TextStyle,

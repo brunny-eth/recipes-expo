@@ -924,19 +924,19 @@ export default function SavedFolderDetailScreen() {
         </View>
       </View>
 
-      {/* Search and Select toolbar */}
-      <View style={styles.toolbarContainer}>
-        <TouchableOpacity
-          key="search-button"
-          style={styles.toolbarButton}
+      {/* Toolbar content wrapper - matches library.tsx savedContent */}
+      <View style={styles.savedContent}>
+        {/* Search button */}
+        <TouchableHighlight
+          style={styles.searchButtonRow}
           onPress={isSearchActive ? undefined : toggleSearch}
-          activeOpacity={0.7}
+          underlayColor="transparent"
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <View style={styles.toolbarButtonContent}>
+          <View style={styles.searchToolbarContent}>
             {isSearchActive ? (
               <TextInput
-                style={styles.toolbarButtonText}
+                style={styles.headerText}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 placeholder=""
@@ -949,42 +949,39 @@ export default function SavedFolderDetailScreen() {
                 }}
               />
             ) : (
-              <Text style={styles.toolbarButtonText}>Search</Text>
+              <Text style={styles.headerText}>Search</Text>
             )}
           </View>
-        </TouchableOpacity>
+        </TouchableHighlight>
 
+        {/* Select button */}
         <TouchableHighlight
-          key="select-button"
-          style={styles.toolbarButton}
+          style={[styles.toolbarRow, styles.selectButtonRow]}
           onPress={toggleSelection}
           underlayColor="transparent"
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <View style={styles.toolbarButtonContent}>
-            <Text style={styles.toolbarButtonText}>Select</Text>
+          <View style={styles.searchToolbarContent}>
+            <Text style={styles.headerText}>Select</Text>
           </View>
         </TouchableHighlight>
 
+        {/* Delete Folder button */}
         <TouchableHighlight
-          key="delete-folder-button"
-          style={[styles.toolbarButton, styles.deleteButton]}
+          style={[styles.toolbarRow, styles.deleteButtonRow]}
           onPress={handleDeleteFolder}
           underlayColor="transparent"
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <View style={styles.toolbarButtonContent}>
-            <Text style={styles.toolbarButtonText}>Delete Folder</Text>
+          <View style={styles.searchToolbarContent}>
+            <Text style={styles.headerText}>Delete Folder</Text>
           </View>
         </TouchableHighlight>
-
-
+        
+        {renameError ? <Text style={styles.renameErrorText}>{renameError}</Text> : null}
+        
+        {renderContent()}
       </View>
-
-
-      {renameError ? <Text style={styles.renameErrorText}>{renameError}</Text> : null}
-      
-      {renderContent()}
       
       {/* Folder Picker Modal for moving recipes */}
       <FolderPickerModal
@@ -1156,45 +1153,53 @@ const styles = StyleSheet.create({
   clearButton: {
     padding: 4,
   },
-  // Toolbar styles
-  toolbarContainer: {
-    flexDirection: 'column', // Stack vertically
-    height: 112, // Updated for 16px spacing: 32px + 16px + 32px + 16px + 16px = 112px
-    backgroundColor: 'transparent',
+  // Content wrapper - matches library.tsx exactly
+  savedContent: {
+    flex: 1,
+    paddingTop: SPACING.md, // 16px to match library.tsx exactly
+  },
+  // Toolbar styles - simplified to match library.tsx structure
+  toolbarRow: {
+    height: 40, // Match addFolderRow height from library.tsx
     width: '90%',
     alignSelf: 'flex-start', // Left align to screen edge
     marginLeft: '5%', // Offset to account for 90% width
-    marginTop: SPACING.md, // Consistent with other screens
-    marginBottom: SPACING.xxxl + SPACING.contentTopMargin, // Match library.tsx spacing between buttons and content
+    marginTop: 0, // No marginTop - inherits spacing from savedContent paddingTop
+    marginBottom: 0, // No bottom margin for individual rows
   },
-  toolbarButton: {
-    height: 32, // Increased for better fit with 20px font
-    backgroundColor: 'transparent',
-    marginBottom: SPACING.md, // Increased to 16px for consistent spacing across toolbars
+  searchButtonRow: {
+    height: 32, // Match searchToolbar height from library.tsx
+    width: '90%',
+    alignSelf: 'flex-start', // Left align to screen edge
+    marginLeft: '5%', // Offset to account for 90% width
+    marginTop: 0, // No marginTop - inherits spacing from savedContent paddingTop
+    marginBottom: 0, // No bottom margin for individual rows
   },
-  deleteButton: {
+  selectButtonRow: {
+    marginTop: SPACING.md, // Match addFolderRow marginTop for 16px spacing
+  },
+  deleteButtonRow: {
     width: '45%', // Smaller width for DELETE FOLDER button
-    alignSelf: 'flex-start', // Left align the button
-    marginBottom: 0, // Remove bottom margin for last button
+    marginTop: SPACING.md, // Match addFolderRow marginTop for 16px spacing
+    marginBottom: SPACING.xxxl + SPACING.contentTopMargin, // Big bottom margin for spacing from content
   },
-
-  toolbarButtonContent: {
+  searchToolbarContent: {
     flexDirection: 'row',
     alignItems: 'center',
     height: '100%',
     paddingLeft: 0, // Remove left padding for true left alignment
     paddingRight: 18, // Keep some right padding
   },
-  toolbarButtonText: {
+  headerText: {
     fontFamily: 'Inter',
     fontSize: 20,
     fontWeight: '400', // Non-bold variant to match library.tsx
-    lineHeight: 24,
+    lineHeight: 26, // Match headerText lineHeight from library.tsx
     color: COLORS.textDark,
     flex: 1,
     textAlign: 'left', // Ensure left alignment
     textAlignVertical: 'center',
-    paddingVertical: 0,
+    paddingVertical: 0, // Match element inspector showing padding: 0 for library.tsx
   },
 
   toolbarDivider: {

@@ -284,9 +284,10 @@ const styles = StyleSheet.create({
     gap: 2, // Space between buttons
   },
   bottomButton: {
-    height: 24, // Match Library.tsx searchToolbar height
+    height: 32, // Increased height to prevent text cutoff
     backgroundColor: 'transparent',
     alignSelf: 'flex-start', // Only take up space needed for content
+    minWidth: 120, // Ensure minimum width for text
   },
   bottomButtonContent: {
     flexDirection: 'row',
@@ -300,11 +301,11 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     fontSize: 16,
     fontWeight: '400', // Match Library.tsx headerText
-    lineHeight: 22,
+    lineHeight: 24, // Increased line height to prevent descender cutoff
     color: COLORS.textDark,
     textAlign: 'left',
     textAlignVertical: 'center',
-    paddingVertical: 0,
+    paddingVertical: 4, // Add vertical padding for better text positioning
     textDecorationLine: 'underline',
   },
 });

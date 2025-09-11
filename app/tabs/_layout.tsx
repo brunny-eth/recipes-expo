@@ -16,7 +16,7 @@ const styles = StyleSheet.create({
   },
   tabBarLabel: {
     ...captionText,
-    fontSize: 11,
+    fontSize: 10,
   },
   tabBarItem: {
     alignItems: 'center',
@@ -25,9 +25,9 @@ const styles = StyleSheet.create({
   },
   tabBarText: {
     ...captionText,
-    fontSize: 15,
+    fontSize: 14,
     textAlign: 'center',
-    width: 64,
+    width: 80,
   },
   activeTabUnderline: {
     position: 'absolute',
@@ -77,7 +77,7 @@ const MemoizedTabsNavigator = React.memo(() => {
         tabBarLabelStyle: styles.tabBarLabel,
         tabBarItemStyle: {
           width: 'auto',
-          minWidth: 85,
+          minWidth: 95,
         },
       }}
     >
