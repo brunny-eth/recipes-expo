@@ -17,14 +17,27 @@ export default React.memo(function PremiumGate({ children }: PremiumGateProps) {
   const { isPremium, isLoading } = useRevenueCat();
   const [showPaywall, setShowPaywall] = useState(false);
 
-  // Automatically show paywall when user doesn't have premium access
+  // Check if paywall is enabled
+  const enablePaywall = process.env.EXPO_PUBLIC_ENABLE_PAYWALL === "true";
+
+  // Automatically show paywall when user doesn't have premium access (only if paywall is enabled)
   useEffect(() => {
+    if (!enablePaywall) {
+      setShowPaywall(false);
+      return;
+    }
+
     if (!isLoading && !isPremium) {
       setShowPaywall(true);
     } else if (isPremium) {
       setShowPaywall(false);
     }
-  }, [isPremium, isLoading]);
+  }, [isPremium, isLoading, enablePaywall]);
+
+  // If paywall is disabled, always show content
+  if (!enablePaywall) {
+    return <>{children}</>;
+  }
 
   // Show loading state
   if (isLoading) {

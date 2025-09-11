@@ -31,9 +31,12 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
   const { isAuthenticated } = useAuth();
   const { showError } = useErrorModal();
 
+  // Check if paywall is enabled
+  const enablePaywall = process.env.EXPO_PUBLIC_ENABLE_PAYWALL === "true";
+
   // State
-  const [isPremium, setIsPremium] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isPremium, setIsPremium] = useState(!enablePaywall); // Always premium if paywall disabled
+  const [isLoading, setIsLoading] = useState(enablePaywall); // Only loading if paywall enabled
   const [offerings, setOfferings] = useState<any>(null);
   const [isPurchaseInProgress, setIsPurchaseInProgress] = useState(false);
   const [sdkInitialized, setSdkInitialized] = useState(globalSdkInitialized);
@@ -44,8 +47,15 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
     showErrorRef.current = showError;
   }, [showError]);
 
-  // Initialize RevenueCat SDK once globally
+  // Initialize RevenueCat SDK once globally (only if paywall is enabled)
   React.useEffect(() => {
+    if (!enablePaywall) {
+      logger.info('[RevenueCat] Paywall disabled, skipping SDK initialization');
+      setSdkInitialized(true);
+      setIsLoading(false);
+      return;
+    }
+
     if (!globalSdkInitialized) {
       const revenueCatApiKey = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY;
       logger.info('[RevenueCat] Initialization starting...', {
@@ -77,15 +87,24 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
       // SDK already initialized globally, just update local state
       setSdkInitialized(true);
     }
-  }, []);
+  }, [enablePaywall]);
 
   // Check user entitlements with defensive error handling
   const checkEntitlements = useCallback(async () => {
     logger.info('[RevenueCat] checkEntitlements called', {
       isAuthenticated,
       sdkInitialized,
+      enablePaywall,
       timestamp: new Date().toISOString()
     });
+
+    // If paywall is disabled, always grant premium access
+    if (!enablePaywall) {
+      logger.info('[RevenueCat] Paywall disabled, granting premium access');
+      setIsPremium(true);
+      setIsLoading(false);
+      return;
+    }
 
     if (!isAuthenticated) {
       logger.info('[RevenueCat] User not authenticated, skipping entitlements check');

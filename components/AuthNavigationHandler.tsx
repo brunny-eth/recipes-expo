@@ -19,8 +19,17 @@ export function AuthNavigationHandler() {
   const handleError = useHandleError();
   const [showPaywall, setShowPaywall] = useState(false);
 
-  // Show paywall when user doesn't have premium access
+  // Check if paywall is enabled
+  const enablePaywall = process.env.EXPO_PUBLIC_ENABLE_PAYWALL === "true";
+
+  // Show paywall when user doesn't have premium access (only if paywall is enabled)
   useEffect(() => {
+    if (!enablePaywall) {
+      console.log('[AuthNavigationHandler] Paywall disabled, hiding paywall');
+      setShowPaywall(false);
+      return;
+    }
+
     if (!isRevenueCatLoading && !isPremium) {
       console.log('[AuthNavigationHandler] User does not have premium access, showing paywall');
       setShowPaywall(true);
@@ -28,7 +37,7 @@ export function AuthNavigationHandler() {
       console.log('[AuthNavigationHandler] User has premium access, hiding paywall');
       setShowPaywall(false);
     }
-  }, [isPremium, isRevenueCatLoading]);
+  }, [isPremium, isRevenueCatLoading, enablePaywall]);
 
   useEffect(() => {
     const unsubscribe = onAuthNavigation((event) => {
@@ -58,16 +67,21 @@ export function AuthNavigationHandler() {
             );
           }
           
-          // Check premium status after authentication
+          // Check premium status after authentication (only if paywall is enabled)
           setTimeout(async () => {
             try {
-              await checkEntitlements();
-              
-              if (!isPremium && !isRevenueCatLoading) {
-                logger.info('User not premium, showing paywall', { userId: event.userId });
-                setShowPaywall(true);
+              if (enablePaywall) {
+                await checkEntitlements();
+                
+                if (!isPremium && !isRevenueCatLoading) {
+                  logger.info('User not premium, showing paywall', { userId: event.userId });
+                  setShowPaywall(true);
+                } else {
+                  logger.info('User has premium access, navigating to tabs', { userId: event.userId, isPremium });
+                  router.replace('/tabs');
+                }
               } else {
-                logger.info('User has premium access, navigating to tabs', { userId: event.userId, isPremium });
+                logger.info('Paywall disabled, navigating directly to tabs', { userId: event.userId });
                 router.replace('/tabs');
               }
             } catch (error) {
