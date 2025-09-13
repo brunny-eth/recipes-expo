@@ -22,11 +22,9 @@ import { useHandleError } from '@/hooks/useHandleError';
 import { CombinedParsedRecipe as ParsedRecipe } from '../../common/types';
 import { useAnalytics } from '@/utils/analytics';
 import { FONT } from '@/constants/typography';
-import { Image } from 'react-native';
-import Logo from '@/assets/images/logo.svg';
 import { getErrorMessage, getNetworkErrorMessage } from '../../utils/errorMessages';
 import { ParseErrorCode } from '../../common/types/errors';
-import LogoHeader from '@/components/LogoHeader';
+import ScreenHeader from '@/components/ScreenHeader';
 import { useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
@@ -487,22 +485,13 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
   };
 
   const headerLogo = useMemo(() => (
-    <LogoHeader
-      animatedLogo={(
-        <Animated.View>
-          <Logo
-            width={isCompact ? 300 : 400}
-            height={isCompact ? 150 : 200}
-            style={{
-              alignSelf: 'center',
-              marginTop: isCompact ? SPACING.lg : SPACING.xl,
-              marginBottom: 0,
-            }}
-          />
-        </Animated.View>
-      )}
+    <ScreenHeader
+      title="OLEA"
+      showBack={false}
+      titleStyle={{ fontSize: 32, fontWeight: '800' }}
+      backgroundColor="#DEF6FF"
     />
-  ), [isCompact]);
+  ), []);
 
   if (loadingMode === 'checklist') {
     return (
@@ -580,23 +569,13 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
 const styles = StyleSheet.create({
   contentWrapper: {
     width: '100%',
-    marginTop: SPACING.xxxl, // More space below Meez logo
+    marginTop: SPACING.md, // Match spacing from index.tsx and welcome screen
     marginBottom: SPACING.xxxl, // Maintain spacing that was previously provided by tagline
   } as ViewStyle,
   checklistContainer: {
     alignItems: 'stretch',
+    marginTop: 30,
   } as ViewStyle,
-  logoContainer: {
-    alignItems: 'center',
-    paddingTop: 24,
-    marginBottom: SPACING.md,
-  } as ViewStyle,
-  logo: {
-    width: 220,
-    height: 120,
-    marginBottom: SPACING.md,
-    alignSelf: 'center',
-  } as ImageStyle,
   tagline: {
     fontSize: FONT.size.smBody,
     fontFamily: FONT.family.inter,

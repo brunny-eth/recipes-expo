@@ -701,7 +701,6 @@ export default function SavedFolderDetailScreen() {
     if (savedRecipes.length === 0) {
       return (
         <View style={styles.emptyContainer}>
-          <MaterialCommunityIcons name="heart-outline" size={48} color={COLORS.lightGray} />
           <Text style={styles.emptyText}>No recipes in this folder yet</Text>
           <Text style={styles.emptySubtext}>
             Save recipes to this folder or move recipes from another folder.
@@ -1111,7 +1110,7 @@ const styles = StyleSheet.create({
   emptyContainer: {
     flexGrow: 1,
     justifyContent: 'flex-start',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingHorizontal: SPACING.xl,
     paddingVertical: SPACING.xl,
     paddingTop: '30%',
