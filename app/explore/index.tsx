@@ -83,7 +83,7 @@ export default function ExploreScreen() {
   }, [fetchFromAPI]);
 
   const navigateToRecipe = useCallback(async (recipe: ParsedRecipe) => {
-    try { await track('input_mode_selected', { inputType: 'explore' }); } catch {}
+    try { await track('input_mode_selected', { input_type: 'explore' }); } catch {}
     router.push({ pathname: '/recipe/summary', params: { recipeId: recipe.id?.toString(), entryPoint: 'library' } });
   }, [router, track]);
 

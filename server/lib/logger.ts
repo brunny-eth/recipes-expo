@@ -11,8 +11,15 @@ export interface Logger {
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
+// Log token prefix in development for verification
+if (isDevelopment && process.env.LOGTAIL_TOKEN) {
+  console.log("🔑 Logtail token prefix:", process.env.LOGTAIL_TOKEN.slice(0, 6));
+}
+
 // Initialize Logtail only in production and only if token is available
-const logtail = isDevelopment || !process.env.LOGTAIL_TOKEN ? null : new Logtail(process.env.LOGTAIL_TOKEN);
+const logtail = isDevelopment || !process.env.LOGTAIL_TOKEN ? null : new Logtail(process.env.LOGTAIL_TOKEN, {
+  endpoint: "https://in.logs.eu.betterstack.com"
+});
 
 const logger = pino({
   level: isDevelopment ? 'debug' : 'info',

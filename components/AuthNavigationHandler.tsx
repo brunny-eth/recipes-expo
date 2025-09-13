@@ -22,13 +22,11 @@ export function AuthNavigationHandler() {
   // Check if paywall is enabled (use same logic as RevenueCatContext)
   const enablePaywall = process.env.EXPO_PUBLIC_ENABLE_PAYWALL === "true";
   
-  // TESTING: Disable main app paywall for testing selective paywall (remove this in production)
-  const TESTING_PAYWALL = false; // Set to false to disable main app paywall
-  const forceEnablePaywall = enablePaywall && TESTING_PAYWALL;
+  // Enable paywall when environment variable is set
+  const forceEnablePaywall = enablePaywall;
   
   console.log('🔍 [AuthNavigationHandler] Paywall configuration:', {
     enablePaywall,
-    TESTING_PAYWALL,
     forceEnablePaywall,
     envValue: process.env.EXPO_PUBLIC_ENABLE_PAYWALL,
     isPremium,

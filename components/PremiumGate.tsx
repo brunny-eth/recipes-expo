@@ -19,8 +19,7 @@ export default React.memo(function PremiumGate({ children }: PremiumGateProps) {
 
   // Check if paywall is enabled (use same logic as RevenueCatContext)
   const enablePaywall = process.env.EXPO_PUBLIC_ENABLE_PAYWALL === "true";
-  const TESTING_PAYWALL = process.env.NODE_ENV === 'development'; // Match RevenueCatContext
-  const forceEnablePaywall = enablePaywall || TESTING_PAYWALL;
+  const forceEnablePaywall = enablePaywall;
 
   // Automatically show paywall when user doesn't have premium access (only if paywall is enabled)
   useEffect(() => {

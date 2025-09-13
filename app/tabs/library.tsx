@@ -35,6 +35,7 @@ import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
 import { useAnalytics } from '@/utils/analytics';
 import { useRenderCounter } from '@/hooks/useRenderCounter';
 import { useHandleError } from '@/hooks/useHandleError';
+import { logger } from '@/utils/logger';
 
 // Types for folders
 type SavedFolder = {
@@ -232,16 +233,12 @@ export default function LibraryScreen() {
         )
       );
 
-      track('folder_color_updated', {
-        folderId,
-        newColor,
-        userId: session?.user?.id,
-      });
     } catch (error) {
-      track('folder_color_update_error', {
-        folderId,
-        errorMessage: error instanceof Error ? error.message : String(error),
-        userId: session?.user?.id,
+      logger.error('Folder color update error', {
+        scope: 'library',
+        folder_id: folderId,
+        error: error instanceof Error ? error.message : String(error),
+        user_id: session?.user?.id,
       });
       handleError('Error', error);
     } finally {
@@ -292,10 +289,11 @@ export default function LibraryScreen() {
     
     const backendUrl = process.env.EXPO_PUBLIC_API_URL;
     if (!backendUrl) {
-      track('api_config_error', { 
+      logger.error('API config error', {
+        scope: 'library',
         screen: 'LibraryScreen', 
         error: 'EXPO_PUBLIC_API_URL not set',
-        userId: session?.user?.id,
+        user_id: session?.user?.id,
       });
       setExploreError('API configuration error. Please check your environment variables.');
       if (!isRefresh) {
@@ -331,10 +329,11 @@ export default function LibraryScreen() {
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load explore recipes';
-      track('fetch_explore_recipes_error', { 
+      logger.error('Fetch explore recipes error', {
+        scope: 'library',
         screen: 'LibraryScreen', 
         error: errorMessage,
-        userId: session?.user?.id,
+        user_id: session?.user?.id,
       });
       setExploreError(errorMessage);
     } finally {
@@ -381,10 +380,11 @@ export default function LibraryScreen() {
       setSavedFolders(folders || []);
       
     } catch (err) {
-      track('fetch_saved_folders_error', { 
+      logger.error('Fetch saved folders error', {
+        scope: 'library',
         screen: 'LibraryScreen', 
         error: 'Failed to load saved folders',
-        userId: session?.user?.id,
+        user_id: session?.user?.id,
       });
       setSavedError('Failed to load saved folders. Please try again.');
     } finally {
@@ -453,12 +453,13 @@ export default function LibraryScreen() {
     // Track input mode selection if user is on explore tab
     if (selectedTab === 'explore') {
       try {
-        await track('input_mode_selected', { inputType: 'explore' });
+        await track('input_mode_selected', { input_type: 'explore' });
       } catch (error) {
-        track('track_explore_recipe_selection_error', {
+        logger.error('Track explore recipe selection error', {
+          scope: 'library',
           screen: 'LibraryScreen',
           error: error instanceof Error ? error.message : String(error),
-          userId: session?.user?.id,
+          user_id: session?.user?.id,
         });
       }
     }
@@ -512,22 +513,24 @@ export default function LibraryScreen() {
       });
 
       if (!response.ok) {
-        track('delete_folder_error', { 
+        logger.error('Delete folder error', {
+          scope: 'library',
           screen: 'LibraryScreen', 
-          folderId: folderToDelete?.id, 
+          folder_id: folderToDelete?.id, 
           error: response.statusText,
-          userId: session?.user?.id,
+          user_id: session?.user?.id,
         });
         setSavedError('Failed to delete folder. Please try again.');
       } else {
         setSavedFolders(prev => prev.filter(f => f.id !== folderToDelete.id));
       }
     } catch (error) {
-      track('unexpected_delete_folder_error', { 
+      logger.error('Unexpected delete folder error', {
+        scope: 'library',
         screen: 'LibraryScreen', 
-        folderId: folderToDelete?.id, 
+        folder_id: folderToDelete?.id, 
         error: error instanceof Error ? error.message : String(error),
-        userId: session?.user?.id,
+        user_id: session?.user?.id,
       });
       setSavedError('Failed to delete folder. Please try again.');
     } finally {

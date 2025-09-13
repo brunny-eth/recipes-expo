@@ -346,17 +346,25 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
           // Track successful recipe parsing
           if (__DEV__) {
             console.log('[POSTHOG] Tracking event: recipe_parsed', { 
-              inputType, 
-              ingredientsCount: result.recipe.ingredients?.length || 0 
+              input_type: inputType, 
+              success: true,
+              recipe_id: result.recipe.id?.toString()
             });
           }
           await track('recipe_parsed', { 
-            inputType, 
-            ingredientsCount: result.recipe.ingredients?.length || 0 
+            input_type: inputType, 
+            success: true,
+            recipe_id: result.recipe.id?.toString()
           });
           
           return result.recipe;
         } else {
+          // Track failed recipe parsing
+          await track('recipe_parsed', { 
+            input_type: inputType, 
+            success: false
+          });
+          
           // Show error modal globally
           const userMessage = result.error 
             ? processBackendError(result)
@@ -385,6 +393,12 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
               ? { context: 'image_processing' } // Use context instead of stage
               : { stage: 'parsing', statusCode: response.status };
             
+            // Track failed recipe parsing
+            await track('recipe_parsed', { 
+              input_type: inputType, 
+              success: false
+            });
+            
             handleError(
               'Recipe Processing Error',
               processedMessage,
@@ -393,6 +407,12 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
             );
           }
         } catch {
+          // Track failed recipe parsing
+          await track('recipe_parsed', { 
+            input_type: inputType, 
+            success: false
+          });
+          
           const statusMessage = getNetworkErrorMessage(`HTTP ${response.status}`, response.status);
           if (isMountedRef.current) {
             handleError('Oops!', statusMessage, { statusCode: response.status }, { onDismissCallback: handleBack });
@@ -400,6 +420,12 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
         }
       }
     } catch (e: any) {
+      // Track failed recipe parsing
+      await track('recipe_parsed', { 
+        input_type: inputType, 
+        success: false
+      });
+      
       if (isMountedRef.current) {
         handleError('Oops!', e, undefined, { onDismissCallback: handleBack });
       }

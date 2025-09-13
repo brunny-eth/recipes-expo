@@ -12,6 +12,8 @@ interface RevenueCatContextType {
   isLoading: boolean;
   offerings: any;
   isPurchaseInProgress: boolean;
+  subscriptionStatus: string;
+  customerInfo: CustomerInfo | null;
 
   // Actions
   checkEntitlements: () => Promise<void>;
@@ -38,16 +40,14 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
   // Check if paywall is enabled
   const enablePaywall = process.env.EXPO_PUBLIC_ENABLE_PAYWALL === "true";
   
-  // TESTING: Disable main app paywall but keep selective paywall for testing (remove this in production)
-  const TESTING_PAYWALL = false; // Set to false to disable main app paywall
-  const forceEnablePaywall = enablePaywall && TESTING_PAYWALL;
+  // Enable paywall when environment variable is set
+  const forceEnablePaywall = enablePaywall;
   
-  // TESTING: Manual premium toggle for testing selective paywall (remove this in production)
-  const [manualPremiumToggle, setManualPremiumToggle] = useState(true); // Start as premium for testing
+  // Manual premium toggle for testing (starts as false for real paywall testing)
+  const [manualPremiumToggle, setManualPremiumToggle] = useState(false);
   
   console.log('🔍 [RevenueCat] Paywall configuration:', {
     enablePaywall,
-    TESTING_PAYWALL,
     forceEnablePaywall,
     envValue: process.env.EXPO_PUBLIC_ENABLE_PAYWALL,
     nodeEnv: process.env.NODE_ENV
@@ -62,12 +62,71 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
   const [offerings, setOfferings] = useState<any>(null);
   const [isPurchaseInProgress, setIsPurchaseInProgress] = useState(false);
   const [sdkInitialized, setSdkInitialized] = useState<boolean>(globalSdkInitialized);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string>('Free');
+  const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
 
   // Keep stable reference to showError
   const showErrorRef = React.useRef(showError);
   React.useEffect(() => {
     showErrorRef.current = showError;
   }, [showError]);
+
+  // Helper function to determine subscription status from CustomerInfo
+  const getSubscriptionStatus = useCallback((customerInfo: CustomerInfo | null): string => {
+    if (!customerInfo || !forceEnablePaywall) {
+      return 'Free';
+    }
+
+    // Check if user has premium access
+    const hasPremiumAccess = customerInfo.entitlements.active?.["premium_access"];
+    
+    if (!hasPremiumAccess) {
+      return 'Free';
+    }
+
+    // Get the premium access entitlement
+    const premiumEntitlement = customerInfo.entitlements.all?.["premium_access"];
+    
+    if (!premiumEntitlement) {
+      return 'Premium';
+    }
+
+    // Check if it's a trial period
+    if (premiumEntitlement.periodType === 'trial') {
+      return 'Free Trial';
+    }
+
+    // Check if it's an introductory period
+    if (premiumEntitlement.periodType === 'intro') {
+      return 'Introductory Period';
+    }
+
+    // Check if it's in grace period (billing issue)
+    if (premiumEntitlement.willRenew === false && premiumEntitlement.expirationDate) {
+      const expirationDate = new Date(premiumEntitlement.expirationDate);
+      const now = new Date();
+      if (expirationDate > now) {
+        return 'Set to Cancel';
+      }
+    }
+
+    // Check if subscription is cancelled but still active
+    if (premiumEntitlement.willRenew === false) {
+      return 'Cancelled';
+    }
+
+    // Check if it's expired
+    if (premiumEntitlement.expirationDate) {
+      const expirationDate = new Date(premiumEntitlement.expirationDate);
+      const now = new Date();
+      if (expirationDate <= now) {
+        return 'Expired';
+      }
+    }
+
+    // Default to active subscription
+    return 'Subscribed';
+  }, [forceEnablePaywall]);
 
   // Initialize RevenueCat SDK once globally (only if paywall is enabled)
   React.useEffect(() => {
@@ -92,6 +151,11 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
           logger.info('[RevenueCat] Starting Purchases.configure()');
           Purchases.configure({ apiKey: revenueCatApiKey });
           logger.info('[RevenueCat] Purchases.configure() finished');
+          
+          // Enable debug logging for RevenueCat
+          Purchases.setLogLevel(Purchases.LOG_LEVEL.DEBUG);
+          logger.info('[RevenueCat] Debug logging enabled');
+          
           globalSdkInitialized = true;
           setSdkInitialized(true);
           logger.info('[RevenueCat] SDK initialized successfully');
@@ -189,6 +253,12 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
             subscriptionsByProductIdentifier: {}
           } as CustomerInfo;
         }
+
+        // Store customer info and update subscription status
+        setCustomerInfo(customerInfo);
+        const status = getSubscriptionStatus(customerInfo);
+        setSubscriptionStatus(status);
+        logger.info('[RevenueCat] Subscription status updated:', { status });
       } catch (entitlementError: any) {
         logger.error('Purchases.getCustomerInfo() failed', {
           error: entitlementError?.message || 'Unknown entitlement error',
@@ -572,6 +642,8 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
     isLoading,
     offerings,
     isPurchaseInProgress,
+    subscriptionStatus,
+    customerInfo,
     checkEntitlements,
     fetchOfferings,
     purchasePackage,

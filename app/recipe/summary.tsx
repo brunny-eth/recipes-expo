@@ -2211,12 +2211,10 @@ export default function RecipeSummaryScreen() {
           
           // Track recipe saved event
           console.log('[POSTHOG] Tracking event: recipe_saved', { 
-            recipeId: recipe.id.toString(), 
-            inputType: entryPoint 
+            recipe_id: recipe.id.toString()
           });
           await track('recipe_saved', { 
-            recipeId: recipe.id.toString(), 
-            inputType: entryPoint 
+            recipe_id: recipe.id.toString()
           });
 
           // CRITICAL: Navigate to the fork so subsequent edits hit PATCH path automatically
@@ -2260,12 +2258,10 @@ export default function RecipeSummaryScreen() {
         if (result.success) {
           // Track recipe saved event
           console.log('[POSTHOG] Tracking event: recipe_saved', { 
-            recipeId: recipe.id.toString(), 
-            inputType: entryPoint 
+            recipe_id: recipe.id.toString()
           });
           await track('recipe_saved', { 
-            recipeId: recipe.id.toString(), 
-            inputType: entryPoint 
+            recipe_id: recipe.id.toString()
           });
           
           // Navigate to the specific folder that the recipe was saved to

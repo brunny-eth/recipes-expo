@@ -3,6 +3,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useAnalytics } from '@/utils/analytics';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import { useHandleError } from '@/hooks/useHandleError';
+import { logger } from '@/utils/logger';
 // Types from mise.tsx
 type GroceryItem = {
   name: string;
@@ -77,11 +78,12 @@ export function useGroceryToggle(
           isChecked: newCheckedState,
         }),
       }).catch(err => {
-        track('grocery_item_toggle_error', {
-          itemName: itemToUpdate!.name,
-          isChecked: newCheckedState,
-          errorMessage: err instanceof Error ? err.message : String(err),
-          userId: session.user.id,
+        logger.error('Grocery item toggle error', {
+          scope: 'mise',
+          item_name: itemToUpdate!.name,
+          is_checked: newCheckedState,
+          error: err instanceof Error ? err.message : String(err),
+          user_id: session.user.id,
         });
         // Optionally, revert the optimistic update and show an error
         handleError('Sync Error', err);

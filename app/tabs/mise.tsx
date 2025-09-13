@@ -38,6 +38,7 @@ import { useErrorModal } from '@/context/ErrorModalContext';
 import { useHandleError } from '@/hooks/useHandleError';
 import { useAnalytics } from '@/utils/analytics';
 import { useRenderCounter } from '@/hooks/useRenderCounter';
+import { logger } from '@/utils/logger';
 import ScreenHeader from '@/components/ScreenHeader';
 import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
 import { parseServingsValue } from '@/utils/recipeUtils';
@@ -367,10 +368,11 @@ export default function MiseScreen() {
     } catch (error) {
       // Track error without causing re-renders
       if (session?.user?.id) {
-        track('mise_manual_items_load_error', {
-          errorMessage: error instanceof Error ? error.message : String(error),
-          errorStack: error instanceof Error ? error.stack : undefined,
-          userId: session.user.id,
+        logger.error('Mise manual items load error', {
+          scope: 'mise',
+          error: error instanceof Error ? error.message : String(error),
+          error_stack: error instanceof Error ? error.stack : undefined,
+          user_id: session.user.id,
         });
       }
       // Don't show error to user for manual items - graceful degradation
@@ -408,10 +410,11 @@ export default function MiseScreen() {
     } catch (error) {
       // Track error without causing re-renders
       if (session?.user?.id) {
-        track('mise_staples_preferences_load_error', {
-          errorMessage: error instanceof Error ? error.message : String(error),
-          errorStack: error instanceof Error ? error.stack : undefined,
-          userId: session.user.id,
+        logger.error('Mise staples preferences load error', {
+          scope: 'mise',
+          error: error instanceof Error ? error.message : String(error),
+          error_stack: error instanceof Error ? error.stack : undefined,
+          user_id: session.user.id,
         });
       }
     }
@@ -427,12 +430,13 @@ export default function MiseScreen() {
     } catch (error) {
       // Track error without causing re-renders
       if (session?.user?.id) {
-        track('mise_staples_preferences_save_error', {
-          errorMessage: error instanceof Error ? error.message : String(error),
-          errorStack: error instanceof Error ? error.stack : undefined,
-          userId: session.user.id,
+        logger.error('Mise staples preferences save error', {
+          scope: 'mise',
+          error: error instanceof Error ? error.message : String(error),
+          error_stack: error instanceof Error ? error.stack : undefined,
+          user_id: session.user.id,
           enabled,
-          staplesCount: staples.length,
+          staples_count: staples.length,
         });
       }
     }
@@ -626,12 +630,13 @@ export default function MiseScreen() {
         }
         
         if (idsChanged || recipeContentChanged) {
-          track('mise_cooking_session_invalidated', {
-            idsChanged,
-            recipeContentChanged,
-            currentRecipesCount: currentRecipeIds.length,
-            freshRecipesCount: freshRecipeIds.length,
-            userId: session?.user?.id,
+          logger.info('Mise cooking session invalidated', {
+            scope: 'mise',
+            ids_changed: idsChanged,
+            recipe_content_changed: recipeContentChanged,
+            current_recipes_count: currentRecipeIds.length,
+            fresh_recipes_count: freshRecipeIds.length,
+            user_id: session?.user?.id,
           });
           console.log('[CTX] Invalidating cooking session due to recipe changes');
           invalidateSession();
@@ -647,9 +652,10 @@ export default function MiseScreen() {
     } finally {
       setIsLoading(false);
       const totalTime = performance.now() - startTime;
-      track('mise_data_fetch_performance', {
-        durationMs: totalTime,
-        userId: session?.user?.id,
+      logger.info('Mise data fetch performance', {
+        scope: 'mise',
+        duration: totalTime,
+        user_id: session?.user?.id,
         success: !error,
       });
     }
@@ -685,19 +691,21 @@ export default function MiseScreen() {
         setGroceryList(mergedGroceryList); // Only update grocery list, no loading states
       } else {
         if (session?.user?.id) {
-          track('mise_grocery_refresh_error', {
-            statusText: groceryResponse.statusText,
+          logger.error('Mise grocery refresh error', {
+            scope: 'mise',
+            status_text: groceryResponse.statusText,
             status: groceryResponse.status,
-            userId: session.user.id,
+            user_id: session.user.id,
           });
         }
       }
     } catch (error) {
       if (session?.user?.id) {
-        track('mise_grocery_refresh_exception', {
-          errorMessage: error instanceof Error ? error.message : String(error),
-          errorStack: error instanceof Error ? error.stack : undefined,
-          userId: session.user.id,
+        logger.error('Mise grocery refresh exception', {
+          scope: 'mise',
+          error: error instanceof Error ? error.message : String(error),
+          error_stack: error instanceof Error ? error.stack : undefined,
+          user_id: session.user.id,
         });
       }
       // Fail silently - recipe deletion was successful, just grocery refresh failed
@@ -744,17 +752,19 @@ export default function MiseScreen() {
         prev.map((r) => (String(r.id) === String(recipeId) ? { ...r, is_completed: isCompleted } : r))
       );
       
-      track('mise_recipe_completion_updated', {
-        recipeId,
-        isCompleted,
-        userId: session?.user?.id,
+      logger.info('Mise recipe completion updated', {
+        scope: 'mise',
+        recipe_id: recipeId,
+        is_completed: isCompleted,
+        user_id: session?.user?.id,
       });
     } catch (err) {
-      track('mise_recipe_completion_error', {
-        recipeId,
-        errorMessage: err instanceof Error ? err.message : String(err),
-        errorStack: err instanceof Error ? err.stack : undefined,
-        userId: session?.user?.id,
+      logger.error('Mise recipe completion error', {
+        scope: 'mise',
+        recipe_id: recipeId,
+        error: err instanceof Error ? err.message : String(err),
+        error_stack: err instanceof Error ? err.stack : undefined,
+        user_id: session?.user?.id,
       });
       handleError('Recipe Error', err);
     }
@@ -792,17 +802,19 @@ export default function MiseScreen() {
       // Silently refresh grocery list to ensure it reflects the deletion
       await refreshGroceryListOnly();
 
-      track('mise_recipe_deleted', {
-        recipeId,
-        userId: session?.user?.id,
+      logger.info('Mise recipe deleted', {
+        scope: 'mise',
+        recipe_id: recipeId,
+        user_id: session?.user?.id,
       });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
-      track('mise_recipe_deletion_error', {
-        recipeId,
-        errorMessage: err instanceof Error ? err.message : String(err),
-        errorStack: err instanceof Error ? err.stack : undefined,
-        userId: session?.user?.id,
+      logger.error('Mise recipe deletion error', {
+        scope: 'mise',
+        recipe_id: recipeId,
+        error: err instanceof Error ? err.message : String(err),
+        error_stack: err instanceof Error ? err.stack : undefined,
+        user_id: session?.user?.id,
       });
       handleError('Error', err);
     }
@@ -854,12 +866,13 @@ export default function MiseScreen() {
           isChecked: newCheckedState,
         }),
       }).catch(err => {
-        track('mise_grocery_item_toggle_error', {
-          itemName: itemToUpdate!.name,
-          isChecked: newCheckedState,
-          errorMessage: err instanceof Error ? err.message : String(err),
-          errorStack: err instanceof Error ? err.stack : undefined,
-          userId: session.user.id,
+        logger.error('Mise grocery item toggle error', {
+          scope: 'mise',
+          item_name: itemToUpdate!.name,
+          is_checked: newCheckedState,
+          error: err instanceof Error ? err.message : String(err),
+          error_stack: err instanceof Error ? err.stack : undefined,
+          user_id: session.user.id,
         });
         // Optionally, revert the optimistic update and show an error
         handleError('Sync Error', err);
@@ -943,10 +956,11 @@ export default function MiseScreen() {
         title: 'Grocery List',
       });
     } catch (error) {
-      track('mise_grocery_share_error', {
-        errorMessage: error instanceof Error ? error.message : String(error),
-        errorStack: error instanceof Error ? error.stack : undefined,
-        userId: session?.user?.id,
+      logger.error('Mise grocery share error', {
+        scope: 'mise',
+        error: error instanceof Error ? error.message : String(error),
+        error_stack: error instanceof Error ? error.stack : undefined,
+        user_id: session?.user?.id,
       });
       handleError('Share Error', error);
     }
@@ -979,12 +993,13 @@ export default function MiseScreen() {
       const mergedGroceryList = mergeManualItemsIntoCategories(recipeCategorizedList, updatedManualItems);
       setGroceryList(mergedGroceryList);
     } catch (error) {
-      track('mise_manual_item_add_error', {
+      logger.error('Mise manual item add error', {
+        scope: 'mise',
         category,
-        itemText,
-        errorMessage: error instanceof Error ? error.message : String(error),
-        errorStack: error instanceof Error ? error.stack : undefined,
-        userId: session?.user?.id,
+        item_text: itemText,
+        error: error instanceof Error ? error.message : String(error),
+        error_stack: error instanceof Error ? error.stack : undefined,
+        user_id: session?.user?.id,
       });
       handleError('Error', error);
     }
@@ -1013,11 +1028,12 @@ export default function MiseScreen() {
       const mergedGroceryList = mergeManualItemsIntoCategories(recipeCategorizedList, updatedManualItems);
       setGroceryList(mergedGroceryList);
     } catch (error) {
-      track('mise_manual_item_delete_error', {
-        itemId,
-        errorMessage: error instanceof Error ? error.message : String(error),
-        errorStack: error instanceof Error ? error.stack : undefined,
-        userId: session?.user?.id,
+      logger.error('Mise manual item delete error', {
+        scope: 'mise',
+        item_id: itemId,
+        error: error instanceof Error ? error.message : String(error),
+        error_stack: error instanceof Error ? error.stack : undefined,
+        user_id: session?.user?.id,
       });
       handleError('Error', error);
     }
@@ -1046,10 +1062,11 @@ export default function MiseScreen() {
       const mergedGroceryList = mergeManualItemsIntoCategories(recipeCategorizedList, []);
       setGroceryList(mergedGroceryList);
     } catch (error) {
-      track('mise_manual_items_clear_error', {
-        errorMessage: error instanceof Error ? error.message : String(error),
-        errorStack: error instanceof Error ? error.stack : undefined,
-        userId: session?.user?.id,
+      logger.error('Mise manual items clear error', {
+        scope: 'mise',
+        error: error instanceof Error ? error.message : String(error),
+        error_stack: error instanceof Error ? error.stack : undefined,
+        user_id: session?.user?.id,
       });
       handleError('Error', error);
     }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import { useRevenueCat } from '@/context/RevenueCatContext';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { bodyStrongText, sectionHeaderText, bodyText } from '@/constants/typography';
 import { useSuccessModal } from '@/context/SuccessModalContext';
+import { useAnalytics } from '@/utils/analytics';
 
 interface PaywallModalProps {
   visible: boolean;
@@ -23,7 +24,15 @@ interface PaywallModalProps {
 export default function PaywallModal({ visible, onClose, onSubscribed }: PaywallModalProps) {
   const { offerings, purchasePackage, isPurchaseInProgress } = useRevenueCat();
   const { showSuccess } = useSuccessModal();
+  const { track } = useAnalytics();
   const [selectedPackage, setSelectedPackage] = useState<PurchasesPackage | null>(null);
+
+  // Track paywall_viewed when modal becomes visible
+  useEffect(() => {
+    if (visible) {
+      track('paywall_viewed', { context: 'premium_gate' });
+    }
+  }, [visible, track]);
 
   const handlePurchase = async (pkg: PurchasesPackage) => {
     // Prevent multiple rapid button presses
@@ -51,11 +60,11 @@ export default function PaywallModal({ visible, onClose, onSubscribed }: Paywall
   const getPackageDisplayName = (identifier: string) => {
     switch (identifier) {
       case 'olea.month':
-        return 'Monthly';
+        return 'Monthly Subscription';
       case 'olea.annual':
-        return 'Annual';
+        return 'Annual Subscription';
       case 'olea.lifetime':
-        return 'Lifetime';
+        return 'Lifetime Pass';
       default:
         return identifier;
     }
@@ -112,7 +121,7 @@ export default function PaywallModal({ visible, onClose, onSubscribed }: Paywall
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.title}>Unlock Premium</Text>
+          <Text style={styles.title}>Welcome to Olea Premium</Text>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
             <Text style={styles.closeButtonText}>✕</Text>
           </TouchableOpacity>
@@ -120,12 +129,18 @@ export default function PaywallModal({ visible, onClose, onSubscribed }: Paywall
 
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
           <View style={styles.heroSection}>
-            <Text style={styles.heroTitle}>Welcome to Olea Premium</Text>
-            <Text style={styles.heroSubtitle}>
-              Transform your cooking with AI-powered recipes, smart timers, and unlimited access to premium features.
-              Join thousands of home cooks who have discovered their perfect recipes with Olea's intelligent cooking assistant.
-              Start your free trial today and experience the future of cooking.
-            </Text>
+              <Text style={styles.heroSubtitle}>
+                Start your free trial with Olea today to transform your home cooking experience.
+              </Text>
+          </View>
+
+          <View style={styles.featuresSection}>
+            <Text style={styles.featuresTitle}>Premium features include:</Text>
+            <View style={styles.featuresList}>
+              <Text style={styles.featureItem}>• Cook and shop for multiple recipes</Text>
+              <Text style={styles.featureItem}>• Save your recipes and variations</Text>
+              <Text style={styles.featureItem}>• Unlimited recipe storage in your library</Text>
+            </View>
           </View>
 
           <View style={styles.packagesContainer}>
@@ -141,17 +156,19 @@ export default function PaywallModal({ visible, onClose, onSubscribed }: Paywall
                 disabled={isPurchaseInProgress}
               >
                 <View style={styles.packageHeader}>
-                  <Text style={styles.packageName}>
+                  <Text style={[
+                    styles.packageName,
+                    selectedPackage?.identifier === pkg.identifier && styles.packageTextSelected
+                  ]}>
                     {getPackageDisplayName(pkg.identifier)}
                   </Text>
-                  <Text style={styles.packagePrice}>
+                  <Text style={[
+                    styles.packagePrice,
+                    selectedPackage?.identifier === pkg.identifier && styles.packageTextSelected
+                  ]}>
                     {formatPrice(pkg.product.priceString)}
                   </Text>
                 </View>
-
-                <Text style={styles.packageDescription}>
-                  {getPackageDescription(pkg.identifier)}
-                </Text>
 
                 {pkg.identifier === 'olea.annual' && (
                   <View style={styles.savingsBadge}>
@@ -179,17 +196,6 @@ export default function PaywallModal({ visible, onClose, onSubscribed }: Paywall
               </Text>
             </TouchableOpacity>
           )}
-
-          <View style={styles.featuresSection}>
-            <Text style={styles.featuresTitle}>Premium Features Include:</Text>
-            <View style={styles.featuresList}>
-              <Text style={styles.featureItem}>• Unlimited recipe storage</Text>
-              <Text style={styles.featureItem}>• Advanced cooking timers</Text>
-              <Text style={styles.featureItem}>• Ingredient substitutions</Text>
-              <Text style={styles.featureItem}>• Recipe variations</Text>
-              <Text style={styles.featureItem}>• Priority support</Text>
-            </View>
-          </View>
 
           <Text style={styles.disclaimer}>
             Payment will be charged to your Apple/Google account at confirmation of purchase.
@@ -255,10 +261,14 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   heroSubtitle: {
-    ...bodyText,
-    color: COLORS.textSubtle,
-    textAlign: 'center',
+    ...bodyStrongText,
+    color: COLORS.textDark,
+    textAlign: 'left',
     lineHeight: 24,
+    marginBottom: SPACING.md,
+  },
+  italicText: {
+    fontStyle: 'italic',
   },
   packagesContainer: {
     marginBottom: SPACING.xl,
@@ -268,12 +278,17 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: COLORS.divider,
     borderRadius: RADIUS.md,
-    padding: SPACING.lg,
+    paddingVertical: 12,
+    paddingHorizontal: SPACING.lg,
     marginBottom: SPACING.md,
     position: 'relative',
+    minHeight: 48,
+    justifyContent: 'center',
   },
   packageCardSelected: {
-    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primary,
+    borderColor: '#000000',
+    borderWidth: 1,
   },
   packageCardDisabled: {
     opacity: 0.6,
@@ -282,7 +297,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.sm,
   },
   packageName: {
     ...bodyStrongText,
@@ -290,12 +304,15 @@ const styles = StyleSheet.create({
   },
   packagePrice: {
     ...bodyStrongText,
-    color: COLORS.primary,
+    color: COLORS.textDark,
     fontSize: 18,
   },
   packageDescription: {
     ...bodyText,
     color: COLORS.textSubtle,
+  },
+  packageTextSelected: {
+    color: COLORS.textDark,
   },
   savingsBadge: {
     position: 'absolute',
@@ -313,6 +330,8 @@ const styles = StyleSheet.create({
   },
   purchaseButton: {
     backgroundColor: COLORS.primary,
+    borderWidth: 1,
+    borderColor: '#000000',
     paddingVertical: SPACING.lg,
     borderRadius: RADIUS.md,
     alignItems: 'center',
@@ -323,7 +342,7 @@ const styles = StyleSheet.create({
   },
   purchaseButtonText: {
     ...bodyStrongText,
-    color: 'white',
+    color: COLORS.textDark,
     fontSize: 16,
   },
   featuresSection: {
@@ -332,14 +351,16 @@ const styles = StyleSheet.create({
   featuresTitle: {
     ...bodyStrongText,
     color: COLORS.textDark,
+    textAlign: 'left',
     marginBottom: SPACING.md,
   },
   featuresList: {
-    paddingLeft: SPACING.md,
+    paddingLeft: 0,
   },
   featureItem: {
     ...bodyText,
     color: COLORS.textDark,
+    textAlign: 'left',
     marginBottom: SPACING.xs,
   },
   disclaimer: {

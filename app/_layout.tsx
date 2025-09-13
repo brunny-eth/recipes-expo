@@ -3,7 +3,7 @@ import { useRouter, useSegments, Stack, Redirect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
-import { View } from 'react-native';
+import { View, AppState } from 'react-native';
 import { Asset } from 'expo-asset';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -22,6 +22,7 @@ import { COLORS } from '@/constants/theme';
 import { AuthNavigationHandler } from '@/components/AuthNavigationHandler';
 import OfflineBanner from '@/components/OfflineBanner';
 import { getNetworkStatus } from '@/utils/networkUtils';
+import { useAnalytics } from '@/utils/analytics';
 
 // Keep native splash visible until React tree is ready
 SplashScreen.preventAutoHideAsync();
@@ -39,11 +40,14 @@ function RootLayoutNav() {
   const { session, isLoading: isAuthLoading } = useAuth();
   const router = useRouter();
   const segments = useSegments();
+  const { track } = useAnalytics();
 
   // App readiness states
   const [ready, setReady] = useState(false);
   const [isFirstLaunch, setIsFirstLaunch] = useState<boolean | null>(null);
   const [isOffline, setIsOffline] = useState(false);
+  const [appState, setAppState] = useState(AppState.currentState);
+  const [hasTrackedAppOpened, setHasTrackedAppOpened] = useState(false);
 
   // Load fonts
   const [fontsLoaded] = useFonts({
@@ -51,6 +55,29 @@ function RootLayoutNav() {
     'Inter-Regular': require('../assets/fonts/Inter-Regular.ttf'),
     'Inter-SemiBold': require('../assets/fonts/Inter-SemiBold.ttf'),
   });
+
+  // Track app_opened events
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: string) => {
+      if (appState.match(/inactive|background/) && nextAppState === 'active') {
+        // App has come to the foreground
+        track('app_opened', { cold_start: false });
+        setHasTrackedAppOpened(true);
+      }
+      setAppState(nextAppState);
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription?.remove();
+  }, [appState, track]);
+
+  // Track initial app open (cold start)
+  useEffect(() => {
+    if (ready && !hasTrackedAppOpened) {
+      track('app_opened', { cold_start: true });
+      setHasTrackedAppOpened(true);
+    }
+  }, [ready, hasTrackedAppOpened, track]);
 
   // Check network status
   useEffect(() => {

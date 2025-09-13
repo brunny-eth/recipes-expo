@@ -34,7 +34,6 @@ export default function HomeScreen() {
   const [isHomeFocused, setIsHomeFocused] = useState(false);
 
   const { session } = useAuth();
-  const { isPremium, togglePremiumStatus, manualPremiumToggle } = useRevenueCat();
   const router = useRouter();
 
 
@@ -162,20 +161,6 @@ export default function HomeScreen() {
 
       {/* Bottom left buttons */}
       <View style={styles.bottomButtonsContainer}>
-        {/* TESTING: Premium toggle button (remove this in production) */}
-        <TouchableOpacity
-          style={[styles.bottomButton, styles.testingButton]}
-          onPress={togglePremiumStatus}
-          activeOpacity={0.7}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <View style={styles.bottomButtonContent}>
-            <Text style={[styles.bottomButtonText, styles.testingButtonText]}>
-              {isPremium ? '🔓 Premium (Testing)' : '🔒 Free (Testing)'}
-            </Text>
-          </View>
-        </TouchableOpacity>
-
         <TouchableOpacity
           style={styles.bottomButton}
           onPress={() => router.push('/onboarding')}
@@ -323,19 +308,5 @@ const styles = StyleSheet.create({
     textAlignVertical: 'center',
     paddingVertical: 4, // Add vertical padding for better text positioning
     textDecorationLine: 'underline',
-  },
-  
-  // TESTING: Premium toggle button styles (remove this in production)
-  testingButton: {
-    backgroundColor: '#FFF3CD',
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginBottom: 4,
-  },
-  testingButtonText: {
-    color: '#856404',
-    fontWeight: '600',
-    textDecorationLine: 'none',
   },
 });

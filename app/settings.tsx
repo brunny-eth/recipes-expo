@@ -18,6 +18,7 @@ import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import { useSuccessModal } from '@/context/SuccessModalContext';
+import { useRevenueCat } from '@/context/RevenueCatContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Updates from 'expo-updates';
@@ -38,6 +39,7 @@ import BottomTabBar from '@/components/BottomTabBar';
 
 export default function AccountScreen() {
   const { signOut, isAuthenticated, session } = useAuth();
+  const { subscriptionStatus, customerInfo } = useRevenueCat();
   useRenderCounter('AccountScreen', { hasSession: !!session, isAuthenticated });
   const { showError } = useErrorModal();
   const handleError = useHandleError();
@@ -49,6 +51,36 @@ export default function AccountScreen() {
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
   const [feedbackAnimation] = useState(new Animated.Value(0));
   const appVersion = (Application?.nativeApplicationVersion as string | null) || (Constants?.expoConfig?.version as string | undefined) || 'dev';
+
+  // Helper function to get subscription details
+  const getSubscriptionDetails = (customerInfo: any, status: string): string => {
+    if (status === 'Free') return '';
+    
+    const premiumEntitlement = customerInfo.entitlements?.all?.["premium_access"];
+    if (!premiumEntitlement) return '';
+
+    const details = [];
+    
+    if (premiumEntitlement.expirationDate) {
+      const expirationDate = new Date(premiumEntitlement.expirationDate);
+      const formattedDate = expirationDate.toLocaleDateString();
+      
+      if (status === 'Free Trial' || status === 'Introductory Period') {
+        details.push(`Expires ${formattedDate}`);
+      } else if (status === 'Set to Cancel') {
+        details.push(`Cancels ${formattedDate}`);
+      } else if (status === 'Subscribed') {
+        details.push(`Renews ${formattedDate}`);
+      }
+    }
+
+    if (premiumEntitlement.productIdentifier) {
+      const productName = premiumEntitlement.productIdentifier.replace('olea.', '');
+      details.push(`${productName.charAt(0).toUpperCase() + productName.slice(1)} Plan`);
+    }
+
+    return details.join(' • ');
+  };
 
   // Animation functions
   const showFeedback = () => {
@@ -160,8 +192,13 @@ export default function AccountScreen() {
                 {`Logged in as ${session?.user?.email}`}
               </Text>
               <Text style={styles.authStatusText}>
-                Account status: Subscribed
+                Account status: {subscriptionStatus}
               </Text>
+              {customerInfo && subscriptionStatus !== 'Free' && (
+                <Text style={styles.subscriptionDetailsText}>
+                  {getSubscriptionDetails(customerInfo, subscriptionStatus)}
+                </Text>
+              )}
             </>
           ) : (
             <TouchableOpacity
@@ -334,6 +371,13 @@ const styles = StyleSheet.create({
     ...bodyText,
     color: COLORS.textDark,
     textAlign: 'left',
+  } as TextStyle,
+  subscriptionDetailsText: {
+    ...bodyText,
+    color: COLORS.textSubtle,
+    textAlign: 'left',
+    fontSize: FONT.size.caption,
+    marginTop: SPACING.xs,
   } as TextStyle,
   signOutButton: {
     height: 32,

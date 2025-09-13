@@ -381,21 +381,18 @@ export default function CookScreen() {
             
             setRecipes(existingRecipes);
             
-            // Track steps started event for existing multi-recipe cooking sessions
+            // Track recipe_cooked event for existing multi-recipe cooking sessions
             const trackExistingStepsStarted = async () => {
               try {
                 // For existing sessions, we can't easily determine modifications from the context
                 // So we'll track with basic info
-                await track('steps_started', { 
-                  scaled: false, // Default assumption for existing sessions
-                  substitutions: 0, // Default assumption for existing sessions
-                  modified: false, // Default assumption for existing sessions
-                  sessionType: 'multi_recipe',
-                  recipeCount: existingRecipes.length,
-                  existingSession: true
+                await track('recipe_cooked', { 
+                  source: 'saved', // TODO: Determine if recipes are from parsed or saved
+                  session_id: 'existing_session', // TODO: Generate proper session ID
+                  num_recipes: existingRecipes.length
                 });
               } catch (error) {
-                logger.error('Error tracking steps_started for existing sessions', {
+                logger.error('Error tracking recipe_cooked for existing sessions', {
                   errorMessage: error instanceof Error ? error.message : String(error),
                   existingRecipesCount: existingRecipes.length
                 });
@@ -409,7 +406,8 @@ export default function CookScreen() {
           
           // Fetch fresh mise data from API
           if (!session?.user) {
-            await track('mise_recipes_fetch_failed', { 
+            logger.error('Mise recipes fetch failed', {
+              scope: 'mise',
               reason: 'no_user_session',
               screen: 'cook'
             });
@@ -484,15 +482,13 @@ export default function CookScreen() {
               }, 0);
               
               const modified = totalSubstitutions > 0 || hasModifications;
-              await track('steps_started', { 
-                scaled: hasModifications, 
-                substitutions: totalSubstitutions,
-                modified,
-                sessionType: 'multi_recipe',
-                recipeCount: recipeList.length
+              await track('recipe_cooked', { 
+                source: 'saved', // TODO: Determine if recipes are from parsed or saved
+                session_id: 'new_session', // TODO: Generate proper session ID
+                num_recipes: recipeList.length
               });
             } catch (error) {
-              logger.error('Error tracking steps_started', {
+              logger.error('Error tracking recipe_cooked', {
                 errorMessage: error instanceof Error ? error.message : String(error),
                 recipeListLength: recipeList.length
               });
@@ -928,12 +924,13 @@ export default function CookScreen() {
     // Find the current recipe and toggle the step
     const currentRecipeSession = cookingContext.state.activeRecipes.find(r => r.recipeId === recipeId);
     if (!currentRecipeSession || !currentRecipeSession.recipe) {
-      await track('step_toggle_failed', { 
+      logger.error('Step toggle failed', {
+        scope: 'mise',
         reason: 'no_recipe_session',
-        recipeId,
-        stepIndex,
-        hasCurrentRecipeSession: !!currentRecipeSession,
-        hasRecipeData: !!currentRecipeSession?.recipe
+        recipe_id: recipeId,
+        step_index: stepIndex,
+        has_current_recipe_session: !!currentRecipeSession,
+        has_recipe_data: !!currentRecipeSession?.recipe
       });
       return;
     }
@@ -1110,11 +1107,12 @@ export default function CookScreen() {
       
       // Ensure state.activeRecipes is an array before accessing its properties
       if (!cookingContext.state.activeRecipes || !Array.isArray(cookingContext.state.activeRecipes) || cookingContext.state.activeRecipes.length === 0) {
-        await track('swipe_gesture_ignored', { 
+        logger.info('Swipe gesture ignored', {
+          scope: 'mise',
           reason: 'no_active_recipes',
-          activeRecipesCount: cookingContext.state.activeRecipes?.length || 0,
-          hasActiveRecipes: !!cookingContext.state.activeRecipes,
-          isArray: Array.isArray(cookingContext.state.activeRecipes)
+          active_recipes_count: cookingContext.state.activeRecipes?.length || 0,
+          has_active_recipes: !!cookingContext.state.activeRecipes,
+          is_array: Array.isArray(cookingContext.state.activeRecipes)
         });
         return;
       }

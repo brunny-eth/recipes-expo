@@ -49,6 +49,7 @@ import { useRecipeSubmission } from '@/hooks/useRecipeSubmission';
 import { detectInputType, validateRawTextInput, validateDishNameInput } from '../../server/utils/detectInputType';
 import { useAnalytics } from '@/utils/analytics';
 import { useHandleError } from '@/hooks/useHandleError';
+import { logger } from '@/utils/logger';
 
 export default function ImportScreen() {
   const insets = useSafeAreaInsets();
@@ -309,9 +310,9 @@ export default function ImportScreen() {
           },
         });
         track('recipe_selected_from_modal', {
-          recipeId: selectedMatch.recipe.id,
-          recipeTitle: selectedMatch.recipe.title,
-          userId: session?.user?.id,
+          recipe_id: selectedMatch.recipe.id.toString(),
+          title: selectedMatch.recipe.title,
+          source: 'modal',
         });
       } else {
         console.error('[ImportScreen] Could not find selected recipe in potentialMatches:', extra);
@@ -511,8 +512,8 @@ export default function ImportScreen() {
         }
       }
       currentStage = 'analytics_tracking';
-      try { await track('input_mode_selected', { inputType }); } catch {}
-      try { await track('recipe_submission_started', { inputLength: localRecipeInput.length, inputType, submissionId: localSubmissionId, userId: session?.user?.id }); } catch {}
+      try { await track('input_mode_selected', { input_type: inputType }); } catch {}
+      try { logger.info('Recipe submission started', { scope: 'parseRecipe', input_length: localRecipeInput.length, input_type: inputType, submission_id: localSubmissionId, user_id: session?.user?.id }); } catch {}
 
             // Handle dish name vs raw text differently
       let result;
@@ -526,11 +527,12 @@ export default function ImportScreen() {
         console.log('[ImportScreen] Raw text mode - navigating to loading screen');
         currentStage = 'navigation_routing';
         try {
-          await track('navigation_to_loading_screen', {
-            normalizedUrl: localRecipeInput,
-            inputType: 'raw_text',
-            submissionId: localSubmissionId,
-            userId: session?.user?.id
+          logger.info('Navigation to loading screen', {
+            scope: 'parseRecipe',
+            normalized_url: localRecipeInput,
+            input_type: 'raw_text',
+            submission_id: localSubmissionId,
+            user_id: session?.user?.id
           });
         } catch {}
         InteractionManager.runAfterInteractions(() => {
@@ -561,16 +563,17 @@ export default function ImportScreen() {
       });
 
       try {
-        await track('recipe_submission_result', {
+        logger.info('Recipe submission result', {
+          scope: 'parseRecipe',
           success: result.success,
           action: result.action,
           error: result.error,
           matches_count: result.matches?.length,
-          recipeId: result.recipe?.id,
-          normalizedUrl: result.normalizedUrl,
-           inputType: result.inputType,
-           submissionId: localSubmissionId,
-          userId: session?.user?.id,
+          recipe_id: result.recipe?.id,
+          normalized_url: result.normalizedUrl,
+          input_type: result.inputType,
+          submission_id: localSubmissionId,
+          user_id: session?.user?.id,
         });
       } catch {}
 
@@ -603,14 +606,14 @@ export default function ImportScreen() {
         // Always show match selection modal for textual queries, regardless of input field used
         setPotentialMatches(result.matches);
         setShowMatchSelectionModal(true);
-        try { await track('recipe_matches_found', { match_count: result.matches.length, submissionId: localSubmissionId, userId: session?.user?.id }); } catch {}
+        try { await track('recipe_matches_found', { match_count: result.matches.length, submission_id: localSubmissionId, user_id: session?.user?.id }); } catch {}
       } else if (result.action === 'navigate_to_summary' && result.recipe) {
         console.log('[ImportScreen] Navigating to summary with recipe:', {
           recipeId: result.recipe?.id,
           recipeTitle: result.recipe?.title,
           submissionId: localSubmissionId
         });
-        try { await track('navigation_to_recipe_summary', { recipeId: result.recipe?.id, entryPoint: 'new', submissionId: localSubmissionId, userId: session?.user?.id }); } catch {}
+        try { logger.info('Navigation to recipe summary', { scope: 'parseRecipe', recipe_id: result.recipe?.id, entry_point: 'new', submission_id: localSubmissionId, user_id: session?.user?.id }); } catch {}
         InteractionManager.runAfterInteractions(() => {
           router.push({ pathname: '/recipe/summary', params: { recipeId: result.recipe?.id?.toString(), entryPoint: 'new', from: '/tabs', inputType: result.inputType || detectInputType(localRecipeInput) } });
         });
@@ -620,7 +623,7 @@ export default function ImportScreen() {
           inputType: result.inputType,
           submissionId: localSubmissionId
         });
-        try { await track('navigation_to_loading_screen', { normalizedUrl: result.normalizedUrl, inputType: result.inputType, submissionId: localSubmissionId, userId: session?.user?.id }); } catch {}
+        try { logger.info('Navigation to loading screen', { scope: 'parseRecipe', normalized_url: result.normalizedUrl, input_type: result.inputType, submission_id: localSubmissionId, user_id: session?.user?.id }); } catch {}
         InteractionManager.runAfterInteractions(() => {
           router.push({ pathname: '/loading', params: { recipeUrl: result.normalizedUrl, inputType: result.inputType } });
         });
@@ -650,14 +653,14 @@ export default function ImportScreen() {
 
       // Log and show normalized error
       try {
-        track('recipe_submission_failed', {
-          errorMessage: error instanceof Error ? error.message : String(error),
-          errorStack: error instanceof Error ? error.stack : undefined,
-          currentStage,
-          submissionId: localSubmissionId || 'unknown',
-          userId: session?.user?.id,
-          recipeInput: localRecipeInput,
-          inputType: detectInputType(localRecipeInput),
+        logger.error('Recipe submission failed', {
+          scope: 'parseRecipe',
+          error: error instanceof Error ? error.message : String(error),
+          error_stack: error instanceof Error ? error.stack : undefined,
+          current_stage: currentStage,
+          submission_id: localSubmissionId || 'unknown',
+          user_id: session?.user?.id,
+          input_type: detectInputType(localRecipeInput),
         });
       } catch {}
 
@@ -701,11 +704,12 @@ export default function ImportScreen() {
       }
     } else if (result.success && result.recipe) {
       // Track successful upload
-      track('recipe_upload_success', {
-        hasExtractedText: !!result.extractedText,
-        hasCoverImage: !!result.coverImageUrl,
-        imageProcessingTime: result.imageProcessingTime,
-        userId: session?.user?.id,
+      logger.info('Recipe upload success', {
+        scope: 'parseRecipe',
+        has_extracted_text: !!result.extractedText,
+        has_cover_image: !!result.coverImageUrl,
+        image_processing_time: result.imageProcessingTime,
+        user_id: session?.user?.id,
       });
 
       // Navigate to recipe summary
@@ -722,10 +726,8 @@ export default function ImportScreen() {
       // Handle case where multiple similar recipes were found
       track('recipe_matches_found', {
         match_count: result.cachedMatches.length,
-        hasExtractedText: !!result.extractedText,
-        hasCoverImage: !!result.coverImageUrl,
-        imageProcessingTime: result.imageProcessingTime,
-        userId: session?.user?.id,
+        submission_id: localSubmissionId,
+        user_id: session?.user?.id,
       });
 
       // Show the match selection modal
@@ -733,9 +735,10 @@ export default function ImportScreen() {
       setShowMatchSelectionModal(true);
     } else {
       // Track upload failure
-      track('recipe_upload_failed', {
+      logger.error('Recipe upload failed', {
+        scope: 'parseRecipe',
         error: result.error,
-        userId: session?.user?.id,
+        user_id: session?.user?.id,
       });
 
       showError('Upload Failed', result.error || 'Failed to process the uploaded image. Please try again.');
