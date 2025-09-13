@@ -18,8 +18,13 @@ if (isDevelopment && process.env.LOGTAIL_TOKEN) {
 
 // Initialize Logtail only in production and only if token is available
 const logtail = isDevelopment || !process.env.LOGTAIL_TOKEN ? null : new Logtail(process.env.LOGTAIL_TOKEN, {
-  endpoint: "https://in.logs.eu.betterstack.com"
+  endpoint: "https://s1458544.eu-nbg-2.betterstackdata.com"
 });
+
+// Debug log for Logtail initialization
+if (logtail) {
+  console.log("📊 Logtail initialized with source-specific endpoint");
+}
 
 const logger = pino({
   level: isDevelopment ? 'debug' : 'info',

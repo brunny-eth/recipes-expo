@@ -1380,6 +1380,24 @@ export default function MiseScreen() {
       );
     }
 
+    // Show premium feature message for non-premium users (even if logged in)
+    if (!isPremium) {
+      return (
+        <View style={styles.premiumFeatureContainer}>
+          <Text style={styles.premiumFeatureTitle}>Premium Features</Text>
+          <Text style={styles.premiumFeatureDescription}>
+            Unlock your personalized cooking experience with grocery lists, recipe organization, and streamlined meal prep.
+          </Text>
+          <TouchableOpacity
+            style={styles.premiumFeatureButton}
+            onPress={() => setShowPaywallModal(true)}
+          >
+            <Text style={styles.premiumFeatureButtonText}>Upgrade to Premium</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
     if (error) {
       return (
         <View style={styles.emptyContainer}>
@@ -1401,120 +1419,102 @@ export default function MiseScreen() {
     }
 
     // Show premium content if user is premium
-    if (isPremium) {
-      return (
-        <ScrollView style={styles.combinedContent} showsVerticalScrollIndicator={false}>
-          {/* Action Buttons */}
-          <TouchableOpacity
-            style={styles.miseToolbarButton}
-            onPress={handleCookMyRecipes}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Text style={styles.miseToolbarButtonText}>Cook Recipes</Text>
-          </TouchableOpacity>
+    return (
+      <ScrollView style={styles.combinedContent} showsVerticalScrollIndicator={false}>
+        {/* Action Buttons */}
+        <TouchableOpacity
+          style={styles.miseToolbarButton}
+          onPress={handleCookMyRecipes}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={styles.miseToolbarButtonText}>Cook Recipes</Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.miseToolbarButtonSecond}
-            onPress={handleOpenStaplesModal}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Text style={styles.miseToolbarButtonText}>Edit Pantry</Text>
-          </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.miseToolbarButtonSecond}
+          onPress={handleOpenStaplesModal}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={styles.miseToolbarButtonText}>Edit Pantry</Text>
+        </TouchableOpacity>
 
-          {/* Menu Section */}
-          <View style={styles.menuSectionContainer}>
-            <View style={styles.sectionHeaderWithControls}>
-              <Text style={styles.sectionTitle}>Menu</Text>
+        {/* Menu Section */}
+        <View style={styles.menuSectionContainer}>
+          <View style={styles.sectionHeaderWithControls}>
+            <Text style={styles.sectionTitle}>Menu</Text>
+          </View>
+          <View style={styles.sectionDivider} />
+          {miseRecipes.length === 0 ? (
+            <View style={styles.emptySection}>
+              <Text style={styles.emptySectionText}>No recipes in your menu.</Text>
+              <Text style={styles.emptySectionSubtext}>
+                Add recipes to build a grocery list and start cooking.
+              </Text>
+              <TouchableOpacity
+                onPress={() => router.push('/tabs/library')}
+              >
+                <Text style={styles.emptyActionText}>Go to my recipe library.</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => router.push('/tabs/import')}
+              >
+                <Text style={styles.emptyActionText}>Go to the import recipe page.</Text>
+              </TouchableOpacity>
             </View>
-            <View style={styles.sectionDivider} />
-            {miseRecipes.length === 0 ? (
-              <View style={styles.emptySection}>
-                <Text style={styles.emptySectionText}>No recipes in your menu.</Text>
-                <Text style={styles.emptySectionSubtext}>
-                  Add recipes to build a grocery list and start cooking.
-                </Text>
-                <TouchableOpacity
-                  onPress={() => router.push('/tabs/library')}
-                >
-                  <Text style={styles.emptyActionText}>Go to my recipe library.</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => router.push('/tabs/import')}
-                >
-                  <Text style={styles.emptyActionText}>Go to the import recipe page.</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={styles.recipeListContainer}>
-                {miseRecipes.map((item, index) => (
-                  <View key={item.id}>
-                    {renderRecipeItem({ item, index })}
+          ) : (
+            <View style={styles.recipeListContainer}>
+              {miseRecipes.map((item, index) => (
+                <View key={item.id}>
+                  {renderRecipeItem({ item, index })}
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* Groceries Section */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeaderWithControls}>
+            <Text style={styles.sectionTitle}>Groceries</Text>
+            <TouchableOpacity
+              onPress={handleShareGrocery}
+              style={styles.shareIconButton}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <MaterialCommunityIcons name="share" size={16} color={COLORS.textDark} />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.sectionDivider} />
+          
+          {(() => {
+            // Determine which data to use based on sort mode and staples filter
+            let displayGroceryList = groceryList;
+            
+            // First apply staples filtering if enabled
+            displayGroceryList = filterHouseholdStaples(displayGroceryList, staplesEnabled, selectedStaples);
+            
+            // Then apply sorting if alphabetical mode
+            if (sortMode === 'alphabetical') {
+              displayGroceryList = sortGroceryItemsAlphabetically(displayGroceryList);
+            }
+
+            // Always render the grocery list; ensure there's always a Miscellaneous category
+            if (displayGroceryList.length === 0) {
+              displayGroceryList = [{ name: 'Miscellaneous', items: [] }];
+            }
+
+            return (
+              <View style={styles.groceryListContainer}>
+                {displayGroceryList.map((category) => (
+                  <View key={`category-${category.name}-${category.items.length}`}>
+                    {renderGroceryCategory({ item: category })}
                   </View>
                 ))}
               </View>
-            )}
-          </View>
-
-          {/* Groceries Section */}
-          <View style={styles.sectionContainer}>
-            <View style={styles.sectionHeaderWithControls}>
-              <Text style={styles.sectionTitle}>Groceries</Text>
-              <TouchableOpacity
-                onPress={handleShareGrocery}
-                style={styles.shareIconButton}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <MaterialCommunityIcons name="share" size={16} color={COLORS.textDark} />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.sectionDivider} />
-            
-            {(() => {
-              // Determine which data to use based on sort mode and staples filter
-              let displayGroceryList = groceryList;
-              
-              // First apply staples filtering if enabled
-              displayGroceryList = filterHouseholdStaples(displayGroceryList, staplesEnabled, selectedStaples);
-              
-              // Then apply sorting if alphabetical mode
-              if (sortMode === 'alphabetical') {
-                displayGroceryList = sortGroceryItemsAlphabetically(displayGroceryList);
-              }
-
-              // Always render the grocery list; ensure there's always a Miscellaneous category
-              if (displayGroceryList.length === 0) {
-                displayGroceryList = [{ name: 'Miscellaneous', items: [] }];
-              }
-
-              return (
-                <View style={styles.groceryListContainer}>
-                  {displayGroceryList.map((category) => (
-                    <View key={`category-${category.name}-${category.items.length}`}>
-                      {renderGroceryCategory({ item: category })}
-                    </View>
-                  ))}
-                </View>
-              );
-            })()}
-          </View>
-        </ScrollView>
-      );
-    }
-
-    // Show premium feature message for non-premium users
-    return (
-      <View style={styles.premiumFeatureContainer}>
-        <Text style={styles.premiumFeatureTitle}>Premium Features</Text>
-        <Text style={styles.premiumFeatureDescription}>
-          Unlock your personalized cooking experience with grocery lists, recipe organization, and streamlined meal prep.
-        </Text>
-        <TouchableOpacity
-          style={styles.premiumFeatureButton}
-          onPress={() => setShowPaywallModal(true)}
-        >
-          <Text style={styles.premiumFeatureButtonText}>Upgrade to Premium</Text>
-        </TouchableOpacity>
-      </View>
+            );
+          })()}
+        </View>
+      </ScrollView>
     );
   };
 

@@ -12,7 +12,7 @@ const logger = createLogger('auth-navigation');
 
 export function AuthNavigationHandler() {
   const router = useRouter();
-  const { onAuthNavigation } = useAuth();
+  const { onAuthNavigation, session } = useAuth();
   const { isPremium, isLoading: isRevenueCatLoading, checkEntitlements } = useRevenueCat();
   const { showSuccess } = useSuccessModal();
   const { showError } = useErrorModal();
@@ -30,35 +30,28 @@ export function AuthNavigationHandler() {
     forceEnablePaywall,
     envValue: process.env.EXPO_PUBLIC_ENABLE_PAYWALL,
     isPremium,
-    isRevenueCatLoading
+    isRevenueCatLoading,
+    hasSession: !!session
   });
   
   // Force visible log for debugging
-  console.warn('🚨 AUTH NAV DEBUG - Paywall enabled:', forceEnablePaywall, 'isPremium:', isPremium, 'isLoading:', isRevenueCatLoading);
+  console.warn('🚨 AUTH NAV DEBUG - Paywall enabled:', forceEnablePaywall, 'isPremium:', isPremium, 'isLoading:', isRevenueCatLoading, 'hasSession:', !!session);
 
-  // Show paywall when user doesn't have premium access (only if paywall is enabled)
+  // Don't automatically show paywall - let individual screens handle premium gating
+  // The paywall should only appear when users try to access premium features
   useEffect(() => {
     console.warn('🚨 AUTH NAV useEffect triggered:', {
       forceEnablePaywall,
       isRevenueCatLoading,
       isPremium,
-      showPaywall
+      showPaywall,
+      hasSession: !!session
     });
     
-    if (!forceEnablePaywall) {
-      console.log('[AuthNavigationHandler] Paywall disabled, hiding paywall');
-      setShowPaywall(false);
-      return;
-    }
-
-    if (!isRevenueCatLoading && !isPremium) {
-      console.warn('🚨 SHOWING PAYWALL - User does not have premium access');
-      setShowPaywall(true);
-    } else if (isPremium) {
-      console.log('[AuthNavigationHandler] User has premium access, hiding paywall');
-      setShowPaywall(false);
-    }
-  }, [isPremium, isRevenueCatLoading, forceEnablePaywall]);
+    // Always hide paywall in AuthNavigationHandler - let screens handle their own premium gating
+    console.log('[AuthNavigationHandler] Hiding paywall - screens will handle their own premium gating');
+    setShowPaywall(false);
+  }, [isPremium, isRevenueCatLoading, forceEnablePaywall, session]);
 
   useEffect(() => {
     const unsubscribe = onAuthNavigation((event) => {
@@ -88,29 +81,10 @@ export function AuthNavigationHandler() {
             );
           }
           
-          // Check premium status after authentication (only if paywall is enabled)
-          setTimeout(async () => {
-            try {
-              if (forceEnablePaywall) {
-                await checkEntitlements();
-                
-                if (!isPremium && !isRevenueCatLoading) {
-                  logger.info('User not premium, showing paywall', { userId: event.userId });
-                  setShowPaywall(true);
-                } else {
-                  logger.info('User has premium access, navigating to tabs', { userId: event.userId, isPremium });
-                  router.replace('/tabs');
-                }
-              } else {
-                logger.info('Paywall disabled, navigating directly to tabs', { userId: event.userId });
-                router.replace('/tabs');
-              }
-            } catch (error) {
-              logger.error('Error checking entitlements after sign in', { error, userId: event.userId });
-              // On error, allow user to proceed to avoid blocking access
-              router.replace('/tabs');
-            }
-          }, 500);
+          // Navigate directly to tabs after successful authentication
+          // Individual screens will handle their own premium gating
+          logger.info('User signed in successfully, navigating to tabs', { userId: event.userId });
+          router.replace('/tabs');
           break;
         
         case 'SIGNED_OUT':

@@ -48,8 +48,8 @@ import { CombinedParsedRecipe } from '@/common/types';
 import { useRecipeSubmission } from '@/hooks/useRecipeSubmission';
 import { detectInputType, validateRawTextInput, validateDishNameInput } from '../../server/utils/detectInputType';
 import { useAnalytics } from '@/utils/analytics';
-import { useHandleError } from '@/hooks/useHandleError';
 import { logger } from '@/utils/logger';
+import { useHandleError } from '@/hooks/useHandleError';
 
 export default function ImportScreen() {
   const insets = useSafeAreaInsets();
@@ -328,7 +328,7 @@ export default function ImportScreen() {
 
 
 
-      track('recipe_create_new_selected', {
+      logger.info('recipe_create_new_selected', {
         recipeInput: inputToParse,
         inputType: 'raw_text',
         userId: session?.user?.id,

@@ -71,6 +71,7 @@ The response must be exactly one object with the following shape:
 14. If no stated yield is found, estimate the yield. Use context clues (e.g., 4 chicken thighs = 4 servings). Do your best to estimate. 
 15. **Instruction Length Control**: Each instruction step MUST be 1-2 sentences maximum. If an instruction contains multiple steps or complex procedures, break it into separate, focused instruction steps. Each step should be clear, actionable, and concise.
 16. **Tips Extraction**: Extract relevant cooking tips, tricks, or helpful advice mentioned in the text into the 'tips' field. This includes equipment recommendations (e.g., "use a cast iron skillet for best results" or "if you don't have galangal or kefir lime leaves, you can also swap ginger and fresh lime juice"), technique suggestions, timing advice, or any other helpful guidance that isn't explicitly an instruction. These may be in the form of a 'Recipe Notes' or 'Tips' section, or just plainly in text. BUT DO NOT include any promotional text ("sign up for our newsletter" or similar) in the tips field.
+17. YOU MUST REFUSE TO PARSE ANY TEXT THAT IS NOT AN EDIBLE FOOD RECIPE. IF THE TEXT IS NOT A RECIPE, YOU MUST RETURN AN ERROR.
 `;
 
 export function buildTextParsePrompt(input: string, fromImageExtraction: boolean = false): PromptPayload {
