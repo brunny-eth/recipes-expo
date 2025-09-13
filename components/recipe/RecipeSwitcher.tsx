@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   chip: {
-    borderRadius: RADIUS.lg,
+    borderRadius: RADIUS.xl, // Increased from RADIUS.lg (16px) to RADIUS.xl (20px) for more rounded corners
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     marginRight: SPACING.sm,
@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
   },
   popupContainer: {
     backgroundColor: COLORS.white,
-    borderRadius: RADIUS.md,
+    borderRadius: RADIUS.lg, // Increased from RADIUS.md (12px) to RADIUS.lg (16px) for more rounded corners
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
     marginHorizontal: SPACING.pageHorizontal,

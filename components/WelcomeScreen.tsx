@@ -12,13 +12,16 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
   const [currentScreen, setCurrentScreen] = useState<WelcomeScreenState>('welcome');
   const features: { text: string }[] = [
     {
-      text: 'Import, customize, and save any recipe from any source.'
+      text: 'Customize any recipe.'
     },
     {
-      text: 'Remix recipes to your taste, diet, and cooking style.'
+      text: 'Generate grocery lists.'
     },
     {
-      text: 'Generate shopping lists and follow multiple recipes at once.'
+      text: 'Cook multiple recipes together.'
+    },
+    {
+      text: 'Enjoy cooking your way.'
     },
   ];
 
@@ -52,11 +55,10 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
 
         <View style={{
           flex: 1,
-          justifyContent: 'space-between',
           paddingTop: SPACING.md, // Match index.tsx ScrollView paddingTop
           paddingHorizontal: 0, // Remove since taglineSection handles its own padding
         }}>
-          {/* Top content container */}
+          {/* Top content container - natural flow */}
           <View style={{ width: '100%', alignItems: 'flex-start' }}>
             <Animated.View
               entering={FadeIn.duration(1200)}
@@ -66,35 +68,40 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
                 Turn any recipe into{' '}
                 <Text style={styles.taglineBold}>your{'\u00A0'}recipe.</Text>
               </Text>
-            </Animated.View>
-
-            {/* Numbered list */}
-            <Animated.View
-              entering={FadeIn.duration(800).delay(1500)}
-              style={styles.listContainer}
-            >
-              {features.map((item, index) => (
-                <View key={index} style={styles.listItem}>
-                  <Text style={styles.listText}>
-                    {item.text}
-                  </Text>
-                </View>
-              ))}
+              <Animated.View entering={FadeIn.duration(800).delay(1500)}>
+                <Text style={[styles.taglineText, styles.taglineBullet]}>
+                  {features.map(item => item.text).join('\n')}
+                </Text>
+              </Animated.View>
             </Animated.View>
           </View>
 
-          {/* Button container - positioned using rule of thirds */}
-          <View style={styles.buttonContainer}>
-            <Animated.View entering={FadeIn.duration(1000).delay(1500)}>
+          {/* Spacer to push buttons higher up */}
+          <View style={{ flex: 1, justifyContent: 'flex-start', paddingTop: SPACING.xxxl }}>
+            {/* Button container - positioned higher up */}
+            <View style={styles.buttonContainer}>
+            <Animated.View entering={FadeIn.duration(1000).delay(3000)}>
+              <TouchableOpacity
+                style={styles.takeTourButton}
+                onPress={() => setCurrentScreen('onboarding')}
+              >
+                <Text style={styles.buttonText}>
+                  Take a quick tour
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
+            
+            <Animated.View entering={FadeIn.duration(1000).delay(3000)}>
               <TouchableOpacity
                 style={styles.getStartedButton}
                 onPress={onDismiss}
               >
                 <Text style={styles.buttonText}>
-                  Get Started
+                  Get started
                 </Text>
               </TouchableOpacity>
             </Animated.View>
+            </View>
           </View>
         </View>
       </SafeAreaView>
@@ -106,8 +113,8 @@ const styles = StyleSheet.create({
   taglineSection: {
     alignItems: 'flex-start',
     paddingHorizontal: SPACING.pageHorizontal,
-    marginTop: SPACING.sm, // Reduced from SPACING.xl to bring it closer to header
-    marginBottom: SPACING.xl, // Increased to create more space before cards
+    marginTop: SPACING.sm, // Match index.tsx exactly
+    marginBottom: SPACING.xl, // Match index.tsx exactly
   } as ViewStyle,
   taglineText: {
     fontFamily: 'Inter',
@@ -119,7 +126,7 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   } as TextStyle,
   taglineYourRecipe: {
-    marginBottom: SPACING.xxxl * 1.5, // Even more spacing below the main title
+    marginBottom: SPACING.lg, // Match index.tsx exactly (16px)
   } as TextStyle,
   taglineBold: {
     fontFamily: 'Inter',
@@ -128,32 +135,30 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     color: COLORS.textDark,
   } as TextStyle,
-  listContainer: {
-    width: '100%',
-    paddingHorizontal: SPACING.pageHorizontal, // Add horizontal padding for proper margins
-  } as ViewStyle,
-  listItem: {
-    marginBottom: SPACING.md, // Spacing between list items
-    width: '100%',
-  } as ViewStyle,
-  listText: {
-    fontFamily: 'Inter',
-    fontSize: 20,
-    fontWeight: '400',
-    lineHeight: 24,
-    color: COLORS.textDark,
-    textAlign: 'left',
-    marginBottom: SPACING.lg, // Add spacing between list items
+  taglineBullet: {
+    marginTop: SPACING.xs, // Match index.tsx exactly (4px)
   } as TextStyle,
   buttonContainer: {
     width: '100%',
-    height: 46, // Fixed height container like fullWidthRow in Import.tsx
     paddingHorizontal: SPACING.pageHorizontal, // Add horizontal padding for proper margins
-    marginBottom: '10%', // Bring button up even closer to content
+    paddingBottom: SPACING.xl, // Natural bottom padding
+    gap: SPACING.sm, // Add gap between buttons
+  } as ViewStyle,
+  takeTourButton: {
+    width: '100%',
+    height: 46, // Fixed height like the original button
+    backgroundColor: COLORS.primary,
+    borderWidth: 1,
+    borderColor: '#000000',
+    borderRadius: RADIUS.lg,
+    justifyContent: 'center',
+    alignItems: 'flex-start', // Left align content
+    paddingLeft: 16, // Match INPUT_LEFT_PAD from Import.tsx
+    ...SHADOWS.medium,
   } as ViewStyle,
   getStartedButton: {
     width: '100%',
-    height: '100%', // Fill the container height
+    height: 46, // Fixed height like the original button
     backgroundColor: COLORS.primary,
     borderWidth: 1,
     borderColor: '#000000',

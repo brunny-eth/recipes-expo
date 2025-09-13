@@ -174,7 +174,7 @@ export default function OnboardingScreen({ onComplete, onBack }: OnboardingScree
                   {currentStep === 4 ? (
                     <Animated.View 
                       style={styles.buttonContainer}
-                      entering={FadeIn.duration(800).delay(3000)}
+                      entering={FadeIn.duration(800).delay(1500)}
                     >
                       <TouchableOpacity
                         style={styles.startButton}
@@ -316,6 +316,7 @@ const styles = StyleSheet.create({
   },
   startButtonText: {
     ...bodyStrongText,
+    fontSize: 24, // Increased from default bodyStrongText size
     color: '#000000',
   },
 });

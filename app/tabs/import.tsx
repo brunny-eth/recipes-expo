@@ -1017,8 +1017,8 @@ export default function ImportScreen() {
                   )}
                 </View>
 
-                {/* Raw Text Button */}
-                <View style={styles.sectionWrapper}>
+                {/* Raw Text Button - COMMENTED OUT */}
+                {/* <View style={styles.sectionWrapper}>
                   <TouchableHighlight
                     style={[styles.sectionCard, styles.importTextCard]}
                     onPress={() => toggleImportOption('rawText')}
@@ -1081,7 +1081,7 @@ export default function ImportScreen() {
                       </View>
                     </View>
                   )}
-                </View>
+                </View> */}
 
                 {/* Explore Button */}
                 <View style={styles.sectionWrapper}>

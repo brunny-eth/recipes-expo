@@ -2092,10 +2092,10 @@ const styles = StyleSheet.create({
   stepItemContainer: {
     backgroundColor: COLORS.background,
     borderRadius: RADIUS.sm, // Lighter border radius for checklist feel
-    marginBottom: 4, // Reduced from SPACING.sm (8px) to 4px
-    paddingHorizontal: SPACING.sm, // Keep horizontal padding
-    paddingTop: SPACING.xs, // Reduced top padding (4px instead of 8px)
-    paddingBottom: SPACING.xs, // Reduced bottom padding (4px instead of 8px)
+    marginBottom: 16, 
+    paddingHorizontal: SPACING.sm, 
+    paddingTop: SPACING.xs, 
+    paddingBottom: SPACING.xs, 
     borderWidth: 1,
     borderColor: '#000000',
     ...SHADOWS.small,

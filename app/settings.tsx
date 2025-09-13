@@ -4,12 +4,14 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  TouchableHighlight,
   ScrollView,
   ViewStyle,
   TextStyle,
   Linking,
   Alert,
   TextInput,
+  Animated,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
@@ -44,7 +46,37 @@ export default function AccountScreen() {
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [showFeedbackForm, setShowFeedbackForm] = useState(false);
+  const [feedbackAnimation] = useState(new Animated.Value(0));
   const appVersion = (Application?.nativeApplicationVersion as string | null) || (Constants?.expoConfig?.version as string | undefined) || 'dev';
+
+  // Animation functions
+  const showFeedback = () => {
+    setShowFeedbackForm(true);
+    Animated.timing(feedbackAnimation, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  };
+
+  const hideFeedback = () => {
+    Animated.timing(feedbackAnimation, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: false,
+    }).start(() => {
+      setShowFeedbackForm(false);
+    });
+  };
+
+  const handleToggleFeedback = () => {
+    if (showFeedbackForm) {
+      hideFeedback();
+    } else {
+      showFeedback();
+    }
+  };
 
   const handleSubmitFeedback = async () => {
     if (!feedbackMessage.trim()) {
@@ -83,6 +115,7 @@ export default function AccountScreen() {
         const responseData = await response.json();
         showSuccess('Success', 'Thank you for your feedback!');
         setFeedbackMessage('');
+        hideFeedback(); // Close the feedback form after successful submission
       } else {
         const errorData = await response.json().catch(() => ({}));
         console.error('[AccountScreen] Feedback submission failed:', errorData);
@@ -140,52 +173,88 @@ export default function AccountScreen() {
           )}
         </View>
 
-        {/* Feedback Form Section - Always at consistent position */}
-        <View style={styles.feedbackSection}>
-          <Text style={[styles.sectionTitle, styles.feedbackTitle]}>Tell us what to improve</Text>
-          <TextInput
-            style={styles.feedbackInput}
-            placeholder="Send us a note if you have an idea for a feature, found a bug, or just want to say hi."
-            placeholderTextColor={COLORS.textSubtle}
-            value={feedbackMessage}
-            onChangeText={setFeedbackMessage}
-            multiline
-            numberOfLines={6}
-            textAlignVertical="top"
-            maxLength={400}
-          />
-          <TouchableOpacity
-            style={[
-              styles.sendFeedbackButton,
-              (!feedbackMessage.trim() || isSubmitting) && styles.sendFeedbackButtonDisabled
-            ]}
-            onPress={handleSubmitFeedback}
-            disabled={!feedbackMessage.trim() || isSubmitting}
-          >
-            <Text style={styles.sendFeedbackButtonText}>
-              {isSubmitting ? 'Sending...' : 'Send Feedback'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Sign Out Section - After feedback */}
+        {/* Sign Out Section */}
         {isAuthenticated && (
           <View style={styles.signOutSection}>
-            <TouchableOpacity 
-              style={[
-                styles.signOutButton,
-                isSigningOut && styles.signOutButtonDisabled
-              ]} 
+            <TouchableHighlight
+              style={styles.signOutButton}
               onPress={handleSignOut}
+              underlayColor="transparent"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               disabled={isSigningOut}
             >
-              <Text style={styles.signOutButtonText}>
-                {isSigningOut ? 'Signing Out...' : 'Sign Out'}
-              </Text>
-            </TouchableOpacity>
+              <View style={styles.signOutButtonContent}>
+                <Text style={styles.signOutButtonText}>
+                  {isSigningOut ? 'Signing Out...' : 'Sign Out'}
+                </Text>
+              </View>
+            </TouchableHighlight>
           </View>
         )}
 
+        {/* Send Feedback Button - Right under Sign Out */}
+        <View style={styles.sendFeedbackButtonSection}>
+            <TouchableHighlight
+              style={styles.sendFeedbackButton}
+              onPress={handleToggleFeedback}
+              underlayColor="transparent"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <View style={styles.sendFeedbackButtonContent}>
+                <Text style={styles.sendFeedbackButtonText}>
+                  Send Feedback
+                </Text>
+              </View>
+            </TouchableHighlight>
+        </View>
+
+        {/* Animated Feedback Form Section */}
+        {showFeedbackForm && (
+          <Animated.View 
+            style={[
+              styles.feedbackSection,
+              {
+                opacity: feedbackAnimation,
+                transform: [{
+                  translateY: feedbackAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-20, 0],
+                  })
+                }]
+              }
+            ]}
+          >
+            <TextInput
+              style={styles.feedbackInput}
+              placeholder="Send us a note if you have an idea for a feature, found a bug, or just want to say hi."
+              placeholderTextColor={COLORS.textSubtle}
+              value={feedbackMessage}
+              onChangeText={setFeedbackMessage}
+              multiline
+              numberOfLines={6}
+              textAlignVertical="top"
+              maxLength={400}
+            />
+            <TouchableHighlight
+              style={styles.submitFeedbackButton}
+              onPress={handleSubmitFeedback}
+              underlayColor="transparent"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              disabled={!feedbackMessage.trim() || isSubmitting}
+            >
+              <View style={styles.submitFeedbackButtonContent}>
+                <Text style={[
+                  styles.submitFeedbackButtonText,
+                  (!feedbackMessage.trim() || isSubmitting) && styles.submitFeedbackButtonTextDisabled
+                ]}>
+                  {isSubmitting ? 'Sending...' : 'Submit Feedback'}
+                </Text>
+              </View>
+            </TouchableHighlight>
+          </Animated.View>
+        )}
+
+        {/* Debug Section - Moved to bottom of scrollview */}
         {__DEV__ && (
           <View style={styles.devSection}>
             <TouchableOpacity
@@ -222,27 +291,26 @@ export default function AccountScreen() {
           </View>
         )}
 
-        {/* Bottom info - ordered: tagline, version, legal links */}
-        <View style={styles.bottomLegalSection}>
-          <Text style={styles.tagline}>Designed for home cooks, by home cooks</Text>
-          <Text style={styles.versionText}>Version {appVersion}</Text>
-          <View style={styles.legalSection}>
-            <TouchableOpacity
-              style={styles.legalLink}
-              onPress={() => Linking.openURL('https://cookolea.com/privacy.html')}
-            >
-              <Text style={styles.legalLinkText}>Privacy Policy</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.legalLink}
-              onPress={() => Linking.openURL('https://cookolea.com/tos.html')}
-            >
-              <Text style={styles.legalLinkText}>Terms of Service</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+       </ScrollView>
 
-      </ScrollView>
+       {/* Fixed Bottom Legal Section - Above tabs */}
+       <View style={styles.fixedBottomLegalSection}>
+         <Text style={styles.versionText}>Version {appVersion}</Text>
+         <View style={styles.legalSection}>
+           <TouchableOpacity
+             style={styles.legalLink}
+             onPress={() => Linking.openURL('https://cookolea.com/privacy.html')}
+           >
+             <Text style={styles.legalLinkText}>Privacy Policy</Text>
+           </TouchableOpacity>
+           <TouchableOpacity
+             style={styles.legalLink}
+             onPress={() => Linking.openURL('https://cookolea.com/tos.html')}
+           >
+             <Text style={styles.legalLinkText}>Terms of Service</Text>
+           </TouchableOpacity>
+         </View>
+       </View>
 
       <BottomTabBar />
     </View>
@@ -265,23 +333,30 @@ const styles = StyleSheet.create({
   authStatusText: {
     ...bodyText,
     color: COLORS.textDark,
-    textAlign: 'center',
+    textAlign: 'left',
   } as TextStyle,
   signOutButton: {
+    height: 32,
     marginTop: SPACING.sm,
-    marginBottom: SPACING.xxl,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#000000',
-    paddingVertical: 12,
-    paddingHorizontal: 32,
-    borderRadius: RADIUS.sm,
+    marginBottom: SPACING.sm,
+  } as ViewStyle,
+  signOutButtonContent: {
+    flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 44,
+    height: '100%',
+    paddingLeft: 0,
+    paddingRight: 18,
   } as ViewStyle,
   signOutButtonText: {
-    ...bodyStrongText,
-    color: '#000000',
+    fontFamily: 'Inter',
+    fontSize: 20,
+    fontWeight: '400',
+    lineHeight: 26,
+    color: COLORS.textDark,
+    flex: 1,
+    textAlign: 'left',
+    textAlignVertical: 'center',
+    paddingVertical: 0,
   } as TextStyle,
   feedbackSection: {
     marginTop: SPACING.lg,
@@ -313,21 +388,54 @@ const styles = StyleSheet.create({
     ...bodyText,
     color: COLORS.textDark,
   } as TextStyle,
-  sendFeedbackButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#000000',
-    paddingVertical: 12,
-    paddingHorizontal: 32,
-    borderRadius: RADIUS.sm,
-    alignItems: 'center',
+  sendFeedbackButtonSection: {
+    marginBottom: SPACING.sm,
   } as ViewStyle,
-  sendFeedbackButtonDisabled: {
-    opacity: 0.5,
+  sendFeedbackButton: {
+    height: 32,
+  } as ViewStyle,
+  sendFeedbackButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: '100%',
+    paddingLeft: 0,
+    paddingRight: 18,
   } as ViewStyle,
   sendFeedbackButtonText: {
-    ...bodyStrongText,
-    color: '#000000',
+    fontFamily: 'Inter',
+    fontSize: 20,
+    fontWeight: '400',
+    lineHeight: 26,
+    color: COLORS.textDark,
+    flex: 1,
+    textAlign: 'left',
+    textAlignVertical: 'center',
+    paddingVertical: 0,
+  } as TextStyle,
+  submitFeedbackButton: {
+    height: 32,
+    marginTop: SPACING.sm,
+  } as ViewStyle,
+  submitFeedbackButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: '100%',
+    paddingLeft: 0,
+    paddingRight: 18,
+  } as ViewStyle,
+  submitFeedbackButtonText: {
+    fontFamily: 'Inter',
+    fontSize: 20,
+    fontWeight: '400',
+    lineHeight: 26,
+    color: COLORS.textDark,
+    flex: 1,
+    textAlign: 'left',
+    textAlignVertical: 'center',
+    paddingVertical: 0,
+  } as TextStyle,
+  submitFeedbackButtonTextDisabled: {
+    opacity: 0.5,
   } as TextStyle,
   devSection: {
     marginBottom: SPACING.xl,
@@ -354,11 +462,11 @@ const styles = StyleSheet.create({
   legalLinkText: {
     ...bodyText,
     fontSize: FONT.size.caption,
-    color: COLORS.textDark,
+    color: '#666666', // Greyish color
   } as TextStyle,
   versionText: {
     ...bodyText,
-    color: COLORS.textDark,
+    color: '#666666', // Greyish color
     textAlign: 'center',
     fontSize: FONT.size.caption,
     marginTop: 0,
@@ -366,7 +474,7 @@ const styles = StyleSheet.create({
   tagline: {
     ...bodyText,
     textAlign: 'center',
-    color: COLORS.textDark,
+    color: '#666666', // Greyish color
     marginTop: SPACING.xs,
     marginBottom: SPACING.xxl,
     fontSize: FONT.size.caption,
@@ -386,13 +494,21 @@ const styles = StyleSheet.create({
     color: '#000000',
   } as TextStyle,
   scrollContent: {
-    paddingBottom: 0,
+    paddingBottom: 120, // Add padding to account for fixed bottom section
     paddingHorizontal: SPACING.pageHorizontal,
   } as ViewStyle,
-  bottomLegalSection: {
-    paddingTop: SPACING.xl,
-    paddingBottom: SPACING.xl,
+  fixedBottomLegalSection: {
+    position: 'absolute',
+    bottom: 100, // Position above the bottom tabs (adjust based on tab height)
+    left: 0,
+    right: 0,
+    backgroundColor: COLORS.background,
+    paddingTop: SPACING.lg,
+    paddingBottom: 0, // Remove bottom padding
+    paddingHorizontal: SPACING.pageHorizontal,
     alignItems: 'center',
+    borderTopWidth: 0, // Remove top border
+    borderTopColor: 'transparent', // Make border transparent
   } as ViewStyle,
   signOutButtonDisabled: {
     backgroundColor: COLORS.disabled,
