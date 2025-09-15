@@ -4,6 +4,21 @@ import logger from '../lib/logger';
 
 const router = express.Router();
 
+// CORS middleware for share routes
+const corsHeaders = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  res.setHeader("Access-Control-Allow-Origin", "https://cookolea.com");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+  
+  next();
+};
+
 // Generate a random alphanumeric slug (8-10 characters)
 function generateSlug(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -16,7 +31,7 @@ function generateSlug(): string {
 }
 
 // POST /api/share - Create or retrieve a share slug for recipe or folder
-router.post('/api/share', async (req, res) => {
+router.post('/api/share', corsHeaders, async (req, res) => {
   const requestId = (req as any).id;
   
   try {
@@ -268,7 +283,7 @@ router.post('/api/share', async (req, res) => {
 });
 
 // GET /api/public-shares/:slug - Fetch share data by slug
-router.get('/api/public-shares/:slug', async (req, res) => {
+router.get('/api/public-shares/:slug', corsHeaders, async (req, res) => {
   const requestId = (req as any).id;
   
   try {
