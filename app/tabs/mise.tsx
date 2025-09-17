@@ -35,6 +35,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useErrorModal } from '@/context/ErrorModalContext';
+import { useSuccessModal } from '@/context/SuccessModalContext';
 import { useHandleError } from '@/hooks/useHandleError';
 import { useAnalytics } from '@/utils/analytics';
 import { useRenderCounter } from '@/hooks/useRenderCounter';
@@ -55,6 +56,7 @@ import {
 } from '@/utils/manualGroceryStorage';
 import HouseholdStaplesModal from '@/components/HouseholdStaplesModal';
 import PaywallModal from '@/components/PaywallModal';
+import FolderPickerModal from '@/components/FolderPickerModal';
 
 // Cache removed - always fetch fresh data for consistency
 
@@ -323,6 +325,7 @@ export default function MiseScreen() {
   const { session } = useAuth();
   useRenderCounter('MiseScreen', { hasSession: !!session });
   const { showError } = useErrorModal();
+  const { showSuccess } = useSuccessModal();
   const handleError = useHandleError();
   const { track } = useAnalytics();
   const { hasResumableSession, state: cookingState, invalidateSession, initializeSessions, selectMiseRecipe } = useCooking();
@@ -343,6 +346,10 @@ export default function MiseScreen() {
   
   // Paywall modal state
   const [showPaywallModal, setShowPaywallModal] = useState(false);
+  
+  // Folder picker modal state
+  const [showFolderPicker, setShowFolderPicker] = useState(false);
+  const [selectedRecipeForFolder, setSelectedRecipeForFolder] = useState<MiseRecipe | null>(null);
 
   // Removed caching strategy - always fetch fresh data for consistency
 
@@ -1148,63 +1155,6 @@ export default function MiseScreen() {
 
 
 
-  // Render recipe item
-  const renderRecipeItem = useCallback(({ item, index }: { item: MiseRecipe; index: number }) => {
-    const displayTitle = item.title_override || item.prepared_recipe_data.title;
-
-    const handleRecipePress = () => {
-      router.push({
-        pathname: '/recipe/summary',
-        params: {
-          recipeId: item.prepared_recipe_data.id?.toString(),
-          entryPoint: 'mise',
-          miseRecipeId: item.id,
-          appliedChanges: item.applied_changes ? JSON.stringify(item.applied_changes) : undefined,
-          titleOverride: item.title_override,
-          originalRecipeData: item.original_recipe_data ? JSON.stringify(item.original_recipe_data) : undefined,
-        },
-      });
-    };
-
-    return (
-      <TouchableOpacity
-        style={[
-          styles.card,
-          styles.cardWithMinHeight,
-          index === 0 && { marginTop: 0 }, // Add top margin to first recipe
-          index === 0 && { borderTopWidth: 1, borderTopColor: '#000000' } // Add top border to first recipe
-        ]}
-        onPress={handleRecipePress}
-        activeOpacity={0.7}
-      >
-        <View style={styles.cardContent}>
-          <View style={styles.cardTextContainer}>
-            <Text style={styles.cardTitle} numberOfLines={2} ellipsizeMode="tail">
-              {displayTitle}
-            </Text>
-            {(() => {
-              const servingsCount = parseServingsValue(item.prepared_recipe_data.recipeYield);
-              return servingsCount ? (
-                <Text style={styles.servingsText}>For {servingsCount}</Text>
-              ) : null;
-            })()}
-          </View>
-        </View>
-
-        {/* Delete icon */}
-        <TouchableOpacity
-          style={styles.trashIcon}
-          onPress={(e) => {
-            e.stopPropagation();
-            handleDeleteRecipe(item.id);
-          }}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.deleteIcon}>×</Text>
-        </TouchableOpacity>
-      </TouchableOpacity>
-    );
-  }, [handleDeleteRecipe, router]);
 
   // Render grocery category
   const renderGroceryCategory = useCallback(({ item }: { item: GroceryCategory }) => {
@@ -1458,7 +1408,7 @@ export default function MiseScreen() {
               <TouchableOpacity
                 onPress={() => router.push('/tabs/import')}
               >
-                <Text style={styles.emptyActionText}>Go to the import recipe page.</Text>
+                <Text style={styles.emptyActionText}>Import a recipe.</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -1518,6 +1468,141 @@ export default function MiseScreen() {
     );
   };
 
+  // Handle long press on recipe to show save to folder modal
+  const handleRecipeLongPress = useCallback((recipe: MiseRecipe) => {
+    setSelectedRecipeForFolder(recipe);
+    setShowFolderPicker(true);
+  }, []);
+
+  // Handle folder selection for saving recipe
+  const handleFolderPickerSelect = useCallback(async (folderId: number) => {
+    if (!selectedRecipeForFolder || !session?.user) {
+      setShowFolderPicker(false);
+      return;
+    }
+
+    try {
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+      if (!backendUrl) {
+        throw new Error('API configuration error. Please check your environment variables.');
+      }
+
+      const recipeData = selectedRecipeForFolder.prepared_recipe_data;
+      const originalRecipeData = selectedRecipeForFolder.original_recipe_data;
+      
+      // Use the original recipe data if available, otherwise use prepared data
+      const recipeToSave = originalRecipeData || recipeData;
+      
+      if (!recipeToSave?.id) {
+        throw new Error('Recipe data is missing required ID');
+      }
+      
+      const headers = {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      };
+
+      // Save the recipe to the selected folder
+      const saveResponse = await fetch(`${backendUrl}/api/recipes/save-modified`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          originalRecipeId: recipeToSave.id,
+          userId: session.user.id,
+          modifiedRecipeData: recipeData,
+          appliedChanges: selectedRecipeForFolder.applied_changes || [],
+          folderId: folderId,
+        }),
+      });
+
+      if (!saveResponse.ok) {
+        const errorData = await saveResponse.json();
+        throw new Error(errorData.error || 'Failed to save recipe to folder');
+      }
+
+      // Track the save event
+      track('recipe_saved', { 
+        recipe_id: recipeToSave.id.toString(),
+        from_mise: true
+      });
+
+      // Close modal and reset state
+      setShowFolderPicker(false);
+      setSelectedRecipeForFolder(null);
+
+      // Show success feedback
+      const recipeTitle = selectedRecipeForFolder.title_override || selectedRecipeForFolder.prepared_recipe_data.title;
+      showSuccess('Recipe Saved!', `${recipeTitle} has been saved to your folder.`);
+      console.log('[MiseScreen] ✅ Recipe saved to folder successfully');
+      
+    } catch (error) {
+      console.error('[MiseScreen] Error saving recipe to folder:', error);
+      handleError('Save Error', error);
+      setShowFolderPicker(false);
+      setSelectedRecipeForFolder(null);
+    }
+  }, [selectedRecipeForFolder, session, track, handleError, showSuccess]);
+
+  // Render recipe item
+  const renderRecipeItem = useCallback(({ item, index }: { item: MiseRecipe; index: number }) => {
+    const displayTitle = item.title_override || item.prepared_recipe_data.title;
+
+    const handleRecipePress = () => {
+      router.push({
+        pathname: '/recipe/summary',
+        params: {
+          recipeId: item.prepared_recipe_data.id?.toString(),
+          entryPoint: 'mise',
+          miseRecipeId: item.id,
+          appliedChanges: item.applied_changes ? JSON.stringify(item.applied_changes) : undefined,
+          titleOverride: item.title_override,
+          originalRecipeData: item.original_recipe_data ? JSON.stringify(item.original_recipe_data) : undefined,
+        },
+      });
+    };
+
+    return (
+      <TouchableOpacity
+        style={[
+          styles.card,
+          styles.cardWithMinHeight,
+          index === 0 && { marginTop: 0 }, // Add top margin to first recipe
+          index === 0 && { borderTopWidth: 1, borderTopColor: '#000000' } // Add top border to first recipe
+        ]}
+        onPress={handleRecipePress}
+        onLongPress={() => handleRecipeLongPress(item)}
+        activeOpacity={0.7}
+        delayLongPress={500}
+      >
+        <View style={styles.cardContent}>
+          <View style={styles.cardTextContainer}>
+            <Text style={styles.cardTitle} numberOfLines={2} ellipsizeMode="tail">
+              {displayTitle}
+            </Text>
+            {(() => {
+              const servingsCount = parseServingsValue(item.prepared_recipe_data.recipeYield);
+              return servingsCount ? (
+                <Text style={styles.servingsText}>For {servingsCount}</Text>
+              ) : null;
+            })()}
+          </View>
+        </View>
+
+        {/* Delete icon */}
+        <TouchableOpacity
+          style={styles.trashIcon}
+          onPress={(e) => {
+            e.stopPropagation();
+            handleDeleteRecipe(item.id);
+          }}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.deleteIcon}>×</Text>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    );
+  }, [handleDeleteRecipe, router, handleRecipeLongPress]);
+
   // Handle cooking session start
   const handleCookMyRecipes = useCallback(() => {
     if (miseRecipes.length === 0) {
@@ -1569,6 +1654,17 @@ export default function MiseScreen() {
         visible={showPaywallModal}
         onClose={() => setShowPaywallModal(false)}
         onSubscribed={() => setShowPaywallModal(false)}
+      />
+
+      {/* Folder Picker Modal for saving recipes */}
+      <FolderPickerModal
+        visible={showFolderPicker}
+        onClose={() => {
+          setShowFolderPicker(false);
+          setSelectedRecipeForFolder(null);
+        }}
+        onSelectFolder={handleFolderPickerSelect}
+        isLoading={false}
       />
 
     </View>

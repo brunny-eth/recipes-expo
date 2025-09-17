@@ -137,8 +137,7 @@ export function normalizeAppError(error: unknown, opts: NormalizeAppErrorOptions
     // Use your parse error mapping if the message hints at parse/validation
     const parseMessage = getErrorMessage(
       // Fallback to default branch inside getErrorMessage
-      // @ts-expect-error: allow passing unknown for default mapping
-      undefined,
+      undefined as any,
       context,
     );
     return {

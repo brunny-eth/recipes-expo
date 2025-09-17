@@ -117,9 +117,8 @@ export default function IngredientSubstitutionModal({
         style={styles.modalContent}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>Substitute</Text>
-          <Text style={styles.ingredientTitle} numberOfLines={2}>
-            {ingredientName}
+          <Text style={styles.title}>
+            Substitute {ingredientName} for:
           </Text>
         </View>
 

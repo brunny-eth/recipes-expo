@@ -13,7 +13,7 @@ export function getErrorMessage(errorCode: ParseErrorCode, context?: string): st
       if (context === 'raw_text') {
         return "Please be a bit more descriptive so we can make you the best recipe! Try adding details like 'chicken empanadas with cheese' or 'vegetarian empanadas with spinach'.";
       }
-      return "That doesn't look like a valid recipe. \n\n Please try a URL with an actual recipe in it, or just paste the recipe text directly.";
+      return "That doesn't look like a valid recipe.\n\nPlease try a URL with an actual recipe in it.";
       
     case ParseErrorCode.GENERATION_FAILED:
       if (context === 'image' || context === 'images') {
@@ -22,7 +22,7 @@ export function getErrorMessage(errorCode: ParseErrorCode, context?: string): st
       if (context === 'raw_text') {
         return "We couldn't process that recipe. Please be a bit more descriptive so we can make you the best recipe! Try adding details like cooking method or main ingredients.";
       }
-      return "We couldn't process that recipe. \n\n Please try a URL with an actual recipe on it, or just paste the recipe text directly.";
+      return "We couldn't process that recipe.\n\nPlease try a URL with an actual recipe on it.";
       
     case ParseErrorCode.GENERATION_EMPTY:
       if (context === 'image' || context === 'images') {
@@ -49,7 +49,7 @@ export function getErrorMessage(errorCode: ParseErrorCode, context?: string): st
       return "The recipe details seem incomplete. Please add more ingredients or cooking steps and try again.";
       
     case ParseErrorCode.UNSUPPORTED_INPUT_TYPE:
-      return "Please try pasting a link with a recipe in it,or just search for a similar recipe.";
+      return "Please try pasting a link with a recipe in it, or just search for a similar recipe.";
       
     default:
       return "Something went wrong while processing your recipe. Please try again.";
