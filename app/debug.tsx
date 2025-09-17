@@ -14,6 +14,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Session, User } from '@supabase/supabase-js';
 
 import { useAuth } from '@/context/AuthContext';
+import { useRevenueCat } from '@/context/RevenueCatContext';
 import { supabase } from '@/lib/supabaseClient';
 import { COLORS } from '@/constants/theme';
 import {
@@ -67,6 +68,8 @@ export default function SessionDebugScreen() {
     isLoading: isAuthLoading,
     signOut,
   } = useAuth();
+  
+  const { isPremium, togglePremiumStatus, subscriptionStatus } = useRevenueCat();
 
   const [hydratedSession, setHydratedSession] = useState<Session | null>(null);
   const [hydratedUser, setHydratedUser] = useState<User | null>(null);
@@ -159,7 +162,13 @@ export default function SessionDebugScreen() {
           label="ExpoSecureStoreAdapter Logs"
           value={secureStoreLogs.join('\n')}
         />
-
+        
+        {/* Premium Status Section */}
+        <View style={styles.sectionDivider} />
+        <Text style={styles.sectionTitle}>Premium Status</Text>
+        <DebugField label="isPremium" value={String(isPremium)} />
+        <DebugField label="subscriptionStatus" value={subscriptionStatus} />
+        
         <View style={styles.buttonContainer}>
           <TouchableOpacity
             style={styles.button}
@@ -171,6 +180,14 @@ export default function SessionDebugScreen() {
             ) : (
               <Text style={styles.buttonText}>Force Rehydrate</Text>
             )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.button, styles.premiumToggleButton]}
+            onPress={togglePremiumStatus}
+          >
+            <Text style={styles.buttonText}>
+              {isPremium ? 'Disable Premium' : 'Enable Premium'}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.button, styles.signOutButton]}
@@ -247,6 +264,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
+  sectionDivider: {
+    height: 1,
+    backgroundColor: COLORS.lightGray,
+    marginVertical: 20,
+  },
+  sectionTitle: {
+    ...bodyStrongText,
+    fontSize: 16,
+    color: COLORS.textDark,
+    marginBottom: 12,
+  },
   buttonContainer: {
     marginTop: 20,
     borderTopWidth: 1,
@@ -259,6 +287,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     marginBottom: 12,
+  },
+  premiumToggleButton: {
+    backgroundColor: COLORS.accent,
   },
   signOutButton: {
     backgroundColor: COLORS.error,

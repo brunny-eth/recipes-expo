@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, SafeAreaView, TextStyle, ViewStyle, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, SafeAreaView, TextStyle, ViewStyle, StyleSheet, useWindowDimensions } from 'react-native';
 import { COLORS, SPACING, RADIUS, BORDER_WIDTH, SHADOWS } from '@/constants/theme';
 import { FONT, bodyStrongText, screenTitleText, bodyText } from '@/constants/typography';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -10,6 +10,12 @@ type WelcomeScreenState = 'welcome' | 'onboarding';
 
 export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) {
   const [currentScreen, setCurrentScreen] = useState<WelcomeScreenState>('welcome');
+  const { width } = useWindowDimensions();
+  
+  // iPad detection: consider iPad if width is greater than 768px
+  // This ensures iPhone layouts remain unchanged while fixing iPad display
+  const isIpad = width > 768;
+  
   const features: { text: string }[] = [
     {
       text: 'Customize any recipe.'
@@ -45,6 +51,8 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
       <SafeAreaView style={{
         flex: 1,
       }}>
+        {/* iPad-specific container wrapper for proper centering and max width */}
+        <View style={isIpad ? styles.ipadContainer : styles.phoneContainer}>
         {/* OLEA Header Section - mimicking index.tsx */}
         <ScreenHeader
           title="OLEA"
@@ -104,12 +112,25 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
             </View>
           </View>
         </View>
+        </View> {/* Close iPad/phone container */}
       </SafeAreaView>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
+  // iPad-specific container for proper centering and max width
+  ipadContainer: {
+    flex: 1,
+    alignSelf: 'center',
+    maxWidth: 500, // Reasonable max width for iPad content
+    width: '100%',
+    paddingHorizontal: SPACING.xl, // Extra horizontal padding for iPad
+  } as ViewStyle,
+  // Phone container - no changes to existing layout
+  phoneContainer: {
+    flex: 1,
+  } as ViewStyle,
   taglineSection: {
     alignItems: 'flex-start',
     paddingHorizontal: SPACING.pageHorizontal,

@@ -23,6 +23,7 @@ import { AuthNavigationHandler } from '@/components/AuthNavigationHandler';
 import OfflineBanner from '@/components/OfflineBanner';
 import { getNetworkStatus } from '@/utils/networkUtils';
 import { useAnalytics } from '@/utils/analytics';
+import { useDeepLinkHandler } from '@/hooks/useDeepLinkHandler';
 
 // Keep native splash visible until React tree is ready
 SplashScreen.preventAutoHideAsync();
@@ -41,6 +42,9 @@ function RootLayoutNav() {
   const router = useRouter();
   const segments = useSegments();
   const { track } = useAnalytics();
+  
+  // Initialize deep link handler
+  useDeepLinkHandler();
 
   // App readiness states
   const [ready, setReady] = useState(false);

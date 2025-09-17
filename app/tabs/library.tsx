@@ -103,7 +103,7 @@ function buildSearchBlob(item: SavedRecipe): string {
 export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const params = useLocalSearchParams<{ tab?: string }>();
+  const params = useLocalSearchParams<{ tab?: string; slug?: string }>();
   const { session } = useAuth();
   useRenderCounter('LibraryScreen', { hasSession: !!session });
   const { showError } = useErrorModal();
@@ -115,6 +115,9 @@ export default function LibraryScreen() {
   const [selectedTab, setSelectedTab] = useState<'explore' | 'saved'>(
     params?.tab === 'saved' ? 'saved' : 'explore'
   );
+  
+  // Deep link support
+  const slug = params?.slug;
 
   // Keep selected tab in sync with route params even if the screen stays mounted
   useEffect(() => {
@@ -159,6 +162,14 @@ export default function LibraryScreen() {
   const [showColorPickerModal, setShowColorPickerModal] = useState(false);
   const [folderToEdit, setFolderToEdit] = useState<SavedFolder | null>(null);
   const [isUpdatingColor, setIsUpdatingColor] = useState(false);
+  
+  // Deep link shared folder state
+  const [sharedFolderData, setSharedFolderData] = useState<any>(null);
+  const [isLoadingSharedFolder, setIsLoadingSharedFolder] = useState(false);
+  const [sharedFolderError, setSharedFolderError] = useState<string | null>(null);
+  const [isDuplicatingFolder, setIsDuplicatingFolder] = useState(false);
+  const [duplicationSuccess, setDuplicationSuccess] = useState(false);
+  const [fetchedSlugs, setFetchedSlugs] = useState<Set<string>>(new Set());
 
   // Debounce search input (200ms)
   useEffect(() => {
@@ -200,6 +211,62 @@ export default function LibraryScreen() {
       .filter((ir) => tokens.every((t) => ir.blob.includes(t)))
       .map((ir) => ir.recipe);
   }, [debouncedSearchQuery, savedRecipes, indexedRecipes]);
+
+  // Fetch shared folder data by slug
+  const fetchSharedFolder = useCallback(async (slug: string) => {
+    // Guard against re-fetching the same slug
+    if (fetchedSlugs.has(slug)) {
+      console.log('[Library] Already fetched slug, skipping:', slug);
+      return;
+    }
+
+    try {
+      console.log('[Library] Fetching shared folder:', slug);
+      console.log('[Library] Fetch state transition: loading started');
+      setIsLoadingSharedFolder(true);
+      setSharedFolderError(null);
+      
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+      const response = await fetch(`${backendUrl}/api/public-shares/${slug}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch shared folder: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('[Library] API response raw:', JSON.stringify(data, null, 2));
+      console.log('[Library] Shared folder data received:', { 
+        hasData: !!data, 
+        type: data?.type,
+        kind: data?.kind,
+        hasFolderData: !!data?.folder_data,
+        hasRecipes: !!data?.recipes,
+        recipeCount: data?.recipes?.length || 0,
+        hasDirectFolderData: !!(data?.title || data?.name)
+      });
+      
+      // Mark this slug as fetched to prevent re-fetching
+      setFetchedSlugs(prev => new Set(prev).add(slug));
+      
+      // Set the shared folder data (API returns folder data directly)
+      setSharedFolderData(data);
+      
+      // Switch to saved tab to show the shared folder
+      setSelectedTab('saved');
+      
+      console.log('[Library] Fetch state transition: completed successfully');
+      
+    } catch (error) {
+      console.error('[Library] Error fetching shared folder:', error);
+      console.log('[Library] Fetch state transition: error occurred');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load shared folder';
+      setSharedFolderError(errorMessage);
+      handleError('Error Loading Shared Folder', 'This shared folder could not be loaded. It may have been deleted or the link may be invalid.');
+    } finally {
+      setIsLoadingSharedFolder(false);
+      console.log('[Library] Fetch state transition: loading finished');
+    }
+  }, [handleError, fetchedSlugs]);
 
   // Update folder color
   const updateFolderColor = useCallback(async (folderId: number, newColor: string) => {
@@ -419,6 +486,81 @@ export default function LibraryScreen() {
       setIsSearchingRecipes(false);
     }
   }, [session?.user]);
+
+  // Duplicate shared folder for the current user
+  const duplicateSharedFolder = useCallback(async (slug: string) => {
+    if (!session?.user) {
+      handleError('Authentication Required', 'Please log in to save this folder to your library.');
+      return;
+    }
+
+    setIsDuplicatingFolder(true);
+    setDuplicationSuccess(false);
+
+    try {
+      console.log('[Library] Duplicating shared folder:', slug);
+      
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+      const response = await fetch(`${backendUrl}/api/duplicate-folder/${slug}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: session.user.id
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Failed to duplicate folder: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('[Library] Folder duplication successful:', result);
+
+      setDuplicationSuccess(true);
+      
+      // Refresh the saved folders to show the new folder
+      await fetchSavedFolders();
+      
+      // Show success message
+      Alert.alert(
+        'Folder Saved!',
+        `"${result.newFolder.name}" has been added to your library with ${result.newFolder.recipeCount} recipe${result.newFolder.recipeCount !== 1 ? 's' : ''}.`,
+        [
+          {
+            text: 'View Library',
+            onPress: () => {
+              // Clear shared folder data to return to normal library view
+              setSharedFolderData(null);
+              setDuplicationSuccess(false);
+            }
+          }
+        ]
+      );
+
+    } catch (error) {
+      console.error('[Library] Error duplicating shared folder:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save folder';
+      handleError('Error Saving Folder', errorMessage);
+    } finally {
+      setIsDuplicatingFolder(false);
+    }
+  }, [session, handleError, fetchSavedFolders]);
+
+  // Handle deep link slug loading
+  useEffect(() => {
+    if (slug && !fetchedSlugs.has(slug) && !isLoadingSharedFolder) {
+      console.log('[Library] Deep link slug detected:', slug);
+      console.log('[Library] Fetch conditions:', {
+        hasSlug: !!slug,
+        alreadyFetched: fetchedSlugs.has(slug),
+        isLoading: isLoadingSharedFolder
+      });
+      fetchSharedFolder(slug);
+    }
+  }, [slug]); // Only depend on slug, not fetchSharedFolder to prevent loops
 
   // Load data on focus (Saved only)
   useFocusEffect(
@@ -700,6 +842,137 @@ export default function LibraryScreen() {
 
   // Render saved content
   const renderSavedContent = () => {
+    // Show loading for shared folder
+    if (isLoadingSharedFolder) {
+      return (
+        <View style={styles.centered}>
+          <ActivityIndicator
+            size="large"
+            color="black"
+          />
+          <Text style={styles.emptyText}>Loading shared folder...</Text>
+        </View>
+      );
+    }
+
+    // Show shared folder error
+    if (sharedFolderError) {
+      return (
+        <View style={styles.emptyContainer}>
+          <MaterialCommunityIcons
+            name="alert-circle-outline"
+            size={48}
+            color={COLORS.lightGray}
+          />
+          <Text style={styles.emptyText}>Couldn't load shared folder</Text>
+          <Text style={styles.emptySubtext}>{sharedFolderError}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => slug && fetchSharedFolder(slug)}
+          >
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    // Show shared folder data if available
+    if (sharedFolderData) {
+      console.log('[Library] Rendering shared folder data:', {
+        hasData: !!sharedFolderData,
+        kind: sharedFolderData.kind,
+        title: sharedFolderData.title,
+        recipeCount: sharedFolderData.recipes?.length || 0
+      });
+      
+      return (
+        <View style={styles.savedContent}>
+          <View style={styles.sharedFolderHeader}>
+            <Text style={styles.sharedFolderTitle}>
+              {sharedFolderData.title || sharedFolderData.folder_data?.name || 'Shared Folder'}
+            </Text>
+            <Text style={styles.sharedFolderSubtitle}>
+              {sharedFolderData.recipes?.length || sharedFolderData.folder_data?.recipe_count || 0} recipe{(sharedFolderData.recipes?.length || sharedFolderData.folder_data?.recipe_count || 0) !== 1 ? 's' : ''}
+            </Text>
+            
+            {/* Duplication button */}
+            {!duplicationSuccess && (
+              <TouchableOpacity
+                style={[
+                  styles.duplicateButton,
+                  isDuplicatingFolder && styles.duplicateButtonDisabled
+                ]}
+                onPress={() => slug && duplicateSharedFolder(slug)}
+                disabled={isDuplicatingFolder || !session?.user}
+              >
+                {isDuplicatingFolder ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <>
+                    <MaterialCommunityIcons 
+                      name="content-copy" 
+                      size={16} 
+                      color="white" 
+                      style={styles.duplicateButtonIcon}
+                    />
+                    <Text style={styles.duplicateButtonText}>
+                      {session?.user ? 'Save this folder to your Library' : 'Log in to save this folder'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+            
+            {duplicationSuccess && (
+              <View style={styles.duplicationSuccessContainer}>
+                <MaterialCommunityIcons 
+                  name="check-circle" 
+                  size={20} 
+                  color={COLORS.success} 
+                />
+                <Text style={styles.duplicationSuccessText}>
+                  Folder saved to your Library!
+                </Text>
+              </View>
+            )}
+          </View>
+          
+          {/* Show shared recipes if available */}
+          {sharedFolderData.recipes && sharedFolderData.recipes.length > 0 ? (
+            <FlatList
+              data={sharedFolderData.recipes}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.exploreCard}
+                  onPress={() => navigateToRecipe(item)}
+                >
+                  <View style={styles.imageContainer}>
+                    {item.image && (
+                      <FastImage
+                        source={{ uri: item.image }}
+                        style={styles.exploreCardImage}
+                      />
+                    )}
+                  </View>
+                  <View style={styles.titleContainer}>
+                    <Text style={styles.exploreCardTitle} numberOfLines={3}>
+                      {item.title}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+              keyExtractor={(item, index) => `shared-${item.id || index}`}
+              contentContainerStyle={styles.listContent}
+            />
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No recipes in this shared folder</Text>
+            </View>
+          )}
+        </View>
+      );
+    }
+
     if (isSavedLoading) {
       return (
         <ActivityIndicator
@@ -1486,5 +1759,63 @@ const styles = StyleSheet.create({
     ...bodyStrongText,
     color: COLORS.textDark,
     textAlign: 'center',
+  } as TextStyle,
+
+  // Shared folder styles
+  sharedFolderHeader: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.surface,
+    marginBottom: SPACING.md,
+  } as ViewStyle,
+  sharedFolderTitle: {
+    ...bodyStrongText,
+    fontSize: FONT.size.sectionHeader,
+    color: COLORS.textDark,
+    marginBottom: SPACING.xs,
+  } as TextStyle,
+  sharedFolderSubtitle: {
+    ...bodyText,
+    fontSize: FONT.size.body,
+    color: COLORS.textMuted,
+    marginBottom: SPACING.md,
+  } as TextStyle,
+  duplicateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.md,
+    marginTop: SPACING.sm,
+  } as ViewStyle,
+  duplicateButtonDisabled: {
+    backgroundColor: COLORS.lightGray,
+  } as ViewStyle,
+  duplicateButtonIcon: {
+    marginRight: SPACING.xs,
+  },
+  duplicateButtonText: {
+    ...bodyStrongText,
+    fontSize: FONT.size.body,
+    color: 'white',
+  } as TextStyle,
+  duplicationSuccessContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.successLight,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.md,
+    marginTop: SPACING.sm,
+  } as ViewStyle,
+  duplicationSuccessText: {
+    ...bodyStrongText,
+    fontSize: FONT.size.body,
+    color: COLORS.success,
+    marginLeft: SPACING.xs,
   } as TextStyle,
 }); 

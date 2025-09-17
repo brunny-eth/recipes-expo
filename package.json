@@ -6,6 +6,8 @@
     "dev": "EXPO_NO_TELEMETRY=1 expo start",
     "build:web": "expo export --platform web",
     "lint": "expo lint",
+    "test": "vitest",
+    "test:run": "vitest run",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "start": "expo start --dev-client",
@@ -116,7 +118,8 @@
     "eslint-config-expo": "~9.2.0",
     "metro-react-native-babel-transformer": "^0.77.0",
     "ts-node": "^10.9.2",
-    "typescript": "~5.8.3"
+    "typescript": "~5.8.3",
+    "vitest": "^2.1.8"
   },
   "overrides": {
     "simple-swizzle": "0.2.2"

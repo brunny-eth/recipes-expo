@@ -250,6 +250,7 @@ export default function RecipeSummaryScreen() {
     inputType?: string;
     folderId?: string; // Add folderId for saved recipes
     recipeId?: string; // Add recipeId for ID-based loading
+    slug?: string; // Add slug for deep link support
   }>();
   const router = useRouter();
   const { session } = useAuth();
@@ -276,7 +277,11 @@ export default function RecipeSummaryScreen() {
   const from = params.from; // Store from
   const isModified = params.isModified; // Store isModified
   const finalYield = params.finalYield; // Store finalYield
+  const slug = params.slug; // Store slug for deep link support
   const numericId = Number(recipeId);
+  
+  // Track fetched slugs to prevent re-fetching
+  const [fetchedSlugs, setFetchedSlugs] = useState<Set<string>>(new Set());
   
   // Get the actual recipe ID (from param or recipe object)
   const getRecipeId = () => {
@@ -737,6 +742,59 @@ export default function RecipeSummaryScreen() {
   // ✅ FIX: Modified useEffect to fetch by ID when recipeData is missing
   useEffect(() => {
     const loadRecipe = async () => {
+      // Handle deep link slug first
+      if (slug && !fetchedSlugs.has(slug)) {
+        try {
+          console.log('[Summary] Loading recipe from deep link slug:', slug);
+          console.log('[Summary] Fetch conditions:', {
+            hasSlug: !!slug,
+            alreadyFetched: fetchedSlugs.has(slug)
+          });
+          setIsLoading(true);
+          
+          // Mark this slug as fetched to prevent re-fetching
+          setFetchedSlugs(prev => new Set(prev).add(slug));
+          
+          const sharedRecipe = await fetchSharedRecipe(slug);
+          console.log('[Summary] fetchSharedRecipe result:', {
+            hasRecipe: !!sharedRecipe,
+            recipeId: sharedRecipe?.id,
+            recipeTitle: sharedRecipe?.title,
+            recipeKeys: sharedRecipe ? Object.keys(sharedRecipe) : []
+          });
+          
+          if (sharedRecipe) {
+            setRecipe(sharedRecipe);
+            setOriginalRecipe(sharedRecipe); // Set original recipe for allergens detection
+            setImageLoadFailed(false);
+            
+            // Set the unscaled ingredient groups for scaling calculations
+            setUnscaledIngredientGroups(sharedRecipe.ingredientGroups ? [...sharedRecipe.ingredientGroups] : []);
+            setBaselineScaleFactor(1);
+            setSelectedScaleFactor(1);
+            
+            // Set original yield value for scaling
+            const yieldNum = parseServingsValue(sharedRecipe.recipeYield);
+            setOriginalYieldValue(yieldNum);
+            
+            console.log('[Summary] Successfully loaded shared recipe:', sharedRecipe.title);
+            console.log('[Summary] Set unscaled ingredient groups:', {
+              count: sharedRecipe.ingredientGroups?.length || 0,
+              groups: sharedRecipe.ingredientGroups?.map(g => g.name) || []
+            });
+            console.log('[Summary] Set original recipe for allergens detection');
+          } else {
+            throw new Error('No recipe data found in share');
+          }
+        } catch (error) {
+          console.error('[Summary] Error loading shared recipe:', error);
+          handleError('Error Loading Shared Recipe', 'This shared recipe could not be loaded. It may have been deleted or the link may be invalid.');
+        } finally {
+          setIsLoading(false);
+        }
+        return;
+      }
+      
       if (params.recipeData) {
         // Legacy path: parse recipeData from params
         try {
@@ -986,7 +1044,7 @@ export default function RecipeSummaryScreen() {
       handleError('Error Loading Summary', error);
       setIsLoading(false);
     });
-  }, [params.recipeData, params.appliedChanges, numericId, entryPoint]); // Removed fetchCanonicalById and handleError dependencies
+  }, [params.recipeData, params.appliedChanges, numericId, entryPoint, slug]); // Only depend on slug, not fetchSharedRecipe to prevent loops
 
   // Initialize title state when recipe is loaded
   useEffect(() => {
@@ -1015,6 +1073,52 @@ export default function RecipeSummaryScreen() {
     setPendingTitleSave(null);
     setIsSavingTitle(false);
     setIsEditingTitle(false);
+  }, []);
+
+  // Fetch shared recipe data by slug
+  const fetchSharedRecipe = useCallback(async (slug: string): Promise<ParsedRecipe | null> => {
+    try {
+      console.log('[Summary] Fetching shared recipe:', slug);
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+      const response = await fetch(`${backendUrl}/api/public-shares/${slug}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch shared recipe: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('[Summary] API response raw:', JSON.stringify(data, null, 2));
+      console.log('[Summary] Shared recipe data received:', { 
+        hasData: !!data, 
+        type: data?.type,
+        kind: data?.kind,
+        hasRecipeData: !!data?.recipe_data,
+        hasDirectRecipeData: !!(data?.id && data?.title)
+      });
+      
+      // Debug logging for ingredient groups
+      console.log('[DEBUG] keys of API response:', Object.keys(data));
+      console.log('[DEBUG] ingredientGroups length:', data.ingredientGroups?.length);
+      console.log('[DEBUG] ingredientGroups structure:', data.ingredientGroups?.map((g: any) => ({
+        name: g.name,
+        ingredientCount: g.ingredients?.length || 0
+      })));
+      
+      // The API returns recipe data directly, not wrapped in recipe_data
+      // Check if it's a direct recipe object or wrapped
+      if (data?.id && data?.title) {
+        // Direct recipe object
+        return data;
+      } else if (data?.recipe_data) {
+        // Wrapped in recipe_data property
+        return data.recipe_data;
+      } else {
+        return null;
+      }
+    } catch (error) {
+      console.error('[Summary] Error fetching shared recipe:', error);
+      throw error;
+    }
   }, []);
 
   // API helper functions for title editing
@@ -3322,6 +3426,7 @@ export default function RecipeSummaryScreen() {
       <PaywallModal
         visible={showPremiumModal}
         onClose={() => setShowPremiumModal(false)}
+        onSubscribed={() => setShowPremiumModal(false)}
       />
       </View>
     </PanGestureHandler>

@@ -292,14 +292,14 @@ function parseIngredientString(ingredientString: string): {
   if (amount === null) {
     // Enhanced amount extraction patterns with better approximation and range handling
     const amountExtractionPatterns = [
-      // Approximation prefix with tilde: "~2", "~ 1.5"
-      /^(~\s*\d+(?:\.\d+)?(?:\s+\d+\/\d+)?)\s+/,
-      // Complex approximations with amounts: "about 1 1/2", "roughly 2.5", "approximately 3"
-      /^((?:about|approximately|roughly|around|nearly|almost)\s+\d+(?:\s+\d+\/\d+|\.\d+)?)\s+/i,
+      // Approximation prefix with tilde: "~2", "~ 1.5" - extract just the amount part
+      /^~\s*(\d+(?:\.\d+)?(?:\s+\d+\/\d+)?)\s+/,
+      // Complex approximations with amounts: "about 1 1/2", "roughly 2.5", "approximately 3" - extract just the amount part
+      /^(?:about|approximately|roughly|around|nearly|almost)\s+(\d+(?:\s+\d+\/\d+|\.\d+)?)\s+/i,
       // Ranges with various separators: "1-2", "2 to 3", "1–2" (en dash), "1—2" (em dash)
       /^(\d+(?:\.\d+)?\s*(?:[-–—]|to)\s*\d+(?:\.\d+)?)\s+/i,
       // Compound measurements: "1 14.5 oz", "2 16 fl oz" (amount + size + unit)
-      /^(\d+)\s+(\d+(?:\.\d+)?)\s+(oz|fl\s*oz|lb|g|kg)\s+/i,
+      /^(\d+)\s+(\d+(?:\.\d+)?)\s+(oz|fl\s*oz|lb|g|kg)\s+(can|jar|bottle|bag|box|package|container)\s+/i,
       // Unicode fractions: "½", "1½", "2¾"
       /^(\d*[¼½¾⅐⅑⅒⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞])\s+/,
       // Mixed fractions: "1 1/2", "2 3/4", "1 2/16"
@@ -316,18 +316,22 @@ function parseIngredientString(ingredientString: string): {
       const match = workingString.match(pattern);
       if (match) {
         // Handle compound measurements specially
-        if (match[2] && match[3]) {
+        if (match[2] && match[3] && match[4]) {
           // This is a compound measurement like "1 14.5 oz can"
           amount = match[1].trim(); // Just the count (1)
-          // Reconstruct the remaining text with the size and unit preserved
-          remainingText = `${match[2]} ${match[3]} ${workingString.substring(match[0].length)}`.trim();
+          // Reconstruct the remaining text with the size, unit, and container preserved
+          remainingText = `${match[2]} ${match[3]} ${match[4]} ${workingString.substring(match[0].length)}`.trim();
           if (process.env.NODE_ENV === 'development') {
             console.log('[ingredientHelpers] 📦 Extracted compound measurement:', {
               count: amount,
+              size: match[2],
+              unit: match[3],
+              container: match[4],
               remaining: remainingText
             });
           }
         } else {
+          // For approximation patterns, match[1] contains just the amount part
           amount = match[1].trim();
           remainingText = workingString.substring(match[0].length).trim();
           if (process.env.NODE_ENV === 'development') {
@@ -356,6 +360,8 @@ function parseIngredientString(ingredientString: string): {
       /^(\d+(?:\.\d+)?\s+(?:oz|fl\s*oz|lb|g|kg)\s+(?:can|jar|bottle|bag|box|package|container))\b/i,
       // Weight ounces (not fluid): "ounces", "oz" when not preceded by "fl"
       /^(ounces?|oz)(?!\s+(?:can|jar|bottle|bag|box|package|container))\b/i,
+      // Units with periods: "tsp.", "tbsp.", "lb.", "oz.", "fl. oz."
+      /^(tsp\.|tbsp\.|lb\.|oz\.|fl\.\s*oz\.|ml\.|l\.|g\.|kg\.|pound\.|ounce\.|teaspoon\.|tablespoon\.|milliliter\.|liter\.|gram\.|kilogram\.)\b/i,
       // Standard unit pattern for all other units
       null // Will be filled below
     ];
@@ -371,20 +377,28 @@ function parseIngredientString(ingredientString: string): {
       if (unitMatch) {
         const rawUnit = unitMatch[1];
         
+        // Clean up periods from units before normalization
+        const cleanedUnit = rawUnit.replace(/\.$/, ''); // Remove trailing period
+        
         // Special handling for compound units
-        if (rawUnit.includes(' ') && /\d/.test(rawUnit)) {
+        if (cleanedUnit.includes(' ') && /\d/.test(cleanedUnit)) {
           // This is a compound unit like "14.5 oz can"
-          unit = normalizeUnit(rawUnit);
+          unit = normalizeUnit(cleanedUnit);
           if (!unit) {
             // If normalization failed, preserve the compound unit as-is
-            unit = rawUnit.toLowerCase().replace(/\s+/g, ' ');
+            unit = cleanedUnit.toLowerCase().replace(/\s+/g, ' ');
           }
         } else {
           // Standard unit normalization
-          unit = normalizeUnit(rawUnit);
+          unit = normalizeUnit(cleanedUnit);
         }
         
         finalName = remainingText.substring(unitMatch[0].length).trim();
+        
+        // Clean up any leftover periods from unit extraction
+        if (finalName.startsWith('. ')) {
+          finalName = finalName.substring(2).trim();
+        }
         
         if (process.env.NODE_ENV === 'development') {
           console.log('[ingredientHelpers] 📏 Extracted unit:', {
@@ -463,6 +477,11 @@ function parseIngredientString(ingredientString: string): {
 }
 
 // === EXPORT UPDATED FUNCTIONS ===
+
+/**
+ * Export parseIngredientString for use in other modules
+ */
+export { parseIngredientString };
 
 /**
  * Coerces an array of mixed ingredient types (string or StructuredIngredient objects)
@@ -564,8 +583,10 @@ export const coerceToIngredientGroups = (
 };
 
 /**
+ * Frontend parser for substitutions/removals (gentle cleaning for UI).
  * Parses an ingredient display name for RECIPE DISPLAY purposes.
  * Detects removal and substitution markers without aggressive cleaning.
+ * Used for recipe UI operations like change tracking, substitution handling, and display logic.
  */
 export function parseRecipeDisplayName(name: string): { 
   baseName: string; 
@@ -687,177 +708,6 @@ export function parseRecipeDisplayName(name: string): {
   };
 }
 
-/**
- * Parses an ingredient display name for GROCERY LIST purposes.
- * Aggressively cleans and normalizes ingredient names.
- */
-export function parseIngredientDisplayName(name: string): {
-  baseName: string;
-  substitutionText: string | null;
-  isRemoved?: boolean;
-  substitutedFor?: string | null;
-} {
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[ingredientHelpers] 🔄 Parsing GROCERY ingredient name:', name);
-  }
-
-  // Fix for egg pluralization issue - return egg names unchanged
-  if (name.toLowerCase().includes('egg')) {
-    return {
-      baseName: name,
-      substitutionText: null,
-      isRemoved: false,
-      substitutedFor: null
-    };
-  }
-  
-  // Handle null/undefined input
-  if (!name) {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[ingredientHelpers] ⚠️ Empty ingredient name');
-    }
-    return { baseName: '', substitutionText: null };
-  }
-
-  // Split on substitution markers, but be smarter about compound ingredient names
-  const substitutionMarkers = [' or ', ' (or ', ' / ', ' OR '];
-  let baseName = name;
-  let substitutionText = null;
-
-  for (const marker of substitutionMarkers) {
-    if (name.includes(marker)) {
-      const parts = name.split(marker);
-      const firstPart = parts[0].trim();
-      const secondPart = parts.slice(1).join(marker).trim();
-
-      // Special case: Handle "fresh or frozen" and similar patterns
-      // These are not substitutions but describe equally valid forms of the same ingredient
-      const freshFrozenPatterns = [
-        { first: 'fresh', second: 'frozen' },
-        { first: 'frozen', second: 'fresh' },
-        { first: 'dried', second: 'fresh' },
-        { first: 'fresh', second: 'dried' },
-        { first: 'canned', second: 'fresh' },
-        { first: 'fresh', second: 'canned' }
-      ];
-
-      for (const pattern of freshFrozenPatterns) {
-        if (firstPart.toLowerCase() === pattern.first && secondPart.toLowerCase().startsWith(pattern.second)) {
-          baseName = name; // Keep the full name as-is
-          substitutionText = null;
-          console.log('[ingredientHelpers] 🥬 DEBUG: Preserving compound ingredient name:', {
-            originalName: name,
-            firstPart,
-            secondPart,
-            pattern,
-            result: baseName
-          });
-          break;
-        }
-      }
-
-      // If we found a preserved pattern, break out of the marker loop
-      if (baseName === name && substitutionText === null) {
-        break;
-      }
-
-      // Special case: If first part is just "champagne" and second part contains "vinegar",
-      // treat this as a compound ingredient name, not a substitution
-      if (firstPart.toLowerCase() === 'champagne' && secondPart.toLowerCase().includes('vinegar')) {
-        baseName = name; // Keep the full name as-is
-        substitutionText = null;
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[ingredientHelpers] 🍾 Preserving compound vinegar name:', name);
-        }
-        break;
-      }
-
-      // Special case: If both parts contain "paprika", treat this as a compound ingredient name
-      if (firstPart.toLowerCase().includes('paprika') || secondPart.toLowerCase().includes('paprika')) {
-        baseName = name; // Keep the full name as-is
-        substitutionText = null;
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[ingredientHelpers] 🌶️ Preserving compound paprika name:', name);
-        }
-        break;
-      }
-
-      // Special case: If the ingredient contains "half & half", treat this as a compound ingredient name
-      if (name.toLowerCase().includes('half & half') || name.toLowerCase().includes('half and half')) {
-        baseName = name; // Keep the full name as-is
-        substitutionText = null;
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[ingredientHelpers] 🥛 Preserving compound half & half name:', name);
-        }
-        break;
-      }
-
-      baseName = firstPart;
-      substitutionText = secondPart;
-      // Remove trailing parenthesis if present
-      if (substitutionText.endsWith(')')) {
-        substitutionText = substitutionText.slice(0, -1).trim();
-      }
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[ingredientHelpers] 🔍 Found substitution:', {
-          marker,
-          baseName,
-          substitutionText
-        });
-      }
-      break;
-    }
-  }
-
-  // Clean up any parenthetical notes (for grocery normalization)
-  const parenMatch = baseName.match(/^(.*?)\s*\(.*\)\s*$/);
-  if (parenMatch) {
-    baseName = parenMatch[1].trim();
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[ingredientHelpers] 🧹 Cleaned parenthetical for grocery:', baseName);
-    }
-  }
-  
-  // Preserve important combinations that should not be modified
-  // This is a simplified version of the PRESERVED_COMBINATIONS logic
-  const preservedCombinations = [
-    'golden potatoes', 'red potatoes', 'small potatoes', 'baby potatoes', 'fingerling potatoes',
-    'russet potatoes', 'yukon gold potatoes', 'sweet potatoes', 'purple potatoes', 'white potatoes',
-    'all purpose flour', 'all-purpose flour', 'unbleached all purpose flour', 'unbleached all-purpose flour'
-  ];
-  
-  const lowerBaseName = baseName.toLowerCase();
-  for (const combination of preservedCombinations) {
-    if (lowerBaseName.includes(combination)) {
-      // Keep the original case from the input
-      const originalCase = baseName.match(new RegExp(combination, 'i'))?.[0];
-      if (originalCase) {
-        baseName = originalCase;
-        if (process.env.NODE_ENV === 'development') {
-          console.log('[ingredientHelpers] 🛡️ Preserved combination:', combination);
-        }
-        break;
-      }
-    }
-  }
-
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[ingredientHelpers] ✅ GROCERY parsed result:', {
-      baseName,
-      substitutionText
-    });
-  }
-  
-  // For grocery context, we don't need removal/substitution detection
-  const substitutedFor = substitutionText;
-
-  return { 
-    baseName, 
-    substitutionText,
-    isRemoved: false, // Grocery context doesn't care about removals
-    substitutedFor
-  };
-}
 
 // Removed parseCanonicalIngredientName function - functionality moved to
 // normalizeName in groceryHelpers.ts for better consistency

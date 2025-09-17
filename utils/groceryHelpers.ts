@@ -1,8 +1,8 @@
 import { CombinedParsedRecipe, StructuredIngredient } from '../common/types';
-import { parseIngredientDisplayName } from './ingredientHelpers';
 import { parseAmountString } from './recipeUtils';
 import { formatMeasurement } from './format';
 import { convertUnits, availableUnits, Unit, getUnitDisplayName } from './units';
+import { parseIngredientString } from './ingredientHelpers';
 
 /**
  * Converts decimal amounts to readable fractions for grocery list display
@@ -58,19 +58,19 @@ const INGREDIENT_ALIASES: Record<string, string> = {
   'chicken egg': 'eggs',
   'chicken eggs': 'eggs',
   
-  // Flour variations
-  'flour': 'all purpose flour',
-  'plain flour': 'all purpose flour',
-  'white flour': 'all purpose flour',
+  // Flour variations - PRESERVE specific flour types, only collapse generic terms
+  // REMOVED: 'flour': 'all purpose flour' - too broad, affects specific flour types
+  'plain flour': 'all purpose flour', // True synonym for all purpose flour
+  'white flour': 'all purpose flour', // True synonym for all purpose flour
   'all-purpose flour': 'all purpose flour', // Handle hyphenated version
   'all purpose flour': 'all purpose flour', // Keep canonical form
   
-  // Tomato variations
-  'roma tomato': 'tomato',
-  'roma tomatoes': 'tomatoes',
-  'cherry tomato': 'cherry tomatoes',
-  'grape tomato': 'grape tomatoes',
-  'plum tomato': 'plum tomatoes',
+  // Tomato variations - PRESERVE varieties and preparation forms for cooking distinctions
+  // REMOVED: 'roma tomato': 'tomato' - roma tomatoes are distinct from regular tomatoes
+  // REMOVED: 'roma tomatoes': 'tomatoes' - preserve variety name
+  // REMOVED: 'cherry tomato': 'cherry tomatoes' - preserve variety name  
+  // REMOVED: 'grape tomato': 'grape tomatoes' - preserve variety name
+  // REMOVED: 'plum tomato': 'plum tomatoes' - preserve variety name
   
   // Pepper variations
   'bell peppers': 'bell pepper',
@@ -103,16 +103,17 @@ const INGREDIENT_ALIASES: Record<string, string> = {
   'grated cheese': 'cheese',
   'sliced cheese': 'cheese',
   
-  // Oil variations
-  'cooking oil': 'oil',
-  'vegetable cooking oil': 'vegetable oil',
-  'extra virgin olive oil': 'olive oil',
-  'evoo': 'olive oil',
+  // Oil variations - PRESERVE oil types for cooking distinctions
+  'cooking oil': 'oil', // Generic cooking oil can be collapsed
+  'vegetable cooking oil': 'vegetable oil', // Preserve vegetable oil type
+  'extra virgin olive oil': 'olive oil', // Safe collapse: EVOO → olive oil
+  'evoo': 'olive oil', // Safe collapse: EVOO → olive oil
+  // PRESERVED: sesame oil, canola oil, vegetable oil, coconut oil, avocado oil - these are distinct
   
-  // Common ingredient variations and cleanup
-  'diced tomatoes': 'tomatoes', // Preserve plural for canned tomatoes
-  'crushed tomatoes': 'tomatoes',
-  'whole tomatoes': 'tomatoes',
+  // Common ingredient variations and cleanup - PRESERVE preparation forms
+  // REMOVED: 'diced tomatoes': 'tomatoes' - diced tomatoes are distinct from whole tomatoes
+  // REMOVED: 'crushed tomatoes': 'tomatoes' - crushed tomatoes are distinct from whole tomatoes  
+  // REMOVED: 'whole tomatoes': 'tomatoes' - whole tomatoes are distinct from diced/crushed
   'cherry tomatoes': 'cherry tomatoes', // Keep specific type
   'grape tomatoes': 'grape tomatoes', // Keep specific type
   
@@ -124,18 +125,18 @@ const INGREDIENT_ALIASES: Record<string, string> = {
   'ground pork': 'ground pork',
   'ground lamb': 'ground lamb',
   
-  // Salt variations - normalize all to base "salt"
-  'kosher salt': 'salt',
-  'sea salt': 'salt', 
-  'fine salt': 'salt',
-  'coarse salt': 'salt',
-  'table salt': 'salt',
-  'iodized salt': 'salt',
-  'himalayan salt': 'salt',
-  'pink salt': 'salt',
-  'rock salt': 'salt',
-  'celtic salt': 'salt',
-  'flaky salt': 'salt',
+  // Salt variations - PRESERVE meaningful salt types for cooking distinctions
+  // REMOVED: 'kosher salt': 'salt' - kosher salt is distinct from table salt
+  // REMOVED: 'sea salt': 'salt' - sea salt is distinct from table salt
+  // REMOVED: 'fine salt': 'salt' - fine salt is distinct from coarse salt
+  // REMOVED: 'coarse salt': 'salt' - coarse salt is distinct from fine salt
+  // REMOVED: 'table salt': 'salt' - table salt is distinct from kosher/sea salt
+  'iodized salt': 'table salt', // Only collapse trivial spelling variant
+  // REMOVED: 'himalayan salt': 'salt' - himalayan salt is distinct
+  // REMOVED: 'pink salt': 'salt' - pink salt is distinct
+  // REMOVED: 'rock salt': 'salt' - rock salt is distinct
+  // REMOVED: 'celtic salt': 'salt' - celtic salt is distinct
+  // REMOVED: 'flaky salt': 'salt' - flaky salt is distinct
 
   // Mustard variations - normalize grainy types to "grainy mustard"
   'grain mustard': 'grainy mustard',
@@ -155,6 +156,10 @@ const INGREDIENT_ALIASES: Record<string, string> = {
   'balsamic vinegar': 'balsamic vinegar',
   'rice vinegar': 'rice vinegar',
 
+  // Legume synonyms - collapse true synonyms
+  'garbanzo beans': 'chickpeas', // True synonym for chickpeas
+  'garbanzo bean': 'chickpeas',
+  
   // Unit-based cleanup (remove unit words from ingredient names)
   'fluid ounces': '', // Remove when it appears in ingredient name
   'ounces': '', // Remove when it appears in ingredient name
@@ -168,6 +173,11 @@ const PRESERVED_COMBINATIONS = new Set([
   'shredded cheese', 'grated cheese', 'sliced cheese',
   'smoked salmon', 'smoked paprika', 'smoked salt', 'smoked bacon',
   'roasted red peppers', 'roasted tomatoes', 'roasted garlic',
+  'roasted tomatos', // Handle misspelling
+  'fire-roasted tomatoes', 'fire roasted tomatoes',
+  'fire-roasted tomatos', 'fire roasted tomatos', // Handle misspelling
+  'diced fire-roasted tomatoes', 'diced fire roasted tomatoes',
+  'diced fire-roasted tomatos', 'diced fire roasted tomatos', // Handle misspelling
   'sun dried tomatoes', 'sun dried',
   'toasted nuts', 'toasted seeds', 'toasted bread',
   'aged cheddar', 'aged cheese',
@@ -179,17 +189,55 @@ const PRESERVED_COMBINATIONS = new Set([
   'heavy cream', 'light cream', 'sour cream', 'whipped cream',
   'cottage cheese', 'cream cheese', 'goat cheese', 'blue cheese',
   'green beans', 'black beans', 'kidney beans', 'navy beans',
-  'bell pepper', 'hot pepper', 'chili pepper',
-  'olive oil', 'vegetable oil', 'canola oil', 'sesame oil', 'coconut oil',
+  // Pepper varieties - PRESERVE varietal names for cooking distinctions
+  'bell pepper', 'hot pepper', 'chili pepper', 'jalapeño pepper', 'jalapeño peppers', 'poblano pepper', 'poblano peppers',
+  'serrano pepper', 'serrano peppers', 'habanero pepper', 'habanero peppers', 'anaheim pepper', 'anaheim peppers',
+  'cayenne pepper', 'cayenne peppers', 'chipotle pepper', 'chipotle peppers', 'banana pepper', 'banana peppers',
+  'sweet pepper', 'sweet peppers', 'red pepper', 'red peppers', 'green pepper', 'green peppers', 'yellow pepper', 'yellow peppers',
+  // Onion descriptors - PRESERVE color/variety distinctions
+  'red onion', 'yellow onion', 'white onion', 'sweet onion', 'vidalia onion', 'spanish onion',
+  'olive oil', 'vegetable oil', 'canola oil', 'sesame oil', 'coconut oil', 'avocado oil',
   'red wine vinegar', 'white wine vinegar', 'apple cider vinegar', 'balsamic vinegar',
   'soy sauce', 'hot sauce', 'barbecue sauce', 'tomato sauce',
   'chicken broth', 'beef broth', 'vegetable broth',
   'greek yogurt', 'plain yogurt',
-  'golden potatoes', 'red potatoes', 'small potatoes', 'baby potatoes', 'fingerling potatoes',
-  'russet potatoes', 'yukon gold potatoes', 'sweet potatoes', 'purple potatoes', 'white potatoes',
+  // Potato varieties - PRESERVE varietal names for cooking distinctions
+  'golden potato', 'golden potatoes', 'red potato', 'red potatoes', 'small potatoes', 'baby potatoes', 'fingerling potato', 'fingerling potatoes',
+  'russet potato', 'russet potatoes', 'yukon gold potato', 'yukon gold potatoes', 'sweet potato', 'sweet potatoes', 'purple potato', 'purple potatoes', 'white potato', 'white potatoes',
+  // Tomato varieties and preparation forms - PRESERVE for cooking distinctions
+  'roma tomato', 'roma tomatoes', 'cherry tomato', 'cherry tomatoes', 'grape tomato', 'grape tomatoes',
+  'plum tomato', 'plum tomatoes', 'beefsteak tomato', 'beefsteak tomatoes',
+  'diced tomatoes', 'crushed tomatoes', 'whole tomatoes', 'canned tomatoes', 'fresh tomatoes',
+  // Apple varieties - PRESERVE varietal names for cooking distinctions
+  'granny smith apple', 'granny smith apples', 'honeycrisp apple', 'honeycrisp apples', 'gala apple', 'gala apples',
+  'fuji apple', 'fuji apples', 'red delicious apple', 'red delicious apples', 'golden delicious apple', 'golden delicious apples',
+  'pink lady apple', 'pink lady apples', 'braeburn apple', 'braeburn apples', 'cortland apple', 'cortland apples',
   'mini cucumbers',
   'fresh or frozen', 'frozen or fresh', 'fresh or dried', 'dried or fresh',
-  'fresh or canned', 'canned or fresh'
+  'fresh or canned', 'canned or fresh',
+  // Salt types - PRESERVE meaningful salt distinctions
+  'kosher salt', 'sea salt', 'table salt', 'flaky salt', 'pink salt', 'himalayan salt',
+  'rock salt', 'celtic salt', 'fine salt', 'coarse salt',
+  // Herb varieties - PRESERVE varietal names for cooking distinctions
+  'flat leaf parsley', 'curly parsley', 'italian parsley', 'flat leaf basil', 'thai basil',
+  'purple basil', 'lemon basil', 'mint', 'spearmint', 'peppermint', 'chocolate mint',
+  'oregano', 'greek oregano', 'mexican oregano', 'thyme', 'lemon thyme', 'english thyme',
+  'rosemary', 'sage', 'dill', 'cilantro', 'coriander', 'tarragon', 'chives', 'garlic chives',
+  'marjoram', 'chervil', 'bay leaves', 'laurel leaves',
+  // Citrus & Fruit Varietals - PRESERVE specific citrus and fruit types
+  'meyer lemon', 'meyer lemons', 'blood orange', 'blood oranges', 'key lime', 'key limes',
+  'valencia orange', 'valencia oranges', 'plantain', 'plantains',
+  // Rice & Grain Varietals - PRESERVE specific rice and grain types
+  'basmati rice', 'jasmine rice', 'arborio rice', 'sushi rice', 'wild rice',
+  'red quinoa', 'white quinoa', 'black quinoa',
+  // Flour Varietals - PRESERVE specific flour types
+  'bread flour', 'cake flour', '00 flour', 'self rising flour', 'self-rising flour',
+  // Legume Varietals - PRESERVE specific lentil and bean types
+  'red lentils', 'green lentils', 'french lentils', 'black lentils',
+  // Specialty Salts - PRESERVE specific salt types
+  'maldon salt', 'fleur de sel', 'smoked salt',
+  // Specialty Sugars - PRESERVE specific sugar types
+  'turbinado sugar', 'demerara sugar', 'coconut sugar'
 ]);
 
 /**
@@ -202,8 +250,11 @@ const REMOVABLE_ADJECTIVES = new Set([
   'large', 'medium', 'small', 'jumbo', 'extra', 'super', 'mini', 'baby',
   'ripe', 'unripe', 'organic', 'natural', 'wild', 'free-range', 'grass-fed',
   'whole', 'half', 'quarter', 'thick', 'thin', 'regular',
+  // REMOVED color descriptors that are important for ingredient identification:
+  // 'green', 'red', 'yellow', 'white' - these are preserved for onions, peppers, etc.
   'cubed', 'drained', 'flaked', 'melted', 'softened', 'room-temperature',
   'plain', 'clarified', 'boneless', 'skinless', 'shelled', 'hulled',
+  'and', 'or', 'with', 'without', 'finely', 'roughly', 'coarsely', // Conjunctions and adverbs that should be removed when left alone
   'pureed', 'mashed', 'whipped', 'beaten', 'sifted', 'strained',
   'instant', 'pre-cooked', 'quick-cooking', 'self-rising',
   'reduced-sodium', 'low-sodium', 'unsalted', 'salted',
@@ -212,8 +263,9 @@ const REMOVABLE_ADJECTIVES = new Set([
   'pasteurized', 'unpasteurized', 'homogenized',
   'chilled', 'cold', 'warm', 'hot',
   'tender', 'firm', 'soft', 'hard', 'crisp', 'crunchy',
-  'mild', 'medium', 'hot', 'spicy', 'sweet', 'sour', 'bitter',
-  'light', 'dark', 'golden', 'pale',
+  'mild', 'medium', 'hot', 'spicy', 'sour', 'bitter',
+  'light', 'dark', 'pale',
+  // REMOVED 'sweet' and 'golden' - these are now preserved for varietal names (sweet potato, golden potato, etc.)
   'imported', 'domestic', 'local', 'artisanal', 'homemade'
 ]);
 
@@ -325,10 +377,22 @@ function removeAdjectives(name: string): string {
     
     // Check if this adjective is part of a preserved combination
     const wordIndex = words.indexOf(word);
-    if (wordIndex !== -1 && wordIndex < words.length - 1) {
-      const nextWord = words[wordIndex + 1];
-      if (PRESERVED_COMBINATIONS.has(`${word} ${nextWord}`)) {
-        return true; // Keep adjective that's part of preserved combination
+    if (wordIndex !== -1) {
+      // Check for 2-word combinations
+      if (wordIndex < words.length - 1) {
+        const nextWord = words[wordIndex + 1];
+        if (PRESERVED_COMBINATIONS.has(`${word} ${nextWord}`)) {
+          return true; // Keep adjective that's part of preserved combination
+        }
+      }
+      
+      // Check for 3-word combinations (like "fire roasted tomatoes")
+      if (wordIndex < words.length - 2) {
+        const nextWord = words[wordIndex + 1];
+        const nextNextWord = words[wordIndex + 2];
+        if (PRESERVED_COMBINATIONS.has(`${word} ${nextWord} ${nextNextWord}`)) {
+          return true; // Keep adjective that's part of preserved combination
+        }
       }
     }
     
@@ -458,18 +522,19 @@ function applySpecialCases(name: string): string {
       return name;
     }
     
-    // If it's just "[herb]" without fresh/dried, assume it's fresh
+    // If it's just "[herb]" without fresh/dried, preserve as-is (don't assume fresh)
+    // This preserves "basil" as "basil" rather than auto-converting to "fresh basil"
     const herbName = commonHerbs.find(herb => {
       // Use word boundaries to avoid partial matches
       const herbRegex = new RegExp(`\\b${herb}\\b`, 'i');
       return herbRegex.test(lowerName);
     });
     if (herbName) {
-      const freshHerbName = `fresh ${herbName}`;
+      // PRESERVE original herb name without adding "fresh" assumption
       if (process.env.NODE_ENV === 'development') {
-        console.log('[groceryHelpers] 🌿 Assuming fresh herb:', name, '→', freshHerbName);
+        console.log('[groceryHelpers] 🌿 Preserving herb as-is (no fresh assumption):', name);
       }
-      return freshHerbName;
+      return name; // Return original name without modification
     }
   }
   
@@ -522,8 +587,11 @@ function applySpecialCases(name: string): string {
 }
 
 /**
- * Normalizes an ingredient name for consistent aggregation.
- * This is the main entry point for ingredient name normalization.
+ * Backend canonicalizer for grocery aggregation (aliases, adjectives, special cases, singularization).
+ * This function should ONLY be called with already-parsed ingredient names (no amounts/units).
+ * Applies comprehensive 6-step pipeline: cleanup, aliases, adjective removal, special cases, singularization, final cleanup.
+ * 
+ * For full ingredient strings with amounts/units, use parseAndNormalizeIngredient instead.
  */
 export function normalizeName(name: string): string {
   // Fix for egg pluralization issue - prevent double pluralization
@@ -593,6 +661,49 @@ export function normalizeName(name: string): string {
     }
   }
   return normalized || name; // Fallback to original if somehow empty
+}
+
+/**
+ * Complete ingredient processing pipeline: parse + normalize.
+ * This is the main entry point for processing raw ingredient strings.
+ * 
+ * 1. Uses parseIngredientString to extract amount, unit, name, preparation
+ * 2. Uses normalizeName to clean up the name field only
+ * 3. Returns the parsed structure with normalized name
+ * 
+ * @param ingredientString - Raw ingredient string like "1/2 cup diced tomatoes"
+ * @returns Parsed ingredient with normalized name
+ */
+export function parseAndNormalizeIngredient(ingredientString: string): {
+  amount: string | null;
+  unit: string | null;
+  name: string;
+  preparation: string | null;
+  displayUnit: string | null;
+  parsedAmount: number | null;
+} {
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[groceryHelpers] 🔄 parseAndNormalizeIngredient called with:', ingredientString);
+  }
+  
+  // parseIngredientString is now imported at the top of the file
+  
+  // Step 1: Parse the ingredient string to extract amount, unit, name, preparation
+  const parsed = parseIngredientString(ingredientString);
+  
+  // Step 2: Normalize only the name field (no amounts/units)
+  const normalizedName = normalizeName(parsed.name);
+  
+  const result = {
+    ...parsed,
+    name: normalizedName
+  };
+  
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[groceryHelpers] ✅ parseAndNormalizeIngredient result:', result);
+  }
+  
+  return result;
 }
 
 /**
@@ -1139,12 +1250,13 @@ export function formatIngredientsForGroceryList(
           amount: ingredient.amount,
           unit: ingredient.unit
         });
-        const parsedName = parseIngredientDisplayName(ingredient.name);
-        console.log('[groceryHelpers] 🔍 DEBUG: Parsed ingredient name:', {
+        // For grocery list creation, we need normalized names for aggregation
+        // parseRecipeDisplayName() is for UI parsing (substitutions/removals)
+        // normalizeName() is for grocery aggregation (aliases, adjectives, singularization)
+        const normalizedName = normalizeName(ingredient.name);
+        console.log('[groceryHelpers] 🔍 DEBUG: Normalized ingredient name:', {
           originalName: ingredient.name,
-          parsedBaseName: parsedName.baseName,
-          parsedSubstitutionText: parsedName.substitutionText,
-          result: parsedName
+          normalizedName: normalizedName
         });
 
 
@@ -1183,7 +1295,7 @@ export function formatIngredientsForGroceryList(
         if (process.env.NODE_ENV === 'development') {
           console.log(`[groceryHelpers] 🥬 Processing ingredient:`, {
             originalName: ingredient.name,
-            parsedBaseName: parsedName.baseName,
+            normalizedName: normalizedName,
             originalText,
             amount: ingredient.amount,
             amountType: typeof ingredient.amount,
@@ -1198,7 +1310,7 @@ export function formatIngredientsForGroceryList(
         if (ingredient.name.toLowerCase().includes('broccoli')) {
           console.log('[groceryHelpers] 🥦 BROCCOLI DEBUG:', {
             originalName: ingredient.name,
-            parsedBaseName: parsedName.baseName,
+            normalizedName: normalizedName,
             originalUnit: ingredient.unit,
             originalText
           });
@@ -1208,7 +1320,7 @@ export function formatIngredientsForGroceryList(
         if (ingredient.name.toLowerCase().includes('garlic')) {
           console.log('[groceryHelpers] 🧄 GARLIC DEBUG:', {
             originalName: ingredient.name,
-            parsedBaseName: parsedName.baseName,
+            normalizedName: normalizedName,
             originalUnit: ingredient.unit,
             originalText
           });
@@ -1218,7 +1330,7 @@ export function formatIngredientsForGroceryList(
         if (ingredient.name.toLowerCase().includes('potato')) {
           console.log('[groceryHelpers] 🥔 POTATO DEBUG:', {
             originalName: ingredient.name,
-            parsedBaseName: parsedName.baseName,
+            normalizedName: normalizedName,
             originalUnit: ingredient.unit,
             originalText
           });
@@ -1228,7 +1340,7 @@ export function formatIngredientsForGroceryList(
         if (ingredient.name.toLowerCase().includes('flour')) {
           console.log('[groceryHelpers] 🌾 FLOUR DEBUG:', {
             originalName: ingredient.name,
-            parsedBaseName: parsedName.baseName,
+            normalizedName: normalizedName,
             originalUnit: ingredient.unit,
             originalText
           });
@@ -1316,7 +1428,7 @@ export function formatIngredientsForGroceryList(
         
         // Special case: For spices without units, assign appropriate units based on ingredient name
         if (standardizedUnit === null && amount !== null) {
-          const ingredientName = parsedName.baseName.toLowerCase();
+          const ingredientName = normalizedName.toLowerCase();
           
           // Check if this is a spice/seasoning that should get a pinch unit
           // Be more specific to avoid catching vegetable peppers
@@ -1376,11 +1488,11 @@ export function formatIngredientsForGroceryList(
 
         // Create grocery list item from final ingredient
         // Include descriptive size in the item name if present, but not if it's a unit
-        let finalItemName = parsedName.baseName;
+        let finalItemName = normalizedName;
         if (descriptiveSize && !displayUnit) {
           // Only add descriptive size if we don't have a display unit
           // This prevents "small heads broccoli" when we have display_unit: "heads"
-          finalItemName = `${descriptiveSize} ${parsedName.baseName}`;
+          finalItemName = `${descriptiveSize} ${normalizedName}`;
         }
         
         const groceryItem = {
@@ -1405,7 +1517,7 @@ export function formatIngredientsForGroceryList(
           quantity_unit: groceryItem.quantity_unit,
           display_unit: groceryItem.display_unit,
           originalText,
-          parsedName
+          normalizedName
         });
 
 
@@ -1413,7 +1525,7 @@ export function formatIngredientsForGroceryList(
         if (process.env.NODE_ENV === 'development') {
           console.log(`[groceryHelpers] 🔍 Detailed grocery item creation:`, {
             originalName: ingredient.name,
-            parsedBaseName: parsedName.baseName,
+            normalizedName: normalizedName,
             originalAmount: ingredient.amount,
             parsedAmount: amount,
             originalUnit: ingredient.unit,

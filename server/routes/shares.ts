@@ -419,4 +419,203 @@ router.get('/api/public-shares/:slug', corsHeaders, async (req, res) => {
   }
 });
 
+// POST /api/duplicate-folder/:slug - Duplicate a shared folder for the current user
+router.post('/api/duplicate-folder/:slug', corsHeaders, async (req, res) => {
+  const requestId = (req as any).id;
+  
+  try {
+    const { slug } = req.params;
+    const { userId } = req.body;
+
+    // Enhanced validation
+    if (!slug || typeof slug !== 'string' || slug.trim() === '') {
+      return res.status(400).json({ 
+        error: 'Invalid or missing slug parameter. Must be a non-empty string',
+        received: slug 
+      });
+    }
+
+    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+      return res.status(400).json({ 
+        error: 'Invalid or missing userId. Must be a non-empty string',
+        received: userId 
+      });
+    }
+
+    logger.info({ 
+      requestId, 
+      scope: "shares", 
+      action: "duplicate_folder", 
+      slug,
+      userId
+    }, 'Starting folder duplication');
+
+    // Step 1: Resolve slug in public_shares - must be type folder
+    const { data: shareData, error: shareError } = await supabaseAdmin
+      .from('public_shares')
+      .select('*')
+      .eq('slug', slug)
+      .eq('type', 'folder')
+      .is('revoked_at', null)
+      .single();
+
+    if (shareError || !shareData) {
+      logger.warn({ 
+        requestId, 
+        scope: "shares", 
+        action: "duplicate_folder", 
+        slug,
+        error: shareError?.message 
+      }, 'Share not found or not a folder');
+      return res.status(404).json({ error: 'Folder share not found or has been revoked' });
+    }
+
+    const originalFolderId = shareData.object_id;
+
+    // Step 2: Fetch original folder data using supabaseAdmin
+    const { data: originalFolder, error: folderError } = await supabaseAdmin
+      .from('user_saved_folders')
+      .select('name, color, icon, display_order, is_system')
+      .eq('id', originalFolderId)
+      .single();
+
+    if (folderError || !originalFolder) {
+      logger.error({ 
+        requestId, 
+        scope: "shares", 
+        action: "duplicate_folder", 
+        slug,
+        folderId: originalFolderId,
+        error: folderError?.message 
+      }, 'Original folder not found');
+      return res.status(404).json({ error: 'Original folder not found' });
+    }
+
+    // Step 3: Fetch original folder recipes (max 100) using supabaseAdmin
+    const { data: originalRecipes, error: recipesError } = await supabaseAdmin
+      .from('user_saved_recipes')
+      .select('base_recipe_id, title_override, notes, applied_changes, display_order')
+      .eq('folder_id', originalFolderId)
+      .limit(100);
+
+    if (recipesError) {
+      logger.error({ 
+        requestId, 
+        scope: "shares", 
+        action: "duplicate_folder", 
+        slug,
+        folderId: originalFolderId,
+        error: recipesError.message 
+      }, 'Failed to fetch original folder recipes');
+      return res.status(500).json({ error: 'Failed to fetch original folder recipes' });
+    }
+
+    const recipesToDuplicate = originalRecipes || [];
+    
+    // Enforce 100 recipe cap
+    if (recipesToDuplicate.length > 100) {
+      logger.warn({ 
+        requestId, 
+        scope: "shares", 
+        action: "duplicate_folder", 
+        slug,
+        folderId: originalFolderId,
+        recipeCount: recipesToDuplicate.length
+      }, 'Folder has more than 100 recipes, capping at 100');
+    }
+
+    // Step 4: Insert new folder for the current user
+    const { data: newFolder, error: newFolderError } = await supabaseAdmin
+      .from('user_saved_folders')
+      .insert({
+        user_id: userId,
+        name: originalFolder.name,
+        color: originalFolder.color,
+        icon: originalFolder.icon,
+        display_order: originalFolder.display_order,
+        is_system: false // Always false for duplicated folders
+      })
+      .select('id')
+      .single();
+
+    if (newFolderError || !newFolder) {
+      logger.error({ 
+        requestId, 
+        scope: "shares", 
+        action: "duplicate_folder", 
+        slug,
+        userId,
+        error: newFolderError?.message 
+      }, 'Failed to create new folder');
+      return res.status(500).json({ error: 'Failed to create new folder' });
+    }
+
+    const newFolderId = newFolder.id;
+
+    // Step 5: Insert cloned recipes into user_saved_recipes
+    if (recipesToDuplicate.length > 0) {
+      const recipesToInsert = recipesToDuplicate.slice(0, 100).map(recipe => ({
+        user_id: userId,
+        base_recipe_id: recipe.base_recipe_id,
+        title_override: recipe.title_override,
+        notes: recipe.notes,
+        applied_changes: recipe.applied_changes,
+        folder_id: newFolderId,
+        display_order: recipe.display_order
+      }));
+
+      const { error: insertRecipesError } = await supabaseAdmin
+        .from('user_saved_recipes')
+        .insert(recipesToInsert);
+
+      if (insertRecipesError) {
+        logger.error({ 
+          requestId, 
+          scope: "shares", 
+          action: "duplicate_folder", 
+          slug,
+          userId,
+          newFolderId,
+          recipeCount: recipesToInsert.length,
+          error: insertRecipesError.message 
+        }, 'Failed to insert cloned recipes');
+        
+        // Clean up the created folder
+        await supabaseAdmin
+          .from('user_saved_folders')
+          .delete()
+          .eq('id', newFolderId);
+        
+        return res.status(500).json({ error: 'Failed to duplicate recipes' });
+      }
+    }
+
+    logger.info({ 
+      requestId, 
+      scope: "shares", 
+      action: "duplicate_folder", 
+      slug,
+      userId,
+      newFolderId,
+      recipeCount: recipesToDuplicate.length
+    }, 'Successfully duplicated folder');
+
+    res.json({ 
+      success: true, 
+      newFolder: {
+        id: newFolderId,
+        name: originalFolder.name,
+        color: originalFolder.color,
+        icon: originalFolder.icon,
+        recipeCount: recipesToDuplicate.length
+      }
+    });
+
+  } catch (err) {
+    const error = err as Error;
+    logger.error({ requestId, err: error }, 'Error in POST /api/duplicate-folder/:slug route');
+    res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+});
+
 export { router as sharesRouter };

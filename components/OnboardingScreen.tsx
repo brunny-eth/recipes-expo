@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, SafeAreaView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, SafeAreaView, useWindowDimensions } from 'react-native';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { FONT, screenTitleText, bodyText, bodyStrongText } from '@/constants/typography';
@@ -47,6 +47,11 @@ export default function OnboardingScreen({ onComplete, onBack }: OnboardingScree
   const currentStepData = onboardingSteps[currentStep - 1];
   const translateX = useSharedValue(0);
   const { track } = useAnalytics();
+  const { width } = useWindowDimensions();
+  
+  // iPad detection: consider iPad if width is greater than 768px
+  // This ensures iPhone layouts remain unchanged while fixing iPad display
+  const isIpad = width > 768;
 
   // Create video player for current step
   const videoPlayer = useVideoPlayer(currentStepData.videoSource || '', player => {
@@ -122,82 +127,82 @@ export default function OnboardingScreen({ onComplete, onBack }: OnboardingScree
       >
         <SafeAreaView style={styles.safeArea}>
           <PanGestureHandler onGestureEvent={onSwipeGesture}>
-            <Animated.View style={[styles.content, animatedStyle]}>
-              {/* Text Content - now above the GIF */}
-              <Animated.View
-                key={`text-${currentStep}`}
-                entering={FadeIn.duration(600).delay(200)}
-                style={styles.textContent}
-              >
-                <Text style={styles.stepTitle}>{currentStepData.title}</Text>
-              </Animated.View>
+            <Animated.View style={[styles.content, animatedStyle, isIpad ? styles.ipadContent : {}]}>
+                {/* Text Content - now above the GIF */}
+                <Animated.View
+                  key={`text-${currentStep}`}
+                  entering={FadeIn.duration(600).delay(200)}
+                  style={styles.textContent}
+                >
+                  <Text style={styles.stepTitle}>{currentStepData.title}</Text>
+                </Animated.View>
 
-              {/* Video Container - now below the text */}
-              <View style={styles.videoContainer}>
-                {currentStepData.videoSource ? (
-                  <VideoView
-                    player={videoPlayer}
-                    style={styles.video}
-                    contentFit="cover"
-                    allowsFullscreen={false}
-                    allowsPictureInPicture={false}
-                  />
-                ) : (
-                  <View style={styles.videoPlaceholder}>
-                    <Text style={styles.placeholderText}>
-                      VIDEO {currentStep}{'\n'}
-                      ({currentStepData.title}){'\n'}
-                      {currentStepData.videoSource ? 'VIDEO LOADED' : 'WAITING FOR MP4'}
-                    </Text>
-                  </View>
-                )}
-              </View>
-
-              {/* Bottom controls container */}
-              <View style={styles.controlsContainer}>
-                {/* Step indicator - fixed position */}
-                <View style={styles.stepIndicator}>
-                  {onboardingSteps.map((_, index) => (
-                    <View
-                      key={index}
-                      style={[
-                        styles.stepDot,
-                        index + 1 === currentStep && styles.stepDotActive,
-                      ]}
+                {/* Video Container - now below the text */}
+                <View style={styles.videoContainer}>
+                  {currentStepData.videoSource ? (
+                    <VideoView
+                      player={videoPlayer}
+                      style={styles.video}
+                      contentFit="cover"
+                      allowsFullscreen={false}
+                      allowsPictureInPicture={false}
                     />
-                  ))}
-                </View>
-
-                {/* Button area - separate from step indicator */}
-                <View style={styles.buttonArea}>
-                  {/* Start Cooking button - only on step 4 */}
-                  {currentStep === 4 ? (
-                    <Animated.View 
-                      style={styles.buttonContainer}
-                      entering={FadeIn.duration(800).delay(1500)}
-                    >
-                      <TouchableOpacity
-                        style={styles.startButton}
-                        onPress={async () => {
-                          try {
-                            // Track tutorial completion event
-                            await track('tutorial_completed', { method: 'onboarding' });
-                          } catch (error) {
-                            console.error('Failed to track tutorial completion:', error);
-                          }
-                          // Always call onComplete, even if tracking fails
-                          onComplete();
-                        }}
-                      >
-                        <Text style={styles.startButtonText}>Start Cooking</Text>
-                      </TouchableOpacity>
-                    </Animated.View>
                   ) : (
-                    // Empty space to maintain consistent layout
-                    <View style={styles.buttonPlaceholder} />
+                    <View style={styles.videoPlaceholder}>
+                      <Text style={styles.placeholderText}>
+                        VIDEO {currentStep}{'\n'}
+                        ({currentStepData.title}){'\n'}
+                        {currentStepData.videoSource ? 'VIDEO LOADED' : 'WAITING FOR MP4'}
+                      </Text>
+                    </View>
                   )}
                 </View>
-              </View>
+
+                {/* Bottom controls container */}
+                <View style={styles.controlsContainer}>
+                  {/* Step indicator - fixed position */}
+                  <View style={styles.stepIndicator}>
+                    {onboardingSteps.map((_, index) => (
+                      <View
+                        key={index}
+                        style={[
+                          styles.stepDot,
+                          index + 1 === currentStep && styles.stepDotActive,
+                        ]}
+                      />
+                    ))}
+                  </View>
+
+                  {/* Button area - separate from step indicator */}
+                  <View style={styles.buttonArea}>
+                    {/* Start Cooking button - only on step 4 */}
+                    {currentStep === 4 ? (
+                      <Animated.View 
+                        style={styles.buttonContainer}
+                        entering={FadeIn.duration(800).delay(1500)}
+                      >
+                        <TouchableOpacity
+                          style={styles.startButton}
+                          onPress={async () => {
+                            try {
+                              // Track tutorial completion event
+                              await track('tutorial_completed', { method: 'onboarding' });
+                            } catch (error) {
+                              console.error('Failed to track tutorial completion:', error);
+                            }
+                            // Always call onComplete, even if tracking fails
+                            onComplete();
+                          }}
+                        >
+                          <Text style={styles.startButtonText}>Start Cooking</Text>
+                        </TouchableOpacity>
+                      </Animated.View>
+                    ) : (
+                      // Empty space to maintain consistent layout
+                      <View style={styles.buttonPlaceholder} />
+                    )}
+                  </View>
+                </View>
             </Animated.View>
           </PanGestureHandler>
         </SafeAreaView>
@@ -207,6 +212,13 @@ export default function OnboardingScreen({ onComplete, onBack }: OnboardingScree
 }
 
 const styles = StyleSheet.create({
+  // iPad-specific content styling for proper centering and max width
+  ipadContent: {
+    alignSelf: 'center',
+    maxWidth: 500, // Reasonable max width for iPad content
+    width: '100%',
+    paddingHorizontal: SPACING.xl, // Extra horizontal padding for iPad
+  },
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
