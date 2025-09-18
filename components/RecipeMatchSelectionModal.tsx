@@ -135,7 +135,11 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
       transparent={true}
       onRequestClose={handleReturnHome}
     >
-      <View style={styles.modalOverlay}>
+      <TouchableOpacity 
+        style={styles.modalOverlay}
+        activeOpacity={1}
+        onPress={handleReturnHome}
+      >
         <SafeAreaView style={styles.modalContent}>
           {!isCreateExpanded ? (
             <>
@@ -143,13 +147,6 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
                 <Text style={styles.mainTitle}>
                   We found {matches.length} similar recipe{matches.length > 1 ? 's' : ''}
                 </Text>
-                <TouchableOpacity
-                  style={styles.closeButton}
-                  onPress={handleReturnHome}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <MaterialCommunityIcons name="close" size={20} color="#000000" />
-                </TouchableOpacity>
               </View>
 
               <FlatList
@@ -244,7 +241,7 @@ const RecipeMatchSelectionModal: React.FC<RecipeMatchSelectionModalProps> = ({
           )}
 
         </SafeAreaView>
-      </View>
+      </TouchableOpacity>
     </Modal>
   );
 };
@@ -269,10 +266,7 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.lg,
     paddingBottom: SPACING.md,
     alignItems: 'center',
-    paddingLeft: 0, // Remove left padding for perfect alignment
-    paddingRight: 0, // Remove right padding to allow X button at edge
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center', // Center the title
     borderBottomWidth: 1,
     borderBottomColor: '#000000',
     marginBottom: SPACING.sm,
@@ -307,15 +301,12 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xs,
   } as TextStyle,
   mainTitle: {
-    ...bodyStrongText,
-    fontSize: FONT.size.body,
+    ...bodyStrongText, // Match other modals
+    fontSize: FONT.size.lg, // Match other modals (18px)
     color: COLORS.textDark,
-    textAlign: 'left',
+    textAlign: 'center', // Center align the title
   } as TextStyle,
-  closeButton: {
-    padding: 4,
-    marginRight: 0,
-  } as ViewStyle,
+  // Removed closeButton styles since no longer needed
   subtitle: {
     ...bodyText,
     color: COLORS.textMuted,
@@ -450,17 +441,21 @@ const styles = StyleSheet.create({
     fontSize: FONT.size.caption,
   } as TextStyle,
   textButtonContainer: {
+    height: 46, // Match button height consistency
+    width: '100%',
+    backgroundColor: 'transparent', // Match secondary button style
+    borderWidth: 1,
+    borderColor: '#000000', // Match secondary button border
+    borderRadius: 8, // Match button consistency
+    alignItems: 'center',
+    justifyContent: 'center',
     marginTop: SPACING.sm,
-    alignSelf: 'flex-start',
-    paddingLeft: 0, // Remove left padding for perfect alignment
   } as ViewStyle,
   textButton: {
-    ...bodyStrongText,
-    color: COLORS.textDark,
-    textAlign: 'left',
-    textTransform: 'none' as const,
-    textDecorationLine: 'none',
-    fontSize: FONT.size.body,
+    ...bodyText, // Match modal button text style
+    color: '#000000', // Match secondary button text color
+    textAlign: 'center', // Center align like other modal buttons
+    fontSize: FONT.size.body, // 16px consistency
   } as TextStyle,
 });
 

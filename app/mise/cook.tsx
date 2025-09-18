@@ -330,17 +330,17 @@ export default function CookScreen() {
     setBaselineSteps([]);
   }, [canonicalRecipeData?.id]);
 
-  // Initialize steps once per recipe id
+  // Initialize steps once per recipe id - use currentRecipeData (from CookingContext) which has modifications
   useEffect(() => {
-    console.log('[COOK] init steps check', { initializedFromCanonical, id: canonicalRecipeData?.id, stepsLen: steps.length });
-    if (!canonicalRecipeData?.id) return;
+    console.log('[COOK] init steps check', { initializedFromCanonical, id: currentRecipeData?.id, stepsLen: steps.length });
+    if (!currentRecipeData?.id) return;
     if (initializedFromCanonical || steps.length > 0) return;
-    const norm = normalizeInstructionsToSteps(canonicalRecipeData.instructions);
-    console.log('[COOK] initializing steps for', canonicalRecipeData.id, { normLen: norm.length });
+    const norm = normalizeInstructionsToSteps(currentRecipeData.instructions);
+    console.log('[COOK] initializing steps for', currentRecipeData.id, { normLen: norm.length });
     setSteps(norm);
     setBaselineSteps(norm);
     setInitializedFromCanonical(true);
-  }, [canonicalRecipeData?.id, initializedFromCanonical, steps.length]);
+  }, [currentRecipeData?.id, initializedFromCanonical, steps.length]);
 
   // Reset initialization flag when recipe ID changes
   useEffect(() => {
@@ -645,15 +645,7 @@ export default function CookScreen() {
   // Check if steps have changed from baseline using useMemo for performance
   const hasChanges = useMemo(() => {
     const changed = !isEqual(steps, baselineSteps);
-    if (changed) {
-      console.log('🔍 DEBUG: hasChanges =', changed);
-      console.log('🔍 Recipe analysis:', {
-        recipeId: currentRecipeData?.id,
-        isUserFork: currentRecipeData ? isUserFork(currentRecipeData) : false,
-        sourceType: currentRecipeData?.source_type,
-        parentRecipeId: currentRecipeData?.parent_recipe_id
-      });
-    }
+    // Steps comparison completed
     return changed;
   }, [steps, baselineSteps, currentRecipeData]);
 
@@ -1495,16 +1487,6 @@ export default function CookScreen() {
                 <Text style={styles.editModalTitle}>
                   Edit Step
                 </Text>
-                <TouchableOpacity
-                  style={styles.closeButton}
-                  onPress={closeEditModal}
-                >
-                  <MaterialCommunityIcons
-                    name="close"
-                    size={24}
-                    color={COLORS.textMuted}
-                  />
-                </TouchableOpacity>
               </View>
 
               <TextInput
@@ -1517,18 +1499,27 @@ export default function CookScreen() {
               />
 
               <View style={styles.editModalActions}>
+                {/* Save button moved to left (primary) */}
                 <TouchableOpacity
-                  style={styles.editModalCancelButton}
+                  style={[
+                    styles.editModalButton,
+                    styles.editModalSaveButton,
+                    editingStepText.trim() && styles.editModalSaveButtonActive, // Primary style when active
+                  ]}
+                  onPress={saveStepText}
+                >
+                  <Text style={[
+                    styles.editModalSaveText,
+                    editingStepText.trim() && styles.editModalSaveTextActive, // Primary text when active
+                  ]}>Save</Text>
+                </TouchableOpacity>
+
+                {/* Cancel button moved to right (secondary) */}
+                <TouchableOpacity
+                  style={[styles.editModalButton, styles.editModalCancelButton]}
                   onPress={closeEditModal}
                 >
                   <Text style={styles.editModalCancelText}>Cancel</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.editModalSaveButton}
-                  onPress={saveStepText}
-                >
-                  <Text style={styles.editModalSaveText}>Save</Text>
                 </TouchableOpacity>
               </View>
             </Pressable>
@@ -2212,20 +2203,18 @@ const styles = StyleSheet.create({
     ...SHADOWS.large,
   },
   editModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'center', // Center the title
     paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: '#000000',
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.md,
+    // Removed border to match other modals
   },
   editModalTitle: {
-    fontFamily: FONT.family.graphikMedium,
-    fontSize: 18,
-    fontWeight: '600',
-    lineHeight: FONT.lineHeight.normal,
+    ...bodyStrongText, // Match other modals
+    fontSize: FONT.size.lg, // Match other modals (18px)
     color: COLORS.textDark,
+    textAlign: 'center',
   },
   editModalInput: {
     fontFamily: 'Inter',
@@ -2243,32 +2232,48 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   editModalActions: {
-    alignItems: 'flex-start',
-    gap: SPACING.sm,
+    flexDirection: 'row',
+    gap: SPACING.md,
     paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.md,
+  },
+  editModalButton: {
+    flex: 1,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: 8, // Match button consistency
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 46, // Match exact button height consistency
   },
   editModalCancelButton: {
-    marginBottom: SPACING.sm,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#000000',
   },
   editModalCancelText: {
-    fontFamily: 'Inter',
+    ...bodyText, // Match modal button text style
     fontSize: FONT.size.body,
-    fontWeight: '400',
-    lineHeight: FONT.lineHeight.normal,
-    color: COLORS.textDark,
-    textAlign: 'left',
+    color: '#000000',
+    textAlign: 'center',
   },
   editModalSaveButton: {
-    marginBottom: SPACING.sm,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#000000',
+  },
+  editModalSaveButtonActive: {
+    backgroundColor: COLORS.primary, // Light blue background when active
+    borderColor: '#000000',
   },
   editModalSaveText: {
-    fontFamily: 'Inter',
+    ...bodyText, // Match modal button text style
     fontSize: FONT.size.body,
-    fontWeight: '400',
-    lineHeight: FONT.lineHeight.normal,
-    color: COLORS.textDark,
-    textAlign: 'left',
+    color: '#000000',
+    textAlign: 'center',
+  },
+  editModalSaveTextActive: {
+    color: '#000000', // Keep black text on light blue background
   },
 
   // --- Add Step Button Styles ---

@@ -258,7 +258,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
       formData.append('image', imageFile);
       
       // Add userId to FormData
-      console.log("Parse request userId:", session?.user?.id);
+      // Parse request with user authentication
       formData.append("userId", session?.user?.id ?? "");
       
       requestBody = formData;
@@ -280,7 +280,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
       });
       
       // Add userId to FormData
-      console.log("Parse request userId:", session?.user?.id);
+      // Parse request with user authentication
       formData.append("userId", session?.user?.id ?? "");
       
       requestBody = formData;
@@ -288,7 +288,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
       // URL/text processing (existing logic)
       endpoint = '/api/recipes/parse';
       headers['Content-Type'] = 'application/json';
-      console.log("Parse request userId:", session?.user?.id);
+      // Parse request with user authentication
       requestBody = JSON.stringify({ 
         input: recipeInput, 
         forceNewParse,

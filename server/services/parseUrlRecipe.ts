@@ -149,9 +149,7 @@ export async function parseUrlRecipe(
                 try {
                     finalRecipeData = JSON.parse(modelResponse.output);
 
-                    console.log('[DEBUG] Gemini raw parsed recipe:\n', JSON.stringify(finalRecipeData, null, 2));
-                    console.log('[DEBUG] Gemini instruction count:', finalRecipeData?.instructions?.length ?? 'undefined');
-                    console.log('[DEBUG] Gemini recipe keys:', finalRecipeData ? Object.keys(finalRecipeData) : 'null');
+                    logger.debug({ requestId, instructionCount: finalRecipeData?.instructions?.length, recipeKeys: finalRecipeData ? Object.keys(finalRecipeData) : null }, 'Gemini recipe parsing completed');
 
                     if (finalRecipeData && extractedContent) {
                         finalRecipeData.description = extractedContent.description ?? null;
@@ -225,7 +223,7 @@ export async function parseUrlRecipe(
             let insertData: { id: number; created_at: string; last_processed_at: string } | null = null;
             const dbInsertStartTime = Date.now();
             try {
-                console.log('[parseUrlRecipe] attempting insert with cacheKey:', cacheKey);
+                logger.debug({ requestId, cacheKey }, 'Attempting recipe cache insert');
                 
                 // A) Strip any incoming id field to prevent ID pollution from LLM outputs
                 const { id: _jsonIdDrop, ...cleanFinalRecipeData } = (finalRecipeData as Record<string, any>) ?? {};
@@ -240,7 +238,7 @@ export async function parseUrlRecipe(
                         source_type: inputType
                     });
                 
-                console.log('[parseUrlRecipe] insertError:', insertError);
+                logger.error({ requestId, insertError }, 'Recipe cache insert failed');
 
                 if (insertError) {
                     logger.error({ requestId, cacheKey, err: insertError }, `Error saving recipe to cache.`);
@@ -254,8 +252,7 @@ export async function parseUrlRecipe(
                         .limit(1)
                         .single();
                     
-                    console.log('[parseUrlRecipe] queryData:', queryData);
-                    console.log('[parseUrlRecipe] queryError:', queryError);
+                    logger.debug({ requestId, queryData, queryError }, 'Recipe cache query after insert');
                     
                     if (queryData && queryData.id && queryData.created_at && queryData.last_processed_at) {
                         insertData = {
@@ -265,7 +262,7 @@ export async function parseUrlRecipe(
                         };
                         insertedId = queryData.id;
                         logger.info({ requestId, cacheKey, id: insertedId, dbInsertMs: Date.now() - dbInsertStartTime }, `Successfully cached new recipe.`);
-                        console.log('[parseUrlRecipe] Found inserted recipe with ID:', insertedId);
+                        logger.debug({ requestId, insertedId }, 'Found inserted recipe');
 
                         // C) Force JSON id to equal the row id (belt-and-suspenders)
                         const { error: updateError } = await supabase
@@ -305,8 +302,7 @@ export async function parseUrlRecipe(
                 logger.error({ requestId, cacheKey, err: cacheInsertError }, `Exception during cache insertion.`);
             }
 
-            console.log('[parseUrlRecipe] insertData:', insertData);
-            console.log('[parseUrlRecipe] insertedId after insert:', insertedId);
+            logger.debug({ requestId, insertedId }, 'Recipe inserted successfully');
 
             const finalSizeKb = Buffer.byteLength(JSON.stringify(finalRecipeData), 'utf8') / 1024;
             logger.info({ requestId, sizeKb: finalSizeKb.toFixed(2), event: 'final_recipe_size' }, 'Size of final structured recipe JSON');
@@ -344,7 +340,7 @@ export async function parseUrlRecipe(
           servings: finalRecipeData?.recipeYield
         }, "Final structured recipe returned to client");
 
-        console.log('[parseUrlRecipe] Returning parsedRecipe with ID:', parsedRecipe?.id);
+        logger.debug({ requestId, recipeId: parsedRecipe?.id }, 'parseUrlRecipe completed');
 
         return {
             recipe: parsedRecipe,

@@ -263,15 +263,6 @@ export default function TimerTool({
     >
       <Pressable style={styles.modalOverlay} onPress={onClose}>
         <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
-          {/* Close Button */}
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <MaterialCommunityIcons
-              name="close"
-              size={24}
-              color={COLORS.darkGray}
-            />
-          </TouchableOpacity>
-
           {/* Content */}
           {showWheelPicker ? renderWheelPicker() : renderTimerSummary()}
         </Pressable>
@@ -293,8 +284,8 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 400,
     backgroundColor: COLORS.white,
-    borderRadius: 20,
-    paddingTop: 50,
+    borderRadius: RADIUS.lg, // Match other modals (16px)
+    paddingTop: SPACING.lg, // Reduced top padding since no close button
     paddingBottom: 30,
     paddingHorizontal: 30,
     alignItems: 'center',
@@ -307,13 +298,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
-  closeButton: {
-    position: 'absolute',
-    top: 20,
-    right: 20,
-    padding: 5,
-    zIndex: 10,
-  },
+  // Removed closeButton styles since no longer needed
 
   // Wheel Picker Styles
   wheelPickerContainer: {
@@ -321,8 +306,8 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   wheelPickerTitle: {
-    ...bodyStrongText,
-    fontSize: 20,
+    ...bodyStrongText, // Match other modals
+    fontSize: FONT.size.lg, // Match other modals (18px)
     color: COLORS.textDark,
     marginBottom: SPACING.xl,
   },
@@ -367,19 +352,25 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   startButton: {
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.xl,
-    borderRadius: RADIUS.pill,
+    paddingHorizontal: SPACING.lg, // Match button consistency
+    borderRadius: 8, // Match button consistency
+    height: 46, // Match exact button height consistency
     minWidth: 120,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary, // Light blue background when active
+    borderWidth: 1,
+    borderColor: '#000000',
   },
   startButtonDisabled: {
-    opacity: 0.5,
+    backgroundColor: 'transparent', // Match other modals disabled state
+    borderColor: COLORS.lightGray,
   },
   startButtonText: {
-    ...bodyStrongText,
-    color: COLORS.textDark,
+    ...bodyText, // Match modal button text style
+    color: '#000000', // Match button text color
     textAlign: 'center',
-    fontSize: 16,
+    fontSize: FONT.size.body, // 16px consistency
   },
 
   // Timer Summary Styles

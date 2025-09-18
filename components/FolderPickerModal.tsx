@@ -85,7 +85,7 @@ export default function FolderPickerModal({
         .order('display_order', { ascending: true });
 
       if (foldersError) {
-        console.error('[FolderPickerModal] Error fetching folders:', foldersError);
+        // Error fetching folders
       setError("We couldn't load your folders. Please try again.");
         return;
       }
@@ -99,10 +99,10 @@ export default function FolderPickerModal({
         recipe_count: (folder.user_saved_recipes as any)?.[0]?.count || 0,
       })) || [];
 
-      console.log('[FolderPickerModal] Loaded folders:', formattedFolders);
+      // Folders loaded successfully
       setFolders(formattedFolders);
     } catch (err) {
-      console.error('[FolderPickerModal] Unexpected error:', err);
+      // Unexpected error loading folders
       setError('An unexpected error occurred.');
     } finally {
       setIsFetchingFolders(false);
@@ -112,14 +112,11 @@ export default function FolderPickerModal({
   // Create new folder
   const handleCreateFolder = async () => {
     if (!newFolderName.trim() || !session?.user) {
-      console.log('[FolderPickerModal] Cannot create folder - missing name or session:', {
-        folderName: newFolderName.trim(),
-        hasSession: !!session?.user
-      });
+      // Cannot create folder - missing name or session
       return;
     }
 
-    console.log('[FolderPickerModal] Starting folder creation:', newFolderName.trim());
+    // Starting folder creation
     setIsCreatingFolder(true);
     setCreateError(null);
 
@@ -131,7 +128,7 @@ export default function FolderPickerModal({
         .eq('user_id', session.user.id);
 
       const displayOrder = (folderCount || 0) + 1;
-      console.log('[FolderPickerModal] Using display order:', displayOrder);
+      // Using display order for new folder
 
       const { data: newFolder, error: createError } = await supabase
         .from('user_saved_folders')
@@ -144,10 +141,10 @@ export default function FolderPickerModal({
         .select()
         .single();
 
-      console.log('[FolderPickerModal] Supabase response:', { newFolder, createError });
+      // Folder creation response received
 
       if (createError) {
-        console.error('[FolderPickerModal] Database error creating folder:', createError);
+        // Database error creating folder
         if (createError.code === '23505') { // Unique constraint violation
           setCreateError('You already have a folder with this name.');
         } else {
@@ -157,7 +154,7 @@ export default function FolderPickerModal({
       }
 
       // Success - auto-select the newly created folder and navigate
-      console.log('[FolderPickerModal] Folder created successfully, auto-selecting:', newFolder);
+      // Folder created successfully
       
       // Reset state
       setNewFolderName('');
@@ -167,7 +164,7 @@ export default function FolderPickerModal({
       // Don't set mode back to 'select' since the modal will close
       onSelectFolder(newFolder.id);
     } catch (err) {
-      console.error('[FolderPickerModal] Unexpected error creating folder:', err);
+      // Unexpected error creating folder
       setCreateError('An unexpected error occurred.');
     } finally {
       setIsCreatingFolder(false);
@@ -189,6 +186,7 @@ export default function FolderPickerModal({
     setMode('select');
     setNewFolderName('');
     setCreateError(null);
+    setIsCreatingFolder(false); // Reset creating state when going back
   };
 
   // Load folders when modal opens
@@ -203,9 +201,7 @@ export default function FolderPickerModal({
     <TouchableOpacity
       style={[
         styles.folderRow,
-        { backgroundColor: 'transparent' },
-        index === 0 && { marginTop: 8 }, // Add top margin to first folder
-        index === 0 && { borderTopWidth: 1, borderTopColor: '#000000' } // Add top border to first folder
+        { backgroundColor: 'transparent' }
       ]}
       onPress={() => onSelectFolder(item.id)}
       disabled={isLoading}
@@ -307,33 +303,37 @@ export default function FolderPickerModal({
         />
 
         <View style={styles.createButtons}>
-          <TouchableOpacity
-            style={[styles.createButton, styles.cancelButton]}
-            onPress={handleBackToSelect}
-            disabled={isCreatingFolder}
-          >
-            <Text style={styles.cancelButtonText}>Cancel</Text>
-          </TouchableOpacity>
-
+          {/* Create button moved to left */}
           <TouchableOpacity
             style={[
               styles.createButton, 
               styles.confirmButton,
+              newFolderName.trim() && !isCreatingFolder && styles.confirmButtonActive, // Primary style when active
               (!newFolderName.trim() || isCreatingFolder) && styles.confirmButtonDisabled
             ]}
             onPress={handleCreateFolder}
             disabled={!newFolderName.trim() || isCreatingFolder}
           >
             {isCreatingFolder ? (
-              <ActivityIndicator size="small" color={COLORS.white} />
+              <ActivityIndicator size="small" color={newFolderName.trim() ? "#000000" : COLORS.textMuted} />
             ) : (
               <Text style={[
                 styles.confirmButtonText,
+                newFolderName.trim() && !isCreatingFolder && styles.confirmButtonTextActive, // Primary text when active
                 (!newFolderName.trim() || isCreatingFolder) && styles.confirmButtonTextDisabled
               ]}>
                 Create
               </Text>
             )}
+          </TouchableOpacity>
+
+          {/* Cancel button moved to right */}
+          <TouchableOpacity
+            style={[styles.createButton, styles.cancelButton]}
+            onPress={handleBackToSelect}
+            disabled={isCreatingFolder}
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -359,25 +359,9 @@ export default function FolderPickerModal({
         >
           {/* Header */}
           <View style={styles.header}>
-            {mode === 'create' && (
-              <TouchableOpacity
-                style={styles.backButton}
-                onPress={handleBackToSelect}
-                disabled={isCreatingFolder}
-              >
-                <MaterialCommunityIcons name="arrow-left" size={20} color={COLORS.textDark} />
-              </TouchableOpacity>
-            )}
             <Text style={styles.title}>
-              {mode === 'select' ? (showStartCookingOption ? 'Choose action' : 'Save to folder') : 'Add new folder'}
+              {mode === 'select' ? (showStartCookingOption ? 'Choose action' : 'Save To Folder') : 'Add New Folder'}
             </Text>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={handleClose}
-              disabled={isLoading || isCreatingFolder}
-            >
-              <MaterialCommunityIcons name="close" size={20} color={COLORS.textMuted} />
-            </TouchableOpacity>
           </View>
 
           {/* Content */}
@@ -428,7 +412,7 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   modalContainer: {
     backgroundColor: COLORS.white,
-    borderRadius: RADIUS.md,
+    borderRadius: RADIUS.lg, // Match AddNewFolderModal border radius
     width: '100%',
     maxWidth: 400,
     maxHeight: '80%',
@@ -437,34 +421,28 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 20,
     elevation: 10,
+    paddingBottom: 0, // Remove any bottom padding
   } as ViewStyle,
   header: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center', // Center the title since no side buttons
     paddingHorizontal: SPACING.lg,
     paddingTop: SPACING.lg,
     paddingBottom: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.lightGray,
+    // Removed border to match AddNewFolderModal
   } as ViewStyle,
-  backButton: {
-    padding: SPACING.xs,
-  } as ViewStyle,
+  // Removed backButton styles since no longer needed
   title: {
-    ...screenTitleText,
-    fontSize: FONT.size.xl,
+    ...bodyStrongText, // Match other modals
+    fontSize: FONT.size.lg, // Match other modals (18px)
     color: COLORS.textDark,
-    flex: 1,
-    textAlign: 'left', // Changed from center to left
-    paddingLeft: '5%', // Added left padding to match folder indentation
+    textAlign: 'center', // Center aligned
   } as TextStyle,
-  closeButton: {
-    padding: SPACING.xs,
-  } as ViewStyle,
+  // Removed closeButton styles since no longer needed
   content: {
     paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
+    paddingTop: SPACING.md,
+    paddingBottom: 0, // Remove bottom padding to match AddNewFolderModal
     minHeight: 200,
   } as ViewStyle,
   // Select mode styles
@@ -519,6 +497,9 @@ const styles = StyleSheet.create({
   foldersList: {
     flexGrow: 0,
     maxHeight: 300,
+    borderWidth: 1,
+    borderColor: '#000000',
+    borderRightWidth: 2, // Emphasize right border
   } as ViewStyle,
   // Folder row styles matching library.tsx
   folderRow: {
@@ -556,13 +537,19 @@ const styles = StyleSheet.create({
   },
   // Add new folder styles matching library.tsx
   addFolderRow: {
-    height: 24,
+    height: 46, // Match button height exactly
     width: '90%',
     alignSelf: 'flex-start', // Left align to screen edge
     marginLeft: '5%', // Offset to account for 90% width
     marginTop: SPACING.xxl, // Increased top margin for more space
     marginBottom: SPACING.xxl, // Increased bottom margin for more space
-    paddingLeft: SPACING.lg, // Add padding to match content container padding
+    paddingHorizontal: SPACING.lg, // Match modal button padding
+    backgroundColor: 'transparent', // Match Cancel button style
+    borderWidth: 1,
+    borderColor: '#000000', // Match Cancel button border
+    borderRadius: 8, // Match button consistency
+    alignItems: 'center', // Center align like modal buttons
+    justifyContent: 'center', // Center justify like modal buttons
   },
   searchToolbarContent: {
     flexDirection: 'row',
@@ -572,15 +559,11 @@ const styles = StyleSheet.create({
     paddingRight: 18, // Keep some right padding
   },
   headerText: {
-    fontFamily: 'Inter',
-    fontSize: 22,
-    fontWeight: '400', // Non-bold variant
-    lineHeight: 28,
-    color: COLORS.textDark,
-    position: 'absolute',
-    left: 0,
-    top: 0, // Position at top since container height is 24px
-    textAlign: 'left', // Ensure left alignment
+    ...bodyText, // Match modal button text style
+    fontSize: FONT.size.body, // 16px to match consistency
+    color: '#000000', // Match button text color
+    textAlign: 'center', // Center align like modal buttons
+    fontWeight: '400', // Match button weight
   },
   startCookingButton: {
     flexDirection: 'row',
@@ -600,7 +583,7 @@ const styles = StyleSheet.create({
   } as TextStyle,
   // Create mode styles
   createContainer: {
-    paddingVertical: SPACING.sm,
+    // Remove padding to match AddNewFolderModal's tight layout
   } as ViewStyle,
   createErrorContainer: {
     backgroundColor: COLORS.errorBackground,
@@ -631,35 +614,48 @@ const styles = StyleSheet.create({
   createButtons: {
     flexDirection: 'row',
     gap: SPACING.md,
-    paddingTop: SPACING.xxxl,
+    paddingTop: SPACING.lg, // Match AddNewFolderModal spacing (20px instead of 48px)
   } as ViewStyle,
   createButton: {
     flex: 1,
-    paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.sm,
+    borderRadius: 8, // Match Choose image button radius
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 44,
+    height: 46, // Match exact button height consistency
   } as ViewStyle,
   cancelButton: {
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: COLORS.primary,
+    borderColor: '#000000',
   } as ViewStyle,
   cancelButtonText: {
-    ...bodyStrongText,
-    color: COLORS.primary,
+    ...bodyText, // Changed from bodyStrongText to match consistency
+    color: '#000000',
+    fontSize: FONT.size.body,
+    textAlign: 'center',
   } as TextStyle,
   confirmButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#000000',
+  } as ViewStyle,
+  confirmButtonActive: {
+    backgroundColor: COLORS.primary, // Light blue background when active
+    borderColor: '#000000',
   } as ViewStyle,
   confirmButtonDisabled: {
-    backgroundColor: COLORS.lightGray,
+    backgroundColor: 'transparent', // Match AddNewFolderModal (transparent instead of gray)
+    borderColor: COLORS.lightGray, // Light gray border when disabled
   } as ViewStyle,
   confirmButtonText: {
-    ...bodyStrongText,
-    color: COLORS.white,
+    ...bodyText, // Changed from bodyStrongText to match consistency
+    color: '#000000',
+    fontSize: FONT.size.body,
+    textAlign: 'center',
+  } as TextStyle,
+  confirmButtonTextActive: {
+    color: '#000000', // Keep black text on light blue background
   } as TextStyle,
   confirmButtonTextDisabled: {
     color: COLORS.textMuted,

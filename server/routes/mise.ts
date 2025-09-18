@@ -207,7 +207,7 @@ router.post('/save-recipe', async (req: Request, res: Response) => {
 
     // Validation
     if (!userId || !originalRecipeId || !preparedRecipeData || !appliedChanges) {
-      logger.error({ requestId, body: req.body }, 'Missing required fields for saving mise recipe');
+      logger.error({ requestId }, 'Missing required fields for saving mise recipe');
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
@@ -450,10 +450,21 @@ router.get('/recipes', async (req: Request, res: Response) => {
       return res.status(500).json({ error: 'Failed to fetch mise recipes' });
     }
 
-    logger.info({ requestId, count: miseRecipes?.length || 0 }, 'Successfully fetched mise recipes');
+    // Parse JSON fields that are stored as strings in the database
+    const processedRecipes = (miseRecipes || []).map(recipe => ({
+      ...recipe,
+      prepared_recipe_data: typeof recipe.prepared_recipe_data === 'string' 
+        ? JSON.parse(recipe.prepared_recipe_data) 
+        : recipe.prepared_recipe_data,
+      applied_changes: typeof recipe.applied_changes === 'string' 
+        ? JSON.parse(recipe.applied_changes) 
+        : recipe.applied_changes,
+    }));
+
+    logger.info({ requestId, count: processedRecipes.length }, 'Successfully fetched and processed mise recipes');
 
     res.json({
-      recipes: miseRecipes || []
+      recipes: processedRecipes
     });
 
   } catch (err) {

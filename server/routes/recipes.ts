@@ -144,8 +144,8 @@ router.get('/', async (req: Request, res: Response) => {
 // This ensures that a request to '/parse' is handled by this specific handler
 // instead of being mistakenly captured by a dynamic handler like '/:id'.
 router.post('/parse', async (req: Request, res: Response) => {
-  // Add logging for incoming request body
-  logger.info({ body: req.body, requestId: (req as any).id, route: req.originalUrl, method: req.method }, '[parse] Incoming request');
+  // Log incoming request without sensitive body data
+  logger.info({ requestId: (req as any).id, route: req.originalUrl, method: req.method }, '[parse] Incoming request');
   try {
     const { input, forceNewParse, isDishNameSearch, userId } = req.body;
     const requestId = (req as any).id;
@@ -177,7 +177,7 @@ router.post('/parse', async (req: Request, res: Response) => {
     }
 
     // Save to imported folder if user is authenticated
-    console.log("[parse route] userId received:", req.body.userId);
+    // Save to imported folder if user is authenticated
     if (userId && recipe?.id) {
       await saveToImported(userId, recipe.id);
     }
@@ -267,7 +267,7 @@ router.post('/parse-image', upload.single('image'), async (req: Request, res: Re
     }
 
     // Save to imported folder if user is authenticated
-    console.log("[parse-image route] userId received:", req.body.userId);
+    // Save to imported folder if user is authenticated
     if (userId && recipe?.id) {
       await saveToImported(userId, recipe.id);
     }
@@ -350,7 +350,6 @@ router.post('/parse-images', (req: Request, res: Response, next: Function) => {
   
   logger.info({ 
     requestId,
-    headers: req.headers,
     filesCount: (req as any).files?.length || 0,
     route: req.originalUrl,
     method: req.method
@@ -397,7 +396,7 @@ router.post('/parse-images', (req: Request, res: Response, next: Function) => {
     }
 
     // Save to imported folder if user is authenticated
-    console.log("[parse-images route] userId received:", req.body.userId);
+    // Save to imported folder if user is authenticated
     if (userId && recipe?.id) {
       await saveToImported(userId, recipe.id);
     }

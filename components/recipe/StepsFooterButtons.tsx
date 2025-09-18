@@ -47,7 +47,7 @@ const StepsFooterButtons: React.FC<StepsFooterButtonsProps> = ({
         style={styles.timerButton}
         onPress={onTimersPress}
       >
-        <Text style={styles.timerButtonText}>Timer</Text>
+        <Text style={styles.timerButtonText}>Timers</Text>
       </TouchableOpacity>
 
       <TouchableOpacity

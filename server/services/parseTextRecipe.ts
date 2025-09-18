@@ -52,8 +52,7 @@ export async function parseTextRecipe(
     const isDishNameSearch = options?.isDishNameSearch === true;
     
     if (process.env.NODE_ENV === 'development') {
-      console.log(`[parseTextRecipe] forceNewParse received as:`, forceNewParse, `| typeof:`, typeof forceNewParse, `| coerced:`, forceNewParseBool);
-      console.log(`[parseTextRecipe] fromImageExtraction:`, isFromImageExtraction);
+      logger.debug({ requestId, forceNewParse, forceNewParseBool, isFromImageExtraction }, 'parseTextRecipe parameters');
     }
     
     logger.info({ requestId, fromImageExtraction: isFromImageExtraction }, "🚨🚨🚨 parseTextRecipe was called! 🚨🚨🚨");
@@ -453,7 +452,7 @@ export async function parseTextRecipe(
         }, "Final structured recipe returned to client");
 
         if (process.env.NODE_ENV === 'development') {
-          console.log('[parseTextRecipe] Returning parsedRecipe with ID:', parsedRecipe?.id);
+          logger.debug({ requestId, recipeId: parsedRecipe?.id }, 'parseTextRecipe completed');
         }
 
         const finalResult: ParseResult = {

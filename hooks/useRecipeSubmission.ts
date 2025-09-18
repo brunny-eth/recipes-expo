@@ -73,11 +73,7 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
         p_normalized_url: normalizedUrl
       });
 
-      // ------------------- DIAGNOSTIC LOGS (KEEP FOR CONFIRMATION, CAN BE REMOVED LATER) -------------------
-      console.log(`[useRecipeSubmission] checkCache: Type of 'data' from Supabase query: ${typeof data}`);
-      console.log(`[useRecipeSubmission] checkCache: Is 'data' an Array from Supabase query? ${Array.isArray(data)}`);
-      console.log(`[useRecipeSubmission] checkCache: Raw 'data' content (full) from Supabase query:`, data);
-      // ------------------- DIAGNOSTIC LOGS END -------------------
+      // Cache query completed successfully
 
       if (error) {
         console.error('[useRecipeSubmission] Cache check error:', error);
@@ -89,14 +85,14 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
       let actualRowData: any = null;
       if (Array.isArray(data) && data.length > 0) {
         actualRowData = data[0]; // Get the single object from the array
-        console.log('[useRecipeSubmission] checkCache: Data was array, extracted first element.');
+        // Data was array, extracted first element
       } else if (data && typeof data === 'object' && !Array.isArray(data)) {
         actualRowData = data; // Data is already the single object
-        console.log('[useRecipeSubmission] checkCache: Data was already a single object (expected .single() behavior).');
+        // Data was already a single object
       }
 
       if (actualRowData) {
-        console.log('[useRecipeSubmission] checkCache: Cache hit! Raw row data found:', JSON.stringify(actualRowData));
+        console.log('[useRecipeSubmission] checkCache: Cache hit found');
 
         // Assume recipe content is in a 'recipe_data' column (JSONB type) within the actualRowData
         const extractedRecipeContent = actualRowData.recipe_data;
@@ -108,18 +104,17 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
             ...(extractedRecipeContent as CombinedParsedRecipe), // Cast nested content
             id: cachedRecipeId, // Override or add the correct ID
           };
-          console.log('[useRecipeSubmission] checkCache: Successfully extracted recipe from cache:', JSON.stringify(fullCachedRecipe));
+          console.log('[useRecipeSubmission] checkCache: Successfully extracted recipe from cache');
 
           return fullCachedRecipe;
         } else {
           // Fallback: Data was found but 'recipe_data' was missing/malformed or ID was missing.
-          console.warn('[useRecipeSubmission] checkCache: Valid row data found, but could not extract valid CombinedParsedRecipe from element, treating as cache miss.');
-          console.log('[useRecipeSubmission] checkCache: Returning null (fallback)');
+          console.warn('[useRecipeSubmission] checkCache: Could not extract valid recipe data, treating as cache miss.');
           return null;
         }
       } else {
         // This covers cases where data is null, undefined, or an empty array
-        console.log('[useRecipeSubmission] checkCache: Cache miss for URL (no data, null, or empty array).');
+        console.log('[useRecipeSubmission] checkCache: Cache miss for URL.');
         return null;
       }
       // --- REVISED MODIFICATION END ---
@@ -200,9 +195,7 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
           throw new Error('Backend URL not configured');
         }
 
-        console.log('[useRecipeSubmission] Making backend request to:', `${backendUrl}/api/recipes/parse`);
-        console.log('[useRecipeSubmission] Request payload:', { input: normalizedInput, isDishNameSearch });
-        console.log("Parse request userId:", session?.user?.id);
+        console.log('[useRecipeSubmission] Making backend request to parse endpoint');
 
         const response = await fetch(`${backendUrl}/api/recipes/parse`, {
           method: 'POST',

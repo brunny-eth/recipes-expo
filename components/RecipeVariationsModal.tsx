@@ -8,7 +8,7 @@ import {
   TextStyle,
 } from 'react-native';
 import { COLORS, SPACING, RADIUS } from '@/constants/theme';
-import { bodyStrongText, FONT } from '@/constants/typography';
+import { bodyStrongText, bodyText, FONT } from '@/constants/typography';
 
 export type VariationType = 'low_fat' | 'higher_protein' | 'dairy_free' | 'vegetarian' | 'easier_recipe';
 
@@ -120,27 +120,36 @@ const RecipeVariationsModal: React.FC<RecipeVariationsModalProps> = ({
           ))}
         </View>
 
-        <TouchableOpacity
-          style={styles.cancelButton}
-          onPress={handleClose}
-        >
-          <Text style={styles.cancelButtonText}>Cancel</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.confirmButton,
-            !selectedVariation && styles.confirmButtonDisabled
-          ]}
-          onPress={handleConfirm}
-          disabled={!selectedVariation}
-        >
-          <Text style={[
-            styles.confirmButtonText,
-            !selectedVariation && styles.confirmButtonTextDisabled
-          ]}>
-            Start Remixing
-          </Text>
-        </TouchableOpacity>
+        {/* Button container with consistent styling */}
+        <View style={styles.buttonContainer}>
+          {/* Start Remixing button moved to left (primary) */}
+          <TouchableOpacity
+            style={[
+              styles.button,
+              styles.confirmButton,
+              selectedVariation && styles.confirmButtonActive, // Primary style when active
+              !selectedVariation && styles.confirmButtonDisabled
+            ]}
+            onPress={handleConfirm}
+            disabled={!selectedVariation}
+          >
+            <Text style={[
+              styles.confirmButtonText,
+              selectedVariation && styles.confirmButtonTextActive, // Primary text when active
+              !selectedVariation && styles.confirmButtonTextDisabled
+            ]}>
+              Remix
+            </Text>
+          </TouchableOpacity>
+
+          {/* Cancel button moved to right (secondary) */}
+          <TouchableOpacity
+            style={[styles.button, styles.cancelButton]}
+            onPress={handleClose}
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
         </View>
 
 
@@ -177,13 +186,15 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   header: {
     alignItems: 'center',
-    marginBottom: SPACING.lg,
+    justifyContent: 'center', // Center the title
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.md,
+    marginBottom: SPACING.md, // Reduced margin
   } as ViewStyle,
   title: {
-    fontFamily: FONT.family.graphikMedium,
-    fontSize: 28,
-    fontWeight: '600',
-    lineHeight: 32,
+    ...bodyStrongText, // Match other modals
+    fontSize: FONT.size.lg, // Match other modals (18px)
     color: COLORS.textDark,
     textAlign: 'center',
   } as TextStyle,
@@ -243,37 +254,51 @@ const styles = StyleSheet.create({
     color: COLORS.textDark,
     fontWeight: 'bold',
   } as TextStyle,
-  buttonRow: {
-    alignItems: 'flex-start',
-    gap: SPACING.sm,
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+    paddingTop: SPACING.lg,
   } as ViewStyle,
   button: {
-    marginBottom: SPACING.sm,
+    flex: 1,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: 8, // Match button consistency
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 46, // Match exact button height consistency
   } as ViewStyle,
   cancelButton: {
-    marginBottom: SPACING.sm,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#000000',
   } as ViewStyle,
   cancelButtonText: {
-    fontFamily: 'Inter',
+    ...bodyText, // Match modal button text style
     fontSize: FONT.size.body,
-    fontWeight: '400',
-    lineHeight: FONT.lineHeight.normal,
-    color: COLORS.textDark,
-    textAlign: 'left',
+    color: '#000000',
+    textAlign: 'center',
   } as TextStyle,
   confirmButton: {
-    marginBottom: SPACING.sm,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#000000',
+  } as ViewStyle,
+  confirmButtonActive: {
+    backgroundColor: COLORS.primary, // Light blue background when active
+    borderColor: '#000000',
   } as ViewStyle,
   confirmButtonDisabled: {
-    opacity: 0.5,
-  },
+    backgroundColor: 'transparent',
+    borderColor: COLORS.lightGray,
+  } as ViewStyle,
   confirmButtonText: {
-    fontFamily: 'Inter',
+    ...bodyText, // Match modal button text style
     fontSize: FONT.size.body,
-    fontWeight: '400',
-    lineHeight: FONT.lineHeight.normal,
-    color: COLORS.textDark,
-    textAlign: 'left',
+    color: '#000000',
+    textAlign: 'center',
+  } as TextStyle,
+  confirmButtonTextActive: {
+    color: '#000000', // Keep black text on light blue background
   } as TextStyle,
   confirmButtonTextDisabled: {
     color: COLORS.textMuted,

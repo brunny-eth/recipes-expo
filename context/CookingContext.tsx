@@ -166,8 +166,7 @@ export function CookingProvider({ children }: { children: React.ReactNode }) {
         // Convert mise recipes to full recipe objects using prepared_recipe_data
         const recipes: CombinedParsedRecipe[] = miseRecipes.map(miseRecipe => {
           try {
-            const recipeData = miseRecipe.local_modifications?.modified_recipe_data || 
-                             miseRecipe.prepared_recipe_data || 
+            const recipeData = miseRecipe.prepared_recipe_data || 
                              miseRecipe.original_recipe_data;
             
             if (!recipeData) {

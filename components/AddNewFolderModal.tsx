@@ -160,33 +160,37 @@ export default function AddNewFolderModal({
           />
 
           <View style={styles.buttonContainer}>
+            {/* Create button moved to left */}
             <TouchableOpacity
-              style={[styles.button, styles.cancelButton]}
-              onPress={handleClose}
-              disabled={isLoading}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-
-                        <TouchableOpacity
               style={[
                 styles.button,
                 styles.createButton,
+                folderName.trim() && !isLoading && styles.createButtonActive, // Primary style when active
                 (!folderName.trim() || isLoading) && styles.createButtonDisabled
               ]}
               onPress={handleCreate}
               disabled={!folderName.trim() || isLoading}
             >
               {isLoading ? (
-                <ActivityIndicator size="small" color={COLORS.white} />
+                <ActivityIndicator size="small" color={folderName.trim() ? "#000000" : COLORS.textMuted} />
               ) : (
                 <Text style={[
                   styles.createButtonText,
+                  folderName.trim() && !isLoading && styles.createButtonTextActive, // Primary text style when active
                   (!folderName.trim() || isLoading) && styles.createButtonTextDisabled
                 ]}>
                   Create
                 </Text>
               )}
+            </TouchableOpacity>
+
+            {/* Cancel button moved to right */}
+            <TouchableOpacity
+              style={[styles.button, styles.cancelButton]}
+              onPress={handleClose}
+              disabled={isLoading}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -217,10 +221,10 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   title: {
     ...bodyStrongText,
-    fontSize: 20,
+    fontSize: FONT.size.lg, // Match ConfirmationModal (18px)
     color: COLORS.textDark,
     textAlign: 'center',
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.md, // Match ConfirmationModal (16px)
   } as TextStyle,
   errorContainer: {
     backgroundColor: COLORS.errorBackground,
@@ -265,12 +269,11 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   button: {
     flex: 1,
-    paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.md,
+    borderRadius: 8, // Match Choose image button radius
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 44,
+    height: 46, // Match exact button height consistency
     // Fix layout stability: ensure buttons don't resize
     minWidth: 80, // Ensure consistent width for "Create" text
   } as ViewStyle,
@@ -280,13 +283,18 @@ const styles = StyleSheet.create({
     borderColor: '#000000',
   } as ViewStyle,
   cancelButtonText: {
-    ...bodyStrongText,
+    ...bodyText, // Changed from bodyStrongText to match consistency
     color: '#000000',
-    fontSize: 14,
+    fontSize: FONT.size.body, // Use consistent font size
+    textAlign: 'center',
   } as TextStyle,
   createButton: {
     backgroundColor: 'transparent',
     borderWidth: 1,
+    borderColor: '#000000',
+  } as ViewStyle,
+  createButtonActive: {
+    backgroundColor: COLORS.primary, // Light blue background when active
     borderColor: '#000000',
   } as ViewStyle,
   createButtonDisabled: {
@@ -294,10 +302,13 @@ const styles = StyleSheet.create({
     borderColor: COLORS.lightGray,
   } as ViewStyle,
   createButtonText: {
-    ...bodyStrongText,
+    ...bodyText, // Changed from bodyStrongText to match consistency
     color: '#000000',
-    fontSize: 14, // Fixed font size to prevent layout shifts
-    fontWeight: '600', // Fixed weight to prevent metric changes
+    fontSize: FONT.size.body, // Use consistent font size
+    textAlign: 'center',
+  } as TextStyle,
+  createButtonTextActive: {
+    color: '#000000', // Keep black text on light blue background
   } as TextStyle,
   createButtonTextDisabled: {
     color: COLORS.textMuted,

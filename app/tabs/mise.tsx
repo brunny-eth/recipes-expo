@@ -2151,6 +2151,7 @@ const styles = StyleSheet.create({
   cardTextContainer: {
     flex: 1,
     paddingVertical: SPACING.sm, // Add vertical padding to match the fixed height spacing
+    paddingRight: SPACING.lg, // Add right padding to prevent overlap with X button
     justifyContent: 'center', // Center content vertically
   } as ViewStyle,
   cardTitle: {

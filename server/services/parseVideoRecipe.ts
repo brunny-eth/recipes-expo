@@ -139,7 +139,7 @@ function scoreCaptionQuality(caption: string | null): 'high' | 'medium' | 'low' 
   const numberedInstructions = text.match(numberedInstructionPattern);
   if (numberedInstructions) {
     instructionKeywordCount += numberedInstructions.length;
-    console.log(`[scoreCaptionQuality] Found ${numberedInstructions.length} numbered instructions`);
+    logger.debug({ numberedInstructions: numberedInstructions.length }, 'Found numbered instructions');
   }
   
   // Additional check for bullet-pointed instructions (e.g., "- add olive oil", "- add carrots")
@@ -147,7 +147,7 @@ function scoreCaptionQuality(caption: string | null): 'high' | 'medium' | 'low' 
   const bulletInstructions = text.match(bulletInstructionPattern);
   if (bulletInstructions) {
     instructionKeywordCount += bulletInstructions.length;
-    console.log(`[scoreCaptionQuality] Found ${bulletInstructions.length} bullet-pointed instructions`);
+    logger.debug({ bulletInstructions: bulletInstructions.length }, 'Found bullet-pointed instructions');
   }
   
   // Count measurement patterns (e.g., "2 cups", "1 tbsp", "3/4 cup")
@@ -175,18 +175,17 @@ function scoreCaptionQuality(caption: string | null): 'high' | 'medium' | 'low' 
   const keywordDensity = keywordCount / Math.max(wordCount, 1);
   
   // Debug logging for caption quality scoring
-  console.log(`[scoreCaptionQuality] Debug - keywordCount: ${keywordCount}, measurementCount: ${measurementCount}, wordCount: ${wordCount}, instructionKeywordCount: ${instructionKeywordCount}`);
-  console.log(`[scoreCaptionQuality] Debug - text preview: "${text.substring(0, 200)}..."`);
+  logger.debug({ keywordCount, measurementCount, wordCount, instructionKeywordCount, textPreview: text.substring(0, 200) }, 'Caption quality analysis');
   
   // High quality requires at least some instructions
   if (keywordCount >= 5 && measurementCount >= 2 && wordCount >= 50 && instructionKeywordCount >= 3) {
-    console.log(`[scoreCaptionQuality] Returning 'high' quality`);
+    logger.debug({ quality: 'high' }, 'Caption quality determined');
     return 'high';
   } else if (keywordCount >= 3 && (measurementCount >= 1 || wordCount >= 30) && instructionKeywordCount >= 3) {
-    console.log(`[scoreCaptionQuality] Returning 'medium' quality`);
+    logger.debug({ quality: 'medium' }, 'Caption quality determined');
     return 'medium';
   } else {
-    console.log(`[scoreCaptionQuality] Returning 'low' quality - criteria not met`);
+    logger.debug({ quality: 'low' }, 'Caption quality determined');
     return 'low';
   }
 }
@@ -208,10 +207,10 @@ function extractUrlFromText(text: string | null): string | null {
   
   // Log the extraction attempt for debugging, now logging the full text to avoid confusion.
   if (matches && matches.length > 0) {
-    console.log(`[extractUrlFromText] Found ${matches.length} URL(s) in text: ${matches.join(', ')}`);
+    logger.debug({ urlCount: matches.length, urls: matches }, 'URLs found in text');
   } else {
     // No longer truncating the log to prevent confusion about where the text is being cut off.
-    console.log(`[extractUrlFromText] No URLs found in text. Full cleaned text was: "${cleanText}"`);
+    logger.debug({ textPreview: cleanText.substring(0, 100) }, 'No URLs found in text');
   }
   
   return matches ? matches[0] : null;
@@ -310,8 +309,7 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
     }
 
     // A check for null caption is performed below, so we can safely access length here.
-    console.log(`[parseVideoRecipe] Scraper returned caption of length ${scrapeResult.caption!.length}`);
-    console.log("[videoParser] Extracted thumbnail:", scrapeResult.thumbnail);
+    logger.debug({ captionLength: scrapeResult.caption!.length, hasThumbnail: !!scrapeResult.thumbnail }, 'Video scraping completed');
 
     // Add a strict check for the caption before proceeding
     if (!scrapeResult.caption || typeof scrapeResult.caption !== 'string') {
@@ -359,8 +357,7 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
       const prompt = buildVideoParsePrompt(scrapeResult.caption, scrapeResult.platform);
       prompt.metadata = { requestId, route: 'video_caption' };
 
-      console.log('[DEBUG] Gemini System Prompt:\n', prompt.system);
-      console.log('[DEBUG] Gemini Prompt Text:\n', prompt.text);
+      logger.debug({ systemPromptLength: prompt.system.length, textPromptLength: prompt.text.length }, 'Gemini prompts prepared');
 
       console.time(`[${requestId}] gemini_call`);
       logger.info({ requestId, event: 'llm_call_start' }, 'Calling LLM to parse caption.');
@@ -395,11 +392,11 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
       
       try {
         parsedRecipe = JSON.parse(llmResponse.output);
-        console.log('[DEBUG] Gemini Raw Output:\n', JSON.stringify(parsedRecipe, null, 2));
+        logger.debug({ hasRecipe: !!parsedRecipe, recipeKeys: parsedRecipe ? Object.keys(parsedRecipe) : null }, 'Gemini parsing completed');
 
         // Fallback patch for flat ingredients list
         if (parsedRecipe && !parsedRecipe.ingredientGroups && (parsedRecipe as any).ingredients) {
-          console.warn('[PATCH] Gemini returned flat ingredients list — wrapping into ingredientGroups.');
+          logger.warn({ requestId }, 'Gemini returned flat ingredients list, wrapping into groups');
           parsedRecipe.ingredientGroups = [{ name: 'Main Ingredients', ingredients: (parsedRecipe as any).ingredients }];
           delete (parsedRecipe as any).ingredients;
         }
@@ -407,15 +404,14 @@ export async function parseVideoRecipe(videoUrl: string): Promise<VideoParseResu
         logger.info({ requestId, timeMs: overallTimings.geminiParse }, 'Successfully parsed video caption with LLM.');
 
         if (parsedRecipe?.ingredientGroups?.length) {
-          console.log(`[${requestId}] [DEBUG] Parsed ingredient names:`);
-          parsedRecipe.ingredientGroups.forEach((group, i) => {
-            console.log(`  Group ${i + 1} (${group.name || 'no name'}):`);
-            group.ingredients.forEach((ingredient) => {
-              console.log(`    - ${ingredient.name}`);
-            });
-          });
+          const ingredientSummary = parsedRecipe.ingredientGroups.map((group, i) => ({
+            groupIndex: i + 1,
+            groupName: group.name || 'no name',
+            ingredientCount: group.ingredients.length
+          }));
+          logger.debug({ requestId, ingredientSummary }, 'Parsed ingredient groups');
         } else {
-          console.warn(`[${requestId}] [DEBUG] No ingredientGroups returned in parsed recipe`);
+          logger.warn({ requestId }, 'No ingredientGroups returned in parsed recipe');
         }
 
       } catch (parseError) {

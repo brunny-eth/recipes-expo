@@ -70,7 +70,7 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
 
 
   const getMainButtonText = () => {
-    if (isRewriting || isSavingModifications) return 'Processing modifications...';
+    if (isRewriting || isSavingModifications) return ''; // Just show spinner, no text
     if (isScalingInstructions) return 'Making sure everything lines up...';
 
     
@@ -166,19 +166,19 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
             onPress={handleSaveForLaterPress} // Updated to show folder picker
             disabled={isSavingForLater}
           >
-            {isSavingForLater && (
+            {isSavingForLater ? (
               <ActivityIndicator
                 size="small"
                 color="black"
-                style={{ marginRight: SPACING.xs }}
               />
+            ) : (
+              <Text style={[
+                styles.plainButtonText,
+                isSavingForLater && styles.plainButtonTextDisabled
+              ]}>
+                Cook later
+              </Text>
             )}
-            <Text style={[
-              styles.plainButtonText,
-              isSavingForLater && styles.plainButtonTextDisabled
-            ]}>
-              {isSavingForLater ? 'Processing modifications...' : 'Cook later'}
-            </Text>
           </TouchableOpacity>
         );
     }
@@ -198,19 +198,19 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
               onPress={getMainButtonHandler()}
               disabled={buttonDisabled}
             >
-              {(isRewriting || isScalingInstructions || isSavingModifications) && (
+              {(isRewriting || isScalingInstructions || isSavingModifications) ? (
                 <ActivityIndicator
                   size="small"
                   color="black"
-                  style={{ marginRight: SPACING.xs }}
                 />
+              ) : (
+                <Text style={[
+                  styles.miseButtonText,
+                  buttonDisabled && styles.plainButtonTextDisabled
+                ]}>
+                  {getMainButtonText()}
+                </Text>
               )}
-              <Text style={[
-                styles.miseButtonText,
-                buttonDisabled && styles.plainButtonTextDisabled
-              ]}>
-                {getMainButtonText()}
-              </Text>
             </TouchableOpacity>
           </View>
         </View>

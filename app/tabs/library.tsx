@@ -33,7 +33,6 @@ import ConfirmationModal from '@/components/ConfirmationModal';
 import PaywallModal from '@/components/PaywallModal';
 import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
 import { useAnalytics } from '@/utils/analytics';
-import { useRenderCounter } from '@/hooks/useRenderCounter';
 import { useHandleError } from '@/hooks/useHandleError';
 import { logger } from '@/utils/logger';
 
@@ -105,7 +104,7 @@ export default function LibraryScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ tab?: string; slug?: string }>();
   const { session } = useAuth();
-  useRenderCounter('LibraryScreen', { hasSession: !!session });
+  // Library screen rendered
   const { showError } = useErrorModal();
   const handleError = useHandleError();
   const { track } = useAnalytics();

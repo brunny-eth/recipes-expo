@@ -182,17 +182,17 @@ export function validateDishNameInput(input: string): { isValid: boolean; error?
  */
 export function detectInputType(input: string): InputType {
   const trimmed = input.trim();
-  console.log(`[detectInputType] Input received: '${input}' (trimmed: '${trimmed}')`);
+  // Input classification starting
 
   // Handle empty or purely whitespace inputs
   if (trimmed === '') {
-    console.log(`[detectInputType] Classification result: 'invalid' for input: '${input}' (empty trimmed)`);
+    // Empty input classified as invalid
     return 'invalid';
   }
 
   // Loosen minimum length requirement - allow shorter inputs like "lasagna", "pasta"
   if (trimmed.length < 3) {
-    console.log(`[detectInputType] Classification result: 'invalid' for input: '${input}' (too short: ${trimmed.length} chars)`);
+    // Input too short, classified as invalid
     return 'invalid';
   }
 
@@ -219,8 +219,7 @@ export function detectInputType(input: string): InputType {
           const hasFragment = urlObj.hash && urlObj.hash.length > 0; // Has fragment
 
           if (!hasPath && !hasQuery && !hasFragment) {
-              console.log(`[detectInputType] URL "${input}" has valid domain but no path/query/fragment. Classifying as 'invalid' for URL mode.`);
-              console.log(`[detectInputType] Classification result: 'invalid' for input: '${input}' (bare domain without path)`);
+              // Bare domain without path, classified as invalid
               return 'invalid';
           }
 
@@ -234,35 +233,34 @@ export function detectInputType(input: string): InputType {
           const isVideoUrl = videoPatterns.some(pattern => pattern.test(urlObj.hostname));
 
           if (isVideoUrl) {
-              console.log(`[detectInputType] Classification result: 'video' for input: '${input}' (video URL detected)`);
+              // Video URL detected
               return 'video';
           } else {
-              console.log(`[detectInputType] Classification result: 'url' for input: '${input}' (valid URL with proper domain and path)`);
+              // Valid URL with proper domain and path
               return 'url';
           }
       } else {
           // If it has a protocol but the hostname doesn't look like a valid FQDN
           // (e.g., "https://invalid", "http://mylocalhost"), treat it as raw_text since it's likely a recipe name
-          console.log(`[detectInputType] URL hostname "${urlObj.hostname}" does not look like a valid domain. Classifying as 'raw_text'.`);
-          console.log(`[detectInputType] Classification result: 'raw_text' for input: '${input}' (invalid domain, likely recipe name)`);
+          // Invalid domain, likely recipe name - classified as raw_text
           return 'raw_text';
       }
   } catch (e) {
       // If the URL constructor throws an error, the string is not a valid URL.
       // Now check if it's valid text using letter ratio
       const errorMessage = e instanceof Error ? e.message : String(e);
-      console.log(`[detectInputType] URL parsing failed for input '${trimmed}': ${errorMessage}. Checking letter ratio for text classification.`);
+      // URL parsing failed, checking text classification
   }
 
   // If it's not a valid URL, apply letter ratio check for text inputs
   // This allows inputs like "lasagna", "pasta", "curry", "7-layer dip" while rejecting pure numbers
   const letterRatio = (trimmed.match(/[a-zA-Z]/g) || []).length / trimmed.length;
   if (letterRatio < 0.65) {
-    console.log(`[detectInputType] Classification result: 'invalid' for input: '${input}' (insufficient letters: ${letterRatio})`);
+    // Insufficient letters, classified as invalid
     return 'invalid';
   }
 
   // If it passed the letter ratio test but isn't a URL, it's raw text
-  console.log(`[detectInputType] Classification result: 'raw_text' for input: '${input}' (valid text, letter ratio: ${letterRatio})`);
+  // Valid text input classified as raw_text
   return 'raw_text';
 } 

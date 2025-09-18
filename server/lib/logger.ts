@@ -11,9 +11,9 @@ export interface Logger {
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
-// Log token prefix in development for verification
+// Logtail token validation (without logging sensitive data)
 if (isDevelopment && process.env.LOGTAIL_TOKEN) {
-  console.log("🔑 Logtail token prefix:", process.env.LOGTAIL_TOKEN.slice(0, 6));
+  console.log("🔑 Logtail token configured");
 }
 
 // Initialize Logtail only in production and only if token is available

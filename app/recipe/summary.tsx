@@ -235,7 +235,7 @@ const buttonWidth = (availableWidth - buttonTotalGap) / numButtons;
 // --- End Types ---
 
 export default function RecipeSummaryScreen() {
-  console.log('[Summary] 🎬 Component render started');
+  // Component render started
   
   const params = useLocalSearchParams<{
     recipeData?: string; 
@@ -469,7 +469,7 @@ export default function RecipeSummaryScreen() {
     const allAppliedChanges = [...persistedChanges, ...currentUnsavedChanges];
     
     if (__DEV__) {
-      console.log('[DEBUG] ===== SCALING INGREDIENTS =====');
+      // Scaling ingredients
       console.log('[DEBUG] Scaling context:', {
         entryPoint,
         selectedScaleFactor,
@@ -521,7 +521,7 @@ export default function RecipeSummaryScreen() {
       let finalIngredients = scaledIngredients;
       if (allAppliedChanges.length > 0) {
         if (__DEV__) {
-          console.log('[DEBUG] Applying substitutions to scaled ingredients...');
+          // Applying substitutions to scaled ingredients
         }
         
         if (isViewingSavedRecipe) {
@@ -533,18 +533,13 @@ export default function RecipeSummaryScreen() {
               const change = allAppliedChanges.find((c) => c.from === originalName);
               
                           if (__DEV__) {
-              console.log('[DEBUG] Checking ingredient for substitution (clean display):', {
-                baseIngredientName: baseIngredient.name,
-                originalName,
-                foundChange: !!change,
-                change,
-              });
+              // Checking ingredient for substitution
             }
               
               if (change) {
                 if (change.to === null) {
                   if (__DEV__) {
-                    console.log('[DEBUG] Marking ingredient for removal:', originalName);
+                    // Marking ingredient for removal
                   }
                   // Mark for removal (will be filtered out)
                   return null;
@@ -592,17 +587,13 @@ export default function RecipeSummaryScreen() {
             const change = allAppliedChanges.find((c) => c.from === baseIngredient.name);
             
             if (__DEV__) {
-              console.log('[DEBUG] Checking ingredient for substitution (with indicators):', {
-                baseIngredientName: baseIngredient.name,
-                foundChange: !!change,
-                change,
-              });
+              // Checking ingredient for substitution
             }
             
                           if (change) {
                 if (change.to === null) {
                   if (__DEV__) {
-                  console.log('[DEBUG] Applying removal indicator:', baseIngredient.name);
+                  // Applying removal indicator
                 }
                   return {
                     ...baseIngredient,
@@ -651,14 +642,7 @@ export default function RecipeSummaryScreen() {
       }
 
       if (__DEV__) {
-        console.log('[DEBUG] Final ingredients for group:', {
-          groupName: group.name || 'Default',
-          finalIngredients: finalIngredients.map(ing => ({
-            name: ing.name,
-            amount: ing.amount,
-            unit: ing.unit,
-          })),
-        });
+        // Final ingredients processed for group
       }
 
       return {
@@ -668,7 +652,7 @@ export default function RecipeSummaryScreen() {
     });
     
     if (__DEV__) {
-      console.log('[DEBUG] ===== END SCALING INGREDIENTS =====');
+      // End scaling ingredients
     }
     return result;
   }, [originalRecipe, selectedScaleFactor, persistedChanges, currentUnsavedChanges, isViewingSavedRecipe, unscaledIngredientGroups]);
@@ -897,7 +881,7 @@ export default function RecipeSummaryScreen() {
               // Convert saved format to internal format
               if (savedAppliedChanges.ingredientChanges) {
                 if (__DEV__) {
-                  console.log('[DEBUG] Converting ingredientChanges to internal format:', savedAppliedChanges.ingredientChanges);
+                  // Converting ingredientChanges to internal format
                 }
               
                 const convertedChanges: AppliedChange[] = savedAppliedChanges.ingredientChanges.map((change: any) => ({
@@ -1063,8 +1047,7 @@ export default function RecipeSummaryScreen() {
   };
 
   const onScrollViewLayout = (event: any) => {
-    const { height, y } = event.nativeEvent.layout;
-    console.log('[Summary] 📐 ScrollView layout:', { height, y });
+    // ScrollView layout updated
   };
 
   // Folder picker handlers for title editing (will be defined after API helpers)
@@ -1097,12 +1080,7 @@ export default function RecipeSummaryScreen() {
       });
       
       // Debug logging for ingredient groups
-      console.log('[DEBUG] keys of API response:', Object.keys(data));
-      console.log('[DEBUG] ingredientGroups length:', data.ingredientGroups?.length);
-      console.log('[DEBUG] ingredientGroups structure:', data.ingredientGroups?.map((g: any) => ({
-        name: g.name,
-        ingredientCount: g.ingredients?.length || 0
-      })));
+      // Ingredient groups loaded
       
       // The API returns recipe data directly, not wrapped in recipe_data
       // Check if it's a direct recipe object or wrapped
@@ -1412,7 +1390,7 @@ export default function RecipeSummaryScreen() {
       }
 
       // Original recipe OR entryPoint 'new'/'library' - check if it's already saved
-      console.log('[Summary] Title edited on original; checking saved state', { recipeId, userId });
+      console.log('[Summary] Title edited on original; checking saved state');
       if (!userId) {
         throw new Error('User ID is required for title save');
       }
@@ -1570,18 +1548,7 @@ export default function RecipeSummaryScreen() {
 
   const openSubstitutionModal = React.useCallback(
     (ingredient: StructuredIngredient) => {
-          console.log('[DEBUG] openSubstitutionModal called with:', {
-      ingredientName: ingredient.name,
-      ingredientAmount: ingredient.amount,
-      ingredientUnit: ingredient.unit,
-      selectedScaleFactor,
-      isViewingSavedRecipe,
-      persistedChanges,
-      currentUnsavedChanges,
-      hasSuggestedSubstitutions: !!ingredient.suggested_substitutions,
-      substitutionCount: ingredient.suggested_substitutions?.length || 0,
-      suggestedSubstitutions: ingredient.suggested_substitutions,
-    });
+      // Opening substitution modal for ingredient
 
       let scaledSuggestions: SubstitutionSuggestion[] | null = null;
       if (ingredient.suggested_substitutions && selectedScaleFactor !== 1) {

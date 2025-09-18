@@ -15,7 +15,7 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { COLORS, OVERLAYS, SPACING, RADIUS } from '../constants/theme';
-import { FONT, bodyStrongText } from '../constants/typography';
+import { FONT, bodyStrongText, bodyText } from '../constants/typography';
 
 interface ConfirmationModalProps {
   visible: boolean;
@@ -147,11 +147,11 @@ const styles = StyleSheet.create({
   button: {
     flex: 1,
     paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.md,
-    alignItems: 'center',
+    paddingHorizontal: SPACING.lg, // Keep horizontal padding for center alignment
+    borderRadius: 8, // Match Choose image button radius
+    alignItems: 'center', // Keep center alignment for modals
     justifyContent: 'center',
-    minHeight: 48,
+    minHeight: 46, // Match Choose image button height
   } as ViewStyle,
   cancelButton: {
     backgroundColor: 'transparent',
@@ -159,9 +159,10 @@ const styles = StyleSheet.create({
     borderColor: '#000000',
   } as ViewStyle,
   cancelButtonText: {
-    ...bodyStrongText,
+    ...bodyText, // Changed from bodyStrongText to match Choose image
     color: '#000000',
     fontSize: FONT.size.body,
+    textAlign: 'center', // Keep center alignment for modals
   } as TextStyle,
   confirmButton: {
     backgroundColor: 'transparent',
@@ -169,9 +170,10 @@ const styles = StyleSheet.create({
     borderColor: '#000000',
   } as ViewStyle,
   confirmButtonText: {
-    ...bodyStrongText,
+    ...bodyText, // Changed from bodyStrongText to match Choose image
     color: '#000000',
     fontSize: FONT.size.body,
+    textAlign: 'center', // Keep center alignment for modals
   } as TextStyle,
   destructiveButton: {
     backgroundColor: 'transparent',

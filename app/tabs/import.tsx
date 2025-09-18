@@ -59,11 +59,9 @@ export default function ImportScreen() {
   const [expandedImportOption, setExpandedImportOption] = useState<string | null>(null);
   const [recipeUrl, setRecipeUrl] = useState('');
 
-  // Debug: Log recipeUrl state changes
+  // Recipe URL state tracking
   useEffect(() => {
-    if (__DEV__) {
-      console.log('[UI] 🔍 recipeUrl state changed:', { value: recipeUrl, type: typeof recipeUrl, length: recipeUrl?.length });
-    }
+    // URL state changed - ready for validation
   }, [recipeUrl]);
   const [showMatchSelectionModal, setShowMatchSelectionModal] = useState(false);
   const [potentialMatches, setPotentialMatches] = useState<{ recipe: CombinedParsedRecipe; similarity: number; }[]>([]);
@@ -786,7 +784,6 @@ export default function ImportScreen() {
 
   // Track if user has typed
   const handleChangeText = (text: string) => {
-    console.log('[UI] 📝 TextInput onChangeText called with:', { text, type: typeof text, length: text?.length });
     // Update the appropriate field based on current import mode
     if (importMode === 'url') {
       setRecipeUrl(text);
@@ -1467,8 +1464,8 @@ const styles = StyleSheet.create({
     paddingLeft: INPUT_LEFT_PAD, // Left padding moved to wrapper
     borderWidth: 1,
     borderColor: '#000000',
-    borderTopLeftRadius: RADIUS.lg,
-    borderBottomLeftRadius: RADIUS.lg,
+    borderTopLeftRadius: 8,
+    borderBottomLeftRadius: 8,
     borderRightWidth: 0, // Remove right border since button will be attached
     backgroundColor: '#DEF6FF', // Changed to light blue background
   },
@@ -1495,8 +1492,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#000000',
-    borderTopRightRadius: RADIUS.lg,
-    borderBottomRightRadius: RADIUS.lg,
+    borderTopRightRadius: 8,
+    borderBottomRightRadius: 8,
     borderLeftWidth: 0, // Remove left border since input will be attached
   },
   submitButtonConnected: {
@@ -1569,7 +1566,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     borderWidth: 1,
     borderColor: '#000000',
-    borderRadius: RADIUS.lg,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'flex-start', // Left align content
     paddingLeft: INPUT_LEFT_PAD, // Match input left padding

@@ -78,7 +78,12 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
               </Text>
               <Animated.View entering={FadeIn.duration(800).delay(1500)}>
                 <Text style={[styles.taglineText, styles.taglineBullet]}>
-                  {features.map(item => item.text).join('\n')}
+                  {features.map((item, index) => (
+                    <Text key={index}>
+                      {item.text}
+                      {index < features.length - 1 ? '\n' : ''}
+                    </Text>
+                  ))}
                 </Text>
               </Animated.View>
             </Animated.View>

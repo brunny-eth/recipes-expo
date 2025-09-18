@@ -139,7 +139,7 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
 
     if (!globalSdkInitialized) {
       const revenueCatApiKey = process.env.EXPO_PUBLIC_REVENUECAT_KEY;
-      console.log("[RevenueCat] API key at runtime:", process.env.EXPO_PUBLIC_REVENUECAT_KEY);
+      console.log("[RevenueCat] API key configured:", !!process.env.EXPO_PUBLIC_REVENUECAT_KEY);
       logger.info('[RevenueCat] Initialization starting...', {
         hasApiKey: !!revenueCatApiKey,
         keyPrefix: revenueCatApiKey ? revenueCatApiKey.substring(0, 5) + '...' : 'none',
