@@ -3,8 +3,9 @@ import { detectInputType } from '../server/utils/detectInputType';
 import { normalizeUrl } from '../utils/normalizeUrl';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../context/AuthContext';
-import { getNetworkErrorMessage, getSubmissionErrorMessage } from '../utils/errorMessages';
+import { getNetworkErrorMessage, getSubmissionErrorMessage, getErrorMessage } from '../utils/errorMessages';
 import { normalizeAppError } from '../utils/normalizeAppError';
+import { ParseErrorCode } from '../common/types/errors';
 import type { 
   CacheCheckResult, 
   SubmissionState, 
@@ -40,7 +41,7 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
       return {
         isValid: false,
         inputType: 'invalid',
-        error: 'Please paste a recipe URL or recipe text.'
+        error: getErrorMessage(ParseErrorCode.INVALID_INPUT, 'url') // Default to url context for empty input
       };
     }
 
@@ -52,7 +53,7 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
       return {
         isValid: false,
         inputType: 'invalid',
-        error: 'Please paste a valid recipe URL or recipe text.'
+        error: getErrorMessage(ParseErrorCode.INVALID_INPUT, 'url') // Default to url context for invalid input
       };
     }
 
@@ -142,6 +143,9 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
     setIsSubmitting(true);
     setSubmissionState('validating');
 
+    // Declare inputType outside try block so it's available in catch block
+    let inputType: string = 'url'; // Default fallback
+
     try {
       // Step 1: Validate input
       const validation = validateInput(input);
@@ -154,7 +158,9 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
         };
       }
 
-      const { inputType, normalizedInput } = validation;
+      const validationResult = validation;
+      inputType = validationResult.inputType;
+      const { normalizedInput } = validationResult;
 
       // Step 2: Handle different input types
       if (inputType === 'url' || inputType === 'video') {
@@ -214,8 +220,16 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
         console.log('[useRecipeSubmission] Backend response ok:', response.ok);
 
         if (!response.ok) {
-          const errorMessage = getNetworkErrorMessage(`HTTP ${response.status}`, response.status);
-          throw new Error(errorMessage);
+          // For parsing endpoints, treat 4xx/5xx as parsing failures, not network errors
+          if (response.status === 400 || response.status === 422) {
+            throw new Error('Invalid input provided');
+          } else if (response.status === 500) {
+            throw new Error('Could not process the input provided');
+          } else {
+            // True network/service errors (503, 502, etc.)
+            const errorMessage = getNetworkErrorMessage(`HTTP ${response.status}`, response.status);
+            throw new Error(errorMessage);
+          }
         }
 
         const parseResult = await response.json();
@@ -305,7 +319,7 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
         return {
           success: true,
           action: 'navigate_to_loading',
-          normalizedUrl: normalizedInput!,
+          normalizedUrl: normalizedInput,
           inputType: inputType
         };
       } else {
@@ -313,9 +327,19 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
       }
     } catch (error) {
       console.error('[useRecipeSubmission] Submission error:', error);
+      
+      // Capture current submission state before resetting it
+      const currentStage = submissionState;
       setSubmissionState('idle');
       
-      const normalized = normalizeAppError(error, { stage: submissionState });
+      // Map inputType to context for proper error message selection
+      const context = inputType === 'url' || inputType === 'video' ? 'url' :
+                     inputType === 'raw_text' ? 'raw_text' :
+                     inputType === 'image' ? 'image' : 'url';
+      
+      console.log('[useRecipeSubmission] Error context mapping:', { inputType, context, currentStage, submissionState: 'idle' });
+      
+      const normalized = normalizeAppError(error, { stage: currentStage, context });
       return {
         success: false,
         action: 'show_validation_error',

@@ -21,39 +21,35 @@ describe('Error Messages - Current Behavior Snapshots', () => {
       it('returns URL message when no context provided', () => {
         const message = getErrorMessage(ParseErrorCode.INVALID_INPUT);
         expect(message).toMatchInlineSnapshot(`
-          "That doesn't look like a valid recipe.
-
-          Please try a URL with an actual recipe in it."
+          "That doesn't look like a valid recipe. Please try again."
         `);
       });
 
       it('returns image message when context is "image"', () => {
         const message = getErrorMessage(ParseErrorCode.INVALID_INPUT, 'image');
         expect(message).toMatchInlineSnapshot(`
-          "Those images don't appear to contain a recipe. Please try uploading images that show recipe ingredients and instructions."
+          "Those images don't appear to contain a recipe. Try uploading ones with ingredients and instructions."
         `);
       });
 
       it('returns image message when context is "images"', () => {
         const message = getErrorMessage(ParseErrorCode.INVALID_INPUT, 'images');
         expect(message).toMatchInlineSnapshot(`
-          "Those images don't appear to contain a recipe. Please try uploading images that show recipe ingredients and instructions."
+          "Those images don't appear to contain a recipe. Try uploading ones with ingredients and instructions."
         `);
       });
 
       it('returns raw_text message when context is "raw_text"', () => {
         const message = getErrorMessage(ParseErrorCode.INVALID_INPUT, 'raw_text');
         expect(message).toMatchInlineSnapshot(`
-          "Please be a bit more descriptive so we can make you the best recipe! Try adding details like 'chicken empanadas with cheese' or 'vegetarian empanadas with spinach'."
+          "Please be a bit more descriptive. Try something like 'arugula pizza' or 'lasagna'."
         `);
       });
 
       it('returns URL message for unknown context', () => {
         const message = getErrorMessage(ParseErrorCode.INVALID_INPUT, 'unknown_context');
         expect(message).toMatchInlineSnapshot(`
-          "That doesn't look like a valid recipe.
-
-          Please try a URL with an actual recipe in it."
+          "That doesn't look like a valid recipe. Please try again."
         `);
       });
     });
@@ -62,39 +58,35 @@ describe('Error Messages - Current Behavior Snapshots', () => {
       it('returns URL message when no context provided', () => {
         const message = getErrorMessage(ParseErrorCode.GENERATION_FAILED);
         expect(message).toMatchInlineSnapshot(`
-          "We couldn't process that recipe.
-
-          Please try a URL with an actual recipe on it."
+          "We couldn't process that recipe. Please try again."
         `);
       });
 
       it('returns image message when context is "image"', () => {
         const message = getErrorMessage(ParseErrorCode.GENERATION_FAILED, 'image');
         expect(message).toMatchInlineSnapshot(`
-          "We couldn't find a recipe in those images. Please try uploading clearer images that show recipe ingredients and cooking steps."
+          "We couldn't find a recipe in those images. Try clearer images with steps and ingredients."
         `);
       });
 
       it('returns image message when context is "images"', () => {
         const message = getErrorMessage(ParseErrorCode.GENERATION_FAILED, 'images');
         expect(message).toMatchInlineSnapshot(`
-          "We couldn't find a recipe in those images. Please try uploading clearer images that show recipe ingredients and cooking steps."
+          "We couldn't find a recipe in those images. Try clearer images with steps and ingredients."
         `);
       });
 
       it('returns raw_text message when context is "raw_text"', () => {
         const message = getErrorMessage(ParseErrorCode.GENERATION_FAILED, 'raw_text');
         expect(message).toMatchInlineSnapshot(`
-          "We couldn't process that recipe. Please be a bit more descriptive so we can make you the best recipe! Try adding details like cooking method or main ingredients."
+          "We couldn't understand the recipe you pasted. Try adding more detail."
         `);
       });
 
       it('returns URL message for unknown context', () => {
         const message = getErrorMessage(ParseErrorCode.GENERATION_FAILED, 'unknown_context');
         expect(message).toMatchInlineSnapshot(`
-          "We couldn't process that recipe.
-
-          Please try a URL with an actual recipe on it."
+          "We couldn't process that recipe. Please try again."
         `);
       });
     });
@@ -355,7 +347,39 @@ describe('Error Messages - Current Behavior Snapshots', () => {
         const error = 'Invalid input';
         const message = getSubmissionErrorMessage('validation', error);
         expect(message).toMatchInlineSnapshot(`
-          "Please enter a valid recipe URL or recipe text."
+          "That doesn't look like a valid recipe. Please try again."
+        `);
+      });
+
+      it('handles validation errors with URL context', () => {
+        const error = 'Invalid input';
+        const message = getSubmissionErrorMessage('validation', error, 'url');
+        expect(message).toMatchInlineSnapshot(`
+          "That doesn't look like a valid recipe. Please try a recipe URL."
+        `);
+      });
+
+      it('handles validation errors with raw_text context', () => {
+        const error = 'Invalid input';
+        const message = getSubmissionErrorMessage('validation', error, 'raw_text');
+        expect(message).toMatchInlineSnapshot(`
+          "Please be a bit more descriptive. Try something like 'arugula pizza' or 'lasagna'."
+        `);
+      });
+
+      it('handles validation errors with image context', () => {
+        const error = 'Invalid input';
+        const message = getSubmissionErrorMessage('validation', error, 'image');
+        expect(message).toMatchInlineSnapshot(`
+          "Those images don't appear to contain a recipe. Try uploading ones with ingredients and instructions."
+        `);
+      });
+
+      it('handles validation errors with images context (plural)', () => {
+        const error = 'Invalid input';
+        const message = getSubmissionErrorMessage('validation', error, 'images');
+        expect(message).toMatchInlineSnapshot(`
+          "Those images don't appear to contain a recipe. Try uploading ones with ingredients and instructions."
         `);
       });
     });
@@ -457,7 +481,7 @@ describe('Error Messages - Current Behavior Snapshots', () => {
         const error = 'Parsing timeout';
         const message = getSubmissionErrorMessage('parsing', error);
         expect(message).toMatchInlineSnapshot(`
-          "Recipe processing is taking longer than usual. Please try again."
+          "That doesn't look like a valid recipe. Please try again."
         `);
       });
 
@@ -465,7 +489,7 @@ describe('Error Messages - Current Behavior Snapshots', () => {
         const error = 'Parsing failed';
         const message = getSubmissionErrorMessage('parsing', error);
         expect(message).toMatchInlineSnapshot(`
-          "We're having trouble processing that recipe. Please try again or paste the recipe text directly."
+          "That doesn't look like a valid recipe. Please try again."
         `);
       });
     });
@@ -479,6 +503,67 @@ describe('Error Messages - Current Behavior Snapshots', () => {
           "Something unexpected happened when trying to process your recipe. 
           If the problem continues, try pasting recipe text directly."
         `);
+      });
+    });
+  });
+
+  describe('Context Flow Integration Tests', () => {
+    describe('useRecipeSubmission context mapping', () => {
+      it('maps URL input type to url context for validation errors', () => {
+        const error = 'Invalid input';
+        const result = normalizeAppError(error, { 
+          stage: 'validation',
+          context: 'url' // This simulates what useRecipeSubmission now passes
+        });
+        
+        expect(result.code).toBe('SUBMISSION_VALIDATION');
+        expect(result.title).toBe('Submission Error');
+        expect(result.message).toContain("That doesn't look like a valid recipe. Please try a recipe URL.");
+        expect(result.severity).toBe('warn'); // Validation errors are warnings, not errors
+        expect(result.retryable).toBe(false); // User needs to fix input first
+      });
+
+      it('maps raw_text input type to raw_text context for validation errors', () => {
+        const error = 'Invalid input';
+        const result = normalizeAppError(error, { 
+          stage: 'validation',
+          context: 'raw_text' // This simulates what useRecipeSubmission now passes
+        });
+        
+        expect(result.code).toBe('SUBMISSION_VALIDATION');
+        expect(result.title).toBe('Submission Error');
+        expect(result.message).toContain("Please be a bit more descriptive. Try something like 'arugula pizza' or 'lasagna'.");
+        expect(result.severity).toBe('warn'); // Validation errors are warnings, not errors
+        expect(result.retryable).toBe(false); // User needs to fix input first
+      });
+
+      it('maps image input type to image context for validation errors', () => {
+        const error = 'Invalid input';
+        const result = normalizeAppError(error, { 
+          stage: 'validation',
+          context: 'image' // This simulates what useRecipeSubmission now passes
+        });
+        
+        expect(result.code).toBe('SUBMISSION_VALIDATION');
+        expect(result.title).toBe('Submission Error');
+        expect(result.message).toContain("Those images don't appear to contain a recipe. Try uploading ones with ingredients and instructions.");
+        expect(result.severity).toBe('warn'); // Validation errors are warnings, not errors
+        expect(result.retryable).toBe(false); // User needs to fix input first
+      });
+
+      it('handles backend parsing failures as generation errors (not network errors)', () => {
+        const error = 'Could not process the input provided';
+        const result = normalizeAppError(error, { 
+          stage: 'parsing',
+          context: 'raw_text'
+        });
+        
+        // Backend parsing failures should be classified as generation errors, not network errors
+        expect(result.code).toBe('SUBMISSION_PARSING');
+        expect(result.title).toBe('Submission Error');
+        expect(result.message).toBe("We couldn't understand the recipe you pasted. Try adding more detail.");
+        expect(result.severity).toBe('warn'); // Parsing errors are warnings
+        expect(result.retryable).toBe(false); // User needs to fix input first
       });
     });
   });
@@ -595,9 +680,9 @@ describe('Error Messages - Current Behavior Snapshots', () => {
         
         expect(result.code).toBe('SUBMISSION_VALIDATION');
         expect(result.title).toBe('Submission Error');
-        expect(result.message).toContain("Please enter a valid recipe URL or recipe text");
-        expect(result.severity).toBe('error');
-        expect(result.retryable).toBe(true);
+        expect(result.message).toContain("That doesn't look like a valid recipe");
+        expect(result.severity).toBe('warn'); // Validation errors are warnings
+        expect(result.retryable).toBe(false); // User needs to fix input first
       });
 
       it('handles parsing stage errors', () => {
@@ -606,8 +691,8 @@ describe('Error Messages - Current Behavior Snapshots', () => {
         
         expect(result.code).toBe('SUBMISSION_PARSING');
         expect(result.title).toBe('Submission Error');
-        expect(result.severity).toBe('error');
-        expect(result.retryable).toBe(true);
+        expect(result.severity).toBe('warn'); // Parsing errors are warnings
+        expect(result.retryable).toBe(false); // User needs to fix input first
       });
     });
 
@@ -619,7 +704,7 @@ describe('Error Messages - Current Behavior Snapshots', () => {
         expect(result.code).toBe('PARSING_ERROR');
         expect(result.title).toBe('Invalid Input');
         expect(result.severity).toBe('warn');
-        expect(result.retryable).toBe(true);
+        expect(result.retryable).toBe(false); // INVALID_INPUT is not retryable - user needs to fix input
         // Note: The actual message comes from getErrorMessage with undefined errorCode
         // which falls back to the default case
       });
@@ -631,7 +716,7 @@ describe('Error Messages - Current Behavior Snapshots', () => {
         expect(result.code).toBe('PARSING_ERROR');
         expect(result.title).toBe('Invalid Input');
         expect(result.severity).toBe('warn');
-        expect(result.retryable).toBe(true);
+        expect(result.retryable).toBe(false); // INVALID_INPUT is not retryable - user needs to fix input
         // Note: The actual message comes from getErrorMessage with undefined errorCode
         // which falls back to the default case
       });

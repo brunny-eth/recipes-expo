@@ -1250,6 +1250,17 @@ export function formatIngredientsForGroceryList(
           amount: ingredient.amount,
           unit: ingredient.unit
         });
+        
+        // Special debug for parsley and red pepper flakes
+        if (ingredient.name.toLowerCase().includes('parsley') || ingredient.name.toLowerCase().includes('pepper')) {
+          console.log('[groceryHelpers] 🌿🌶️ SPECIAL DEBUG - Parsley/Pepper ingredient:', {
+            name: ingredient.name,
+            amount: ingredient.amount,
+            unit: ingredient.unit,
+            preparation: ingredient.preparation,
+            grocery_category: (ingredient as any).grocery_category
+          });
+        }
         // For grocery list creation, we need normalized names for aggregation
         // parseRecipeDisplayName() is for UI parsing (substitutions/removals)
         // normalizeName() is for grocery aggregation (aliases, adjectives, singularization)
@@ -1474,16 +1485,28 @@ export function formatIngredientsForGroceryList(
           }
         }
         
-        // Skip ingredients that are marked as removed or have no amount
-        if (ingredient.name.includes('(removed)') || amount === null || amount === 0) {
+        // Skip ingredients that are marked as removed, but allow null amounts (for "to taste" ingredients)
+        // Only skip if amount is explicitly 0, not if it's null
+        if (ingredient.name.includes('(removed)') || amount === 0) {
           if (process.env.NODE_ENV === 'development') {
-            console.log(`[groceryHelpers] ⏭️ Skipping removed/empty ingredient:`, {
+            console.log(`[groceryHelpers] ⏭️ Skipping removed/zero ingredient:`, {
               name: ingredient.name,
               amount: ingredient.amount,
               parsedAmount: amount
             });
           }
           continue; // Skip to next ingredient
+        }
+
+        // Special debug for parsley and red pepper flakes
+        if (ingredient.name.toLowerCase().includes('parsley') || ingredient.name.toLowerCase().includes('pepper')) {
+          console.log('[groceryHelpers] 🌿🌶️ DEBUG: About to create grocery item for parsley/pepper:', {
+            name: ingredient.name,
+            amount: ingredient.amount,
+            parsedAmount: amount,
+            unit: ingredient.unit,
+            willCreateItem: true
+          });
         }
 
         // Create grocery list item from final ingredient
@@ -1519,6 +1542,21 @@ export function formatIngredientsForGroceryList(
           originalText,
           normalizedName
         });
+        
+        // Special debug for parsley and red pepper flakes - final grocery item
+        if (ingredient.name.toLowerCase().includes('parsley') || ingredient.name.toLowerCase().includes('pepper')) {
+          console.log('[groceryHelpers] 🌿🌶️ FINAL GROCERY ITEM - Parsley/Pepper:', {
+            originalName: ingredient.name,
+            finalGroceryItem: {
+              item_name: groceryItem.item_name,
+              quantity_amount: groceryItem.quantity_amount,
+              quantity_unit: groceryItem.quantity_unit,
+              display_unit: groceryItem.display_unit,
+              grocery_category: groceryItem.grocery_category,
+              original_ingredient_text: groceryItem.original_ingredient_text
+            }
+          });
+        }
 
 
         

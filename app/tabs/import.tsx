@@ -50,6 +50,8 @@ import { detectInputType, validateRawTextInput, validateDishNameInput } from '..
 import { useAnalytics } from '@/utils/analytics';
 import { logger } from '@/utils/logger';
 import { useHandleError } from '@/hooks/useHandleError';
+import { getErrorMessage } from '@/utils/errorMessages';
+import { ParseErrorCode } from '@/common/types/errors';
 
 export default function ImportScreen() {
   const insets = useSafeAreaInsets();
@@ -413,9 +415,11 @@ export default function ImportScreen() {
       if (importMode === 'name') {
         const validation = validateDishNameInput(localRecipeInput);
         if (!validation.isValid) {
+          // Use unified error messaging system
+          const errorMessage = getErrorMessage(ParseErrorCode.INVALID_INPUT, 'raw_text');
           showError(
-            'Invalid dish name',
-            validation.error || 'Please enter a valid dish name.',
+            'Invalid Input',
+            errorMessage,
             undefined,
             () => {
               hideError();
@@ -429,33 +433,18 @@ export default function ImportScreen() {
 
       // Early validation of the text/URL before mode-specific checks
       if (!isValidRecipeInput(localRecipeInput)) {
-        let errorMessage = 'Please enter valid input for the selected mode.';
-        let errorTitle = 'Input Not Recognized';
-
-        // Mode-specific error messages
-        switch (importMode) {
-          case 'url':
-            errorMessage = 'Please enter a valid website link (e.g., https://example.com/recipe)';
-            break;
-          case 'name':
-            errorMessage = 'Please enter a real dish name (like "chicken soup" or "tomato pasta")';
-            break;
-          case 'text':
-            errorMessage = 'Please enter recipe text or ingredients';
-            break;
-          default:
-            errorMessage = 'Please enter a valid recipe URL, dish name, or recipe text';
-        }
-
-        showError(
-          errorTitle,
-          errorMessage,
-          undefined,
-          () => {
-            hideError();
-          },
-          'OK'
-        );
+        // Map importMode to context for proper error message selection
+        const context = importMode === 'url' ? 'url' : 
+                       importMode === 'name' ? 'raw_text' : 
+                       importMode === 'text' ? 'raw_text' : 'url';
+        
+        // Use context-aware error handling
+        handleError('Input Not Recognized', 'Invalid input', { 
+          stage: 'validation',
+          context: context
+        });
+        
+        // Clear the active input for better UX
         if (importMode === 'url') setRecipeUrl('');
         if (importMode === 'text') setRecipeText('');
         if (importMode === 'name') setRecipeDishName('');
@@ -480,10 +469,11 @@ export default function ImportScreen() {
 
       // If user is in URL mode, strictly require a valid URL or video; do not allow raw text
       if (importMode === 'url' && !(inputType === 'url' || inputType === 'video')) {
-        showError(
-          'Please enter a valid link',
-          'The URL field only accepts links (e.g., https://example.com/recipe). If you want to search by name, switch to Dish name.',
-        );
+        // Use context-aware error handling instead of hardcoded message
+        handleError('Input Not Recognized', 'Invalid input', { 
+          stage: 'validation',
+          context: 'url'
+        });
         setRecipeUrl('');
         return;
       }
@@ -492,10 +482,11 @@ export default function ImportScreen() {
       if (importMode === 'text') {
         const rawTextValidation = validateRawTextInput(localRecipeInput);
         if (!rawTextValidation.isValid) {
-          showError(
-            'Invalid recipe text',
-            rawTextValidation.error || 'The Raw Text field is for recipe text or ingredients. If you have a link, switch to Website.',
-          );
+          // Use context-aware error handling instead of hardcoded message
+          handleError('Invalid recipe text', 'Invalid input', { 
+            stage: 'validation',
+            context: 'raw_text'
+          });
           return;
         }
       }
@@ -504,10 +495,12 @@ export default function ImportScreen() {
       if (importMode === 'name') {
         const dishNameValidation = validateDishNameInput(localRecipeInput);
         if (!dishNameValidation.isValid) {
-          showError(
-            'Invalid dish name',
-            dishNameValidation.error || 'The Dish Name field is for recipe names. If you have a link, switch to Website.',
-          );
+          console.log('[ImportScreen] Dish name validation failed, using context-aware error handling');
+          // Use context-aware error handling with unified error messaging
+          handleError('Invalid Input', 'Invalid input', { 
+            stage: 'validation',
+            context: 'raw_text'
+          });
           return;
         }
       }
@@ -585,15 +578,18 @@ export default function ImportScreen() {
           submissionId: localSubmissionId
         });
         if (result.action === 'show_validation_error') {
-          // Show mode-specific error messages
-          if (importMode === 'url') {
-            showError('Invalid website link', 'Please enter a valid website link (e.g., https://example.com/recipe).');
-          } else if (importMode === 'image') {
-            showError('Image processing error', 'There was an error processing your image. Please try again.');
-          } else if (importMode === 'explore') {
-            showError('Explore error', 'There was an error loading recipes. Please try again.');
-          } else if (result.error) {
-            handleError('Validation Error', result.error, { stage: 'validation' });
+          // Use context-aware error messages based on import mode
+          if (result.error) {
+            // Map importMode to context for proper error message selection
+            const context = importMode === 'url' ? 'url' : 
+                           importMode === 'image' ? 'image' : 
+                           importMode === 'name' ? 'raw_text' :
+                           importMode === 'explore' ? 'raw_text' : 'url';
+            
+            handleError('Validation Error', result.error, { 
+              stage: 'validation',
+              context: context
+            });
           }
         }
         return;

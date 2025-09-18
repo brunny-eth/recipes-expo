@@ -719,6 +719,34 @@ router.get('/grocery-list', async (req: Request, res: Response) => {
         recipe,
         `mise_${miseRecipe.id}`
       );
+      
+      // Debug: Check for parsley and red pepper flakes in formatted items
+      const parsleyFormatted = formattedItems.filter(item => 
+        item.item_name.toLowerCase().includes('parsley')
+      );
+      const pepperFormatted = formattedItems.filter(item => 
+        item.item_name.toLowerCase().includes('pepper')
+      );
+      
+      logger.info({ 
+        requestId, 
+        miseRecipeId: miseRecipe.id,
+        recipeTitle,
+        formattedItemsCount: formattedItems.length,
+        parsleyFormatted: parsleyFormatted.map(item => ({
+          item_name: item.item_name,
+          quantity_amount: item.quantity_amount,
+          quantity_unit: item.quantity_unit,
+          grocery_category: item.grocery_category
+        })),
+        pepperFormatted: pepperFormatted.map(item => ({
+          item_name: item.item_name,
+          quantity_amount: item.quantity_amount,
+          quantity_unit: item.quantity_unit,
+          grocery_category: item.grocery_category
+        }))
+      }, 'Debug: Formatted items for recipe');
+      
       allGroceryItems.push(...formattedItems);
     }
 
@@ -728,9 +756,37 @@ router.get('/grocery-list', async (req: Request, res: Response) => {
       allItems: allGroceryItems.map(item => ({
         item_name: item.item_name,
         original_ingredient_text: item.original_ingredient_text,
-        grocery_category: item.grocery_category
+        grocery_category: item.grocery_category,
+        quantity_amount: item.quantity_amount,
+        quantity_unit: item.quantity_unit
       }))
     }, 'All grocery items before aggregation');
+
+    // Debug: Check for parsley and red pepper flakes before aggregation
+    const parsleyItems = allGroceryItems.filter(item => 
+      item.item_name.toLowerCase().includes('parsley')
+    );
+    const pepperItems = allGroceryItems.filter(item => 
+      item.item_name.toLowerCase().includes('pepper')
+    );
+    
+    logger.info({ 
+      requestId, 
+      parsleyItems: parsleyItems.map(item => ({
+        item_name: item.item_name,
+        original_ingredient_text: item.original_ingredient_text,
+        quantity_amount: item.quantity_amount,
+        quantity_unit: item.quantity_unit,
+        grocery_category: item.grocery_category
+      })),
+      pepperItems: pepperItems.map(item => ({
+        item_name: item.item_name,
+        original_ingredient_text: item.original_ingredient_text,
+        quantity_amount: item.quantity_amount,
+        quantity_unit: item.quantity_unit,
+        grocery_category: item.grocery_category
+      }))
+    }, 'Debug: Parsley and pepper items BEFORE aggregation');
 
     // Special debug for corn ingredients
     const cornItemsBeforeAgg = allGroceryItems.filter(item =>
@@ -755,7 +811,7 @@ router.get('/grocery-list', async (req: Request, res: Response) => {
     const aggregatedItems = aggregateGroceryList(allGroceryItems);
 
     // Debug specific problematic cases
-    const problematicItems = ['garlic', 'tamari', 'avocado', 'corn'];
+    const problematicItems = ['garlic', 'tamari', 'avocado', 'corn', 'parsley', 'red pepper flakes', 'pepper'];
     problematicItems.forEach(itemName => {
       const matchingItems = aggregatedItems.filter(item => 
         item.item_name.toLowerCase().includes(itemName.toLowerCase())
@@ -774,6 +830,12 @@ router.get('/grocery-list', async (req: Request, res: Response) => {
             original_ingredient_text: item.original_ingredient_text
           }))
         }, 'Debug: Found matching items for problematic ingredient');
+      } else {
+        logger.info({ 
+          requestId, 
+          searchTerm: itemName,
+          message: 'No matching items found in aggregated list'
+        }, 'Debug: Missing ingredient in aggregated list');
       }
     });
 
@@ -875,7 +937,14 @@ router.get('/grocery-list', async (req: Request, res: Response) => {
       requestId, 
       finalResponseItemCount: finalItems.length,
       garlicItems: finalItems.filter((item: any) => item.item_name.toLowerCase().includes('garlic')),
-      sesameItems: finalItems.filter((item: any) => item.item_name.toLowerCase().includes('sesame'))
+      sesameItems: finalItems.filter((item: any) => item.item_name.toLowerCase().includes('sesame')),
+      parsleyItems: finalItems.filter((item: any) => item.item_name.toLowerCase().includes('parsley')),
+      pepperItems: finalItems.filter((item: any) => item.item_name.toLowerCase().includes('pepper')),
+      allItems: finalItems.map((item: any) => ({
+        item_name: item.item_name,
+        quantity_amount: item.quantity_amount,
+        quantity_unit: item.quantity_unit
+      }))
     }, '🚨 FINAL RESPONSE TO FRONTEND');
 
     res.json({

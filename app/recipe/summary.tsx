@@ -2503,10 +2503,8 @@ export default function RecipeSummaryScreen() {
           // Skip ingredients marked as removed
           if (ingredient.name.includes('(removed)')) return false;
           
-          // Skip ingredients with null/undefined amounts
-          if (ingredient.amount === null || ingredient.amount === undefined) return false;
-          
-          // Skip ingredients with zero amounts (handle both string and number)
+          // Allow ingredients with null/undefined amounts (for "to taste" ingredients like garnishes)
+          // Only skip ingredients with explicitly zero amounts
           if (typeof ingredient.amount === 'number' && ingredient.amount === 0) return false;
           if (typeof ingredient.amount === 'string' && ingredient.amount === '0') return false;
           

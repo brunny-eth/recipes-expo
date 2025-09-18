@@ -101,8 +101,41 @@ type GroceryCategory = {
   items: GroceryItem[];
 };
 
-// Convert flat grocery items array to categorized format
+  // Convert flat grocery items array to categorized format
 const convertToGroceryCategories = (items: any[]): GroceryCategory[] => {
+  console.log('[MiseScreen] 🔄 convertToGroceryCategories input:', {
+    totalItems: items.length,
+    items: items.map(item => ({
+      item_name: item.item_name,
+      quantity_amount: item.quantity_amount,
+      quantity_unit: item.quantity_unit,
+      grocery_category: item.grocery_category
+    }))
+  });
+  
+  // Special debug for parsley and red pepper flakes
+  const parsleyItems = items.filter(item => 
+    item.item_name && item.item_name.toLowerCase().includes('parsley')
+  );
+  const pepperItems = items.filter(item => 
+    item.item_name && item.item_name.toLowerCase().includes('pepper')
+  );
+  
+  console.log('[MiseScreen] 🌿🌶️ CONVERSION: Parsley/Pepper items found:', {
+    parsleyItems: parsleyItems.map(item => ({
+      item_name: item.item_name,
+      quantity_amount: item.quantity_amount,
+      quantity_unit: item.quantity_unit,
+      grocery_category: item.grocery_category
+    })),
+    pepperItems: pepperItems.map(item => ({
+      item_name: item.item_name,
+      quantity_amount: item.quantity_amount,
+      quantity_unit: item.quantity_unit,
+      grocery_category: item.grocery_category
+    }))
+  });
+  
   const categories: { [key: string]: GroceryItem[] } = {};
 
     const eggItems = items.filter(item =>
@@ -162,7 +195,7 @@ const convertToGroceryCategories = (items: any[]): GroceryCategory[] => {
   });
   
   // Convert to sorted array of categories
-  return Object.entries(categories)
+  const result = Object.entries(categories)
     .map(([name, items]) => ({ name, items }))
     .sort((a, b) => {
       // Put common categories first
@@ -175,6 +208,40 @@ const convertToGroceryCategories = (items: any[]): GroceryCategory[] => {
       if (bIndex !== -1) return 1;
       return a.name.localeCompare(b.name);
     });
+    
+  console.log('[MiseScreen] 🔄 convertToGroceryCategories output:', {
+    totalCategories: result.length,
+    categories: result.map(cat => ({
+      name: cat.name,
+      itemCount: cat.items.length,
+      items: cat.items.map(item => ({
+        name: item.name,
+        amount: item.amount,
+        unit: item.unit
+      }))
+    }))
+  });
+  
+  // Special debug: Check if parsley and pepper made it to the final categories
+  const finalParsleyItems = result.flatMap(cat => 
+    cat.items.filter(item => item.name.toLowerCase().includes('parsley'))
+  );
+  const finalPepperItems = result.flatMap(cat => 
+    cat.items.filter(item => item.name.toLowerCase().includes('pepper'))
+  );
+  
+  console.log('[MiseScreen] 🌿🌶️ FINAL CATEGORIES: Parsley/Pepper items in result:', {
+    parsleyItemsInCategories: finalParsleyItems.map(item => ({
+      name: item.name,
+      category: result.find(cat => cat.items.includes(item))?.name
+    })),
+    pepperItemsInCategories: finalPepperItems.map(item => ({
+      name: item.name,
+      category: result.find(cat => cat.items.includes(item))?.name
+    }))
+  });
+
+  return result;
 };
 
 // Merge manual items into grocery categories
@@ -276,6 +343,15 @@ const filterHouseholdStaples = (
         
         const stapleName = staple.toLowerCase().trim();
         
+        // DEBUG: Log filtering decisions for parsley and red pepper flakes
+        if (itemName.includes('parsley') || itemName.includes('pepper')) {
+          console.log('[MiseScreen] 🔍 DEBUG: Checking staple filter for:', {
+            itemName,
+            stapleName,
+            willBeFiltered: false // We'll update this below
+          });
+        }
+        
         // Special handling for pepper types - match pepper variations but not vegetable peppers
         if (stapleName === 'black pepper' || stapleName === 'ground pepper') {
           const vegetablePeppers = ['bell pepper', 'jalapeño', 'jalapeno', 'poblano', 'serrano', 'habanero', 'chili pepper', 'hot pepper', 'sweet pepper'];
@@ -313,6 +389,16 @@ const filterHouseholdStaples = (
         
         return false;
       });
+      
+      // DEBUG: Log the final filtering decision for parsley and red pepper flakes
+      if (itemName.includes('parsley') || itemName.includes('pepper')) {
+        console.log('[MiseScreen] 🔍 DEBUG: Final filtering decision for:', {
+          itemName,
+          isStaple,
+          willBeKept: !isStaple,
+          selectedStaples
+        });
+      }
       
       return !isStaple;
     })
@@ -504,7 +590,7 @@ export default function MiseScreen() {
       await new Promise(resolve => setTimeout(resolve, 100));
       
       // Then fetch grocery list based on those recipes
-      const groceryResponse = await fetch(`${backendUrl}/api/mise/grocery-list?userId=${session.user.id}`, { headers });
+        const groceryResponse = await fetch(`${backendUrl}/api/mise/grocery-list?userId=${session.user.id}`, { headers });
 
       if (!groceryResponse.ok) {
         throw new Error(`Failed to fetch grocery list: ${groceryResponse.statusText}`);
@@ -515,11 +601,58 @@ export default function MiseScreen() {
         groceryResponse.json(),
       ]);
 
+      // Debug: Log the raw response before any processing
+      console.log('[MiseScreen] 🔍 RAW API RESPONSE DEBUG:', {
+        groceryResponseStatus: groceryResponse.status,
+        groceryResponseOk: groceryResponse.ok,
+        groceryDataKeys: Object.keys(groceryData || {}),
+        groceryDataItemsLength: Array.isArray(groceryData?.items) ? groceryData.items.length : 'not array',
+        groceryDataItemsType: typeof groceryData?.items,
+        groceryDataItems: groceryData?.items || 'no items property'
+      });
+
       // Debug logging for backend data
+      console.log('[MiseScreen] 🛒 Raw grocery data from server:', {
+        totalItems: groceryData?.items?.length || 0,
+        allItems: groceryData?.items?.map((item: any) => ({
+          item_name: item.item_name,
+          quantity_amount: item.quantity_amount,
+          quantity_unit: item.quantity_unit,
+          grocery_category: item.grocery_category
+        })) || [],
+        responseKeys: Object.keys(groceryData || {}),
+        hasItems: !!groceryData?.items,
+        itemsType: typeof groceryData?.items,
+        itemsLength: Array.isArray(groceryData?.items) ? groceryData.items.length : 'not array'
+      });
+      
+      // Debug: Check for parsley and red pepper flakes in raw server data
       if (groceryData?.items) {
-              const eggItems = groceryData.items.filter((item: any) =>
-        (item.item_name || item.name || '').toLowerCase().includes('egg')
-      );
+        const parsleyItems = groceryData.items.filter((item: any) =>
+          (item.item_name || '').toLowerCase().includes('parsley')
+        );
+        const pepperItems = groceryData.items.filter((item: any) =>
+          (item.item_name || '').toLowerCase().includes('pepper')
+        );
+        
+        console.log('[MiseScreen] 🌿🌶️ Parsley/Pepper items in raw server data:', {
+          parsleyItems: parsleyItems.map((item: any) => ({
+            item_name: item.item_name,
+            quantity_amount: item.quantity_amount,
+            quantity_unit: item.quantity_unit,
+            grocery_category: item.grocery_category
+          })),
+          pepperItems: pepperItems.map((item: any) => ({
+            item_name: item.item_name,
+            quantity_amount: item.quantity_amount,
+            quantity_unit: item.quantity_unit,
+            grocery_category: item.grocery_category
+          }))
+        });
+        
+        const eggItems = groceryData.items.filter((item: any) =>
+          (item.item_name || item.name || '').toLowerCase().includes('egg')
+        );
       }
 
       const fetchedRecipes = recipesData?.recipes || [];
@@ -1452,6 +1585,43 @@ export default function MiseScreen() {
             if (displayGroceryList.length === 0) {
               displayGroceryList = [{ name: 'Miscellaneous', items: [] }];
             }
+
+            // DEBUG: Log what's actually being rendered
+            console.log('[MiseScreen] 🎨 FINAL RENDER: displayGroceryList', {
+              totalCategories: displayGroceryList.length,
+              categories: displayGroceryList.map(cat => ({
+                name: cat.name,
+                itemCount: cat.items.length,
+                items: cat.items.map(item => ({
+                  name: item.name,
+                  amount: item.amount,
+                  unit: item.unit
+                }))
+              }))
+            });
+
+            // DEBUG: Specifically look for parsley and pepper in final render
+            const allItemsInRender = displayGroceryList.flatMap(cat => cat.items);
+            const parsleyInRender = allItemsInRender.filter(item => 
+              item.name.toLowerCase().includes('parsley')
+            );
+            const pepperInRender = allItemsInRender.filter(item => 
+              item.name.toLowerCase().includes('pepper')
+            );
+            
+            console.log('[MiseScreen] 🌿🌶️ FINAL RENDER: Parsley/Pepper check', {
+              totalItemsInRender: allItemsInRender.length,
+              parsleyInRender: parsleyInRender.map(item => ({
+                name: item.name,
+                amount: item.amount,
+                unit: item.unit
+              })),
+              pepperInRender: pepperInRender.map(item => ({
+                name: item.name,
+                amount: item.amount,
+                unit: item.unit
+              }))
+            });
 
             return (
               <View style={styles.groceryListContainer}>
