@@ -220,18 +220,31 @@ export default function HouseholdStaplesModal({
                 </View>
               </View>
 
-              {/* All Buttons Stacked */}
-              <View style={styles.buttonStack}>
-                <TouchableOpacity onPress={() => onStaplesToggle(!staplesEnabled)} style={styles.stackedButton}>
-                  <Text style={[styles.stackedButtonText, !staplesEnabled && styles.stackedButtonTextInactive]}>
+              {/* Primary toggle button */}
+              <View style={styles.primaryButtonContainer}>
+                <TouchableOpacity 
+                  onPress={() => onStaplesToggle(!staplesEnabled)} 
+                  style={[
+                    styles.primaryButton,
+                    staplesEnabled ? styles.primaryButtonActive : styles.primaryButtonInactive
+                  ]}
+                >
+                  <Text style={[
+                    styles.primaryButtonText,
+                    staplesEnabled ? styles.primaryButtonTextActive : styles.primaryButtonTextInactive
+                  ]}>
                     {staplesEnabled ? 'Hide Pantry Items' : 'Show Pantry Items'}
                   </Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={handleCancel} style={styles.stackedButton}>
-                  <Text style={styles.stackedButtonText}>Cancel</Text>
+              </View>
+
+              {/* Secondary buttons */}
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity onPress={handleSave} style={styles.button}>
+                  <Text style={styles.buttonText}>Save</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={handleSave} style={styles.stackedButton}>
-                  <Text style={styles.stackedButtonText}>Save</Text>
+                <TouchableOpacity onPress={handleCancel} style={styles.button}>
+                  <Text style={styles.buttonText}>Cancel</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -259,16 +272,16 @@ const styles = StyleSheet.create({
     maxHeight: '85%', // Increased height to accommodate more content
   } as ViewStyle,
   header: {
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: SPACING.md,
   } as ViewStyle,
   title: {
-    fontFamily: FONT.family.graphikMedium,
-    fontSize: 28,
-    fontWeight: '600',
-    lineHeight: 32,
+    ...bodyStrongText,
+    fontSize: FONT.size.lg, // Match other modals (18px)
     color: COLORS.textDark,
+    textAlign: 'center', // Center align the title
     marginBottom: SPACING.xs,
-    textAlign: 'left',
   } as TextStyle,
   subtitle: {
     fontFamily: 'Inter',
@@ -276,7 +289,7 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     lineHeight: 22,
     color: COLORS.textMuted,
-    textAlign: 'left',
+    textAlign: 'center', // Center align subtitle too
   } as TextStyle,
 
   scrollWrapper: {
@@ -292,27 +305,56 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   } as TextStyle,
 
-  buttonStack: {
-    alignItems: 'flex-start',
-    gap: SPACING.sm,
+  primaryButtonContainer: {
+    marginBottom: SPACING.md,
   } as ViewStyle,
-  stackedButton: {
-    height: 24,
-    backgroundColor: 'transparent',
-    alignItems: 'flex-start',
+  primaryButton: {
+    height: 46, // Match button height consistency
+    borderRadius: 8, // Match button consistency
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: SPACING.lg, // Match modal button padding
   } as ViewStyle,
-  stackedButtonText: {
-    fontFamily: 'Inter',
-    fontSize: 18,
-    fontWeight: '400',
-    lineHeight: 22,
-    color: COLORS.textDark,
-    flex: 1,
-    textAlign: 'left',
-    textTransform: 'none' as const,
+  primaryButtonActive: {
+    backgroundColor: COLORS.primary, // Blue when active
+    borderColor: '#000000',
+  } as ViewStyle,
+  primaryButtonInactive: {
+    backgroundColor: 'transparent', // Transparent when inactive
+    borderColor: COLORS.lightGray,
+  } as ViewStyle,
+  primaryButtonText: {
+    ...bodyText, // Match modal button text style
+    fontSize: FONT.size.body, // 16px consistency
+    textAlign: 'center',
   } as TextStyle,
-  stackedButtonTextInactive: {
-    color: COLORS.textMuted,
+  primaryButtonTextActive: {
+    color: '#000000', // Black text on blue background
+  } as TextStyle,
+  primaryButtonTextInactive: {
+    color: COLORS.textMuted, // Muted text when inactive
+  } as TextStyle,
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+  } as ViewStyle,
+  button: {
+    flex: 1,
+    height: 46, // Match button height consistency
+    backgroundColor: 'transparent', // Secondary button style
+    borderWidth: 1,
+    borderColor: '#000000', // Black border
+    borderRadius: 8, // Match button consistency
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: SPACING.lg, // Match modal button padding
+  } as ViewStyle,
+  buttonText: {
+    ...bodyText, // Match modal button text style
+    color: '#000000', // Black text for secondary buttons
+    fontSize: FONT.size.body, // 16px consistency
+    textAlign: 'center',
   } as TextStyle,
   scrollContainerWrapper: {
     position: 'relative', // Needed for absolute positioning of gradient

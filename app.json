@@ -15,7 +15,7 @@
       "backgroundColor": "#DEF6FF"
     },
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.meez.recipes",
       "usesAppleSignIn": true,
       "entitlements": {

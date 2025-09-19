@@ -318,17 +318,20 @@ const styles = StyleSheet.create({
     height: 50,
   },
   startButton: {
-    backgroundColor: 'transparent',
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.sm,
-    marginHorizontal: SPACING.lg,
+    backgroundColor: COLORS.primary, // Blue primary button
+    borderWidth: 1,
+    borderColor: '#000000', // Black border
+    borderRadius: 8, // Match button consistency
+    paddingHorizontal: SPACING.lg, // Match modal button padding
     alignItems: 'center',
-    minHeight: 44,
+    justifyContent: 'center',
+    height: 46, // Match button height consistency
+    marginHorizontal: SPACING.lg,
   },
   startButtonText: {
-    ...bodyStrongText,
-    fontSize: 24, // Increased from default bodyStrongText size
-    color: '#000000',
+    ...bodyText, // Match modal button text style
+    fontSize: FONT.size.body, // 16px consistency
+    color: '#000000', // Black text on blue background
+    textAlign: 'center',
   },
 });

@@ -25,28 +25,28 @@ export function AuthNavigationHandler() {
   // Enable paywall when environment variable is set
   const forceEnablePaywall = enablePaywall;
   
-  console.log('🔍 [AuthNavigationHandler] Paywall configuration:', {
+  console.log('🔍 [AuthNavigationHandler] Paywall configuration: ' + JSON.stringify({
     enablePaywall,
     forceEnablePaywall,
     envValue: process.env.EXPO_PUBLIC_ENABLE_PAYWALL,
     isPremium,
     isRevenueCatLoading,
     hasSession: !!session
-  });
+  }));
   
   // Force visible log for debugging
-  console.warn('🚨 AUTH NAV DEBUG - Paywall enabled:', forceEnablePaywall, 'isPremium:', isPremium, 'isLoading:', isRevenueCatLoading, 'hasSession:', !!session);
+  console.warn('🚨 AUTH NAV DEBUG - Paywall enabled: ' + forceEnablePaywall + ' isPremium: ' + isPremium + ' isLoading: ' + isRevenueCatLoading + ' hasSession: ' + !!session);
 
   // Don't automatically show paywall - let individual screens handle premium gating
   // The paywall should only appear when users try to access premium features
   useEffect(() => {
-    console.warn('🚨 AUTH NAV useEffect triggered:', {
+    console.warn('🚨 AUTH NAV useEffect triggered: ' + JSON.stringify({
       forceEnablePaywall,
       isRevenueCatLoading,
       isPremium,
       showPaywall,
       hasSession: !!session
-    });
+    }));
     
     // Always hide paywall in AuthNavigationHandler - let screens handle their own premium gating
     console.log('[AuthNavigationHandler] Hiding paywall - screens will handle their own premium gating');

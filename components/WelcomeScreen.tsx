@@ -15,21 +15,6 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
   // iPad detection: consider iPad if width is greater than 768px
   // This ensures iPhone layouts remain unchanged while fixing iPad display
   const isIpad = width > 768;
-  
-  const features: { text: string }[] = [
-    {
-      text: 'Customize any recipe.'
-    },
-    {
-      text: 'Generate grocery lists.'
-    },
-    {
-      text: 'Cook multiple recipes together.'
-    },
-    {
-      text: 'Enjoy cooking your way.'
-    },
-  ];
 
   if (currentScreen === 'onboarding') {
     return (
@@ -74,16 +59,14 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
             >
               <Text style={[styles.taglineText, styles.taglineYourRecipe]}>
                 Turn any recipe into{' '}
-                <Text style={styles.taglineBold}>your{'\u00A0'}recipe.</Text>
+                <Text style={styles.taglineBold}>your recipe.</Text>
               </Text>
               <Animated.View entering={FadeIn.duration(800).delay(1500)}>
                 <Text style={[styles.taglineText, styles.taglineBullet]}>
-                  {features.map((item, index) => (
-                    <Text key={index}>
-                      {item.text}
-                      {index < features.length - 1 ? '\n' : ''}
-                    </Text>
-                  ))}
+                  <Text>Customize any recipe.{'\n'}</Text>
+                  <Text>Generate grocery lists.{'\n'}</Text>
+                  <Text>Cook multiple recipes together.{'\n'}</Text>
+                  <Text>Enjoy cooking your way.</Text>
                 </Text>
               </Animated.View>
             </Animated.View>
@@ -95,22 +78,22 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
             <View style={styles.buttonContainer}>
             <Animated.View entering={FadeIn.duration(1000).delay(3000)}>
               <TouchableOpacity
-                style={styles.takeTourButton}
-                onPress={() => setCurrentScreen('onboarding')}
+                style={styles.getStartedButton}
+                onPress={onDismiss}
               >
                 <Text style={styles.buttonText}>
-                  Take a quick tour
+                  Get started
                 </Text>
               </TouchableOpacity>
             </Animated.View>
             
             <Animated.View entering={FadeIn.duration(1000).delay(3000)}>
               <TouchableOpacity
-                style={styles.getStartedButton}
-                onPress={onDismiss}
+                style={styles.takeTourButton}
+                onPress={() => setCurrentScreen('onboarding')}
               >
                 <Text style={styles.buttonText}>
-                  Get started
+                  Take a quick tour
                 </Text>
               </TouchableOpacity>
             </Animated.View>
@@ -172,35 +155,31 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   takeTourButton: {
     width: '100%',
-    height: 46, // Fixed height like the original button
-    backgroundColor: COLORS.primary,
+    height: 46, // Match button height consistency
+    backgroundColor: 'transparent', // Secondary button style
     borderWidth: 1,
-    borderColor: '#000000',
-    borderRadius: RADIUS.lg,
+    borderColor: '#000000', // Black border
+    borderRadius: 8, // Match button consistency
     justifyContent: 'center',
-    alignItems: 'flex-start', // Left align content
-    paddingLeft: 16, // Match INPUT_LEFT_PAD from Import.tsx
-    ...SHADOWS.medium,
+    alignItems: 'center', // Center align content like modal buttons
+    paddingHorizontal: SPACING.lg, // Match modal button padding
   } as ViewStyle,
   getStartedButton: {
     width: '100%',
-    height: 46, // Fixed height like the original button
-    backgroundColor: COLORS.primary,
+    height: 46, // Match button height consistency
+    backgroundColor: COLORS.primary, // Primary button style
     borderWidth: 1,
-    borderColor: '#000000',
-    borderRadius: RADIUS.lg,
+    borderColor: '#000000', // Black border
+    borderRadius: 8, // Match button consistency
     justifyContent: 'center',
-    alignItems: 'flex-start', // Left align content
-    paddingLeft: 16, // Match INPUT_LEFT_PAD from Import.tsx
-    ...SHADOWS.medium,
+    alignItems: 'center', // Center align content like modal buttons
+    paddingHorizontal: SPACING.lg, // Match modal button padding
   } as ViewStyle,
   buttonText: {
-    fontFamily: 'Inter',
-    fontSize: 20,
-    fontWeight: '400',
-    lineHeight: 24,
-    color: '#000000',
-    textAlign: 'left',
+    ...bodyText, // Match modal button text style
+    fontSize: FONT.size.body, // 16px consistency
+    color: '#000000', // Black text
+    textAlign: 'center', // Center align text
   } as TextStyle,
   // Legacy styles kept for reference
   bullet: {

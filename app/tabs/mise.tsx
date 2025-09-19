@@ -2465,7 +2465,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xl,
   } as TextStyle,
   premiumFeatureButton: {
-    backgroundColor: 'transparent',
+    backgroundColor: COLORS.primary,
     borderWidth: 1,
     borderColor: COLORS.textDark,
     paddingVertical: SPACING.md,
