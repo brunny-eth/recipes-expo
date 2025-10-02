@@ -11,11 +11,14 @@ import { Linking } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { FONT, bodyText, bodyTextLoose, bodyStrongText } from '@/constants/typography';
 import ScreenHeader from '@/components/ScreenHeader';
+import { createLogger } from '@/utils/logger';
 
 type AuthProvider = 'google' | 'apple';
 
+const logger = createLogger('Auth:Start');
+
 const LoginScreen = () => {
-  const { signIn, isLoading: isAuthLoading } = useAuth();
+  const { signIn, isLoading: isAuthLoading, session } = useAuth();
   const handleError = useHandleError();
   const { showSuccess } = useSuccessModal();
   const [isSigningIn, setIsSigningIn] = useState<AuthProvider | null>(null);
@@ -23,11 +26,26 @@ const LoginScreen = () => {
   const insets = useSafeAreaInsets();
 
   // Log component render state for debugging
-  console.log('[ui] LoginScreen render, isSigningIn:', isSigningIn, 'isAuthLoading:', isAuthLoading);
+  logger.info('LoginScreen render', { 
+    isSigningIn, 
+    isAuthLoading, 
+    hasExistingSession: !!session,
+    sessionId: session?.user?.id ? `${session.user.id.slice(0, 8)}...` : null
+  });
 
 
   const onGooglePress = useCallback(async () => {
-    if (inFlightRef.current) return;
+    if (inFlightRef.current) {
+      logger.warn('Google sign-in already in progress, ignoring duplicate request');
+      return;
+    }
+    
+    logger.info('User initiated Google login', {
+      provider: 'google',
+      timestamp: new Date().toISOString(),
+      existingSessionId: session?.user?.id ? `${session.user.id.slice(0, 8)}...` : null
+    });
+    
     inFlightRef.current = true;
     setIsSigningIn('google');
     try {
@@ -36,7 +54,7 @@ const LoginScreen = () => {
       inFlightRef.current = false;
       setIsSigningIn(null);
     }
-  }, [signIn]);
+  }, [signIn, session?.user?.id]);
 
   const handleSignIn = async (provider: AuthProvider) => {
     if (provider === 'google') {
@@ -45,18 +63,31 @@ const LoginScreen = () => {
     }
 
     // Handle Apple sign-in (existing logic)
-    if (isSigningIn) return;
+    if (isSigningIn) {
+      logger.warn('Apple sign-in already in progress, ignoring duplicate request');
+      return;
+    }
+    
+    logger.info('User initiated Apple login', {
+      provider: 'apple',
+      timestamp: new Date().toISOString(),
+      existingSessionId: session?.user?.id ? `${session.user.id.slice(0, 8)}...` : null
+    });
+    
     setIsSigningIn(provider);
 
     try {
       const success = await signIn(provider);
       if (success) {
-        console.log(`[LoginScreen] Sign-in successful with ${provider}.`);
+        logger.info('Sign-in successful', { provider });
       } else {
-        console.log(`[LoginScreen] Sign-in flow cancelled or failed for ${provider}.`);
+        logger.warn('Sign-in flow cancelled or failed', { provider });
       }
     } catch (error: any) {
-      console.error(`[LoginScreen] Unexpected error during sign-in initiation with ${provider}:`, error);
+      logger.error('Unexpected error during sign-in initiation', { 
+        provider, 
+        error: error?.message || 'Unknown error' 
+      });
       handleError('Sign In Error', error?.message || 'Sign-in failed');
     } finally {
       setIsSigningIn(null);

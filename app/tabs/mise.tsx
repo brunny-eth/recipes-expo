@@ -665,20 +665,11 @@ export default function MiseScreen() {
       setMiseRecipes(fetchedRecipes);
       setGroceryList(mergedGroceryList);
 
-      // Clear manual items if no recipes are left in mise
-      if (fetchedRecipes.length === 0 && manualItems.length > 0) {
-        console.log('[MiseScreen] 🧹 No recipes left in mise, clearing manual items');
-        clearAllManualItems();
-        setManualItems([]);
-        setManualItemsCleared(true); // Set flag to prevent re-loading
-        console.log('[MiseScreen] 🚫 Set manualItemsCleared flag to true');
-        // Update grocery list to only show empty state
-        setGroceryList([]);
-      } else if (fetchedRecipes.length > 0) {
-        // Reset flag if recipes are present, allowing manual items to be loaded
-        if (manualItemsCleared) {
-          console.log('[MiseScreen] ✅ Recipes present, resetting manualItemsCleared flag');
-        }
+      // Manual items should persist regardless of recipe count
+      // Users should be able to maintain manual grocery items even without recipes
+      // Reset the cleared flag if it was set, allowing manual items to be loaded
+      if (manualItemsCleared) {
+        console.log('[MiseScreen] ✅ Resetting manualItemsCleared flag to allow manual items');
         setManualItemsCleared(false);
       }
 
@@ -1794,7 +1785,11 @@ export default function MiseScreen() {
   }, [miseRecipes, initializeSessions, router]);
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <KeyboardAvoidingView 
+      style={[styles.container, { paddingTop: insets.top }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
         <ScreenHeader title="PREP & COOK" showBack={false} backgroundColor="#DEF6FF" />
       
 
@@ -1837,7 +1832,7 @@ export default function MiseScreen() {
         isLoading={false}
       />
 
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

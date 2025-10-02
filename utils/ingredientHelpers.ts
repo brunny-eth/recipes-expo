@@ -54,13 +54,13 @@ const UNIT_MAPPINGS: Record<string, string> = {
   'lb': 'lb', 'pound': 'lb', 'pounds': 'lb', 'lbs': 'lb', '#': 'lb',
 
   // Compound units (preserve full form for clarity) - patterns for sizes + containers
-  'oz can': 'oz can', 'ounce can': 'ounce can', 'oz jar': 'oz jar', 'ounce jar': 'ounce jar',
-  'oz package': 'oz package', 'ounce package': 'ounce package', 'oz bag': 'oz bag', 'ounce bag': 'ounce bag',
-  'lb bag': 'lb bag', 'pound bag': 'pound bag', 'lb box': 'lb box', 'pound box': 'pound box',
+  'oz can': 'oz can', 'ounce can': 'oz can', 'oz jar': 'oz jar', 'ounce jar': 'oz jar',
+  'oz package': 'oz package', 'ounce package': 'oz package', 'oz bag': 'oz bag', 'ounce bag': 'oz bag',
+  'lb bag': 'lb bag', 'pound bag': 'lb bag', 'lb box': 'lb box', 'pound box': 'lb box',
   'fl oz bottle': 'fl oz bottle', 'fl oz can': 'fl oz can', 'fl oz jar': 'fl oz jar',
   
   // Dynamic compound unit patterns (handled specially in parsing)
-  // These are matched by regex: /\d+(?:\.\d+)?\s+(?:oz|fl\s*oz|lb|g|kg)\s+(?:can|jar|bottle|bag|box|package|container)/
+  // These are matched by regex and normalized: "14-ounce cans" -> "14-oz can"
 };
 
 /**
@@ -356,7 +356,9 @@ function parseIngredientString(ingredientString: string): {
     const enhancedUnitPatterns = [
       // Fluid ounces with various formats: "fluid ounces", "fl oz", "fl. oz"
       /^(fluid\s+ounces?|fl\s*\.?\s*oz|fl\s+ounces?)\b/i,
-      // Compound units with sizes: "14.5 oz can", "16 fl oz bottle"
+      // Compound units with sizes: "14.5 oz can", "16 fl oz bottle", "14-ounce cans"
+      /^(\d+(?:\.\d+)?[-\s]+(?:ounces?|oz|fl\s*oz|lbs?|pounds?|g|grams?|kg|kilograms?)\s+(?:cans?|jars?|bottles?|bags?|boxes?|packages?|containers?))\b/i,
+      // Compound units with sizes (original pattern): "14.5 oz can", "16 fl oz bottle"  
       /^(\d+(?:\.\d+)?\s+(?:oz|fl\s*oz|lb|g|kg)\s+(?:can|jar|bottle|bag|box|package|container))\b/i,
       // Weight ounces (not fluid): "ounces", "oz" when not preceded by "fl"
       /^(ounces?|oz)(?!\s+(?:can|jar|bottle|bag|box|package|container))\b/i,
@@ -382,12 +384,22 @@ function parseIngredientString(ingredientString: string): {
         
         // Special handling for compound units
         if (cleanedUnit.includes(' ') && /\d/.test(cleanedUnit)) {
-          // This is a compound unit like "14.5 oz can"
-          unit = normalizeUnit(cleanedUnit);
-          if (!unit) {
-            // If normalization failed, preserve the compound unit as-is
-            unit = cleanedUnit.toLowerCase().replace(/\s+/g, ' ');
-          }
+          // This is a compound unit like "14.5 oz can" or "14-ounce cans"
+          // Normalize the format: "14-ounce cans" -> "14-oz cans"
+          let normalizedCompound = cleanedUnit
+            .replace(/ounces?/g, 'oz')
+            .replace(/pounds?/g, 'lb')
+            .replace(/grams?/g, 'g')
+            .replace(/kilograms?/g, 'kg')
+            .replace(/cans?/g, 'can')
+            .replace(/jars?/g, 'jar')
+            .replace(/bottles?/g, 'bottle')
+            .replace(/bags?/g, 'bag')
+            .replace(/boxes?/g, 'box')
+            .replace(/packages?/g, 'package')
+            .replace(/containers?/g, 'container');
+          
+          unit = normalizeUnit(normalizedCompound) || normalizedCompound.toLowerCase().replace(/\s+/g, ' ');
         } else {
           // Standard unit normalization
           unit = normalizeUnit(cleanedUnit);

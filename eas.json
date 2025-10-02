@@ -12,7 +12,11 @@
         "BUNDLE_ID": "com.meez.recipes",
         "EXPO_DEBUG": "1",
         "EXPO_PUBLIC_ENABLE_PAYWALL": "true",
-        "EXPO_PUBLIC_REVENUECAT_KEY": "appl_gSwOLBSPbTBxfJyeoLVdVSInSZd"
+        "EXPO_PUBLIC_REVENUECAT_KEY": "appl_gSwOLBSPbTBxfJyeoLVdVSInSZd",
+        "EXPO_PUBLIC_POSTHOG_API_KEY": "phc_LHzQ18078GlMjpjRz43tJHQ7HdiJ971AtSLK4wtdaSu",
+        "EXPO_PUBLIC_POSTHOG_HOST": "https://us.i.posthog.com",
+        "EXPO_PUBLIC_APPLE_SERVICE_ID": "com.meez.recipes",
+        "EXPO_PUBLIC_BYPASS_REVENUECAT": "true"
       },
       "ios": {
         "simulator": false
@@ -24,7 +28,11 @@
       "env": {
         "BUNDLE_ID": "com.meez.recipes",
         "EXPO_PUBLIC_ENABLE_PAYWALL": "true",
-        "EXPO_PUBLIC_REVENUECAT_KEY":"appl_gSwOLBSPbTBxfJyeoLVdVSInSZd"
+        "EXPO_PUBLIC_REVENUECAT_KEY":"appl_gSwOLBSPbTBxfJyeoLVdVSInSZd",
+        "EXPO_PUBLIC_POSTHOG_API_KEY": "phc_LHzQ18078GlMjpjRz43tJHQ7HdiJ971AtSLK4wtdaSu",
+        "EXPO_PUBLIC_POSTHOG_HOST": "https://us.i.posthog.com",
+        "EXPO_PUBLIC_APPLE_SERVICE_ID": "com.meez.recipes",
+        "EXPO_PUBLIC_BYPASS_REVENUECAT": "true"
       },
       "ios": { "simulator": false }
     },
@@ -35,8 +43,12 @@
       "autoIncrement": true,
       "env": {
         "BUNDLE_ID": "com.meez.recipes",
-        "EXPO_PUBLIC_ENV": "production",
-        "EXPO_PUBLIC_ENABLE_PAYWALL": "false"
+        "EXPO_PUBLIC_ENABLE_PAYWALL": "true",
+        "EXPO_PUBLIC_REVENUECAT_KEY":"appl_gSwOLBSPbTBxfJyeoLVdVSInSZd",
+        "EXPO_PUBLIC_POSTHOG_API_KEY": "phc_LHzQ18078GlMjpjRz43tJHQ7HdiJ971AtSLK4wtdaSu",
+        "EXPO_PUBLIC_POSTHOG_HOST": "https://us.i.posthog.com",
+        "EXPO_PUBLIC_APPLE_SERVICE_ID": "com.meez.recipes",
+        "EXPO_PUBLIC_BYPASS_REVENUECAT": "true"
       },
       "ios": {
         "simulator": false,

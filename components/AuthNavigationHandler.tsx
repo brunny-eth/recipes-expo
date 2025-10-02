@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useRouter, useSegments } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useRevenueCat } from '@/context/RevenueCatContext';
 import { useSuccessModal } from '@/context/SuccessModalContext';
@@ -8,72 +8,139 @@ import { useHandleError } from '@/hooks/useHandleError';
 import { createLogger } from '@/utils/logger';
 import PaywallModal from '@/components/PaywallModal';
 
-const logger = createLogger('auth-navigation');
+const logger = createLogger('nav');
 
 export function AuthNavigationHandler() {
   const router = useRouter();
+  const segments = useSegments();
   const { onAuthNavigation, session } = useAuth();
   const { isPremium, isLoading: isRevenueCatLoading, checkEntitlements } = useRevenueCat();
   const { showSuccess } = useSuccessModal();
   const { showError } = useErrorModal();
   const handleError = useHandleError();
   const [showPaywall, setShowPaywall] = useState(false);
+  const [navigationTimeout, setNavigationTimeout] = useState<NodeJS.Timeout | null>(null);
 
-  // Check if paywall is enabled (use same logic as RevenueCatContext)
-  const enablePaywall = process.env.EXPO_PUBLIC_ENABLE_PAYWALL === "true";
-  
-  // Enable paywall when environment variable is set
-  const forceEnablePaywall = enablePaywall;
+  // SIMPLIFIED: forceEnablePaywall only for dev/testing to force show paywall even without offerings
+  // In production builds, paywall logic is always enabled
+  const forceEnablePaywall = process.env.NODE_ENV === 'development' && process.env.EXPO_PUBLIC_ENABLE_PAYWALL === "true";
+  const isProductionBuild = process.env.NODE_ENV !== 'development';
   
   console.log('🔍 [AuthNavigationHandler] Paywall configuration: ' + JSON.stringify({
-    enablePaywall,
     forceEnablePaywall,
     envValue: process.env.EXPO_PUBLIC_ENABLE_PAYWALL,
+    nodeEnv: process.env.NODE_ENV,
+    isProductionBuild,
     isPremium,
     isRevenueCatLoading,
     hasSession: !!session
   }));
   
   // Force visible log for debugging
-  console.warn('🚨 AUTH NAV DEBUG - Paywall enabled: ' + forceEnablePaywall + ' isPremium: ' + isPremium + ' isLoading: ' + isRevenueCatLoading + ' hasSession: ' + !!session);
+  console.warn('🚨 AUTH NAV DEBUG - Force paywall (dev only): ' + forceEnablePaywall + ' isPremium: ' + isPremium + ' isLoading: ' + isRevenueCatLoading + ' hasSession: ' + !!session + ' isProductionBuild: ' + isProductionBuild);
 
-  // Don't automatically show paywall - let individual screens handle premium gating
-  // The paywall should only appear when users try to access premium features
+  // CRITICAL: Never show paywall in AuthNavigationHandler
+  // The paywall should only appear as an overlay on individual screens, never block navigation
   useEffect(() => {
-    console.warn('🚨 AUTH NAV useEffect triggered: ' + JSON.stringify({
+    logger.info('Auth:Navigation - Paywall state check', {
       forceEnablePaywall,
       isRevenueCatLoading,
       isPremium,
       showPaywall,
-      hasSession: !!session
-    }));
+      hasSession: !!session,
+      timestamp: new Date().toISOString()
+    });
     
-    // Always hide paywall in AuthNavigationHandler - let screens handle their own premium gating
-    console.log('[AuthNavigationHandler] Hiding paywall - screens will handle their own premium gating');
-    setShowPaywall(false);
-  }, [isPremium, isRevenueCatLoading, forceEnablePaywall, session]);
+    // Always ensure paywall is hidden in AuthNavigationHandler
+    // Individual screens will handle their own premium gating as overlays
+    if (showPaywall) {
+      logger.warn('Auth:Navigation - Forcing paywall to hide - navigation takes priority', {
+        timestamp: new Date().toISOString()
+      });
+      setShowPaywall(false);
+    }
+  }, [isPremium, isRevenueCatLoading, forceEnablePaywall, session, showPaywall]);
+
+  // APPLE REVIEW FALLBACK: Force navigation if user is stuck on login screen
+  useEffect(() => {
+    if (session && segments.join('/') === 'login') {
+      const fallbackTimeout = setTimeout(() => {
+        const currentPath = segments.join('/');
+        logger.warn('🚨 FALLBACK NAVIGATION TRIGGERED - User stuck on login with valid session', {
+          hasSession: !!session,
+          currentPath,
+          isRevenueCatLoading,
+          isPremium,
+          timestamp: new Date().toISOString()
+        });
+        console.warn('🚨 APPLE REVIEW FALLBACK: Forcing navigation from login to tabs');
+        router.replace('/tabs');
+      }, 3000); // 3 second fallback
+
+      return () => clearTimeout(fallbackTimeout);
+    }
+  }, [session, segments, router, isRevenueCatLoading, isPremium]);
 
   useEffect(() => {
     const unsubscribe = onAuthNavigation((event) => {
-      logger.info('Handling auth navigation event', { 
-        eventType: event.type, 
-        userId: 'userId' in event ? event.userId : undefined 
-      });
+      const userId = 'userId' in event ? event.userId : undefined;
+      const userIdShort = userId ? `${userId.slice(0, 8)}...` : undefined;
+      
+      // COMPREHENSIVE LOGGING for Apple Review debugging
+      const debugState = {
+        eventType: event.type,
+        userId: userIdShort,
+        hasSession: !!session,
+        currentPath: segments.join('/'),
+        isRevenueCatLoading,
+        isPremium,
+        bypassRevenueCat: process.env.EXPO_PUBLIC_BYPASS_REVENUECAT === 'true',
+        timestamp: new Date().toISOString()
+      };
+      
+      logger.info('[nav] Handling auth navigation event', debugState);
+      console.log('🔍 [APPLE REVIEW DEBUG] Auth Navigation Event:', debugState);
 
       switch (event.type) {
         case 'SIGNED_IN':
-          logger.info('Navigating to main app after sign in', { userId: event.userId });
+          logger.info('[nav] SIGNED_IN event fired - starting navigation flow', { 
+            userId: userIdShort,
+            timestamp: new Date().toISOString()
+          });
+          
+          // CRITICAL: Ensure paywall is hidden before navigation
+          logger.info('[nav] Ensuring paywall is hidden before navigation', {
+            userId: userIdShort,
+            currentShowPaywall: showPaywall,
+            timestamp: new Date().toISOString()
+          });
+          setShowPaywall(false);
           
           // Check if user is new based on first_login_at metadata
           const isNewUser = !event.userMetadata?.first_login_at;
           
+          logger.info('[nav] User metadata check', {
+            userId: userIdShort,
+            isNewUser,
+            hasFirstLoginAt: !!event.userMetadata?.first_login_at,
+            timestamp: new Date().toISOString()
+          });
+          
           if (isNewUser) {
+            logger.info('[nav] Showing welcome message for new user', {
+              userId: userIdShort,
+              timestamp: new Date().toISOString()
+            });
             showSuccess(
               'Welcome to Olea.',
               'Turn any recipe into your recipe.',
               4000 // Show for 4 seconds
             );
           } else {
+            logger.info('[nav] Showing welcome back message for returning user', {
+              userId: userIdShort,
+              timestamp: new Date().toISOString()
+            });
             showSuccess(
               'Welcome back to Olea.',
               'Your recipes are ready for you.',
@@ -83,28 +150,94 @@ export function AuthNavigationHandler() {
           
           // Navigate directly to tabs after successful authentication
           // Individual screens will handle their own premium gating
-          logger.info('User signed in successfully, navigating to tabs', { userId: event.userId });
+          const preNavigationState = {
+            userId: userIdShort,
+            currentPath: segments.join('/'),
+            isRevenueCatLoading,
+            isPremium,
+            bypassRevenueCat: process.env.EXPO_PUBLIC_BYPASS_REVENUECAT === 'true',
+            timestamp: new Date().toISOString()
+          };
+          
+          logger.info('[nav] Navigating to /tabs after successful sign in', preNavigationState);
+          console.log('🔍 [APPLE REVIEW DEBUG] Pre-Navigation State:', preNavigationState);
+          
+          // Set up a timeout to detect if navigation fails
+          const timeout = setTimeout(() => {
+            logger.error('[nav] Navigation timeout after auth - user may be stuck on login screen', {
+              userId: userIdShort,
+              timeoutMs: 5000,
+              timestamp: new Date().toISOString()
+            });
+          }, 5000);
+          
+          setNavigationTimeout(timeout);
           router.replace('/tabs');
+          
+          // Log navigation completion attempt
+          const postNavigationState = {
+            userId: userIdShort,
+            targetPath: '/tabs',
+            fromPath: segments.join('/'),
+            timestamp: new Date().toISOString()
+          };
+          
+          logger.info('[nav] Navigation to /tabs triggered', postNavigationState);
+          console.log('🔍 [APPLE REVIEW DEBUG] Post-Navigation Trigger:', postNavigationState);
           break;
         
         case 'SIGNED_OUT':
-          logger.info('User signed out, auth state change will trigger re-render');
+          logger.info('Auth:Navigation - User signed out, auth state change will trigger re-render', {
+            userId: userIdShort,
+            timestamp: new Date().toISOString()
+          });
           // No need to navigate - the auth state change will trigger RootLayoutNav to re-render
           // and show the LoginScreen component directly
           break;
         
         case 'AUTH_ERROR':
-          logger.warn('Auth error occurred, staying on current screen', { error: event.error });
+          logger.warn('Auth:Navigation - Auth error occurred, staying on current screen', { 
+            error: event.error,
+            userId: userIdShort,
+            timestamp: new Date().toISOString()
+          });
           handleError('Authentication Error', event.error || 'An unexpected authentication error occurred. Please try again.');
           break;
         
         default:
-          logger.warn('Unknown auth navigation event', { eventType: (event as any).type });
+          logger.warn('Auth:Navigation - Unknown auth navigation event', { 
+            eventType: (event as any).type,
+            userId: userIdShort,
+            timestamp: new Date().toISOString()
+          });
       }
     });
 
     return unsubscribe;
   }, [onAuthNavigation, router, showSuccess, showError, handleError, isPremium, isRevenueCatLoading, checkEntitlements]);
+
+  // Cleanup navigation timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (navigationTimeout) {
+        clearTimeout(navigationTimeout);
+        logger.info('[nav] Cleared navigation timeout on unmount');
+      }
+    };
+  }, [navigationTimeout]);
+
+  // Detect when navigation completes by monitoring session state
+  useEffect(() => {
+    if (session && navigationTimeout) {
+      // Clear timeout when session is established (navigation likely completed)
+      logger.info('[nav] Navigation completed - session established, clearing timeout', {
+        userId: session.user.id ? `${session.user.id.slice(0, 8)}...` : null,
+        timestamp: new Date().toISOString()
+      });
+      clearTimeout(navigationTimeout);
+      setNavigationTimeout(null);
+    }
+  }, [session, navigationTimeout]);
 
   const handlePaywallClose = () => {
     setShowPaywall(false);

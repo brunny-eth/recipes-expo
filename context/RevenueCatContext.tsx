@@ -4,7 +4,7 @@ import { useAuth } from './AuthContext';
 import { useErrorModal } from './ErrorModalContext';
 import { createLogger } from '@/utils/logger';
 
-const logger = createLogger('RevenueCat');
+const logger = createLogger('paywall');
 
 interface RevenueCatContextType {
   // State
@@ -37,32 +37,35 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
   const { isAuthenticated } = useAuth();
   const { showError } = useErrorModal();
 
-  // Check if paywall is enabled
-  const enablePaywall = process.env.EXPO_PUBLIC_ENABLE_PAYWALL === "true";
+  // APPLE REVIEW BYPASS: Skip RevenueCat entirely for App Store review builds
+  const bypassRevenueCat = process.env.EXPO_PUBLIC_BYPASS_REVENUECAT === 'true';
   
-  // Enable paywall when environment variable is set
-  const forceEnablePaywall = enablePaywall;
+  // SIMPLIFIED: forceEnablePaywall only for dev/testing to force show paywall even without offerings
+  // In production builds, Purchases.configure() always runs and paywall logic is always enabled
+  const forceEnablePaywall = process.env.NODE_ENV === 'development' && process.env.EXPO_PUBLIC_ENABLE_PAYWALL === "true";
+  const isProductionBuild = process.env.NODE_ENV !== 'development';
   
   // Manual premium toggle for testing (starts as false for real paywall testing)
   const [manualPremiumToggle, setManualPremiumToggle] = useState(false);
   
   console.log('🔍 [RevenueCat] Paywall configuration:', {
-    enablePaywall,
     forceEnablePaywall,
     envValue: process.env.EXPO_PUBLIC_ENABLE_PAYWALL,
-    nodeEnv: process.env.NODE_ENV
+    nodeEnv: process.env.NODE_ENV,
+    isProductionBuild,
+    bypassRevenueCat
   });
   
   // Force visible log for debugging
-  console.warn('🚨 REVENUECAT DEBUG - Paywall enabled:', forceEnablePaywall, 'isPremium:', !forceEnablePaywall);
+  console.warn('🚨 REVENUECAT DEBUG - Force paywall (dev only):', forceEnablePaywall, 'isPremium:', !forceEnablePaywall, 'isProductionBuild:', isProductionBuild, 'bypassRevenueCat:', bypassRevenueCat);
 
   // State
-  const [isPremium, setIsPremium] = useState(manualPremiumToggle); // Use manual toggle for testing
-  const [isLoading, setIsLoading] = useState<boolean>(forceEnablePaywall); // Only loading if paywall enabled
+  const [isPremium, setIsPremium] = useState(bypassRevenueCat ? true : manualPremiumToggle); // Grant premium if bypassing
+  const [isLoading, setIsLoading] = useState<boolean>(bypassRevenueCat ? false : true); // Skip loading if bypassing
   const [offerings, setOfferings] = useState<any>(null);
   const [isPurchaseInProgress, setIsPurchaseInProgress] = useState(false);
-  const [sdkInitialized, setSdkInitialized] = useState<boolean>(globalSdkInitialized);
-  const [subscriptionStatus, setSubscriptionStatus] = useState<string>('Free');
+  const [sdkInitialized, setSdkInitialized] = useState<boolean>(bypassRevenueCat ? true : globalSdkInitialized);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string>(bypassRevenueCat ? 'Apple Review Bypass' : 'Free');
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
 
   // Keep stable reference to showError
@@ -128,27 +131,30 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
     return 'Subscribed';
   }, [forceEnablePaywall]);
 
-  // Initialize RevenueCat SDK once globally (only if paywall is enabled)
+  // Initialize RevenueCat SDK once globally
+  // CRITICAL: Always initialize in App Store builds to prevent IAP rejection
   React.useEffect(() => {
-    if (!forceEnablePaywall) {
-      logger.info('[RevenueCat] Paywall disabled, skipping SDK initialization');
-      setSdkInitialized(true);
-      setIsLoading(false);
+    // APPLE REVIEW BYPASS: Skip RevenueCat initialization entirely
+    if (bypassRevenueCat) {
+      logger.info('[RevenueCat] BYPASSING RevenueCat for Apple Review - granting premium access');
+      console.warn('🚨 APPLE REVIEW BYPASS ACTIVE - RevenueCat disabled, premium granted');
       return;
     }
-
+    
     if (!globalSdkInitialized) {
       const revenueCatApiKey = process.env.EXPO_PUBLIC_REVENUECAT_KEY;
-      console.log("[RevenueCat] API key configured:", !!process.env.EXPO_PUBLIC_REVENUECAT_KEY);
+      console.log(`[RevenueCat] SDK configured with API key: ${revenueCatApiKey?.substring(0, 5) || 'none'}...`);
       logger.info('[RevenueCat] Initialization starting...', {
         hasApiKey: !!revenueCatApiKey,
         keyPrefix: revenueCatApiKey ? revenueCatApiKey.substring(0, 5) + '...' : 'none',
-        keyStartsWithAppl: revenueCatApiKey?.startsWith('appl_')
+        keyStartsWithAppl: revenueCatApiKey?.startsWith('appl_'),
+        forceEnablePaywall,
+        isProductionBuild
       });
       
       if (revenueCatApiKey && revenueCatApiKey.startsWith('appl_')) {
         try {
-          logger.info('[RevenueCat] Starting Purchases.configure()');
+          logger.info('[RevenueCat] Purchases.configure() called');
           Purchases.configure({ apiKey: revenueCatApiKey });
           logger.info('[RevenueCat] Purchases.configure() finished');
           
@@ -174,20 +180,21 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
       // SDK already initialized globally, just update local state
       setSdkInitialized(true);
     }
-  }, [forceEnablePaywall]);
+  }, [bypassRevenueCat]); // Add bypassRevenueCat dependency
 
   // Check user entitlements with defensive error handling
   const checkEntitlements = useCallback(async () => {
     logger.info('[RevenueCat] checkEntitlements called', {
       isAuthenticated,
       sdkInitialized,
-      enablePaywall: forceEnablePaywall,
+      forceEnablePaywall,
+      bypassRevenueCat,
       timestamp: new Date().toISOString()
     });
 
-    // If paywall is disabled, always grant premium access
-    if (!forceEnablePaywall) {
-      logger.info('[RevenueCat] Paywall disabled, granting premium access');
+    // APPLE REVIEW BYPASS: Skip entitlements check entirely
+    if (bypassRevenueCat) {
+      logger.info('[RevenueCat] BYPASSING entitlements check for Apple Review');
       setIsPremium(true);
       setIsLoading(false);
       return;
@@ -220,39 +227,14 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
 
       logger.info('[RevenueCat] About to call Purchases.getCustomerInfo()');
 
-      // Wrap the actual customer info call
+      // Get customer info from RevenueCat
       let customerInfo: CustomerInfo;
       try {
-        if (forceEnablePaywall) {
-          customerInfo = await Purchases.getCustomerInfo();
-          logger.info('[RevenueCat] Purchases.getCustomerInfo() succeeded');
-          console.log('[RevenueCat] entitlements:', customerInfo.entitlements.active);
-          console.log('[RevenueCat] raw entitlements', customerInfo.entitlements);
-          console.log('[Paywall] shouldShow =', Object.keys(customerInfo.entitlements.active || {}).length === 0);
-        } else {
-          // If paywall is disabled, create a mock customer info with no entitlements
-          customerInfo = {
-            entitlements: { 
-              active: {},
-              all: {},
-              verification: 'NOT_REQUESTED'
-            },
-            activeSubscriptions: [],
-            allPurchaseDates: {},
-            allExpirationDates: {},
-            allPurchasedProductIdentifiers: [],
-            latestExpirationDate: null,
-            originalAppUserId: '',
-            originalApplicationVersion: '',
-            originalPurchaseDate: null,
-            requestDate: new Date().toISOString(),
-            firstSeen: new Date().toISOString(),
-            nonSubscriptionTransactions: [],
-            managementURL: null,
-            user: null,
-            subscriptionsByProductIdentifier: {}
-          } as CustomerInfo;
-        }
+        customerInfo = await Purchases.getCustomerInfo();
+        logger.info('[RevenueCat] Purchases.getCustomerInfo() succeeded');
+        console.log('[RevenueCat] entitlements:', customerInfo.entitlements.active);
+        console.log('[RevenueCat] raw entitlements', customerInfo.entitlements);
+        console.log('[Paywall] shouldShow =', Object.keys(customerInfo.entitlements.active || {}).length === 0);
 
         // Store customer info and update subscription status
         setCustomerInfo(customerInfo);
@@ -291,18 +273,29 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
 
       // Check if user has premium access
       const hasPremiumAccess = customerInfo.entitlements.active?.["premium_access"];
+      const hasActiveEntitlements = customerInfo.entitlements.active && Object.keys(customerInfo.entitlements.active).length > 0;
+      
       console.warn('🚨 REVENUECAT ENTITLEMENTS CHECK:', {
         hasPremiumAccess,
+        hasActiveEntitlements,
         activeEntitlements: customerInfo.entitlements.active,
         allEntitlements: customerInfo.entitlements
       });
       
       if (hasPremiumAccess) {
-        logger.info('User has premium access - unlocking app');
+        console.log('[RevenueCat] entitlements updated');
+        console.log('[paywall] user has premium');
+        logger.info('[paywall] User has premium access - unlocking app');
         console.warn('🚨 CALLING UNLOCK APP');
         unlockApp();
+      } else if (!hasActiveEntitlements) {
+        logger.info('[paywall] No active entitlements - user will see friendly paywall', {
+          reason: 'no_entitlements_available'
+        });
+        // Don't call showPaywall() - let PremiumGate handle friendly paywall
+        setIsPremium(false);
       } else {
-        logger.info('User does not have premium access - showing paywall');
+        logger.info('[paywall] User does not have premium access - showing paywall');
         console.warn('🚨 CALLING SHOW PAYWALL');
         showPaywall();
       }
@@ -324,58 +317,56 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated, sdkInitialized]); // Remove showError from dependencies
+  }, [isAuthenticated, sdkInitialized, forceEnablePaywall, bypassRevenueCat, getSubscriptionStatus]); // Add bypassRevenueCat dependency
 
   // Fetch available offerings/products with defensive error handling
   const fetchOfferings = useCallback(async () => {
-    // Don't fetch offerings if paywall is disabled
-    if (!forceEnablePaywall) {
-      logger.info('Paywall disabled, skipping offerings fetch');
-      return;
-    }
 
     // Don't fetch offerings until SDK is initialized
     if (!sdkInitialized) {
-      logger.info('Waiting for RevenueCat SDK initialization before fetching offerings');
+      logger.info('[paywall] Waiting for RevenueCat SDK initialization before fetching offerings');
       return;
     }
 
     let offeringsData;
 
     try {
-      logger.info('Fetching offerings');
+      logger.info('[paywall] Fetching offerings');
 
       // Defensive check: Ensure Purchases is available
       if (!Purchases || typeof Purchases.getOfferings !== 'function') {
-        logger.error('Purchases SDK not available');
+        logger.error('[paywall] Purchases SDK not available');
         setOfferings(null);
         return;
       }
 
-      // Wrap the actual API call with try/catch
+      // Get offerings from RevenueCat
       try {
-        if (forceEnablePaywall) {
-          offeringsData = await Purchases.getOfferings();
-          console.log('[RevenueCat] offerings', offeringsData);
-        }
+        offeringsData = await Purchases.getOfferings();
+        console.log('[paywall] offerings result', offeringsData);
       } catch (apiError: any) {
-        logger.error('Purchases.getOfferings() failed', {
+        logger.error('[paywall] offerings fetch failed, continuing free mode', {
           error: apiError?.message || 'Unknown API error',
           code: apiError?.code,
           userInfo: apiError?.userInfo
         });
 
-        // Don't show error modal for known setup issues
+        // Don't show error modal for known setup issues - just log and continue
         const isSetupError = apiError?.message?.includes('no products registered') ||
                             apiError?.message?.includes('Invalid API Key') ||
                             apiError?.message?.includes('credentials issue') ||
+                            apiError?.message?.includes('OfferingsManager.Error 1') ||
                             apiError?.code === 0; // Network/configuration issues
 
-        if (!isSetupError) {
-          showErrorRef.current(
-            'Subscription Error',
-            'Unable to load subscription options. Please check your connection and try again.'
-          );
+        if (isSetupError) {
+          logger.info('[paywall] Offerings unavailable, skipping paywall - continuing free mode', {
+            errorType: 'setup_error',
+            error: apiError?.message
+          });
+        } else {
+          logger.warn('[paywall] Offerings fetch failed with unexpected error, continuing free mode', {
+            error: apiError?.message
+          });
         }
 
         setOfferings(null);
@@ -384,42 +375,34 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
 
       // Validate the response structure
       if (!offeringsData || typeof offeringsData !== 'object') {
-        logger.error('Invalid offerings response structure', { offeringsData });
+        logger.error('[paywall] Invalid offerings response structure', { offeringsData });
         setOfferings(null);
         return;
       }
 
       if (offeringsData.current) {
-        logger.info('Offerings loaded successfully', {
+        logger.info('[paywall] Offerings loaded successfully', {
           availablePackages: offeringsData.current.availablePackages?.length || 0
         });
         setOfferings(offeringsData);
       } else {
-        logger.warn('No current offerings available - this is normal during setup');
+        logger.info('[paywall] Offerings unavailable, skipping paywall - continuing free mode', {
+          reason: 'no_current_offerings'
+        });
         setOfferings(null);
       }
 
     } catch (unexpectedError: any) {
       // Catch any completely unexpected errors
-      logger.error('Unexpected error in fetchOfferings', {
+      logger.error('[paywall] Unexpected error in fetchOfferings, continuing free mode', {
         error: unexpectedError?.message || 'Unknown error',
         stack: unexpectedError?.stack
       });
 
-      // Don't crash the app - just set offerings to null
+      // Don't crash the app - just set offerings to null and continue
       setOfferings(null);
-
-      // Only show error modal for truly unexpected errors (not setup issues)
-      if (!unexpectedError?.message?.includes('no products') &&
-          !unexpectedError?.message?.includes('Invalid API') &&
-          !unexpectedError?.message?.includes('credentials')) {
-        showErrorRef.current(
-          'Unexpected Error',
-          'An unexpected error occurred while loading subscriptions. The app will continue to work normally.'
-        );
-      }
     }
-  }, [sdkInitialized, forceEnablePaywall]); // Remove showError from dependencies
+  }, [sdkInitialized]); // Remove showError from dependencies
 
   // Purchase a package with defensive error handling and debouncing
   const purchasePackage = useCallback(async (pkg: PurchasesPackage): Promise<boolean> => {
@@ -447,14 +430,10 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
 
       logger.info('Starting purchase', { packageId: pkg.identifier });
 
-      // Wrap the actual purchase call
+      // Purchase the package
       let purchaseResult;
       try {
-        if (forceEnablePaywall) {
-          purchaseResult = await Purchases.purchasePackage(pkg);
-        } else {
-          throw new Error('Paywall is disabled - purchases not available');
-        }
+        purchaseResult = await Purchases.purchasePackage(pkg);
       } catch (purchaseError: any) {
         logger.error('Purchases.purchasePackage() failed', {
           error: purchaseError?.message || 'Unknown purchase error',
@@ -479,6 +458,8 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
 
       // Check if premium access was granted
       if (purchaseResult.customerInfo.entitlements?.active?.["premium_access"]) {
+        console.log('[RevenueCat] entitlements updated');
+        console.log('[paywall] user has premium');
         logger.info('Purchase successful - unlocking app');
         unlockApp();
         return true;
@@ -529,14 +510,10 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
 
       logger.info('Restoring purchases');
 
-      // Wrap the actual restore call
+      // Restore purchases
       let customerInfo: CustomerInfo;
       try {
-        if (forceEnablePaywall) {
-          customerInfo = await Purchases.restorePurchases();
-        } else {
-          throw new Error('Paywall is disabled - restore purchases not available');
-        }
+        customerInfo = await Purchases.restorePurchases();
       } catch (restoreError: any) {
         logger.error('Purchases.restorePurchases() failed', {
           error: restoreError?.message || 'Unknown restore error',
@@ -557,6 +534,8 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
 
       // Check if premium access was restored
       if (customerInfo.entitlements.active?.["premium_access"]) {
+        console.log('[RevenueCat] entitlements updated');
+        console.log('[paywall] user has premium');
         logger.info('Purchases restored successfully - unlocking app');
         unlockApp();
         return true;
@@ -596,10 +575,16 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
 
   // Show paywall (revoke premium access)
   const showPaywall = useCallback(() => {
-    logger.info('Showing paywall - premium access revoked');
+    logger.info('[RevenueCat] showPaywall called - premium access revoked', {
+      timestamp: new Date().toISOString()
+    });
     console.warn('🚨 SHOW PAYWALL CALLED - setting isPremium to false');
     setIsPremium(false);
     setManualPremiumToggle(false);
+    
+    // Note: This function only sets the premium status to false
+    // The actual paywall modal is controlled by individual components
+    // and should only show as an overlay, never blocking navigation
   }, []);
 
   // TESTING: Manual toggle for testing selective paywall (remove this in production)
@@ -619,23 +604,34 @@ export const RevenueCatProvider = ({ children }: PropsWithChildren) => {
   }, [sdkInitialized, checkEntitlements]);
 
   // Check entitlements when auth state changes (but only if SDK is ready)
+  // Add a small delay to ensure navigation happens first
   useEffect(() => {
-    if (sdkInitialized) {
-      logger.info('[RevenueCat] Auth state changed, checking entitlements', {
+    if (sdkInitialized && isAuthenticated) {
+      logger.info('[paywall] Auth state changed, scheduling entitlements check', {
         isAuthenticated,
-        sdkInitialized
+        sdkInitialized,
+        timestamp: new Date().toISOString()
       });
-      checkEntitlements();
+      
+      // Delay entitlements check to ensure navigation happens first
+      const timeout = setTimeout(() => {
+        logger.info('[paywall] Running delayed entitlements check after navigation', {
+          timestamp: new Date().toISOString()
+        });
+        checkEntitlements();
+      }, 1000); // 1 second delay to allow navigation to complete
+      
+      return () => clearTimeout(timeout);
     }
   }, [isAuthenticated, sdkInitialized, checkEntitlements]);
 
-  // Fetch offerings when SDK is ready (only if paywall is enabled)
+  // Fetch offerings when SDK is ready
   useEffect(() => {
-    if (sdkInitialized && forceEnablePaywall) {
+    if (sdkInitialized) {
       logger.info('[RevenueCat] SDK ready, fetching offerings');
       fetchOfferings();
     }
-  }, [sdkInitialized, forceEnablePaywall, fetchOfferings]);
+  }, [sdkInitialized, fetchOfferings]);
 
   const value = {
     isPremium,

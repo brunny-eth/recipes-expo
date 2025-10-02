@@ -250,8 +250,6 @@ const REMOVABLE_ADJECTIVES = new Set([
   'large', 'medium', 'small', 'jumbo', 'extra', 'super', 'mini', 'baby',
   'ripe', 'unripe', 'organic', 'natural', 'wild', 'free-range', 'grass-fed',
   'whole', 'half', 'quarter', 'thick', 'thin', 'regular',
-  // REMOVED color descriptors that are important for ingredient identification:
-  // 'green', 'red', 'yellow', 'white' - these are preserved for onions, peppers, etc.
   'cubed', 'drained', 'flaked', 'melted', 'softened', 'room-temperature',
   'plain', 'clarified', 'boneless', 'skinless', 'shelled', 'hulled',
   'and', 'or', 'with', 'without', 'finely', 'roughly', 'coarsely', // Conjunctions and adverbs that should be removed when left alone
@@ -607,6 +605,11 @@ export function normalizeName(name: string): string {
   // Fix for half & half - preserve compound ingredient name
   if (name.toLowerCase().includes('half & half') || name.toLowerCase().includes('half and half')) {
     return name; // Return half & half names unchanged to prevent corruption
+  }
+
+  // Fix for chicken breasts or thighs - preserve the "or" pattern
+  if (name.toLowerCase().includes('chicken breasts or thighs') || name.toLowerCase().includes('chicken breast or thighs')) {
+    return 'chicken breasts or thighs'; // Normalize to consistent form
   }
 
   if (process.env.NODE_ENV === 'development') {

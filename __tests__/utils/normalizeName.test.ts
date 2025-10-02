@@ -664,6 +664,14 @@ describe('normalizeName', () => {
     it('preserves canned or fresh', () => {
       expect(normalizeName('canned or fresh')).toBe('canned or fresh');
     });
+
+    it('preserves chicken breasts or thighs', () => {
+      expect(normalizeName('chicken breasts or thighs')).toBe('chicken breasts or thighs');
+    });
+
+    it('preserves chicken breast or thighs', () => {
+      expect(normalizeName('chicken breast or thighs')).toBe('chicken breasts or thighs');
+    });
   });
 
   describe('Edge cases and error handling', () => {

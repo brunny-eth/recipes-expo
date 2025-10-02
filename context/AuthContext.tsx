@@ -72,13 +72,14 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   const [justLoggedIn, setJustLoggedIn] = useState(false);
   const { showError } = useErrorModal();
   const handleError = useHandleError();
-  const { maybeIdentifyUser, resetUser } = useAnalytics();
+  const { maybeIdentifyUser, resetUser, track } = useAnalytics();
 
 
   // Keep stable references to external callbacks used inside long-lived listeners
   const showErrorRef = useRef(showError);
   const maybeIdentifyUserRef = useRef(maybeIdentifyUser);
   const resetUserRef = useRef(resetUser);
+  const trackRef = useRef(track);
 
   useEffect(() => {
     showErrorRef.current = showError;
@@ -87,7 +88,8 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   useEffect(() => {
     maybeIdentifyUserRef.current = maybeIdentifyUser;
     resetUserRef.current = resetUser;
-  }, [maybeIdentifyUser, resetUser]);
+    trackRef.current = track;
+  }, [maybeIdentifyUser, resetUser, track]);
 
   // Navigation event listeners
   const navigationListeners = useRef<Set<(event: AuthNavigationEvent) => void>>(new Set());
@@ -118,14 +120,16 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (!session && isLoading) {
-        logger.warn('Session hydration is taking over 3 seconds', { 
+        logger.warn('Auth:Failure - Session hydration is taking over 3 seconds', { 
           sessionExists: !!session, 
-          isLoading 
+          isLoading,
+          timestamp: new Date().toISOString()
         });
       } else if (!session && !isLoading) {
-        logger.warn('No session found after initial hydration', { 
+        logger.warn('Auth:Failure - No session found after initial hydration', { 
           sessionExists: !!session, 
-          isLoading 
+          isLoading,
+          timestamp: new Date().toISOString()
         });
       }
     }, 3000);
@@ -134,10 +138,27 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
 
   const handleUrl = useCallback(
     async (url: string | null) => {
-      if (!url) return;
+      if (!url) {
+        logger.warn('Auth:DeepLink - No URL provided to handleUrl');
+        return;
+      }
 
-      console.log("[auth][handleUrl]", url);
-      logger.info('Handling deep link URL', { url });
+      logger.info('Auth:DeepLink - Handling deep link URL', { 
+        url,
+        timestamp: new Date().toISOString()
+      });
+
+      // Validate app scheme
+      const isOleaScheme = url.startsWith('olea://');
+      const isHttpsScheme = url.includes('cookolea.com');
+      
+      logger.info('Auth:DeepLink - URL scheme validation', {
+        url,
+        isOleaScheme,
+        isHttpsScheme,
+        expectedScheme: 'olea://',
+        timestamp: new Date().toISOString()
+      });
 
       // Extract tokens from URL fragment and set session explicitly using setSession()
       const urlParts = url.split('#');
@@ -147,7 +168,11 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       }
 
       if (!fragment) {
-        logger.warn('No URL fragment found in deep link', { url });
+        logger.warn('Auth:DeepLink - No URL fragment found in deep link', { 
+          url,
+          urlParts: urlParts.length,
+          timestamp: new Date().toISOString()
+        });
         return;
       }
 
@@ -155,18 +180,28 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       const accessToken = params.get('access_token');
       const refreshToken = params.get('refresh_token');
 
-      console.log("[auth][tokens]", {
-        access: accessToken?.slice(0, 8),
-        refresh: refreshToken ? "present" : "missing",
+      logger.info('Auth:DeepLink - Extracted tokens from URL', {
+        accessTokenPresent: !!accessToken,
+        refreshTokenPresent: !!refreshToken,
+        accessTokenLength: accessToken?.length || 0,
+        refreshTokenLength: refreshToken?.length || 0,
+        timestamp: new Date().toISOString()
       });
 
       if (accessToken && refreshToken) {
-        logger.info('Tokens found in deep link URL', { 
+        logger.info('Auth:DeepLink - Tokens found, setting session', { 
           accessTokenPresent: !!accessToken, 
-          refreshTokenPresent: !!refreshToken 
+          refreshTokenPresent: !!refreshToken,
+          timestamp: new Date().toISOString()
         });
         
         try {
+          logger.info('Auth:DeepLink - Calling Supabase setSession', {
+            hasAccessToken: !!accessToken,
+            hasRefreshToken: !!refreshToken,
+            timestamp: new Date().toISOString()
+          });
+
           const {
             data: { session: newSession },
             error: sessionError,
@@ -176,11 +211,12 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           });
 
           if (sessionError) {
-            logger.error('Authentication Error: Failed to set session via deeplink', { 
+            logger.error('Auth:DeepLink - Failed to set session via deeplink', { 
               error: sessionError.message, 
-              url 
+              url,
+              timestamp: new Date().toISOString()
             });
-              showErrorRef.current(
+            showErrorRef.current(
               'Authentication Error',
               `Authentication failed: ${sessionError.message}`,
             );
@@ -188,13 +224,23 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           } else if (newSession) {
             // We intentionally avoid local state updates and event emission here.
             // Setting the session triggers Supabase's onAuthStateChange listener, which is our single source of truth.                                                                                                 
-            logger.info('Session set via deep link', { userId: newSession.user.id });
+            logger.info('Auth:DeepLink - Session set successfully via deep link', { 
+              userId: newSession.user.id ? `${newSession.user.id.slice(0, 8)}...` : null,
+              sessionExpiry: newSession.expires_at ? new Date(newSession.expires_at * 1000).toISOString() : null,
+              timestamp: new Date().toISOString()
+            });
             // Do not call setSession / setJustLoggedIn / maybeIdentifyUser / emit SIGNED_IN here
+          } else {
+            logger.warn('Auth:DeepLink - setSession returned null session', {
+              hasError: !!sessionError,
+              timestamp: new Date().toISOString()
+            });
           }
         } catch (e: any) {
-          logger.error('Authentication Error: Unexpected error setting session via deeplink', { 
+          logger.error('Auth:DeepLink - Unexpected error setting session via deeplink', { 
             error: e.message, 
-            url 
+            url,
+            timestamp: new Date().toISOString()
           });
           showErrorRef.current(
             'Authentication Error',
@@ -203,7 +249,12 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           emitNavigationEvent({ type: 'AUTH_ERROR', error: e.message });
         }
       } else {
-        logger.warn('No access/refresh tokens found in URL fragment', { url });
+        logger.warn('Auth:DeepLink - No access/refresh tokens found in URL fragment', { 
+          url,
+          hasAccessToken: !!accessToken,
+          hasRefreshToken: !!refreshToken,
+          timestamp: new Date().toISOString()
+        });
       }
     },
     [emitNavigationEvent],
@@ -225,14 +276,28 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     // Set up auth state change listener
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        logger.info('Auth Event', { 
+        const sessionId = session?.user?.id ? `${session.user.id.slice(0, 8)}...` : null;
+        const sessionExpiry = session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : null;
+        
+        logger.info('Auth:Callback - Supabase auth state change', { 
           event, 
           sessionExists: !!session, 
-          userId: session?.user?.id 
+          userId: sessionId,
+          sessionExpiry,
+          timestamp: new Date().toISOString()
         });
 
         if (event === 'SIGNED_IN' && session) {
-          logger.info('User signed in', { userId: session.user.id });
+          // 5. "Auth: onAuthStateChange event SIGNED_IN"
+          const authStateData = {
+            event: 'SIGNED_IN',
+            userId: sessionId,
+            sessionExpiry,
+            provider: session.user.app_metadata?.provider || 'unknown',
+            timestamp: new Date().toISOString()
+          };
+          logger.info('Auth: onAuthStateChange event SIGNED_IN', authStateData);
+          trackRef.current('Auth: onAuthStateChange event SIGNED_IN', authStateData);
           setSession(session);
           setJustLoggedIn(true);
           setIsLoading(false);
@@ -291,9 +356,21 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           }
 
           // Emit navigation event with the correct metadata
+          logger.info('Auth:Navigation - Emitting SIGNED_IN event', {
+            userId: sessionId,
+            isNewUser: isNew,
+            timestamp: new Date().toISOString()
+          });
           emitNavigationEvent({ type: 'SIGNED_IN', userId: session.user.id, userMetadata: updatedMetadata });
         } else if (event === 'SIGNED_OUT') {
-          logger.info('User signed out', { userId: session?.user?.id || 'unknown' });
+          // 5. "Auth: onAuthStateChange event SIGNED_OUT"
+          const signedOutData = {
+            event: 'SIGNED_OUT',
+            userId: sessionId || 'unknown',
+            timestamp: new Date().toISOString()
+          };
+          logger.info('Auth: onAuthStateChange event SIGNED_OUT', signedOutData);
+          trackRef.current('Auth: onAuthStateChange event SIGNED_OUT', signedOutData);
           setSession(null);
           setJustLoggedIn(false);
           setIsLoading(false);
@@ -302,15 +379,24 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           resetUserRef.current();
           
           // Emit navigation event
+          logger.info('Auth:Navigation - Emitting SIGNED_OUT event', {
+            timestamp: new Date().toISOString()
+          });
           emitNavigationEvent({ type: 'SIGNED_OUT' });
         } else if (event === 'TOKEN_REFRESHED' && session) {
-          logger.info('Session token refreshed', { userId: session.user.id });
+          logger.info('Auth:StateChange - Session token refreshed', { 
+            userId: sessionId,
+            sessionExpiry,
+            timestamp: new Date().toISOString()
+          });
           setSession(session);
           setIsLoading(false);
         } else if (event === 'INITIAL_SESSION') {
-          logger.info('Initial session check', { 
+          logger.info('Auth:StateChange - Initial session check', { 
             sessionFound: !!session, 
-            userId: session?.user?.id 
+            userId: sessionId,
+            sessionExpiry,
+            timestamp: new Date().toISOString()
           });
           if (session) {
             setSession(session);
@@ -321,6 +407,12 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           }
           setIsLoading(false);
         } else {
+          logger.info('Auth:StateChange - Other auth event', {
+            event,
+            sessionExists: !!session,
+            userId: sessionId,
+            timestamp: new Date().toISOString()
+          });
           setIsLoading(false);
         }
       },
@@ -328,15 +420,31 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
 
     // Set up URL listener for deep links
     const urlSubscription = Linking.addEventListener('url', (event) => {
+      logger.info('Auth:DeepLink - URL event received', {
+        url: event.url,
+        timestamp: new Date().toISOString()
+      });
       handleUrl(event.url);
     });
 
     // Check for initial URL when app starts
     Linking.getInitialURL().then((url) => {
       if (url) {
-        logger.info('Initial URL detected', { url });
+        logger.info('Auth:DeepLink - Initial URL detected on app start', { 
+          url,
+          timestamp: new Date().toISOString()
+        });
         handleUrl(url);
+      } else {
+        logger.info('Auth:DeepLink - No initial URL detected on app start', {
+          timestamp: new Date().toISOString()
+        });
       }
+    }).catch((error) => {
+      logger.error('Auth:DeepLink - Error getting initial URL', {
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
     });
 
     // Cleanup function
@@ -348,22 +456,36 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   }, [handleUrl, emitNavigationEvent]);
 
   const signIn = useCallback(async (provider: AuthProvider): Promise<boolean> => {
-    logger.info('Sign-in process started', { provider });
+    const sessionId = session?.user?.id ? `${session.user.id.slice(0, 8)}...` : null;
+    logger.info('Sign-in process started', { 
+      provider, 
+      timestamp: new Date().toISOString(),
+      existingSessionId: sessionId
+    });
     setIsLoading(true);
 
     try { // Wrap the entire logic in a try-finally
       if (provider === 'apple') {
         // Apple Native Sign-In
         try {
+          // 1. "Auth: Apple sign-in started"
+          logger.info('Auth: Apple sign-in started', { provider, timestamp: new Date().toISOString() });
+          track('Auth: Apple sign-in started', { provider, timestamp: new Date().toISOString() });
+          
+          logger.info('Checking Apple authentication availability', { provider });
           const isAvailable = await AppleAuthentication.isAvailableAsync();
           if (!isAvailable) {
             logger.error('Apple Sign-In Error: Authentication not available', { 
-              error: 'Apple authentication not available on this device' 
+              error: 'Apple authentication not available on this device',
+              provider
             });
             throw new Error('Apple authentication is not available on this device');
           }
 
-          logger.info('Apple Sign In process started', { provider });
+          logger.info('Apple authentication available, starting sign-in flow', { 
+            provider,
+            timestamp: new Date().toISOString()
+          });
           
           const credential = await AppleAuthentication.signInAsync({
             requestedScopes: [
@@ -372,20 +494,56 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
             ],
           });
 
+          // Temporary debug line to check Apple identity token
+          console.log('Apple identity token:', credential.identityToken);
+
           const { identityToken, email, fullName } = credential;
+          
+          // 2. "Auth: Apple returned credential"
+          const credentialData = {
+            provider,
+            hasIdentityToken: !!identityToken,
+            hasEmail: !!email,
+            hasFullName: !!fullName,
+            timestamp: new Date().toISOString()
+          };
+          logger.info('Auth: Apple returned credential', credentialData);
+          track('Auth: Apple returned credential', credentialData);
+          
           if (!identityToken) {
+            const errorMsg = 'Apple didn\'t return a token. Please try again.';
             logger.error('Apple Sign-In Error: No identity token returned', { 
-              error: 'No identity token returned from Apple' 
+              error: errorMsg,
+              provider,
+              timestamp: new Date().toISOString()
             });
-            throw new Error('No identity token returned from Apple');
+            track('Auth: Apple token missing', { provider, timestamp: new Date().toISOString() });
+            
+            // Show user-facing error message to prevent frozen login experience
+            showError('Apple Sign-In Error', errorMsg);
+            return false; // Don't throw, just return failure
           }
 
-          logger.info('Apple identity token received, signing in with Supabase', { provider });
+          logger.info('Apple identity token received, signing in with Supabase', { 
+            provider,
+            tokenPresent: true,
+            timestamp: new Date().toISOString()
+          });
 
-          // *** THIS IS THE CRITICAL CHANGE ***
-          // For native Apple Sign In, the clientId for Supabase's verification
-          // should typically be your app's Bundle ID, not the Service ID (which is more for web flows).
-          const supabaseClientId = 'com.meez.recipes.oauth';
+          // *** APPLE SERVICE ID FOR TOKEN VERIFICATION ***
+          // For Apple Sign In with Supabase, the clientId should be your Apple Service ID
+          // (configured in Apple Developer Console), NOT the Bundle ID.
+          // The Bundle ID is only used for app provisioning and entitlements.
+          const supabaseClientId = process.env.EXPO_PUBLIC_APPLE_SERVICE_ID || 'com.meez.recipes.oauth';
+
+          // 3. "Auth: Attempting Supabase exchange"
+          const exchangeData = {
+            provider: 'apple',
+            clientId: supabaseClientId,
+            timestamp: new Date().toISOString()
+          };
+          logger.info('Auth: Attempting Supabase exchange', exchangeData);
+          track('Auth: Attempting Supabase exchange', exchangeData);
 
           const { data, error } = await supabase.auth.signInWithIdToken({
             provider: 'apple',
@@ -395,11 +553,27 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           });
 
           if (error) {
-            logger.error('Apple Sign-In Error: Supabase signInWithIdToken failed', { 
-              error: error.message 
-            });
+            // 4. "Auth: Supabase exchange error"
+            const errorData = {
+              error: error.message,
+              provider: 'apple',
+              clientId: supabaseClientId,
+              timestamp: new Date().toISOString()
+            };
+            logger.error('Auth: Supabase exchange error', errorData);
+            track('Auth: Supabase exchange error', errorData);
             throw error;
           }
+
+          // 4. "Auth: Supabase exchange success"
+          const successData = {
+            provider: 'apple',
+            hasUser: !!data?.user,
+            userId: data?.user?.id ? `${data.user.id.slice(0, 8)}...` : null,
+            timestamp: new Date().toISOString()
+          };
+          logger.info('Auth: Supabase exchange success', successData);
+          track('Auth: Supabase exchange success', successData);
 
           if (data?.user) {
             const fullNameStr = fullName
@@ -443,9 +617,16 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           });
           return true; // Indicate success for Apple
         } catch (err: any) {
-          logger.error('Apple sign-in failed', { provider, error: err.message });
-          handleError('Sign In Error', err);
-          return false; // Indicate failure
+          if (err.code === 'ERR_REQUEST_CANCELED') {
+            // User cancelled the sign-in flow - this is normal behavior
+            logger.info('Apple sign-in cancelled by user', { provider });
+            return false; // Return false but don't show error to user
+          } else {
+            // Actual error occurred
+            logger.error('Apple sign-in failed', { provider, error: err.message });
+            handleError('Sign In Error', err);
+            return false; // Indicate failure
+          }
         }
       } else { // Google OAuth flow
         const redirectTo = process.env.EXPO_PUBLIC_AUTH_URL;
@@ -453,12 +634,19 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         if (!redirectTo) {
           const errorMsg =
             'Missing EXPO_PUBLIC_AUTH_URL environment variable. Cannot proceed with authentication.';
-          logger.error('Configuration Error: Missing EXPO_PUBLIC_AUTH_URL', { error: errorMsg });
+          logger.error('Configuration Error: Missing EXPO_PUBLIC_AUTH_URL', { 
+            error: errorMsg,
+            provider: 'google'
+          });
           handleError('Configuration Error', errorMsg);
           return false; // Indicate failure
         }
 
-        logger.info('Web browser session opened', { provider, redirectTo });
+        logger.info('Starting Google OAuth flow', { 
+          provider, 
+          redirectTo,
+          timestamp: new Date().toISOString()
+        });
 
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider,
@@ -468,45 +656,86 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           },
         });
 
-        if (error) throw error;
+        if (error) {
+          logger.error('Google OAuth: Supabase signInWithOAuth failed', {
+            provider: 'google',
+            error: error.message,
+            timestamp: new Date().toISOString()
+          });
+          throw error;
+        }
 
         if (data.url) {
+          logger.info('Opening WebBrowser for Google OAuth', {
+            provider: 'google',
+            hasUrl: !!data.url,
+            redirectTo,
+            timestamp: new Date().toISOString()
+          });
+
           const result = await WebBrowser.openAuthSessionAsync(
             data.url,
             redirectTo,
           );
-          if (result.type === 'success' && result.url) {
-            logger.info('Web browser session success', { provider, url: result.url });
+          
+          logger.info('WebBrowser session completed', {
+            provider: 'google',
+            resultType: result.type,
+            hasResultUrl: 'url' in result && !!result.url,
+            timestamp: new Date().toISOString()
+          });
+
+          if (result.type === 'success' && 'url' in result && result.url) {
+            logger.info('Web browser session success', { 
+              provider, 
+              url: result.url,
+              timestamp: new Date().toISOString()
+            });
             await handleUrl(result.url);
             return true; // Indicate that browser flow completed successfully
           } else if (result.type === 'cancel') {
-            logger.warn('Web browser session cancelled by user', { provider });
+            logger.warn('Web browser session cancelled by user', { 
+              provider,
+              timestamp: new Date().toISOString()
+            });
             handleError('Sign In Cancelled', 'You cancelled the sign-in process.');
             return false; // Indicate cancellation
           } else {
             logger.error('Web browser session unknown result type', { 
               provider, 
-              resultType: result.type 
+              resultType: result.type,
+              timestamp: new Date().toISOString()
             });
             handleError('Sign In Error', `Sign-in was not completed. Reason: ${result.type}`);
             return false; // Indicate other failure
           }
         } else {
-          logger.error('Sign-in failed: No redirect URL received', { provider });
+          logger.error('Sign-in failed: No redirect URL received', { 
+            provider,
+            timestamp: new Date().toISOString()
+          });
           handleError('Sign In Error', 'No redirect URL received. Please try again.');
           return false; // Indicate failure to get URL
         }
       }
     } catch (err: any) {
-      logger.error('Generic Sign-In Error', { error: err.message, provider });
+      logger.error('Auth:Failure - Generic Sign-In Error', { 
+        error: err.message, 
+        provider,
+        timestamp: new Date().toISOString()
+      });
       handleError('Sign In Error', err);
       return false; // Indicate failure due to an exception
     } finally {
       // Always ensure isLoading is set to false when the signIn process finishes,
       // regardless of success, error, or cancellation.
+      logger.info('Auth:OAuth - Sign-in process completed', {
+        provider,
+        timestamp: new Date().toISOString()
+      });
       setIsLoading(false);
     }
-  }, [handleUrl, showError]);
+  }, [handleUrl, showError, track]);
 
   const signOut = useCallback(async () => {
     logger.info('Sign-out process initiated', { userId: session?.user?.id });

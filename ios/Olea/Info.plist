@@ -19,7 +19,7 @@
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.1.1</string>
+    <string>1.1.2</string>
     <key>CFBundleSignature</key>
     <string>????</string>
     <key>CFBundleURLTypes</key>
@@ -83,16 +83,13 @@
       <string>UIInterfaceOrientationPortrait</string>
       <string>UIInterfaceOrientationPortraitUpsideDown</string>
     </array>
-    <key>UISupportedInterfaceOrientations~ipad</key>
-    <array>
-      <string>UIInterfaceOrientationPortrait</string>
-      <string>UIInterfaceOrientationPortraitUpsideDown</string>
-      <string>UIInterfaceOrientationLandscapeLeft</string>
-      <string>UIInterfaceOrientationLandscapeRight</string>
-    </array>
     <key>UIUserInterfaceStyle</key>
     <string>Automatic</string>
     <key>UIViewControllerBasedStatusBarAppearance</key>
     <false/>
+        <key>UIDeviceFamily</key>
+    <array>
+      <integer>1</integer>
+    </array>
   </dict>
 </plist>

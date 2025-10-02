@@ -39,7 +39,7 @@ import BottomTabBar from '@/components/BottomTabBar';
 
 export default function AccountScreen() {
   const { signOut, isAuthenticated, session } = useAuth();
-  const { subscriptionStatus, customerInfo } = useRevenueCat();
+  const { subscriptionStatus, customerInfo, restorePurchases } = useRevenueCat();
   useRenderCounter('AccountScreen', { hasSession: !!session, isAuthenticated });
   const { showError } = useErrorModal();
   const handleError = useHandleError();
@@ -50,6 +50,7 @@ export default function AccountScreen() {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
   const [feedbackAnimation] = useState(new Animated.Value(0));
+  const [isRestoringPurchases, setIsRestoringPurchases] = useState(false);
   const appVersion = (Application?.nativeApplicationVersion as string | null) || (Constants?.expoConfig?.version as string | undefined) || 'dev';
 
   // Helper function to get subscription details
@@ -61,12 +62,13 @@ export default function AccountScreen() {
 
     const details = [];
     
+    // Handle expiration dates
     if (premiumEntitlement.expirationDate) {
       const expirationDate = new Date(premiumEntitlement.expirationDate);
       const formattedDate = expirationDate.toLocaleDateString();
       
       if (status === 'Free Trial' || status === 'Introductory Period') {
-        details.push(`Expires ${formattedDate}`);
+        details.push(`Trial expires ${formattedDate}`);
       } else if (status === 'Set to Cancel') {
         details.push(`Cancels ${formattedDate}`);
       } else if (status === 'Subscribed') {
@@ -74,9 +76,19 @@ export default function AccountScreen() {
       }
     }
 
+    // Handle product types - updated for new offerings
     if (premiumEntitlement.productIdentifier) {
-      const productName = premiumEntitlement.productIdentifier.replace('olea.', '');
-      details.push(`${productName.charAt(0).toUpperCase() + productName.slice(1)} Plan`);
+      const productId = premiumEntitlement.productIdentifier.toLowerCase();
+      
+      if (productId.includes('lifetime') || productId.includes('$rc_lifetime')) {
+        details.push('Lifetime Purchase ($15)');
+      } else if (productId.includes('monthly') || productId.includes('$rc_monthly')) {
+        details.push('Monthly Subscription ($3/month)');
+      } else {
+        // Fallback for other product identifiers
+        const productName = premiumEntitlement.productIdentifier.replace('olea.', '').replace('$rc_', '');
+        details.push(`${productName.charAt(0).toUpperCase() + productName.slice(1)} Plan`);
+      }
     }
 
     return details.join(' • ');
@@ -175,6 +187,35 @@ export default function AccountScreen() {
     }
   };
 
+  const handleRestorePurchases = async () => {
+    if (isRestoringPurchases) {
+      return;
+    }
+
+    setIsRestoringPurchases(true);
+    
+    try {
+      const success = await restorePurchases();
+      if (success) {
+        showSuccess('Purchases Restored!', 'Your previous purchases have been restored successfully.');
+      }
+    } catch (error) {
+      // Error handling is done in the context
+      console.log('Restore purchases error handled in context');
+    } finally {
+      setIsRestoringPurchases(false);
+    }
+  };
+
+  const handleManageSubscriptions = () => {
+    // Open Apple's subscription management page
+    Linking.openURL('itms-apps://apps.apple.com/account/subscriptions').catch((err) => {
+      console.log('Error opening subscription management:', err);
+      // Fallback to web version
+      Linking.openURL('https://apps.apple.com/account/subscriptions');
+    });
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScreenHeader title="ACCOUNT" showBack={false} backgroundColor="#DEF6FF" />
@@ -223,6 +264,38 @@ export default function AccountScreen() {
               <View style={styles.signOutButtonContent}>
                 <Text style={styles.signOutButtonText}>
                   {isSigningOut ? 'Signing Out...' : 'Sign Out'}
+                </Text>
+              </View>
+            </TouchableHighlight>
+          </View>
+        )}
+
+        {/* Subscription Management Section */}
+        {isAuthenticated && (
+          <View style={styles.subscriptionSection}>
+            <TouchableHighlight
+              style={styles.subscriptionButton}
+              onPress={handleRestorePurchases}
+              underlayColor="transparent"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              disabled={isRestoringPurchases}
+            >
+              <View style={styles.subscriptionButtonContent}>
+                <Text style={styles.subscriptionButtonText}>
+                  {isRestoringPurchases ? 'Restoring...' : 'Restore Purchases'}
+                </Text>
+              </View>
+            </TouchableHighlight>
+            
+            <TouchableHighlight
+              style={styles.subscriptionButton}
+              onPress={handleManageSubscriptions}
+              underlayColor="transparent"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <View style={styles.subscriptionButtonContent}>
+                <Text style={styles.subscriptionButtonText}>
+                  Manage Subscriptions
                 </Text>
               </View>
             </TouchableHighlight>
@@ -409,6 +482,31 @@ const styles = StyleSheet.create({
   signOutSection: {
     marginBottom: SPACING.md,
   } as ViewStyle,
+  subscriptionSection: {
+    marginBottom: SPACING.md,
+  } as ViewStyle,
+  subscriptionButton: {
+    height: 32,
+    marginBottom: SPACING.sm,
+  } as ViewStyle,
+  subscriptionButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: '100%',
+    paddingLeft: 0,
+    paddingRight: 18,
+  } as ViewStyle,
+  subscriptionButtonText: {
+    fontFamily: 'Inter',
+    fontSize: 20,
+    fontWeight: '400',
+    lineHeight: 26,
+    color: COLORS.textDark,
+    flex: 1,
+    textAlign: 'left',
+    textAlignVertical: 'center',
+    paddingVertical: 0,
+  } as TextStyle,
   sectionTitle: {
     ...sectionHeaderText,
     marginTop: SPACING.xxl,
