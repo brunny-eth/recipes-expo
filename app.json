@@ -18,15 +18,6 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.meez.recipes",
       "usesAppleSignIn": true,
-      "entitlements": {
-        "com.apple.developer.applesignin": [
-          "Default"
-        ],
-        "com.apple.developer.associated-domains": [
-          "applinks:meez.app",
-          "applinks:cookolea.com"
-        ]
-      },
       "splash": {
         "image": "./assets/images/splash.png",
         "resizeMode": "contain",
@@ -71,7 +62,19 @@
       "expo-image-picker",
       "expo-document-picker",
       "expo-file-system",
-      "expo-video"
+      "expo-video",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "entitlements": {
+              "com.apple.developer.associated-domains": [
+                "applinks:cookolea.com"
+              ]
+            }
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
