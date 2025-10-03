@@ -162,6 +162,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
 
       // Extract tokens from URL fragment and set session explicitly using setSession()
       const urlParts = url.split('#');
+      console.log("🔍 DeepLink fragment:", url.split("#")[1]);
       let fragment = null;
       if (urlParts.length > 1) {
         fragment = urlParts[1];

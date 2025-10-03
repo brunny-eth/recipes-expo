@@ -13,6 +13,7 @@ export function useDeepLinkHandler() {
 
   const parseDeepLink = useCallback((url: string): DeepLinkParams | null => {
     console.log('[DeepLinkHandler] Parsing URL:', url);
+    console.log("🔍 DeepLink fragment:", url.split("#")[1]);
     
     try {
       // Handle both custom scheme (olea://) and universal links (https://cookolea.com)
