@@ -18,6 +18,7 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.meez.recipes",
       "usesAppleSignIn": true,
+      "associatedDomains": ["applinks:cookolea.com"],
       "splash": {
         "image": "./assets/images/splash.png",
         "resizeMode": "contain",
