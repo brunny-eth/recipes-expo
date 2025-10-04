@@ -64,6 +64,7 @@
       "expo-document-picker",
       "expo-file-system",
       "expo-video",
+      "expo-apple-authentication",
       [
         "expo-build-properties",
         {
@@ -71,6 +72,9 @@
             "entitlements": {
               "com.apple.developer.associated-domains": [
                 "applinks:cookolea.com"
+              ],
+              "com.apple.developer.applesignin": [
+                "Default"
               ]
             }
           }
