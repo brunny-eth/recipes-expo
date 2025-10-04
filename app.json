@@ -18,10 +18,7 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.meez.recipes",
       "usesAppleSignIn": true,
-      "associatedDomains": [
-        "applinks:cookolea.com",
-        "applinks:www.cookolea.com"
-      ],
+      "associatedDomains": ["applinks:cookolea.com"],
       "splash": {
         "image": "./assets/images/splash.png",
         "resizeMode": "contain",
@@ -73,8 +70,7 @@
           "ios": {
             "entitlements": {
               "com.apple.developer.associated-domains": [
-                "applinks:cookolea.com",
-                "applinks:www.cookolea.com"
+                "applinks:cookolea.com"
               ]
             }
           }
