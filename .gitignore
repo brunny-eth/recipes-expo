@@ -136,3 +136,8 @@ yarn-error.*
 
 # Project scripts (do not commit local import tools)
 scripts/
+
+# IPA extraction artifacts (should not be committed)
+OleaApp/
+*.ipa
+*.symbols
