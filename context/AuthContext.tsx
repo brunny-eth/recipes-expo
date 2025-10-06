@@ -117,24 +117,6 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     };
   }, []);
 
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (!session && isLoading) {
-        logger.warn('Auth:Failure - Session hydration is taking over 3 seconds', { 
-          sessionExists: !!session, 
-          isLoading,
-          timestamp: new Date().toISOString()
-        });
-      } else if (!session && !isLoading) {
-        logger.warn('Auth:Failure - No session found after initial hydration', { 
-          sessionExists: !!session, 
-          isLoading,
-          timestamp: new Date().toISOString()
-        });
-      }
-    }, 3000);
-    return () => clearTimeout(timeout);
-  }, [session, isLoading]);
 
   const handleUrl = useCallback(
     async (url: string | null) => {
@@ -263,69 +245,152 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
 
   // Effect to set up auth state change listener and deep link listener
   useEffect(() => {
-    logger.info('Setting up auth state change listener and URL listener');
+    let mounted = true;
+    
+    logger.info('[Auth] Initialization started', { timestamp: new Date().toISOString() });
 
-    // Debug logging for auth events at app startup
-    supabase.auth.onAuthStateChange((event, session) => {
-      console.log("[auth][event]", event, {
-        userId: session?.user.id,
-        expiresAt: session?.expires_at,
-        hasRefresh: !!session?.refresh_token,
+    // ✅ CRITICAL: Synchronously restore session BEFORE subscribing to prevent race condition
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (!mounted) {
+        logger.warn('[Auth] Component unmounted during getSession');
+        return;
+      }
+
+      if (error) {
+        logger.error('[Auth] getSession error', {
+          error: error.message,
+          timestamp: new Date().toISOString()
+        });
+        
+        // ✅ PostHog: Track getSession errors
+        trackRef.current('auth_getsession_error', {
+          message: error.message,
+          timestamp: new Date().toISOString()
+        });
+        
+        // Fail gracefully - set session to null and unblock app
+        setSession(null);
+        setIsLoading(false);
+        return;
+      }
+
+      if (session) {
+        logger.info('[Auth] Initial session restored via getSession', {
+          userId: session.user.id ? `${session.user.id.slice(0, 8)}...` : null,
+          expiresAt: session.expires_at,
+          provider: session.user.app_metadata?.provider || 'unknown',
+          timestamp: new Date().toISOString()
+        });
+        
+        // ✅ PostHog: Track successful session restoration
+        trackRef.current('auth_getsession_success', {
+          userId: session.user.id,
+          provider: session.user.app_metadata?.provider || 'unknown',
+          hasEmail: !!session.user.email,
+          timestamp: new Date().toISOString()
+        });
+        
+        setSession(session);
+        maybeIdentifyUserRef.current(session.user);
+      } else {
+        logger.info('[Auth] No session found in storage', {
+          timestamp: new Date().toISOString()
+        });
+        setSession(null);
+      }
+
+      // ✅ Always unblock app after getSession completes
+      setIsLoading(false);
+    }).catch((unexpectedError: any) => {
+      if (!mounted) return;
+      
+      logger.error('[Auth] Unexpected error in getSession', {
+        error: unexpectedError.message,
+        timestamp: new Date().toISOString()
       });
+      
+      // ✅ PostHog: Track unexpected errors
+      trackRef.current('auth_getsession_exception', {
+        message: unexpectedError.message || String(unexpectedError),
+        timestamp: new Date().toISOString()
+      });
+      
+      // Fail gracefully
+      setSession(null);
+      setIsLoading(false);
     });
 
-    // Set up auth state change listener
+    // ✅ Set up auth state change listener for FUTURE auth events
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!mounted) {
+          logger.warn('[Auth] Received auth event after unmount', { event });
+          return;
+        }
+
         const sessionId = session?.user?.id ? `${session.user.id.slice(0, 8)}...` : null;
         const sessionExpiry = session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : null;
         
-        logger.info('Auth:Callback - Supabase auth state change', { 
+        logger.info('[Auth] State change event', { 
           event, 
           sessionExists: !!session, 
           userId: sessionId,
           sessionExpiry,
           timestamp: new Date().toISOString()
         });
+        
+        // ✅ PostHog: Track ALL auth state changes
+        trackRef.current('auth_state_change', {
+          event,
+          hasSession: !!session,
+          userId: session?.user?.id || null,
+          provider: session?.user?.app_metadata?.provider || null,
+          expiresAt: sessionExpiry,
+          timestamp: new Date().toISOString()
+        });
+
+        // ⚠️ SKIP INITIAL_SESSION - already handled by getSession() above
+        if (event === 'INITIAL_SESSION') {
+          logger.info('[Auth] INITIAL_SESSION event (already handled by getSession)', {
+            timestamp: new Date().toISOString()
+          });
+          return; // Don't update state - already set by getSession()
+        }
 
         if (event === 'SIGNED_IN' && session) {
-          // 5. "Auth: onAuthStateChange event SIGNED_IN"
-          const authStateData = {
+          logger.info('[Auth] SIGNED_IN event', {
+            userId: sessionId,
+            provider: session.user.app_metadata?.provider || 'unknown',
+            timestamp: new Date().toISOString()
+          });
+          
+          trackRef.current('Auth: onAuthStateChange event SIGNED_IN', {
             event: 'SIGNED_IN',
             userId: sessionId,
             sessionExpiry,
             provider: session.user.app_metadata?.provider || 'unknown',
             timestamp: new Date().toISOString()
-          };
-          logger.info('Auth: onAuthStateChange event SIGNED_IN', authStateData);
-          trackRef.current('Auth: onAuthStateChange event SIGNED_IN', authStateData);
+          });
+          
           setSession(session);
           setJustLoggedIn(true);
           setIsLoading(false);
-          
-          // Identify user in PostHog
           maybeIdentifyUserRef.current(session.user);
           
-          // For Apple login, the metadata might already be updated by the signIn function
-          // For Google login, we need to update it here
+          // Handle new user metadata
           let updatedMetadata = session.user.user_metadata as UserMetadata;
           const isNew = !session.user.user_metadata?.first_login_at;
 
           if (isNew) {
             logger.info('New user detected, updating metadata', { userId: session.user.id });
 
-            // For Apple login, check if metadata was already updated by the signIn function
             if (session.user.app_metadata?.provider === 'apple') {
-              // Give Apple login flow a moment to complete metadata update
               await new Promise(resolve => setTimeout(resolve, 200));
-
-              // Refresh user data to get latest metadata
               const { data: refreshedUser } = await supabase.auth.getUser();
               if (refreshedUser.user?.user_metadata?.first_login_at) {
                 updatedMetadata = refreshedUser.user.user_metadata as UserMetadata;
                 logger.info('Apple user metadata already updated by signIn flow', { userId: session.user.id });
               } else {
-                // Fallback: update metadata if it wasn't set
                 const { error: metadataError } = await supabase.auth.updateUser({
                   data: { first_login_at: new Date().toISOString() },
                 });
@@ -337,11 +402,9 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
                 }
               }
             } else {
-              // For Google and other providers, update metadata normally
               const { error: metadataError } = await supabase.auth.updateUser({
                 data: { first_login_at: new Date().toISOString() },
               });
-
               if (metadataError) {
                 logger.error('Error updating new user metadata', {
                   userId: session.user.id,
@@ -356,59 +419,37 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
             }
           }
 
-          // Emit navigation event with the correct metadata
-          logger.info('Auth:Navigation - Emitting SIGNED_IN event', {
-            userId: sessionId,
-            isNewUser: isNew,
+          emitNavigationEvent({ type: 'SIGNED_IN', userId: session.user.id, userMetadata: updatedMetadata });
+          
+        } else if (event === 'SIGNED_OUT') {
+          logger.info('[Auth] SIGNED_OUT event', {
+            userId: sessionId || 'unknown',
             timestamp: new Date().toISOString()
           });
-          emitNavigationEvent({ type: 'SIGNED_IN', userId: session.user.id, userMetadata: updatedMetadata });
-        } else if (event === 'SIGNED_OUT') {
-          // 5. "Auth: onAuthStateChange event SIGNED_OUT"
-          const signedOutData = {
+          
+          trackRef.current('Auth: onAuthStateChange event SIGNED_OUT', {
             event: 'SIGNED_OUT',
             userId: sessionId || 'unknown',
             timestamp: new Date().toISOString()
-          };
-          logger.info('Auth: onAuthStateChange event SIGNED_OUT', signedOutData);
-          trackRef.current('Auth: onAuthStateChange event SIGNED_OUT', signedOutData);
+          });
+          
           setSession(null);
           setJustLoggedIn(false);
           setIsLoading(false);
-          
-          // Reset user in PostHog
           resetUserRef.current();
-          
-          // Emit navigation event
-          logger.info('Auth:Navigation - Emitting SIGNED_OUT event', {
-            timestamp: new Date().toISOString()
-          });
           emitNavigationEvent({ type: 'SIGNED_OUT' });
+          
         } else if (event === 'TOKEN_REFRESHED' && session) {
-          logger.info('Auth:StateChange - Session token refreshed', { 
+          logger.info('[Auth] TOKEN_REFRESHED event', { 
             userId: sessionId,
             sessionExpiry,
             timestamp: new Date().toISOString()
           });
           setSession(session);
           setIsLoading(false);
-        } else if (event === 'INITIAL_SESSION') {
-          logger.info('Auth:StateChange - Initial session check', { 
-            sessionFound: !!session, 
-            userId: sessionId,
-            sessionExpiry,
-            timestamp: new Date().toISOString()
-          });
-          if (session) {
-            setSession(session);
-            // Identify user in PostHog for initial session
-            maybeIdentifyUserRef.current(session.user);
-          } else {
-            setSession(null);
-          }
-          setIsLoading(false);
+          
         } else {
-          logger.info('Auth:StateChange - Other auth event', {
+          logger.info('[Auth] Other auth event', {
             event,
             sessionExists: !!session,
             userId: sessionId,
@@ -448,9 +489,30 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       });
     });
 
+    // ✅ Safety timeout: Force unblock after 5 seconds to prevent infinite loading
+    const safetyTimeout = setTimeout(() => {
+      if (mounted && isLoading) {
+        logger.error('[Auth] TIMEOUT: Auth initialization exceeded 5s - forcing completion', {
+          hasSession: !!session,
+          timestamp: new Date().toISOString()
+        });
+        
+        // ✅ PostHog: Track timeout events (critical for debugging hangs)
+        trackRef.current('auth_timeout', {
+          hadSession: !!session,
+          timestamp: new Date().toISOString()
+        });
+        
+        // Force unblock app
+        setIsLoading(false);
+      }
+    }, 5000);
+
     // Cleanup function
     return () => {
-      logger.info('Cleaning up auth state listener and URL listener');
+      mounted = false;
+      clearTimeout(safetyTimeout);
+      logger.info('[Auth] Cleaning up auth listeners');
       authListener?.subscription?.unsubscribe();
       urlSubscription?.remove();
     };
@@ -545,24 +607,65 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           };
           logger.info('Auth: Attempting Supabase exchange', exchangeData);
           track('Auth: Attempting Supabase exchange', exchangeData);
-
-          const { data, error } = await supabase.auth.signInWithIdToken({
+          
+          // ✅ PostHog: Track sign-in attempt start
+          track('apple_signin_start', {
             provider: 'apple',
-            token: identityToken,
-            // @ts-expect-error Supabase types don't include clientId but it's supported at runtime
+            hasToken: !!identityToken,
+            tokenLength: identityToken?.length || 0,
             clientId: supabaseClientId,
+            timestamp: new Date().toISOString()
           });
+
+          let data, error;
+          try {
+            ({ data, error } = await supabase.auth.signInWithIdToken({
+              provider: 'apple',
+              token: identityToken,
+              // @ts-expect-error Supabase types don't include clientId but it's supported at runtime
+              clientId: supabaseClientId,
+            }));
+          } catch (signInException: any) {
+            // ✅ PostHog: Track exceptions during signInWithIdToken call
+            logger.error('Auth: signInWithIdToken threw exception', {
+              error: signInException.message,
+              errorCode: signInException.code,
+              errorName: signInException.name,
+              provider: 'apple',
+              timestamp: new Date().toISOString()
+            });
+            
+            track('apple_signin_exception', {
+              message: signInException.message || String(signInException),
+              errorCode: signInException.code || 'unknown',
+              errorName: signInException.name || 'Error',
+              provider: 'apple',
+              timestamp: new Date().toISOString()
+            });
+            
+            throw signInException;
+          }
 
           if (error) {
             // 4. "Auth: Supabase exchange error"
             const errorData = {
               error: error.message,
+              errorStatus: error.status || 'unknown',
               provider: 'apple',
               clientId: supabaseClientId,
               timestamp: new Date().toISOString()
             };
             logger.error('Auth: Supabase exchange error', errorData);
             track('Auth: Supabase exchange error', errorData);
+            
+            // ✅ PostHog: Track Supabase-returned errors
+            track('apple_signin_error', {
+              message: error.message,
+              status: error.status || 'unknown',
+              provider: 'apple',
+              timestamp: new Date().toISOString()
+            });
+            
             throw error;
           }
 
@@ -575,6 +678,14 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           };
           logger.info('Auth: Supabase exchange success', successData);
           track('Auth: Supabase exchange success', successData);
+          
+          // ✅ PostHog: Track successful sign-in
+          track('apple_signin_success', {
+            user_id: data?.user?.id,
+            hasEmail: !!data?.user?.email,
+            provider: data?.user?.app_metadata?.provider || 'apple',
+            timestamp: new Date().toISOString()
+          });
 
           if (data?.user) {
             const fullNameStr = fullName
@@ -621,10 +732,28 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           if (err.code === 'ERR_REQUEST_CANCELED') {
             // User cancelled the sign-in flow - this is normal behavior
             logger.info('Apple sign-in cancelled by user', { provider });
+            
+            // ✅ PostHog: Track user cancellations (helps understand drop-off)
+            track('apple_signin_cancelled', {
+              provider: 'apple',
+              reason: 'user_cancelled',
+              timestamp: new Date().toISOString()
+            });
+            
             return false; // Return false but don't show error to user
           } else {
             // Actual error occurred
             logger.error('Apple sign-in failed', { provider, error: err.message });
+            
+            // ✅ PostHog: Track unexpected errors in Apple sign-in flow
+            track('apple_signin_failed', {
+              provider: 'apple',
+              errorMessage: err.message || String(err),
+              errorCode: err.code || 'unknown',
+              errorName: err.name || 'Error',
+              timestamp: new Date().toISOString()
+            });
+            
             handleError('Sign In Error', err);
             return false; // Indicate failure
           }
@@ -725,6 +854,16 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         provider,
         timestamp: new Date().toISOString()
       });
+      
+      // ✅ PostHog: Track outer catch-all errors
+      track('signin_generic_error', {
+        provider,
+        errorMessage: err.message || String(err),
+        errorCode: err.code || 'unknown',
+        errorName: err.name || 'Error',
+        timestamp: new Date().toISOString()
+      });
+      
       handleError('Sign In Error', err);
       return false; // Indicate failure due to an exception
     } finally {
