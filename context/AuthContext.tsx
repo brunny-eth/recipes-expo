@@ -80,6 +80,9 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   const maybeIdentifyUserRef = useRef(maybeIdentifyUser);
   const resetUserRef = useRef(resetUser);
   const trackRef = useRef(track);
+  
+  // Track loading state in a ref to avoid closure issues in timeout
+  const isLoadingRef = useRef(isLoading);
 
   useEffect(() => {
     showErrorRef.current = showError;
@@ -90,6 +93,11 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     resetUserRef.current = resetUser;
     trackRef.current = track;
   }, [maybeIdentifyUser, resetUser, track]);
+  
+  // Keep isLoadingRef in sync with isLoading state
+  useEffect(() => {
+    isLoadingRef.current = isLoading;
+  }, [isLoading]);
 
   // Navigation event listeners
   const navigationListeners = useRef<Set<(event: AuthNavigationEvent) => void>>(new Set());
@@ -491,7 +499,8 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
 
     // ✅ Safety timeout: Force unblock after 5 seconds to prevent infinite loading
     const safetyTimeout = setTimeout(() => {
-      if (mounted && isLoading) {
+      // Check current loading state via ref to avoid closure issues
+      if (mounted && isLoadingRef.current) {
         logger.error('[Auth] TIMEOUT: Auth initialization exceeded 5s - forcing completion', {
           hasSession: !!session,
           timestamp: new Date().toISOString()

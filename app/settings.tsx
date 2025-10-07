@@ -233,7 +233,7 @@ export default function AccountScreen() {
                 {`Logged in as ${session?.user?.email}`}
               </Text>
               <Text style={styles.authStatusText}>
-                Account status: {subscriptionStatus}
+                Account Status: {subscriptionStatus}
               </Text>
               {customerInfo && subscriptionStatus !== 'Free' && (
                 <Text style={styles.subscriptionDetailsText}>
@@ -250,25 +250,6 @@ export default function AccountScreen() {
             </TouchableOpacity>
           )}
         </View>
-
-        {/* Sign Out Section */}
-        {isAuthenticated && (
-          <View style={styles.signOutSection}>
-            <TouchableHighlight
-              style={styles.signOutButton}
-              onPress={handleSignOut}
-              underlayColor="transparent"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              disabled={isSigningOut}
-            >
-              <View style={styles.signOutButtonContent}>
-                <Text style={styles.signOutButtonText}>
-                  {isSigningOut ? 'Signing Out...' : 'Sign Out'}
-                </Text>
-              </View>
-            </TouchableHighlight>
-          </View>
-        )}
 
         {/* Subscription Management Section */}
         {isAuthenticated && (
@@ -364,8 +345,8 @@ export default function AccountScreen() {
           </Animated.View>
         )}
 
-        {/* Debug Section - Moved to bottom of scrollview */}
-        {__DEV__ && (
+        {/* Debug Section - Commented out for now */}
+        {/* {__DEV__ && (
           <View style={styles.devSection}>
             <TouchableOpacity
               style={styles.devLinkRow}
@@ -399,6 +380,25 @@ export default function AccountScreen() {
               <Text style={styles.devLinkText}>Reset Welcome Screen</Text>
             </TouchableOpacity>
           </View>
+        )} */}
+
+        {/* Sign Out Section - Moved to bottom */}
+        {isAuthenticated && (
+          <View style={styles.signOutSection}>
+            <TouchableHighlight
+              style={styles.signOutButton}
+              onPress={handleSignOut}
+              underlayColor="transparent"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              disabled={isSigningOut}
+            >
+              <View style={styles.signOutButtonContent}>
+                <Text style={styles.signOutButtonText}>
+                  {isSigningOut ? 'Signing Out...' : 'Sign Out'}
+                </Text>
+              </View>
+            </TouchableHighlight>
+          </View>
         )}
 
        </ScrollView>
@@ -406,20 +406,18 @@ export default function AccountScreen() {
        {/* Fixed Bottom Legal Section - Above tabs */}
        <View style={styles.fixedBottomLegalSection}>
          <Text style={styles.versionText}>Version {appVersion}</Text>
-         <View style={styles.legalSection}>
-           <TouchableOpacity
-             style={styles.legalLink}
-             onPress={() => Linking.openURL('https://cookolea.com/privacy.html')}
-           >
-             <Text style={styles.legalLinkText}>Privacy Policy</Text>
-           </TouchableOpacity>
-           <TouchableOpacity
-             style={styles.legalLink}
-             onPress={() => Linking.openURL('https://cookolea.com/tos.html')}
-           >
-             <Text style={styles.legalLinkText}>Terms of Service</Text>
-           </TouchableOpacity>
-         </View>
+         <TouchableOpacity
+           style={styles.legalLink}
+           onPress={() => Linking.openURL('https://cookolea.com/privacy.html')}
+         >
+           <Text style={styles.legalLinkText}>Privacy Policy</Text>
+         </TouchableOpacity>
+         <TouchableOpacity
+           style={styles.legalLink}
+           onPress={() => Linking.openURL('https://cookolea.com/tos.html')}
+         >
+           <Text style={styles.legalLinkText}>Terms of Service</Text>
+         </TouchableOpacity>
        </View>
 
       <BottomTabBar />
@@ -437,13 +435,14 @@ const styles = StyleSheet.create({
     flex: 1,
   } as ViewStyle,
   userInfoContainer: {
-    marginBottom: SPACING.lg,
-    paddingTop: SPACING.sm, // Minimal top padding
+    marginBottom: SPACING.xxxl + 24,
+    paddingTop: SPACING.sm,
   } as ViewStyle,
   authStatusText: {
     ...bodyText,
     color: COLORS.textDark,
     textAlign: 'left',
+    marginBottom: SPACING.xs,
   } as TextStyle,
   subscriptionDetailsText: {
     ...bodyText,
@@ -453,59 +452,38 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xs,
   } as TextStyle,
   signOutButton: {
-    height: 32,
-    marginTop: SPACING.sm,
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.xs,
   } as ViewStyle,
   signOutButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: '100%',
-    paddingLeft: 0,
-    paddingRight: 18,
   } as ViewStyle,
   signOutButtonText: {
-    fontFamily: 'Inter',
-    fontSize: 20,
-    fontWeight: '400',
-    lineHeight: 26,
+    ...bodyText,
     color: COLORS.textDark,
-    flex: 1,
     textAlign: 'left',
-    textAlignVertical: 'center',
-    paddingVertical: 0,
   } as TextStyle,
   feedbackSection: {
     marginTop: SPACING.lg,
     marginBottom: SPACING.xs,
   } as ViewStyle,
   signOutSection: {
-    marginBottom: SPACING.md,
+    marginBottom: 0,
   } as ViewStyle,
   subscriptionSection: {
-    marginBottom: SPACING.md,
+    marginBottom: 0,
   } as ViewStyle,
   subscriptionButton: {
-    height: 32,
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.xs,
   } as ViewStyle,
   subscriptionButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: '100%',
-    paddingLeft: 0,
-    paddingRight: 18,
   } as ViewStyle,
   subscriptionButtonText: {
-    fontFamily: 'Inter',
-    fontSize: 20,
-    fontWeight: '400',
-    lineHeight: 26,
+    ...bodyText,
     color: COLORS.textDark,
-    flex: 1,
     textAlign: 'left',
-    textAlignVertical: 'center',
-    paddingVertical: 0,
   } as TextStyle,
   sectionTitle: {
     ...sectionHeaderText,
@@ -531,50 +509,32 @@ const styles = StyleSheet.create({
     color: COLORS.textDark,
   } as TextStyle,
   sendFeedbackButtonSection: {
-    marginBottom: SPACING.sm,
+    marginBottom: 0,
   } as ViewStyle,
   sendFeedbackButton: {
-    height: 32,
+    marginBottom: SPACING.xs,
   } as ViewStyle,
   sendFeedbackButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: '100%',
-    paddingLeft: 0,
-    paddingRight: 18,
   } as ViewStyle,
   sendFeedbackButtonText: {
-    fontFamily: 'Inter',
-    fontSize: 20,
-    fontWeight: '400',
-    lineHeight: 26,
+    ...bodyText,
     color: COLORS.textDark,
-    flex: 1,
     textAlign: 'left',
-    textAlignVertical: 'center',
-    paddingVertical: 0,
   } as TextStyle,
   submitFeedbackButton: {
-    height: 32,
     marginTop: SPACING.sm,
+    marginBottom: SPACING.xs,
   } as ViewStyle,
   submitFeedbackButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: '100%',
-    paddingLeft: 0,
-    paddingRight: 18,
   } as ViewStyle,
   submitFeedbackButtonText: {
-    fontFamily: 'Inter',
-    fontSize: 20,
-    fontWeight: '400',
-    lineHeight: 26,
+    ...bodyText,
     color: COLORS.textDark,
-    flex: 1,
     textAlign: 'left',
-    textAlignVertical: 'center',
-    paddingVertical: 0,
   } as TextStyle,
   submitFeedbackButtonTextDisabled: {
     opacity: 0.5,
@@ -593,25 +553,23 @@ const styles = StyleSheet.create({
     fontSize: FONT.size.smBody,
     color: COLORS.textDark,
   } as TextStyle,
-  legalSection: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: SPACING.lg,
-    marginBottom: 0,
-  } as ViewStyle,
   legalLink: {
+    alignSelf: 'flex-start',
+    marginBottom: SPACING.xs,
   } as ViewStyle,
   legalLinkText: {
     ...bodyText,
     fontSize: FONT.size.caption,
     color: '#666666', // Greyish color
+    textAlign: 'left',
   } as TextStyle,
   versionText: {
     ...bodyText,
     color: '#666666', // Greyish color
-    textAlign: 'center',
+    textAlign: 'left',
     fontSize: FONT.size.caption,
     marginTop: 0,
+    marginBottom: SPACING.xs,
   } as TextStyle,
   tagline: {
     ...bodyText,
@@ -646,11 +604,11 @@ const styles = StyleSheet.create({
     right: 0,
     backgroundColor: COLORS.background,
     paddingTop: SPACING.lg,
-    paddingBottom: 0, // Remove bottom padding
+    paddingBottom: 0,
     paddingHorizontal: SPACING.pageHorizontal,
-    alignItems: 'center',
-    borderTopWidth: 0, // Remove top border
-    borderTopColor: 'transparent', // Make border transparent
+    alignItems: 'flex-start',
+    borderTopWidth: 0,
+    borderTopColor: 'transparent',
   } as ViewStyle,
   signOutButtonDisabled: {
     backgroundColor: COLORS.disabled,

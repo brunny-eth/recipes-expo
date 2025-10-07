@@ -7,6 +7,7 @@ import {
   Modal,
   ScrollView,
   Alert,
+  Linking,
 } from 'react-native';
 import { PurchasesPackage } from 'react-native-purchases';
 import { useRevenueCat } from '@/context/RevenueCatContext';
@@ -61,11 +62,9 @@ export default function PaywallModal({ visible, onClose, onSubscribed }: Paywall
   const getPackageDisplayName = (identifier: string) => {
     switch (identifier) {
       case 'olea.monthly3':
-      case 'olea.month':
       case '$rc_monthly':
         return 'Monthly Subscription';
-      case 'olea.lifetime15':
-      case 'olea.lifetime':
+      case 'Olea.lifetime15':
       case '$rc_lifetime':
         return 'Lifetime Purchase';
       default:
@@ -76,11 +75,9 @@ export default function PaywallModal({ visible, onClose, onSubscribed }: Paywall
   const getPackageButtonLabel = (identifier: string) => {
     switch (identifier) {
       case 'olea.monthly3':
-      case 'olea.month':
       case '$rc_monthly':
         return 'Start Free Trial';
-      case 'olea.lifetime15':
-      case 'olea.lifetime':
+      case 'Olea.lifetime15':
       case '$rc_lifetime':
         return 'Buy Lifetime';
       default:
@@ -91,11 +88,9 @@ export default function PaywallModal({ visible, onClose, onSubscribed }: Paywall
   const getPackageDescription = (identifier: string) => {
     switch (identifier) {
       case 'olea.monthly3':
-      case 'olea.month':
       case '$rc_monthly':
         return 'Prefer a small, monthly payment? Pay $3 per month for access to Olea Premium.';
-      case 'olea.lifetime15':
-      case 'olea.lifetime':
+      case 'Olea.lifetime15':
       case '$rc_lifetime':
         return 'Hate subscriptions? Pay $15 today for lifetime access to Olea Premium.';
       default:
@@ -108,7 +103,7 @@ export default function PaywallModal({ visible, onClose, onSubscribed }: Paywall
     current: {
       availablePackages: [
         {
-          identifier: 'olea.lifetime15',
+          identifier: 'Olea.lifetime15',
           product: { priceString: '$15.00' }
         },
         {
@@ -135,7 +130,7 @@ export default function PaywallModal({ visible, onClose, onSubscribed }: Paywall
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
           <View style={styles.heroSection}>
             <Text style={styles.heroSubtitle}>
-              Sign up for Olea Premium to get your 1 month free trial started today. You will not be charged for either subscription option until your 1 month free trial is complete. You can always cancel before the free trial is complete.
+              Sign up for Olea Premium to get your 1 month free trial started today. You will not be charged until your free trial is complete.
             </Text>
           </View>
 
@@ -146,6 +141,20 @@ export default function PaywallModal({ visible, onClose, onSubscribed }: Paywall
               <Text style={styles.featureItem}>• Save recipes into your library</Text>
               <Text style={styles.featureItem}>• Unlimited recipe storage</Text>
             </View>
+          </View>
+
+          <View style={styles.subscriptionDetailsSection}>
+            <Text style={styles.subscriptionDetailsTitle}>Olea+ Subscription Details</Text>
+            <Text style={styles.subscriptionDetailsItem}>Monthly: $3.00 per month, auto-renews until canceled</Text>
+            <Text style={styles.subscriptionDetailsItem}>Lifetime: $15.00 one-time purchase</Text>
+            <Text style={styles.subscriptionDetailsItem}>Manage your subscription anytime in Settings</Text>
+            <Text style={styles.subscriptionDetailsItem}> </Text>
+            <TouchableOpacity onPress={() => Linking.openURL('https://cookolea.com/tos.html')}>
+              <Text style={styles.subscriptionDetailsLink}>Terms of Use: https://cookolea.com/tos.html</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => Linking.openURL('https://cookolea.com/privacy.html')}>
+              <Text style={styles.subscriptionDetailsLink}>Privacy Policy: https://cookolea.com/privacy.html</Text>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.packagesContainer}>
@@ -420,5 +429,34 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     textAlign: 'center',
+  },
+  subscriptionDetailsSection: {
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+    borderRadius: RADIUS.md,
+    padding: SPACING.md,
+    marginBottom: SPACING.lg,
+  },
+  subscriptionDetailsTitle: {
+    ...bodyStrongText,
+    color: COLORS.textDark,
+    fontSize: 16,
+    marginBottom: SPACING.sm,
+  },
+  subscriptionDetailsItem: {
+    ...bodyText,
+    color: COLORS.textDark,
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: SPACING.xs,
+  },
+  subscriptionDetailsLink: {
+    ...bodyText,
+    color: COLORS.textSubtle,
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: SPACING.xs,
+    textDecorationLine: 'underline',
   },
 });
