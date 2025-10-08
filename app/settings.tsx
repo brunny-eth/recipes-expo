@@ -36,6 +36,8 @@ import ScreenHeader from '@/components/ScreenHeader';
 import { useRenderCounter } from '@/hooks/useRenderCounter';
 import { useHandleError } from '@/hooks/useHandleError';
 import BottomTabBar from '@/components/BottomTabBar';
+import ConfirmationModal from '@/components/ConfirmationModal';
+import { supabase } from '@/lib/supabaseClient';
 
 export default function AccountScreen() {
   const { signOut, isAuthenticated, session } = useAuth();
@@ -51,6 +53,9 @@ export default function AccountScreen() {
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
   const [feedbackAnimation] = useState(new Animated.Value(0));
   const [isRestoringPurchases, setIsRestoringPurchases] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [confirmStep, setConfirmStep] = useState(1);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const appVersion = (Application?.nativeApplicationVersion as string | null) || (Constants?.expoConfig?.version as string | undefined) || 'dev';
 
   // Helper function to get subscription details
@@ -214,6 +219,48 @@ export default function AccountScreen() {
       // Fallback to web version
       Linking.openURL('https://apps.apple.com/account/subscriptions');
     });
+  };
+
+  const handleDeleteAccount = async () => {
+    setIsDeletingAccount(true);
+    
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      
+      if (!token) {
+        throw new Error('No active session');
+      }
+
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+      if (!backendUrl) {
+        throw new Error('Backend URL not configured');
+      }
+
+      const response = await fetch(`${backendUrl}/api/users/delete-account`, {
+        method: 'DELETE',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        // Sign out locally
+        await supabase.auth.signOut();
+        Alert.alert('Account Deleted', 'Your account has been permanently deleted.');
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Could not delete account');
+      }
+    } catch (error) {
+      console.error('[AccountScreen] Delete account error:', error);
+      handleError('Delete Account Error', error);
+    } finally {
+      setIsDeletingAccount(false);
+      setShowDeleteModal(false);
+      setConfirmStep(1);
+    }
   };
 
   return (
@@ -398,10 +445,52 @@ export default function AccountScreen() {
                 </Text>
               </View>
             </TouchableHighlight>
+
+            {/* Delete Account Button */}
+            <TouchableHighlight
+              style={styles.deleteAccountButton}
+              onPress={() => setShowDeleteModal(true)}
+              underlayColor="transparent"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              disabled={isDeletingAccount}
+            >
+              <View style={styles.deleteAccountButtonContent}>
+                <Text style={styles.deleteAccountButtonText}>
+                  {isDeletingAccount ? 'Deleting Account...' : 'Delete Account'}
+                </Text>
+              </View>
+            </TouchableHighlight>
           </View>
         )}
 
        </ScrollView>
+
+       {/* Delete Account Confirmation Modal */}
+       {showDeleteModal && (
+         <ConfirmationModal
+           visible={showDeleteModal}
+           title={confirmStep === 1 ? "Delete Account?" : "Final Confirmation"}
+           message={
+             confirmStep === 1
+               ? "Are you sure you want to delete your Olea account? This will delete all your saved recipes and cancel any existing subscriptions."
+               : "Just making sure you clicked that on purpose. If you want to delete your account, click DELETE below and it'll be deleted forever."
+           }
+           confirmLabel={confirmStep === 1 ? "Continue" : "DELETE"}
+           cancelLabel="Cancel"
+           destructive={confirmStep === 2}
+           onConfirm={() => {
+             if (confirmStep === 1) {
+               setConfirmStep(2);
+             } else {
+               handleDeleteAccount();
+             }
+           }}
+           onCancel={() => {
+             setConfirmStep(1);
+             setShowDeleteModal(false);
+           }}
+         />
+       )}
 
        {/* Fixed Bottom Legal Section - Above tabs */}
        <View style={styles.fixedBottomLegalSection}>
@@ -613,4 +702,17 @@ const styles = StyleSheet.create({
   signOutButtonDisabled: {
     backgroundColor: COLORS.disabled,
   } as ViewStyle,
+  deleteAccountButton: {
+    marginTop: SPACING.xs,
+    marginBottom: SPACING.xs,
+  } as ViewStyle,
+  deleteAccountButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  } as ViewStyle,
+  deleteAccountButtonText: {
+    ...bodyText,
+    color: COLORS.error,
+    textAlign: 'left',
+  } as TextStyle,
 });
