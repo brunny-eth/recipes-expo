@@ -18,7 +18,6 @@ import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import { useSuccessModal } from '@/context/SuccessModalContext';
-import { useRevenueCat } from '@/context/RevenueCatContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Updates from 'expo-updates';
@@ -41,7 +40,6 @@ import { supabase } from '@/lib/supabaseClient';
 
 export default function AccountScreen() {
   const { signOut, isAuthenticated, session } = useAuth();
-  const { subscriptionStatus, customerInfo, restorePurchases } = useRevenueCat();
   useRenderCounter('AccountScreen', { hasSession: !!session, isAuthenticated });
   const { showError } = useErrorModal();
   const handleError = useHandleError();
@@ -52,52 +50,10 @@ export default function AccountScreen() {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
   const [feedbackAnimation] = useState(new Animated.Value(0));
-  const [isRestoringPurchases, setIsRestoringPurchases] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [confirmStep, setConfirmStep] = useState(1);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const appVersion = (Application?.nativeApplicationVersion as string | null) || (Constants?.expoConfig?.version as string | undefined) || 'dev';
-
-  // Helper function to get subscription details
-  const getSubscriptionDetails = (customerInfo: any, status: string): string => {
-    if (status === 'Free') return '';
-    
-    const premiumEntitlement = customerInfo.entitlements?.all?.["premium_access"];
-    if (!premiumEntitlement) return '';
-
-    const details = [];
-    
-    // Handle expiration dates
-    if (premiumEntitlement.expirationDate) {
-      const expirationDate = new Date(premiumEntitlement.expirationDate);
-      const formattedDate = expirationDate.toLocaleDateString();
-      
-      if (status === 'Free Trial' || status === 'Introductory Period') {
-        details.push(`Trial expires ${formattedDate}`);
-      } else if (status === 'Set to Cancel') {
-        details.push(`Cancels ${formattedDate}`);
-      } else if (status === 'Subscribed') {
-        details.push(`Renews ${formattedDate}`);
-      }
-    }
-
-    // Handle product types - updated for new offerings
-    if (premiumEntitlement.productIdentifier) {
-      const productId = premiumEntitlement.productIdentifier.toLowerCase();
-      
-      if (productId.includes('lifetime') || productId.includes('$rc_lifetime')) {
-        details.push('Lifetime Purchase ($15)');
-      } else if (productId.includes('monthly') || productId.includes('$rc_monthly')) {
-        details.push('Monthly Subscription ($3/month)');
-      } else {
-        // Fallback for other product identifiers
-        const productName = premiumEntitlement.productIdentifier.replace('olea.', '').replace('$rc_', '');
-        details.push(`${productName.charAt(0).toUpperCase() + productName.slice(1)} Plan`);
-      }
-    }
-
-    return details.join(' • ');
-  };
 
   // Animation functions
   const showFeedback = () => {
@@ -192,34 +148,6 @@ export default function AccountScreen() {
     }
   };
 
-  const handleRestorePurchases = async () => {
-    if (isRestoringPurchases) {
-      return;
-    }
-
-    setIsRestoringPurchases(true);
-    
-    try {
-      const success = await restorePurchases();
-      if (success) {
-        showSuccess('Purchases Restored!', 'Your previous purchases have been restored successfully.');
-      }
-    } catch (error) {
-      // Error handling is done in the context
-      console.log('Restore purchases error handled in context');
-    } finally {
-      setIsRestoringPurchases(false);
-    }
-  };
-
-  const handleManageSubscriptions = () => {
-    // Open Apple's subscription management page
-    Linking.openURL('itms-apps://apps.apple.com/account/subscriptions').catch((err) => {
-      console.log('Error opening subscription management:', err);
-      // Fallback to web version
-      Linking.openURL('https://apps.apple.com/account/subscriptions');
-    });
-  };
 
   const handleDeleteAccount = async () => {
     setIsDeletingAccount(true);
@@ -279,14 +207,6 @@ export default function AccountScreen() {
               <Text style={styles.authStatusText}>
                 {`Logged in as ${session?.user?.email}`}
               </Text>
-              <Text style={styles.authStatusText}>
-                Account Status: {subscriptionStatus}
-              </Text>
-              {customerInfo && subscriptionStatus !== 'Free' && (
-                <Text style={styles.subscriptionDetailsText}>
-                  {getSubscriptionDetails(customerInfo, subscriptionStatus)}
-                </Text>
-              )}
             </>
           ) : (
             <TouchableOpacity
@@ -297,38 +217,6 @@ export default function AccountScreen() {
             </TouchableOpacity>
           )}
         </View>
-
-        {/* Subscription Management Section */}
-        {isAuthenticated && (
-          <View style={styles.subscriptionSection}>
-            <TouchableHighlight
-              style={styles.subscriptionButton}
-              onPress={handleRestorePurchases}
-              underlayColor="transparent"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              disabled={isRestoringPurchases}
-            >
-              <View style={styles.subscriptionButtonContent}>
-                <Text style={styles.subscriptionButtonText}>
-                  {isRestoringPurchases ? 'Restoring...' : 'Restore Purchases'}
-                </Text>
-              </View>
-            </TouchableHighlight>
-            
-            <TouchableHighlight
-              style={styles.subscriptionButton}
-              onPress={handleManageSubscriptions}
-              underlayColor="transparent"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <View style={styles.subscriptionButtonContent}>
-                <Text style={styles.subscriptionButtonText}>
-                  Manage Subscriptions
-                </Text>
-              </View>
-            </TouchableHighlight>
-          </View>
-        )}
 
         {/* Send Feedback Button - Right under Sign Out */}
         <View style={styles.sendFeedbackButtonSection}>

@@ -26,11 +26,9 @@ import { COLORS, SPACING, RADIUS, BORDER_WIDTH, SHADOWS } from '@/constants/them
 import { bodyText, screenTitleText, FONT, bodyStrongText, captionText, metaText } from '@/constants/typography';
 import { useAuth } from '@/context/AuthContext';
 import { useErrorModal } from '@/context/ErrorModalContext';
-import { useRevenueCat } from '@/context/RevenueCatContext';
 import ScreenHeader from '@/components/ScreenHeader';
 import AddNewFolderModal from '@/components/AddNewFolderModal';
 import ConfirmationModal from '@/components/ConfirmationModal';
-import PaywallModal from '@/components/PaywallModal';
 import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
 import { useAnalytics } from '@/utils/analytics';
 import { useHandleError } from '@/hooks/useHandleError';
@@ -108,7 +106,6 @@ export default function LibraryScreen() {
   const { showError } = useErrorModal();
   const handleError = useHandleError();
   const { track } = useAnalytics();
-  const { isPremium } = useRevenueCat();
   
   // Tab state
   const [selectedTab, setSelectedTab] = useState<'explore' | 'saved'>(
@@ -153,9 +150,6 @@ export default function LibraryScreen() {
   // Confirmation modal state
   const [showDeleteFolderModal, setShowDeleteFolderModal] = useState(false);
   const [folderToDelete, setFolderToDelete] = useState<SavedFolder | null>(null);
-  
-  // Paywall modal state
-  const [showPaywallModal, setShowPaywallModal] = useState(false);
 
   // Color picker modal state
   const [showColorPickerModal, setShowColorPickerModal] = useState(false);
@@ -1153,18 +1147,22 @@ export default function LibraryScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScreenHeader title="LIBRARY" showBack={false} backgroundColor="#DEF6FF" />
       
-      {/* Content: Show paywall for non-premium users */}
-      {isPremium ? renderSavedContent() : (
+      {/* Content: Show login prompt for non-authenticated users */}
+      {session ? renderSavedContent() : (
         <View style={styles.premiumFeatureContainer}>
-          <Text style={styles.premiumFeatureTitle}>Premium Features</Text>
+          <Text style={styles.premiumFeatureTitle}>
+            Log In Required
+          </Text>
           <Text style={styles.premiumFeatureDescription}>
-            Unlock your recipe library to save, organize, and access your favorite recipes anytime.
+            Log in to access your recipe library and save your favorite recipes.
           </Text>
           <TouchableOpacity
             style={styles.premiumFeatureButton}
-            onPress={() => setShowPaywallModal(true)}
+            onPress={() => router.push('/login')}
           >
-            <Text style={styles.premiumFeatureButtonText}>Upgrade to Premium</Text>
+            <Text style={styles.premiumFeatureButtonText}>
+              Log In or Sign Up
+            </Text>
           </TouchableOpacity>
         </View>
       )}
@@ -1269,13 +1267,6 @@ export default function LibraryScreen() {
            </TouchableOpacity>
          </Modal>
        )}
-
-      {/* Paywall Modal */}
-      <PaywallModal
-        visible={showPaywallModal}
-        onClose={() => setShowPaywallModal(false)}
-        onSubscribed={() => setShowPaywallModal(false)}
-      />
     </View>
   );
 }

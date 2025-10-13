@@ -1,12 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useSegments } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
-import { useRevenueCat } from '@/context/RevenueCatContext';
 import { useSuccessModal } from '@/context/SuccessModalContext';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import { useHandleError } from '@/hooks/useHandleError';
 import { createLogger } from '@/utils/logger';
-import PaywallModal from '@/components/PaywallModal';
 
 const logger = createLogger('nav');
 
@@ -14,54 +12,12 @@ export function AuthNavigationHandler() {
   const router = useRouter();
   const segments = useSegments();
   const { onAuthNavigation, session } = useAuth();
-  const { isPremium, isLoading: isRevenueCatLoading, checkEntitlements } = useRevenueCat();
   const { showSuccess } = useSuccessModal();
   const { showError } = useErrorModal();
   const handleError = useHandleError();
-  const [showPaywall, setShowPaywall] = useState(false);
   const [navigationTimeout, setNavigationTimeout] = useState<NodeJS.Timeout | null>(null);
 
-  // SIMPLIFIED: forceEnablePaywall only for dev/testing to force show paywall even without offerings
-  // In production builds, paywall logic is always enabled
-  const forceEnablePaywall = process.env.NODE_ENV === 'development' && process.env.EXPO_PUBLIC_ENABLE_PAYWALL === "true";
-  const isProductionBuild = process.env.NODE_ENV !== 'development';
-  
-  console.log('🔍 [AuthNavigationHandler] Paywall configuration: ' + JSON.stringify({
-    forceEnablePaywall,
-    envValue: process.env.EXPO_PUBLIC_ENABLE_PAYWALL,
-    nodeEnv: process.env.NODE_ENV,
-    isProductionBuild,
-    isPremium,
-    isRevenueCatLoading,
-    hasSession: !!session
-  }));
-  
-  // Force visible log for debugging
-  console.warn('🚨 AUTH NAV DEBUG - Force paywall (dev only): ' + forceEnablePaywall + ' isPremium: ' + isPremium + ' isLoading: ' + isRevenueCatLoading + ' hasSession: ' + !!session + ' isProductionBuild: ' + isProductionBuild);
-
-  // CRITICAL: Never show paywall in AuthNavigationHandler
-  // The paywall should only appear as an overlay on individual screens, never block navigation
-  useEffect(() => {
-    logger.info('Auth:Navigation - Paywall state check', {
-      forceEnablePaywall,
-      isRevenueCatLoading,
-      isPremium,
-      showPaywall,
-      hasSession: !!session,
-      timestamp: new Date().toISOString()
-    });
-    
-    // Always ensure paywall is hidden in AuthNavigationHandler
-    // Individual screens will handle their own premium gating as overlays
-    if (showPaywall) {
-      logger.warn('Auth:Navigation - Forcing paywall to hide - navigation takes priority', {
-        timestamp: new Date().toISOString()
-      });
-      setShowPaywall(false);
-    }
-  }, [isPremium, isRevenueCatLoading, forceEnablePaywall, session, showPaywall]);
-
-  // APPLE REVIEW FALLBACK: Force navigation if user is stuck on login screen
+  // Force navigation if user is stuck on login screen with valid session
   useEffect(() => {
     if (session && segments.join('/') === 'login') {
       const fallbackTimeout = setTimeout(() => {
@@ -69,37 +25,31 @@ export function AuthNavigationHandler() {
         logger.warn('🚨 FALLBACK NAVIGATION TRIGGERED - User stuck on login with valid session', {
           hasSession: !!session,
           currentPath,
-          isRevenueCatLoading,
-          isPremium,
           timestamp: new Date().toISOString()
         });
-        console.warn('🚨 APPLE REVIEW FALLBACK: Forcing navigation from login to tabs');
+        console.warn('🚨 Forcing navigation from login to tabs');
         router.replace('/tabs');
       }, 3000); // 3 second fallback
 
       return () => clearTimeout(fallbackTimeout);
     }
-  }, [session, segments, router, isRevenueCatLoading, isPremium]);
+  }, [session, segments, router]);
 
   useEffect(() => {
     const unsubscribe = onAuthNavigation((event) => {
       const userId = 'userId' in event ? event.userId : undefined;
       const userIdShort = userId ? `${userId.slice(0, 8)}...` : undefined;
       
-      // COMPREHENSIVE LOGGING for Apple Review debugging
+      // Logging for debugging
       const debugState = {
         eventType: event.type,
         userId: userIdShort,
         hasSession: !!session,
         currentPath: segments.join('/'),
-        isRevenueCatLoading,
-        isPremium,
-        bypassRevenueCat: process.env.EXPO_PUBLIC_BYPASS_REVENUECAT === 'true',
         timestamp: new Date().toISOString()
       };
       
       logger.info('[nav] Handling auth navigation event', debugState);
-      console.log('🔍 [APPLE REVIEW DEBUG] Auth Navigation Event:', debugState);
 
       switch (event.type) {
         case 'SIGNED_IN':
@@ -107,14 +57,6 @@ export function AuthNavigationHandler() {
             userId: userIdShort,
             timestamp: new Date().toISOString()
           });
-          
-          // CRITICAL: Ensure paywall is hidden before navigation
-          logger.info('[nav] Ensuring paywall is hidden before navigation', {
-            userId: userIdShort,
-            currentShowPaywall: showPaywall,
-            timestamp: new Date().toISOString()
-          });
-          setShowPaywall(false);
           
           // Check if user is new based on first_login_at metadata
           const isNewUser = !event.userMetadata?.first_login_at;
@@ -149,18 +91,13 @@ export function AuthNavigationHandler() {
           }
           
           // Navigate directly to tabs after successful authentication
-          // Individual screens will handle their own premium gating
           const preNavigationState = {
             userId: userIdShort,
             currentPath: segments.join('/'),
-            isRevenueCatLoading,
-            isPremium,
-            bypassRevenueCat: process.env.EXPO_PUBLIC_BYPASS_REVENUECAT === 'true',
             timestamp: new Date().toISOString()
           };
           
           logger.info('[nav] Navigating to /tabs after successful sign in', preNavigationState);
-          console.log('🔍 [APPLE REVIEW DEBUG] Pre-Navigation State:', preNavigationState);
           
           // Set up a timeout to detect if navigation fails
           const timeout = setTimeout(() => {
@@ -183,7 +120,6 @@ export function AuthNavigationHandler() {
           };
           
           logger.info('[nav] Navigation to /tabs triggered', postNavigationState);
-          console.log('🔍 [APPLE REVIEW DEBUG] Post-Navigation Trigger:', postNavigationState);
           break;
         
         case 'SIGNED_OUT':
@@ -214,7 +150,7 @@ export function AuthNavigationHandler() {
     });
 
     return unsubscribe;
-  }, [onAuthNavigation, router, showSuccess, showError, handleError, isPremium, isRevenueCatLoading, checkEntitlements]);
+  }, [onAuthNavigation, router, showSuccess, showError, handleError]);
 
   // Cleanup navigation timeout on unmount
   useEffect(() => {
@@ -239,22 +175,5 @@ export function AuthNavigationHandler() {
     }
   }, [session, navigationTimeout]);
 
-  const handlePaywallClose = () => {
-    setShowPaywall(false);
-    // Navigate to tabs even if user dismisses paywall
-    router.replace('/tabs');
-  };
-
-  const handleSubscribed = () => {
-    setShowPaywall(false);
-    router.replace('/tabs');
-  };
-
-  return (
-    <PaywallModal
-      visible={showPaywall}
-      onClose={handlePaywallClose}
-      onSubscribed={handleSubscribed}
-    />
-  );
+  return null;
 } 

@@ -7,12 +7,13 @@ import {
   ViewStyle,
   TextStyle,
   ActivityIndicator,
+  Share,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { bodyStrongText, FONT } from '@/constants/typography';
 import { COLORS, SPACING, RADIUS, BORDER_WIDTH } from '@/constants/theme';
 import FolderPickerModal from '@/components/FolderPickerModal';
-import { useRevenueCat } from '@/context/RevenueCatContext';
-import PaywallModal from '@/components/PaywallModal';
+import { useAuth } from '@/context/AuthContext';
 
 type RecipeFooterButtonsProps = {
   handleGoToSteps: () => void;
@@ -30,6 +31,8 @@ type RecipeFooterButtonsProps = {
   hasModifications?: boolean;
   isAlreadyInMise?: boolean;
   onOpenVariations?: () => void; // New prop for opening variations modal
+  recipeId?: number; // Add recipeId for sharing
+  recipeTitle?: string; // Add title for share message
 };
 
 const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
@@ -48,10 +51,13 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
   hasModifications = false,
   isAlreadyInMise = false,
   onOpenVariations,
+  recipeId,
+  recipeTitle,
 }) => {
   const [showFolderPicker, setShowFolderPicker] = useState(false);
-  const [showPremiumModal, setShowPremiumModal] = useState(false);
-  const { isPremium } = useRevenueCat();
+  const [isSharing, setIsSharing] = useState(false);
+  const { session } = useAuth();
+  const router = useRouter();
 
   const handleFolderPickerSelect = (folderId: number) => {
     setShowFolderPicker(false);
@@ -59,13 +65,61 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
   };
 
   const handleSaveForLaterPress = () => {
-    // Check premium status first
-    if (!isPremium) {
-      setShowPremiumModal(true);
+    // Check authentication first
+    if (!session) {
+      router.push('/login');
       return;
     }
     
+    // Open folder picker - app is now free for all users
     setShowFolderPicker(true);
+  };
+
+  const handleShare = async () => {
+    if (!recipeId) {
+      console.error('[RecipeFooterButtons] Cannot share: recipeId is missing');
+      return;
+    }
+
+    setIsSharing(true);
+    
+    try {
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+      
+      // Call the share API to get or create a share link
+      const response = await fetch(`${backendUrl}/api/share`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'recipe',
+          objectId: recipeId,
+          userId: session?.user?.id || null,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create share link');
+      }
+
+      const { url } = await response.json();
+      
+      // Use React Native's Share API
+      await Share.share({
+        message: recipeTitle 
+          ? `Check out this recipe: ${recipeTitle}\n\n${url}`
+          : url,
+        url: url, // iOS will use this for sharing
+        title: recipeTitle || 'Share Recipe',
+      });
+      
+    } catch (error) {
+      console.error('[RecipeFooterButtons] Error sharing recipe:', error);
+      // Silently fail - user may have cancelled the share
+    } finally {
+      setIsSharing(false);
+    }
   };
 
 
@@ -304,6 +358,32 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
             </Text>
           </TouchableOpacity>
         )}
+
+        {/* Share Button - Only for 'saved' and 'new' entrypoints */}
+        {(entryPoint === 'saved' || entryPoint === 'new') && recipeId && (
+          <TouchableOpacity
+            style={[
+              styles.plainButton,
+              (isRewriting || isScalingInstructions || isSavingModifications || isSharing) && styles.plainButtonDisabled
+            ]}
+            onPress={handleShare}
+            disabled={isRewriting || isScalingInstructions || isSavingModifications || isSharing}
+          >
+            {isSharing && (
+              <ActivityIndicator
+                size="small"
+                color="black"
+                style={{ marginRight: SPACING.xs }}
+              />
+            )}
+            <Text style={[
+              styles.plainButtonText,
+              (isRewriting || isScalingInstructions || isSavingModifications || isSharing) && styles.plainButtonTextDisabled
+            ]}>
+              {isSharing ? 'Sharing...' : 'Share'}
+            </Text>
+          </TouchableOpacity>
+        )}
         </View>
       </View>
 
@@ -313,12 +393,6 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
         onClose={() => setShowFolderPicker(false)}
         onSelectFolder={handleFolderPickerSelect}
         isLoading={isSavingForLater}
-      />
-      
-      {/* Premium Modal */}
-      <PaywallModal
-        visible={showPremiumModal}
-        onClose={() => setShowPremiumModal(false)}
       />
     </>
   );

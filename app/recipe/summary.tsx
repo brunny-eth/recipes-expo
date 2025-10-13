@@ -77,8 +77,6 @@ import RecipeStepsHeader from '@/components/recipe/RecipeStepsHeader';
 import ScreenHeader from '@/components/ScreenHeader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCooking } from '@/context/CookingContext';
-import { useRevenueCat } from '@/context/RevenueCatContext';
-import PaywallModal from '@/components/PaywallModal';
 
 // Type for a change (substitution or removal)
 type AppliedChange = {
@@ -256,10 +254,6 @@ export default function RecipeSummaryScreen() {
   const { session } = useAuth();
   const { showError, hideError } = useErrorModal();
   const { showSuccess } = useSuccessModal();
-  const { isPremium } = useRevenueCat();
-  
-  // Premium modal state
-  const [showPremiumModal, setShowPremiumModal] = useState(false);
   const handleError = useHandleError();
   const { track } = useAnalytics();
   const insets = useSafeAreaInsets();
@@ -1305,9 +1299,9 @@ export default function RecipeSummaryScreen() {
 
   // Main title save handler
   const handleSaveTitle = useCallback(async () => {
-    // Check premium status
-    if (!isPremium) {
-      setShowPremiumModal(true);
+    // Check authentication
+    if (!session) {
+      router.push('/login');
       return;
     }
     
@@ -2031,9 +2025,9 @@ export default function RecipeSummaryScreen() {
 
   const handleOpenVariations = () => {
     try {
-      // Check premium status
-      if (!isPremium) {
-        setShowPremiumModal(true);
+      // Check authentication
+      if (!session) {
+        router.push('/login');
         return;
       }
       
@@ -2374,9 +2368,9 @@ export default function RecipeSummaryScreen() {
   const handleCookNow = async () => {
     console.log('[Summary] Cook now button pressed');
     
-    // Check premium status
-    if (!isPremium) {
-      setShowPremiumModal(true);
+    // Check authentication
+    if (!session) {
+      router.push('/login');
       return;
     }
     
@@ -2715,13 +2709,8 @@ export default function RecipeSummaryScreen() {
 
   // Handle saving changes on saved recipes (single source of truth architecture)
   const handleSaveChanges = async () => {
-    // Check premium status
-    if (!isPremium) {
-      setShowPremiumModal(true);
-      return;
-    }
-    
-    if (!recipe || !session?.user) {
+    // Check authentication
+    if (!session?.user || !recipe) {
       handleError('Authentication Required', 'You need an account to save changes.');
       return;
     }
@@ -3385,13 +3374,8 @@ export default function RecipeSummaryScreen() {
         hasModifications={hasModifications}
         isAlreadyInMise={isAlreadyInMise}
         onOpenVariations={handleOpenVariations}
-      />
-      
-      {/* Premium Modal */}
-      <PaywallModal
-        visible={showPremiumModal}
-        onClose={() => setShowPremiumModal(false)}
-        onSubscribed={() => setShowPremiumModal(false)}
+        recipeId={recipe?.id}
+        recipeTitle={recipe?.title ?? undefined}
       />
       </View>
     </PanGestureHandler>
@@ -3731,7 +3715,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
   } as ViewStyle,
   instructionsScrollContainer: {
-    maxHeight: 250, // Allow scrolling for long instruction lists
+    maxHeight: 250,
     marginTop: SPACING.sm,
     borderWidth: 1,
     borderColor: '#000000',

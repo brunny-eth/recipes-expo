@@ -26,7 +26,6 @@ import {
   sectionHeaderText,
 } from '@/constants/typography';
 import { useAuth } from '@/context/AuthContext';
-import { useRevenueCat } from '@/context/RevenueCatContext';
 import ScreenHeader from '@/components/ScreenHeader';
 
 export default function HomeScreen() {

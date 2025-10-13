@@ -55,7 +55,6 @@ import {
   ManualGroceryItem 
 } from '@/utils/manualGroceryStorage';
 import HouseholdStaplesModal from '@/components/HouseholdStaplesModal';
-import PaywallModal from '@/components/PaywallModal';
 import FolderPickerModal from '@/components/FolderPickerModal';
 
 // Cache removed - always fetch fresh data for consistency
@@ -415,7 +414,6 @@ export default function MiseScreen() {
   const handleError = useHandleError();
   const { track } = useAnalytics();
   const { hasResumableSession, state: cookingState, invalidateSession, initializeSessions, selectMiseRecipe } = useCooking();
-  const { isPremium } = useRevenueCat();
   const [miseRecipes, setMiseRecipes] = useState<MiseRecipe[]>([]);
   const [groceryList, setGroceryList] = useState<GroceryCategory[]>([]);
   const [manualItems, setManualItems] = useState<ManualGroceryItem[]>([]);
@@ -429,9 +427,6 @@ export default function MiseScreen() {
   const [staplesModalVisible, setStaplesModalVisible] = useState(false);
   const [staplesEnabled, setStaplesEnabled] = useState(false);
   const [selectedStaples, setSelectedStaples] = useState<string[]>([]);
-  
-  // Paywall modal state
-  const [showPaywallModal, setShowPaywallModal] = useState(false);
   
   // Folder picker modal state
   const [showFolderPicker, setShowFolderPicker] = useState(false);
@@ -1439,38 +1434,25 @@ export default function MiseScreen() {
 
     if (!session) {
       return (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>Log in to see your prep station</Text>
-          <Text style={styles.emptySubtext}>
-            Your ready to cook recipes and shopping list will appear here once you&apos;re logged in.
+        <View style={styles.premiumFeatureContainer}>
+          <Text style={styles.premiumFeatureTitle}>
+            Log In Required
+          </Text>
+          <Text style={styles.premiumFeatureDescription}>
+            Log in to access your prep station and shopping lists.
           </Text>
           <TouchableOpacity
-            style={styles.retryButton}
+            style={styles.premiumFeatureButton}
             onPress={() => router.push('/login')}
           >
-            <Text style={styles.retryButtonText}>Log In</Text>
+            <Text style={styles.premiumFeatureButtonText}>
+              Log In or Sign Up
+            </Text>
           </TouchableOpacity>
         </View>
       );
     }
 
-    // Show premium feature message for non-premium users (even if logged in)
-    if (!isPremium) {
-      return (
-        <View style={styles.premiumFeatureContainer}>
-          <Text style={styles.premiumFeatureTitle}>Premium Features</Text>
-          <Text style={styles.premiumFeatureDescription}>
-            Unlock your personalized cooking experience with grocery lists, recipe organization, and streamlined meal prep.
-          </Text>
-          <TouchableOpacity
-            style={styles.premiumFeatureButton}
-            onPress={() => setShowPaywallModal(true)}
-          >
-            <Text style={styles.premiumFeatureButtonText}>Upgrade to Premium</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
 
     if (error) {
       return (
@@ -1812,13 +1794,6 @@ export default function MiseScreen() {
         onStaplesChange={handleStaplesChange}
         staplesEnabled={staplesEnabled}
         onStaplesToggle={handleToggleStaples}
-      />
-
-      {/* Paywall Modal */}
-      <PaywallModal
-        visible={showPaywallModal}
-        onClose={() => setShowPaywallModal(false)}
-        onSubscribed={() => setShowPaywallModal(false)}
       />
 
       {/* Folder Picker Modal for saving recipes */}
@@ -2458,6 +2433,26 @@ const styles = StyleSheet.create({
     fontSize: FONT.size.body,
     maxWidth: 320,
     marginBottom: SPACING.xl,
+  } as TextStyle,
+  premiumFeatureContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.xl,
+  } as ViewStyle,
+  premiumFeatureTitle: {
+    ...bodyStrongText,
+    fontSize: FONT.size.lg,
+    color: COLORS.textDark,
+    textAlign: 'center',
+    marginBottom: SPACING.md,
+  } as TextStyle,
+  premiumFeatureDescription: {
+    ...bodyText,
+    color: COLORS.textSubtle,
+    textAlign: 'center',
+    marginBottom: SPACING.xl,
+    lineHeight: 22,
   } as TextStyle,
   premiumFeatureButton: {
     backgroundColor: COLORS.primary,
