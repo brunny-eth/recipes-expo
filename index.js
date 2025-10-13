@@ -116,9 +116,7 @@ try {
   // Non-fatal: continue app startup even if preloading fails
 }
 
-// Ensure maybeCompleteAuthSession runs once at app bootstrap
-import * as WebBrowser from 'expo-web-browser';
-WebBrowser.maybeCompleteAuthSession();
-console.log('[auth-trace] maybeCompleteAuthSession called');
+// Note: maybeCompleteAuthSession is now called in AuthContext.tsx
+// to ensure it runs after the Linking listener is set up
 
 import 'expo-router/entry';

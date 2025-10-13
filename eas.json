@@ -11,6 +11,7 @@
       "env": {
         "BUNDLE_ID": "com.meez.recipes",
         "EXPO_DEBUG": "1",
+        "EXPO_PUBLIC_AUTH_URL": "olea://auth-callback",
         "EXPO_PUBLIC_POSTHOG_API_KEY": "phc_LHzQ18078GlMjpjRz43tJHQ7HdiJ971AtSLK4wtdaSu",
         "EXPO_PUBLIC_POSTHOG_HOST": "https://us.i.posthog.com",
         "EXPO_PUBLIC_APPLE_SERVICE_ID": "com.meez.recipes"
@@ -24,6 +25,7 @@
       "channel": "preview",
       "env": {
         "BUNDLE_ID": "com.meez.recipes",
+        "EXPO_PUBLIC_AUTH_URL": "olea://auth-callback",
         "EXPO_PUBLIC_POSTHOG_API_KEY": "phc_LHzQ18078GlMjpjRz43tJHQ7HdiJ971AtSLK4wtdaSu",
         "EXPO_PUBLIC_POSTHOG_HOST": "https://us.i.posthog.com",
         "EXPO_PUBLIC_APPLE_SERVICE_ID": "com.meez.recipes"
@@ -37,6 +39,7 @@
       "env": {
         "BUNDLE_ID": "com.meez.recipes",
         "EXPO_DEBUG": "1",
+        "EXPO_PUBLIC_AUTH_URL": "olea://auth-callback",
         "EXPO_PUBLIC_POSTHOG_API_KEY": "phc_LHzQ18078GlMjpjRz43tJHQ7HdiJ971AtSLK4wtdaSu",
         "EXPO_PUBLIC_POSTHOG_HOST": "https://us.i.posthog.com",
         "EXPO_PUBLIC_APPLE_SERVICE_ID": "com.meez.recipes"
@@ -52,6 +55,7 @@
       "autoIncrement": true,
       "env": {
         "BUNDLE_ID": "com.meez.recipes",
+        "EXPO_PUBLIC_AUTH_URL": "olea://auth-callback",
         "EXPO_PUBLIC_POSTHOG_API_KEY": "phc_LHzQ18078GlMjpjRz43tJHQ7HdiJ971AtSLK4wtdaSu",
         "EXPO_PUBLIC_POSTHOG_HOST": "https://us.i.posthog.com",
         "EXPO_PUBLIC_APPLE_SERVICE_ID": "com.meez.recipes"

@@ -257,6 +257,10 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     
     logger.info('[Auth] Initialization started', { timestamp: new Date().toISOString() });
 
+    // ✅ Install Linking listener - logs all URL events
+    WebBrowser.maybeCompleteAuthSession();
+    console.log('[AUTH] maybeCompleteAuthSession() called');
+
     // ✅ CRITICAL: Synchronously restore session BEFORE subscribing to prevent race condition
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (!mounted) {
@@ -470,6 +474,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
 
     // Set up URL listener for deep links
     const urlSubscription = Linking.addEventListener('url', (event) => {
+      console.log('[AUTH] Linking event URL:', event.url);
       logger.info('Auth:DeepLink - URL event received', {
         url: event.url,
         timestamp: new Date().toISOString()
@@ -479,6 +484,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
 
     // Check for initial URL when app starts
     Linking.getInitialURL().then((url) => {
+      console.log('[AUTH] getInitialURL:', url);
       if (url) {
         logger.info('Auth:DeepLink - Initial URL detected on app start', { 
           url,
@@ -498,17 +504,23 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     });
 
     // ✅ Safety timeout: Force unblock after 5 seconds to prevent infinite loading
-    const safetyTimeout = setTimeout(() => {
+    const safetyTimeout = setTimeout(async () => {
       // Check current loading state via ref to avoid closure issues
       if (mounted && isLoadingRef.current) {
+        // Check session state at timeout
+        const { data: s } = await supabase.auth.getSession();
+        console.log('[AUTH] timeout check -> session exists?', !!s?.session);
+        
         logger.error('[Auth] TIMEOUT: Auth initialization exceeded 5s - forcing completion', {
           hasSession: !!session,
+          sessionExistsInSupabase: !!s?.session,
           timestamp: new Date().toISOString()
         });
         
         // ✅ PostHog: Track timeout events (critical for debugging hangs)
         trackRef.current('auth_timeout', {
           hadSession: !!session,
+          sessionExistsInSupabase: !!s?.session,
           timestamp: new Date().toISOString()
         });
         
@@ -787,6 +799,9 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
           timestamp: new Date().toISOString()
         });
 
+        // BEFORE calling supabase.auth.signInWithOAuth
+        console.log('[AUTH] starting google oauth');
+
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider,
           options: {
@@ -794,6 +809,8 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
             skipBrowserRedirect: true,
           },
         });
+
+        console.log('[AUTH] signInWithOAuth result -> url:', data?.url, 'error:', error);
 
         if (error) {
           logger.error('Google OAuth: Supabase signInWithOAuth failed', {
@@ -816,6 +833,8 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
             data.url,
             redirectTo,
           );
+          
+          console.log('[AUTH] openAuthSessionAsync result:', result);
           
           logger.info('WebBrowser session completed', {
             provider: 'google',

@@ -30,7 +30,7 @@
     },
     {
       "src": "/api/(.*)",
-      "dest": "/server/index.ts"
+      "dest": "/server/index"
     }
   ]
 }
