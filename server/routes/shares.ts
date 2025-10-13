@@ -539,6 +539,22 @@ router.post('/api/duplicate-folder/:slug', corsHeaders, async (req, res) => {
       .single();
 
     if (newFolderError || !newFolder) {
+      // Check if it's a duplicate folder name error
+      if (newFolderError?.code === '23505' && newFolderError?.message?.includes('user_saved_folders_user_id_name_key')) {
+        logger.info({ 
+          requestId, 
+          scope: "shares", 
+          action: "duplicate_folder", 
+          slug,
+          userId,
+          folderName: originalFolder.name
+        }, 'User already has a folder with this name');
+        return res.status(409).json({ 
+          error: 'You already have this folder!',
+          code: 'FOLDER_ALREADY_EXISTS'
+        });
+      }
+      
       logger.error({ 
         requestId, 
         scope: "shares", 

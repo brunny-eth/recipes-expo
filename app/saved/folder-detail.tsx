@@ -11,6 +11,7 @@ import {
   TextInput,
   Pressable,
   ViewStyle,
+  Share,
 } from 'react-native';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import FastImage from '@d11/react-native-fast-image';
@@ -107,6 +108,9 @@ export default function SavedFolderDetailScreen() {
   const [isRemovingRecipes, setIsRemovingRecipes] = useState(false);
   const [showBulkRemoveModal, setShowBulkRemoveModal] = useState(false);
   const [bulkActionsHeight, setBulkActionsHeight] = useState(0);
+  
+  // Share folder state
+  const [isSharing, setIsSharing] = useState(false);
   
   // Confirmation modals state
   const [showDeleteRecipeModal, setShowDeleteRecipeModal] = useState(false);
@@ -297,6 +301,54 @@ export default function SavedFolderDetailScreen() {
       return !prev;
     });
   }, [isSearchActive, isSelectionMode]);
+
+  // Handle share folder button
+  const handleShareFolder = useCallback(async () => {
+    if (!folderId) {
+      console.error('[SavedFolderDetailScreen] Cannot share: folderId is missing');
+      return;
+    }
+
+    setIsSharing(true);
+    
+    try {
+      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
+      
+      // Call the share API to get or create a share link
+      const response = await fetch(`${backendUrl}/api/share`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'folder',
+          objectId: folderId,
+          userId: session?.user?.id || null,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create share link');
+      }
+
+      const { url } = await response.json();
+      
+      // Use React Native's Share API
+      await Share.share({
+        message: folderName 
+          ? `Check out this recipe collection: ${folderName}\n\n${url}`
+          : url,
+        url: url, // iOS will use this for sharing
+        title: folderName || 'Share Folder',
+      });
+      
+    } catch (error) {
+      console.error('[SavedFolderDetailScreen] Error sharing folder:', error);
+      // Silently fail - user may have cancelled the share
+    } finally {
+      setIsSharing(false);
+    }
+  }, [folderId, folderName, session?.user?.id]);
 
   // Handle delete folder button (kept for future use, not exposed in UI)
   const handleDeleteFolder = useCallback(() => {
@@ -977,6 +1029,23 @@ export default function SavedFolderDetailScreen() {
           </View>
         </TouchableHighlight>
 
+        {/* Share Folder button */}
+        <TouchableHighlight
+          style={[styles.toolbarRow, styles.shareButtonRow]}
+          onPress={handleShareFolder}
+          underlayColor="transparent"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          disabled={isSharing}
+        >
+          <View style={styles.searchToolbarContent}>
+            {isSharing ? (
+              <ActivityIndicator size="small" color={COLORS.textDark} />
+            ) : (
+              <Text style={styles.headerText}>Share Folder</Text>
+            )}
+          </View>
+        </TouchableHighlight>
+
         {/* Delete Folder button - only show for non-system folders */}
         {!isSystemFolder && (
           <TouchableHighlight
@@ -1193,6 +1262,9 @@ const styles = StyleSheet.create({
   },
   selectButtonRowLast: {
     marginBottom: SPACING.xxxl + SPACING.contentTopMargin, // Same bottom margin as deleteButtonRow when it's the last toolbar element
+  },
+  shareButtonRow: {
+    marginTop: SPACING.md, // Match addFolderRow marginTop for 16px spacing
   },
   deleteButtonRow: {
     width: '45%', // Smaller width for DELETE FOLDER button

@@ -506,6 +506,26 @@ export default function LibraryScreen() {
 
       if (!response.ok) {
         const errorData = await response.json();
+        
+        // Handle "already exists" error specially
+        if (response.status === 409 && errorData.code === 'FOLDER_ALREADY_EXISTS') {
+          Alert.alert(
+            'You already have this folder!',
+            'This folder is already in your library.',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  // Navigate back to library view
+                  setSharedFolderData(null);
+                  setDuplicationSuccess(false);
+                }
+              }
+            ]
+          );
+          return;
+        }
+        
         throw new Error(errorData.error || `Failed to duplicate folder: ${response.statusText}`);
       }
 
@@ -899,13 +919,13 @@ export default function LibraryScreen() {
                 disabled={isDuplicatingFolder || !session?.user}
               >
                 {isDuplicatingFolder ? (
-                  <ActivityIndicator size="small" color="white" />
+                  <ActivityIndicator size="small" color={COLORS.textDark} />
                 ) : (
                   <>
                     <MaterialCommunityIcons 
                       name="content-copy" 
                       size={16} 
-                      color="white" 
+                      color={COLORS.textDark} 
                       style={styles.duplicateButtonIcon}
                     />
                     <Text style={styles.duplicateButtonText}>
@@ -1775,7 +1795,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.primary,
+    backgroundColor: 'transparent',
+    borderWidth: BORDER_WIDTH.default,
+    borderColor: COLORS.textDark,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.sm,
     borderRadius: RADIUS.md,
@@ -1790,7 +1812,7 @@ const styles = StyleSheet.create({
   duplicateButtonText: {
     ...bodyStrongText,
     fontSize: FONT.size.body,
-    color: 'white',
+    color: COLORS.textDark,
   } as TextStyle,
   duplicationSuccessContainer: {
     flexDirection: 'row',
