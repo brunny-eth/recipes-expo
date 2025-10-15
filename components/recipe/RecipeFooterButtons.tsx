@@ -105,13 +105,22 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
 
       const { url } = await response.json();
       
-      // Use React Native's Share API
+      // Prepare share message
+      const shareMessage = recipeTitle 
+        ? `Check out this recipe: ${recipeTitle}\n\n${url}`
+        : url;
+      
+      console.log('[RecipeFooterButtons] Sharing recipe:', {
+        recipeId,
+        recipeTitle,
+        url,
+        shareMessage
+      });
+      
+      // Use React Native's Share API (iOS-only)
+      // Note: Only using 'message' to avoid duplicate links on iOS
       await Share.share({
-        message: recipeTitle 
-          ? `Check out this recipe: ${recipeTitle}\n\n${url}`
-          : url,
-        url: url, // iOS will use this for sharing
-        title: recipeTitle || 'Share Recipe',
+        message: shareMessage,
       });
       
     } catch (error) {

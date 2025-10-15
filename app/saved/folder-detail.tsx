@@ -333,13 +333,22 @@ export default function SavedFolderDetailScreen() {
 
       const { url } = await response.json();
       
-      // Use React Native's Share API
+      // Prepare share message
+      const shareMessage = folderName 
+        ? `Check out this recipe collection: ${folderName}\n\n${url}`
+        : url;
+      
+      console.log('[SavedFolderDetailScreen] Sharing folder:', {
+        folderId,
+        folderName,
+        url,
+        shareMessage
+      });
+      
+      // Use React Native's Share API (iOS-only)
+      // Note: Only using 'message' to avoid duplicate links on iOS
       await Share.share({
-        message: folderName 
-          ? `Check out this recipe collection: ${folderName}\n\n${url}`
-          : url,
-        url: url, // iOS will use this for sharing
-        title: folderName || 'Share Folder',
+        message: shareMessage,
       });
       
     } catch (error) {
