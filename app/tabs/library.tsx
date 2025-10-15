@@ -12,7 +12,6 @@ import {
   ViewStyle,
   TextStyle,
   TextInput,
-  Alert,
   Modal,
   Keyboard,
 } from 'react-native';
@@ -26,6 +25,7 @@ import { COLORS, SPACING, RADIUS, BORDER_WIDTH, SHADOWS } from '@/constants/them
 import { bodyText, screenTitleText, FONT, bodyStrongText, captionText, metaText } from '@/constants/typography';
 import { useAuth } from '@/context/AuthContext';
 import { useErrorModal } from '@/context/ErrorModalContext';
+import { useSuccessModal } from '@/context/SuccessModalContext';
 import ScreenHeader from '@/components/ScreenHeader';
 import AddNewFolderModal from '@/components/AddNewFolderModal';
 import ConfirmationModal from '@/components/ConfirmationModal';
@@ -104,6 +104,7 @@ export default function LibraryScreen() {
   const { session } = useAuth();
   // Library screen rendered
   const { showError } = useErrorModal();
+  const { showSuccess } = useSuccessModal();
   const handleError = useHandleError();
   const { track } = useAnalytics();
   
@@ -509,20 +510,12 @@ export default function LibraryScreen() {
         
         // Handle "already exists" error specially
         if (response.status === 409 && errorData.code === 'FOLDER_ALREADY_EXISTS') {
-          Alert.alert(
-            'You already have this folder!',
-            'This folder is already in your library.',
-            [
-              {
-                text: 'OK',
-                onPress: () => {
-                  // Navigate back to library view
-                  setSharedFolderData(null);
-                  setDuplicationSuccess(false);
-                }
-              }
-            ]
-          );
+          // Navigate back to library view
+          setSharedFolderData(null);
+          setDuplicationSuccess(false);
+          
+          // Show error message
+          showError('You already have this folder!', 'This folder is already in your library.');
           return;
         }
         
@@ -537,20 +530,14 @@ export default function LibraryScreen() {
       // Refresh the saved folders to show the new folder
       await fetchSavedFolders();
       
+      // Clear shared folder data to return to normal library view
+      setSharedFolderData(null);
+      setDuplicationSuccess(false);
+      
       // Show success message
-      Alert.alert(
+      showSuccess(
         'Folder Saved!',
-        `"${result.newFolder.name}" has been added to your library with ${result.newFolder.recipeCount} recipe${result.newFolder.recipeCount !== 1 ? 's' : ''}.`,
-        [
-          {
-            text: 'View Library',
-            onPress: () => {
-              // Clear shared folder data to return to normal library view
-              setSharedFolderData(null);
-              setDuplicationSuccess(false);
-            }
-          }
-        ]
+        `"${result.newFolder.name}" has been added to your library with ${result.newFolder.recipeCount} recipe${result.newFolder.recipeCount !== 1 ? 's' : ''}.`
       );
 
     } catch (error) {
@@ -562,7 +549,7 @@ export default function LibraryScreen() {
     }
   }, [session, handleError, fetchSavedFolders]);
 
-  // Handle deep link slug loading
+  // Handle deep link slug loading and clearing
   useEffect(() => {
     if (slug && !fetchedSlugs.has(slug) && !isLoadingSharedFolder) {
       console.log('[Library] Deep link slug detected:', slug);
@@ -572,8 +559,14 @@ export default function LibraryScreen() {
         isLoading: isLoadingSharedFolder
       });
       fetchSharedFolder(slug);
+    } else if (!slug && sharedFolderData) {
+      // Clear shared folder data when navigating back to main Library (no slug)
+      console.log('[Library] No slug detected, clearing shared folder data');
+      setSharedFolderData(null);
+      setDuplicationSuccess(false);
+      setFetchedSlugs(new Set()); // Reset fetched slugs
     }
-  }, [slug]); // Only depend on slug, not fetchSharedFolder to prevent loops
+  }, [slug, sharedFolderData, isLoadingSharedFolder]); // Added sharedFolderData to detect when it needs clearing
 
   // Load data on focus (Saved only)
   useFocusEffect(

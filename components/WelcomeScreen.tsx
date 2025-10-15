@@ -36,54 +36,35 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
       <SafeAreaView style={{
         flex: 1,
       }}>
-        {/* iPad-specific container wrapper for proper centering and max width */}
         <View style={isIpad ? styles.ipadContainer : styles.phoneContainer}>
-        {/* OLEA Header Section - mimicking index.tsx */}
         <ScreenHeader
           title="OLEA"
           showBack={false}
           titleStyle={{ fontSize: 32, fontWeight: '800' }}
           backgroundColor="#DEF6FF"
         />
-
         <View style={{
           flex: 1,
-          paddingTop: SPACING.md, // Match index.tsx ScrollView paddingTop
-          paddingHorizontal: 0, // Remove since taglineSection handles its own padding
+          paddingTop: SPACING.md,
+          paddingHorizontal: 0,
         }}>
-          {/* Top content container - natural flow */}
           <View style={{ width: '100%', alignItems: 'flex-start' }}>
-            <Animated.View
-              entering={FadeIn.duration(1200)}
-              style={styles.taglineSection}
-            >
-              <Text style={[styles.taglineText, styles.taglineYourRecipe]}>
-                Turn any recipe into{' '}
-                <Text style={styles.taglineBold}>your recipe.</Text>
-              </Text>
+            <Animated.View entering={FadeIn.duration(1200)} style={styles.taglineSection}>
+              <Text style={[styles.taglineText, styles.taglineYourRecipe]}>Turn any recipe into <Text style={styles.taglineBold}>your recipe.</Text></Text>
               <Animated.View entering={FadeIn.duration(800).delay(1500)}>
-                <Text style={[styles.taglineText, styles.taglineBullet]}>
-                  <Text>Customize any recipe.{'\n'}</Text>
-                  <Text>Generate grocery lists.{'\n'}</Text>
-                  <Text>Cook multiple recipes together.{'\n'}</Text>
-                  <Text>Enjoy cooking your way.</Text>
-                </Text>
+                <Text style={[styles.taglineText, styles.taglineBullet]}>Customize any recipe.{'\n'}Generate grocery lists.{'\n'}Cook multiple recipes together.{'\n'}Enjoy cooking your way.</Text>
               </Animated.View>
             </Animated.View>
           </View>
 
-          {/* Spacer to push buttons higher up */}
           <View style={{ flex: 1, justifyContent: 'flex-start', paddingTop: SPACING.xxxl }}>
-            {/* Button container - positioned higher up */}
             <View style={styles.buttonContainer}>
             <Animated.View entering={FadeIn.duration(1000).delay(3000)}>
               <TouchableOpacity
                 style={styles.getStartedButton}
                 onPress={onDismiss}
               >
-                <Text style={styles.buttonText}>
-                  Get started
-                </Text>
+                <Text style={styles.buttonText}>Get started</Text>
               </TouchableOpacity>
             </Animated.View>
             
@@ -92,15 +73,13 @@ export default function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) 
                 style={styles.takeTourButton}
                 onPress={() => setCurrentScreen('onboarding')}
               >
-                <Text style={styles.buttonText}>
-                  Take a quick tour
-                </Text>
+                <Text style={styles.buttonText}>Take a quick tour</Text>
               </TouchableOpacity>
             </Animated.View>
             </View>
           </View>
         </View>
-        </View> {/* Close iPad/phone container */}
+        </View>
       </SafeAreaView>
     </Animated.View>
   );

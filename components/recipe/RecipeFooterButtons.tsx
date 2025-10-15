@@ -369,19 +369,19 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
             onPress={handleShare}
             disabled={isRewriting || isScalingInstructions || isSavingModifications || isSharing}
           >
-            {isSharing && (
+            {isSharing ? (
               <ActivityIndicator
                 size="small"
                 color="black"
-                style={{ marginRight: SPACING.xs }}
               />
+            ) : (
+              <Text style={[
+                styles.plainButtonText,
+                (isRewriting || isScalingInstructions || isSavingModifications) && styles.plainButtonTextDisabled
+              ]}>
+                Share
+              </Text>
             )}
-            <Text style={[
-              styles.plainButtonText,
-              (isRewriting || isScalingInstructions || isSavingModifications || isSharing) && styles.plainButtonTextDisabled
-            ]}>
-              {isSharing ? 'Sharing...' : 'Share'}
-            </Text>
           </TouchableOpacity>
         )}
         </View>
