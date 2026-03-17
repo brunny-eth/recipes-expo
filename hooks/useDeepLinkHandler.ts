@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import { Linking } from 'react-native';
 import { logger } from '@/utils/logger';
@@ -8,22 +8,24 @@ export interface DeepLinkParams {
   slug: string;
 }
 
-export function useDeepLinkHandler() {
+export function useDeepLinkHandler(canNavigate: boolean) {
   const router = useRouter();
+  const pendingLink = useRef<DeepLinkParams | null>(null);
+
+  // Ref so handleDeepLink can always read the latest value without
+  // being re-created (which would re-subscribe the Linking listener)
+  const canNavigateRef = useRef(canNavigate);
+  canNavigateRef.current = canNavigate;
 
   const parseDeepLink = useCallback((url: string): DeepLinkParams | null => {
     console.log('[DeepLinkHandler] Parsing URL:', url);
-    console.log("🔍 DeepLink fragment:", url.split("#")[1]);
-    
+
     try {
-      // Handle both custom scheme (olea://) and universal links (https://cookolea.com)
       let pathname = '';
-      
+
       if (url.startsWith('olea://')) {
-        // Custom scheme: olea://r/abc123xyz or olea://f/abc123xyz
         pathname = url.replace('olea://', '');
       } else if (url.includes('cookolea.com')) {
-        // Universal link: https://cookolea.com/r/abc123xyz or https://cookolea.com/f/abc123xyz
         const urlObj = new URL(url);
         pathname = urlObj.pathname;
       } else {
@@ -31,16 +33,15 @@ export function useDeepLinkHandler() {
         return null;
       }
 
-      // Parse pathname to extract type and slug
       const pathParts = pathname.split('/').filter(Boolean);
-      
+
       if (pathParts.length !== 2) {
         console.log('[DeepLinkHandler] Invalid path format:', pathParts);
         return null;
       }
 
       const [type, slug] = pathParts;
-      
+
       if (type === 'r' && slug) {
         console.log('[DeepLinkHandler] Parsed recipe deep link:', { slug });
         return { type: 'recipe', slug };
@@ -62,9 +63,46 @@ export function useDeepLinkHandler() {
     }
   }, []);
 
-  const handleDeepLink = useCallback(async (url: string) => {
+  const navigate = useCallback((parsed: DeepLinkParams) => {
+    console.log('[DeepLinkHandler] Navigating:', parsed);
+    try {
+      if (parsed.type === 'recipe') {
+        router.push({
+          pathname: '/recipe/summary',
+          params: {
+            slug: parsed.slug,
+            entryPoint: 'deep-link',
+          },
+        });
+      } else if (parsed.type === 'folder') {
+        router.push({
+          pathname: '/tabs/library',
+          params: {
+            slug: parsed.slug,
+            tab: 'saved',
+          },
+        });
+      }
+    } catch (error) {
+      console.error('[DeepLinkHandler] Error navigating:', error);
+      logger.error('Deep link navigation error', {
+        scope: 'deep-link',
+        error: error instanceof Error ? error.message : String(error),
+        parsed,
+      });
+    }
+  }, [router]);
+
+  // Once the app signals it's ready to navigate, flush any buffered link
+  useEffect(() => {
+    if (canNavigate && pendingLink.current) {
+      navigate(pendingLink.current);
+      pendingLink.current = null;
+    }
+  }, [canNavigate, navigate]);
+
+  const handleDeepLink = useCallback((url: string) => {
     const parsed = parseDeepLink(url);
-    
     if (!parsed) {
       console.log('[DeepLinkHandler] Could not parse deep link, ignoring');
       return;
@@ -72,53 +110,28 @@ export function useDeepLinkHandler() {
 
     console.log('[DeepLinkHandler] Handling deep link:', parsed);
 
-    try {
-      if (parsed.type === 'recipe') {
-        // Navigate to recipe summary with slug parameter
-        router.push({
-          pathname: '/recipe/summary',
-          params: { 
-            slug: parsed.slug,
-            entryPoint: 'deep-link'
-          }
-        });
-      } else if (parsed.type === 'folder') {
-        // Navigate to library with slug parameter
-        router.push({
-          pathname: '/tabs/library',
-          params: { 
-            slug: parsed.slug,
-            tab: 'saved'
-          }
-        });
-      }
-    } catch (error) {
-      console.error('[DeepLinkHandler] Error handling deep link:', error);
-      logger.error('Deep link handling error', {
-        scope: 'deep-link',
-        error: error instanceof Error ? error.message : String(error),
-        parsed,
-      });
+    if (!canNavigateRef.current) {
+      // App not ready yet — buffer and navigate once canNavigate flips true
+      console.log('[DeepLinkHandler] App not ready, buffering:', parsed);
+      pendingLink.current = parsed;
+      return;
     }
-  }, [parseDeepLink, router]);
+
+    navigate(parsed);
+  }, [parseDeepLink, navigate]);
 
   useEffect(() => {
-    // Handle initial URL (when app is opened via deep link)
-    const getInitialURL = async () => {
-      try {
-        const initialUrl = await Linking.getInitialURL();
-        if (initialUrl) {
-          console.log('[DeepLinkHandler] Initial URL detected:', initialUrl);
-          await handleDeepLink(initialUrl);
-        }
-      } catch (error) {
-        console.error('[DeepLinkHandler] Error getting initial URL:', error);
+    // Cold launch: check if app was opened via deep link
+    Linking.getInitialURL().then((initialUrl) => {
+      if (initialUrl) {
+        console.log('[DeepLinkHandler] Initial URL detected:', initialUrl);
+        handleDeepLink(initialUrl);
       }
-    };
+    }).catch((error) => {
+      console.error('[DeepLinkHandler] Error getting initial URL:', error);
+    });
 
-    getInitialURL();
-
-    // Handle subsequent URLs (when app is already running)
+    // Warm launch: app already running when link is tapped
     const subscription = Linking.addEventListener('url', (event) => {
       console.log('[DeepLinkHandler] URL event received:', event.url);
       handleDeepLink(event.url);

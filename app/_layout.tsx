@@ -41,9 +41,6 @@ function RootLayoutNav() {
   const router = useRouter();
   const segments = useSegments();
   const { track } = useAnalytics();
-  
-  // Initialize deep link handler
-  useDeepLinkHandler();
 
   // App readiness states
   const [ready, setReady] = useState(false);
@@ -51,6 +48,11 @@ function RootLayoutNav() {
   const [isOffline, setIsOffline] = useState(false);
   const [appState, setAppState] = useState(AppState.currentState);
   const [hasTrackedAppOpened, setHasTrackedAppOpened] = useState(false);
+
+  // Only allow deep link navigation once the app is fully initialized and
+  // the router has settled (not on +not-found or an empty route)
+  const canNavigate = ready && !isAuthLoading && segments[0] !== '+not-found' && segments.join('/') !== '';
+  useDeepLinkHandler(canNavigate);
 
   // Load fonts
   const [fontsLoaded] = useFonts({
