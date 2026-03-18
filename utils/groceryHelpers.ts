@@ -1531,6 +1531,22 @@ export function formatIngredientsForGroceryList(
           continue; // Skip to next ingredient
         }
 
+        // Skip salt in all forms — it's always in the pantry and clutters the list.
+        // Safe because 'salted' is in REMOVABLE_ADJECTIVES and gets stripped before this check,
+        // so "salted butter" normalizes to "butter" and is never caught here.
+        const isSalt = normalizedName === 'salt' ||
+          normalizedName.endsWith(' salt') ||
+          normalizedName === 'fleur de sel';
+        if (isSalt) continue;
+
+        // Skip black/white pepper only when there's no quantity ("to taste") —
+        // a measured amount like "1 tsp black pepper" is worth showing.
+        const isUnsizedPepper = amount === null && (
+          normalizedName === 'black pepper' ||
+          normalizedName === 'white pepper'
+        );
+        if (isUnsizedPepper) continue;
+
         // Special debug for parsley and red pepper flakes
         if (ingredient.name.toLowerCase().includes('parsley') || ingredient.name.toLowerCase().includes('pepper')) {
           console.log('[groceryHelpers] 🌿🌶️ DEBUG: About to create grocery item for parsley/pepper:', {

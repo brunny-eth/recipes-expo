@@ -27,6 +27,7 @@ type RecipeFooterButtonsProps = {
   isSavingForLater?: boolean;
   isSavingModifications?: boolean;
   isSavingChanges?: boolean; // New loading state for save changes
+  isCookingNow?: boolean;
   entryPoint: string;
   hasModifications?: boolean;
   isAlreadyInMise?: boolean;
@@ -47,6 +48,7 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
   isSavingForLater = false,
   isSavingModifications = false,
   isSavingChanges = false, // New loading state
+  isCookingNow = false,
   entryPoint,
   hasModifications = false,
   isAlreadyInMise = false,
@@ -136,9 +138,8 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
     if (isRewriting || isSavingModifications) return ''; // Just show spinner, no text
     if (isScalingInstructions) return 'Making sure everything lines up...';
 
-    
     if (isAlreadyInMise) return 'Already in prep station';
-    
+
     switch (entryPoint) {
       case 'saved':
         return 'Cook';
@@ -161,7 +162,7 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
   };
 
   const isMainButtonDisabled = () => {
-    if (isRewriting || isScalingInstructions || isSavingModifications || isAlreadyInMise) return true;
+    if (isRewriting || isScalingInstructions || isSavingModifications || isCookingNow || isAlreadyInMise) return true;
     
     // For mise entry point, disable if no modifications
     if (entryPoint === 'mise' && !hasModifications) {

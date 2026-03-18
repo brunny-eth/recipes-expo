@@ -399,6 +399,8 @@ export default function RecipeSummaryScreen() {
   const [isSavingModifications, setIsSavingModifications] = useState(false);
   // Track loading state for saving changes on saved recipes
   const [isSavingChanges, setIsSavingChanges] = useState(false);
+  // Track loading state for the Cook Now button
+  const [isCookingNow, setIsCookingNow] = useState(false);
   // Track loading state for cook now button
 
   const [isHelpModalVisible, setIsHelpModalVisible] = useState(false);
@@ -2367,19 +2369,21 @@ export default function RecipeSummaryScreen() {
 
   const handleCookNow = async () => {
     console.log('[Summary] Cook now button pressed');
-    
+
     // Check authentication
     if (!session) {
       router.push('/login');
       return;
     }
-    
+
     // Cook now available from all entry points now that we use unified mise flow
-    
+
     if (!recipe || !scaledIngredients) {
       console.error('[Summary] Cannot cook now, essential data is missing.');
       return;
     }
+
+    setIsCookingNow(true);
 
     const needsScaling = selectedScaleFactor !== 1;
     const needsSubstitution = currentUnsavedChanges.length > 0;
@@ -2543,6 +2547,8 @@ export default function RecipeSummaryScreen() {
     } catch (error: any) {
       console.error('[Summary] Error in cook now:', error);
       handleError('Cook Now Failed', error);
+    } finally {
+      setIsCookingNow(false);
     }
   };
 
@@ -3369,6 +3375,7 @@ export default function RecipeSummaryScreen() {
         isSavingForLater={isSavingForLater}
         isSavingModifications={isSavingModifications}
         isSavingChanges={isSavingChanges}
+        isCookingNow={isCookingNow}
 
         entryPoint={entryPoint}
         hasModifications={hasModifications}
@@ -3377,12 +3384,53 @@ export default function RecipeSummaryScreen() {
         recipeId={recipe?.id}
         recipeTitle={recipe?.title ?? undefined}
       />
+
+      {/* Loading overlay when applying modifications */}
+      {isCookingNow && hasModifications && (
+        <View style={styles.loadingOverlayContainer}>
+          <View style={styles.loadingOverlayCard}>
+            <ActivityIndicator size="large" color={COLORS.textDark} style={{ marginBottom: SPACING.md }} />
+            <Text style={styles.loadingOverlayTitle}>Applying modifications</Text>
+            <Text style={styles.loadingOverlayMessage}>Updating recipe to match your changes...</Text>
+          </View>
+        </View>
+      )}
       </View>
     </PanGestureHandler>
   );
 }
 
 const styles = StyleSheet.create({
+  loadingOverlayContainer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: OVERLAYS.medium,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+  } as ViewStyle,
+  loadingOverlayCard: {
+    width: '80%',
+    maxWidth: 350,
+    backgroundColor: COLORS.white,
+    padding: SPACING.xl,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: '#000000',
+    alignItems: 'center',
+  } as ViewStyle,
+  loadingOverlayTitle: {
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 18,
+    color: COLORS.textDark,
+    marginBottom: SPACING.sm,
+    textAlign: 'center',
+  } as TextStyle,
+  loadingOverlayMessage: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+  } as TextStyle,
   header: {
     flex: 0,
     paddingHorizontal: 0,
