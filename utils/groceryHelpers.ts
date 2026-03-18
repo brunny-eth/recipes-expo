@@ -245,7 +245,9 @@ const PRESERVED_COMBINATIONS = new Set([
  */
 const REMOVABLE_ADJECTIVES = new Set([
   'chopped', 'diced', 'minced', 'crushed', 'sliced', 'ground',
-  'peeled', 'seeded', 'pitted', 'canned', 'frozen', 'defrosted',
+  'peeled', 'seeded', 'pitted', 'defrosted',
+  // NOTE: 'canned' and 'frozen' intentionally excluded — they indicate purchase location
+  // (canned goods aisle vs freezer section) and must be preserved on ingredient names
   'cooked', 'raw', 'boiled', 'fried', 'baked', 'grilled', 'steamed', 'roasted',
   'large', 'medium', 'small', 'jumbo', 'extra', 'super', 'mini', 'baby',
   'ripe', 'unripe', 'organic', 'natural', 'wild', 'free-range', 'grass-fed',
@@ -1396,10 +1398,24 @@ export function formatIngredientsForGroceryList(
             displayUnit = 'small handfuls';
           } else if (originalUnit === 'small pinch' || originalUnit === 'medium pinch' || originalUnit === 'large pinch') {
             displayUnit = originalUnit; // Keep the full descriptive pinch
+          } else if (originalUnit === 'can' || originalUnit === 'cans') {
+            displayUnit = 'cans';
+          } else if (originalUnit === 'bottle' || originalUnit === 'bottles') {
+            displayUnit = 'bottle';
+          } else if (originalUnit === 'jar' || originalUnit === 'jars') {
+            displayUnit = 'jar';
+          } else if (originalUnit === 'bag' || originalUnit === 'bags') {
+            displayUnit = 'bag';
+          } else if (originalUnit === 'box' || originalUnit === 'boxes') {
+            displayUnit = 'box';
+          } else if (originalUnit === 'package' || originalUnit === 'packages') {
+            displayUnit = 'package';
+          } else if (originalUnit === 'container' || originalUnit === 'containers') {
+            displayUnit = 'container';
           } else {
             displayUnit = null; // Use standardized unit for display
           }
-          
+
           if (process.env.NODE_ENV === 'development') {
             console.log('[groceryHelpers] 📏 Normalized unit:', ingredient.unit, '→', standardizedUnit, '(display:', displayUnit, ', descriptive:', descriptiveSize, ')');
           }
@@ -1432,8 +1448,22 @@ export function formatIngredientsForGroceryList(
             displayUnit = 'large handfuls';
           } else if (extractedUnit === 'small handfuls' || extractedUnit === 'small handful') {
             displayUnit = 'small handfuls';
+          } else if (extractedUnit === 'can' || extractedUnit === 'cans') {
+            displayUnit = 'cans';
+          } else if (extractedUnit === 'bottle' || extractedUnit === 'bottles') {
+            displayUnit = 'bottle';
+          } else if (extractedUnit === 'jar' || extractedUnit === 'jars') {
+            displayUnit = 'jar';
+          } else if (extractedUnit === 'bag' || extractedUnit === 'bags') {
+            displayUnit = 'bag';
+          } else if (extractedUnit === 'box' || extractedUnit === 'boxes') {
+            displayUnit = 'box';
+          } else if (extractedUnit === 'package' || extractedUnit === 'packages') {
+            displayUnit = 'package';
+          } else if (extractedUnit === 'container' || extractedUnit === 'containers') {
+            displayUnit = 'container';
           }
-            
+
             if (process.env.NODE_ENV === 'development') {
               console.log('[groceryHelpers] ✅ Successfully extracted unit from original text:', extractedUnit, '→', standardizedUnit, '(display:', displayUnit, ')');
             }

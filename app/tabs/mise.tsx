@@ -434,27 +434,18 @@ export default function MiseScreen() {
 
   // Removed caching strategy - always fetch fresh data for consistency
 
-  // Flag to prevent reloading manual items after clearing them
-  const [manualItemsCleared, setManualItemsCleared] = useState(false);
 
   // FlatList ref for keyboard handling and scrolling
   const groceryListRef = useRef<FlatList>(null);
 
   // Load manual items from storage on component mount
   const loadManualItemsFromStorage = useCallback(async () => {
-    // Don't reload if we just cleared them
-    if (manualItemsCleared) {
-      console.log('[MiseScreen] 🚫 Blocked loading manual items - flag is set');
-      return;
-    }
-    
     console.log('[MiseScreen] 📖 Loading manual items from storage...');
     try {
       const items = await loadManualItems();
       setManualItems(items);
       console.log('[MiseScreen] ✅ Loaded', items.length, 'manual items');
     } catch (error) {
-      // Track error without causing re-renders
       if (session?.user?.id) {
         logger.error('Mise manual items load error', {
           scope: 'mise',
@@ -463,11 +454,10 @@ export default function MiseScreen() {
           user_id: session.user.id,
         });
       }
-      // Don't show error to user for manual items - graceful degradation
       setManualItems([]);
       console.log('[MiseScreen] ❌ Error loading manual items, set to empty');
     }
-  }, [manualItemsCleared]); // Add manualItemsCleared dependency
+  }, []);
 
   // Load sort mode preference from storage (deprecated; always category)
   const loadSortModeFromStorage = useCallback(async () => {
@@ -653,20 +643,15 @@ export default function MiseScreen() {
       const fetchedRecipes = recipesData?.recipes || [];
 
       const recipeCategorizedList = convertToGroceryCategories(groceryData?.items || []);
-      const mergedGroceryList = mergeManualItemsIntoCategories(recipeCategorizedList, manualItems);
+      const freshManualItems = await loadManualItems();
+      setManualItems(freshManualItems);
+      const mergedGroceryList = mergeManualItemsIntoCategories(recipeCategorizedList, freshManualItems);
 
 
 
       setMiseRecipes(fetchedRecipes);
       setGroceryList(mergedGroceryList);
 
-      // Manual items should persist regardless of recipe count
-      // Users should be able to maintain manual grocery items even without recipes
-      // Reset the cleared flag if it was set, allowing manual items to be loaded
-      if (manualItemsCleared) {
-        console.log('[MiseScreen] ✅ Resetting manualItemsCleared flag to allow manual items');
-        setManualItemsCleared(false);
-      }
 
       // Check if cooking session needs invalidation due to recipe changes or modifications
       if (cookingState.activeRecipes.length > 0) {
@@ -813,7 +798,9 @@ export default function MiseScreen() {
       if (groceryResponse.ok) {
         const groceryData = await groceryResponse.json();
         const recipeCategorizedList = convertToGroceryCategories(groceryData?.items || []);
-        const mergedGroceryList = mergeManualItemsIntoCategories(recipeCategorizedList, manualItems);
+        const freshManualItems = await loadManualItems();
+        setManualItems(freshManualItems);
+        const mergedGroceryList = mergeManualItemsIntoCategories(recipeCategorizedList, freshManualItems);
         setGroceryList(mergedGroceryList); // Only update grocery list, no loading states
       } else {
         if (session?.user?.id) {
@@ -1096,28 +1083,32 @@ export default function MiseScreen() {
   const handleAddManualItem = useCallback(async (category: string, itemText: string) => {
     try {
       const newItem = await addManualItem(category, itemText);
-      
-      // Reset the cleared flag since we're adding items again
-      setManualItemsCleared(false);
-      
-      // Update local state
+
+      // Update manualItems state
       setManualItems(prev => [...prev, newItem]);
-      
-      // Re-merge grocery list with new manual item
-      const recipeCategorizedList = convertToGroceryCategories(groceryList.flatMap(cat => 
-        cat.items.filter(item => !item.isManual).map(item => ({
-          id: item.id,
-          item_name: item.name,
-          quantity_amount: item.amount,
-          display_unit: item.unit,
-          grocery_category: item.category,
-          is_checked: item.checked,
-          preparation: item.preparation // Preserve preparation information
-        }))
-      ));
-      const updatedManualItems = [...manualItems, newItem];
-      const mergedGroceryList = mergeManualItemsIntoCategories(recipeCategorizedList, updatedManualItems);
-      setGroceryList(mergedGroceryList);
+
+      // Inject directly into the existing groceryList — recipe items are untouched
+      const newGroceryItem: GroceryItem = {
+        id: newItem.id,
+        name: newItem.itemText,
+        amount: null,
+        unit: null,
+        category,
+        checked: false,
+        isManual: true,
+        preparation: null,
+      };
+      setGroceryList(prev => {
+        const categoryExists = prev.some(cat => cat.name === category);
+        if (categoryExists) {
+          return prev.map(cat =>
+            cat.name === category
+              ? { ...cat, items: [newGroceryItem, ...cat.items] }
+              : cat
+          );
+        }
+        return [...prev, { name: category, items: [newGroceryItem] }];
+      });
     } catch (error) {
       logger.error('Mise manual item add error', {
         scope: 'mise',
@@ -1129,30 +1120,22 @@ export default function MiseScreen() {
       });
       handleError('Error', error);
     }
-  }, [manualItems, groceryList, showError, track, session?.user?.id]);
+  }, [session?.user?.id]);
 
   const handleDeleteManualItem = useCallback(async (itemId: string) => {
     try {
       await deleteManualItem(itemId);
-      
-      // Update local state
-      const updatedManualItems = manualItems.filter(item => item.id !== itemId);
-      setManualItems(updatedManualItems);
-      
-      // Re-merge grocery list without deleted item
-      const recipeCategorizedList = convertToGroceryCategories(groceryList.flatMap(cat => 
-        cat.items.filter(item => !item.isManual).map(item => ({
-          id: item.id,
-          item_name: item.name,
-          quantity_amount: item.amount,
-          display_unit: item.unit,
-          grocery_category: item.category,
-          is_checked: item.checked,
-          preparation: item.preparation // Preserve preparation information
+
+      // Update manualItems state
+      setManualItems(prev => prev.filter(item => item.id !== itemId));
+
+      // Remove directly from groceryList — recipe items are untouched
+      setGroceryList(prev =>
+        prev.map(cat => ({
+          ...cat,
+          items: cat.items.filter(item => item.id !== itemId),
         }))
-      ));
-      const mergedGroceryList = mergeManualItemsIntoCategories(recipeCategorizedList, updatedManualItems);
-      setGroceryList(mergedGroceryList);
+      );
     } catch (error) {
       logger.error('Mise manual item delete error', {
         scope: 'mise',
@@ -1163,30 +1146,22 @@ export default function MiseScreen() {
       });
       handleError('Error', error);
     }
-  }, [manualItems, groceryList, showError, track, session?.user?.id]);
+  }, [session?.user?.id]);
 
   const handleClearAllManualItems = useCallback(async () => {
     try {
       await clearAllManualItems();
-      
-      // Update local state
+
+      // Update manualItems state
       setManualItems([]);
-      setManualItemsCleared(true); // Set flag to prevent re-loading
-      
-      // Re-merge grocery list without manual items
-      const recipeCategorizedList = convertToGroceryCategories(groceryList.flatMap(cat => 
-        cat.items.filter(item => !item.isManual).map(item => ({
-          id: item.id,
-          item_name: item.name,
-          quantity_amount: item.amount,
-          display_unit: item.unit,
-          grocery_category: item.category,
-          is_checked: item.checked,
-          preparation: item.preparation // Preserve preparation information
+
+      // Remove all manual items directly from groceryList — recipe items are untouched
+      setGroceryList(prev =>
+        prev.map(cat => ({
+          ...cat,
+          items: cat.items.filter(item => !item.isManual),
         }))
-      ));
-      const mergedGroceryList = mergeManualItemsIntoCategories(recipeCategorizedList, []);
-      setGroceryList(mergedGroceryList);
+      );
     } catch (error) {
       logger.error('Mise manual items clear error', {
         scope: 'mise',
@@ -1196,7 +1171,7 @@ export default function MiseScreen() {
       });
       handleError('Error', error);
     }
-  }, [groceryList, showError, track, session?.user?.id]);
+  }, [session?.user?.id]);
 
   // Inline add handlers
   const handleStartInlineAdd = useCallback((categoryName: string) => {
