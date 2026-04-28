@@ -181,7 +181,7 @@ const PRESERVED_COMBINATIONS = new Set([
   'sun dried tomatoes', 'sun dried',
   'toasted nuts', 'toasted seeds', 'toasted bread',
   'aged cheddar', 'aged cheese',
-  'whole wheat flour', 'whole wheat',
+  'whole wheat flour', 'whole wheat', 'whole grain',
   'all purpose flour', 'all purpose',
   'active dry yeast', 'active dry',
   'brown sugar', 'white sugar', 'powdered sugar', 'confectioners sugar',
@@ -253,7 +253,7 @@ const REMOVABLE_ADJECTIVES = new Set([
   'ripe', 'unripe', 'organic', 'natural', 'wild', 'free-range', 'grass-fed',
   'whole', 'half', 'quarter', 'thick', 'thin', 'regular',
   'cubed', 'drained', 'flaked', 'melted', 'softened', 'room-temperature',
-  'plain', 'clarified', 'boneless', 'skinless', 'shelled', 'hulled',
+  'plain', 'clarified', 'shelled', 'hulled',
   'and', 'or', 'with', 'without', 'finely', 'roughly', 'coarsely', // Conjunctions and adverbs that should be removed when left alone
   'pureed', 'mashed', 'whipped', 'beaten', 'sifted', 'strained',
   'instant', 'pre-cooked', 'quick-cooking', 'self-rising',
