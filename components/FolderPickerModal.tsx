@@ -213,7 +213,7 @@ export default function FolderPickerModal({
           ellipsizeMode="tail"
           maxFontSizeMultiplier={1.2}
         >
-          {item.name.replace(/\b\w/g, (l) => l.toUpperCase())}
+          {item.name}
         </Text>
         <Text style={styles.chevronText}>›</Text>
       </View>

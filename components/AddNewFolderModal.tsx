@@ -154,7 +154,7 @@ export default function AddNewFolderModal({
             maxLength={50}
             // Ensure consistent rendering behavior
             autoCorrect={false}
-            autoCapitalize="words"
+            autoCapitalize="none"
             // Prevent layout shifts by maintaining consistent font metrics
             textAlign="left"
           />
