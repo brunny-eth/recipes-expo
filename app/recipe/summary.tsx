@@ -1644,8 +1644,13 @@ export default function RecipeSummaryScreen() {
 
       const isRemoval = substitution.name === 'Remove ingredient';
       let originalNameForSub = ingredientToSubstitute.name;
-      const { substitutionText } = parseRecipeDisplayName(ingredientToSubstitute.name);
-      if (substitutionText) originalNameForSub = substitutionText;
+      // Only parse when it's a UI-generated display name like "olive oil (substituted for butter)".
+      // Natural language alternatives like "fresh cilantro or mint" must be kept as-is so the
+      // render-time match (c.from === baseIngredient.name) can find the right change.
+      if (ingredientToSubstitute.name.includes('(substituted for ')) {
+        const { substitutionText } = parseRecipeDisplayName(ingredientToSubstitute.name);
+        if (substitutionText) originalNameForSub = substitutionText;
+      }
       
       console.log('[DEBUG] Creating substitution change:', {
         originalIngredient: {
