@@ -254,7 +254,7 @@ const REMOVABLE_ADJECTIVES = new Set([
   'whole', 'half', 'quarter', 'thick', 'thin', 'regular',
   'cubed', 'drained', 'flaked', 'melted', 'softened', 'room-temperature',
   'plain', 'clarified', 'shelled', 'hulled',
-  'and', 'or', 'with', 'without', 'finely', 'roughly', 'coarsely', // Conjunctions and adverbs that should be removed when left alone
+  'and', 'or', 'to', 'with', 'without', 'finely', 'roughly', 'coarsely', // Conjunctions and adverbs that should be removed when left alone ('to' handles orphaned size ranges like "small to medium")
   'pureed', 'mashed', 'whipped', 'beaten', 'sifted', 'strained',
   'instant', 'pre-cooked', 'quick-cooking', 'self-rising',
   'reduced-sodium', 'low-sodium', 'unsalted', 'salted',

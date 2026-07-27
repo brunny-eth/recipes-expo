@@ -118,6 +118,10 @@ describe('normalizeName', () => {
     it('removes jumbo from jumbo shrimp', () => {
       expect(normalizeName('jumbo shrimp')).toBe('shrimp');
     });
+
+    it('drops orphaned "to" from size ranges (small to medium zucchini)', () => {
+      expect(normalizeName('small to medium zucchini')).toBe('zucchini');
+    });
   });
 
   describe('Preserved descriptors (should NOT be removed)', () => {
@@ -242,7 +246,9 @@ describe('normalizeName', () => {
     });
 
     it('preserves canned tomatoes', () => {
-      expect(normalizeName('canned tomatoes')).toBe('tomato');
+      // 'canned' is intentionally NOT removed — it indicates purchase location
+      // (canned goods aisle), so it stays on the name.
+      expect(normalizeName('canned tomatoes')).toBe('canned tomato');
     });
 
     it('preserves fresh tomatoes', () => {
@@ -701,7 +707,8 @@ describe('normalizeName', () => {
 
     it('handles very long ingredient names', () => {
       const longName = 'extra large organic free-range grass-fed chicken breast with skin and bones';
-      expect(normalizeName(longName)).toBe('free range grass fed chicken breast with skin and bone');
+      // 'with' and 'and' are stray connectors that get removed when left alone.
+      expect(normalizeName(longName)).toBe('free range grass fed chicken breast skin bone');
     });
 
     it('handles special characters', () => {
