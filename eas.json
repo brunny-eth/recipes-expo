@@ -62,7 +62,7 @@
       },
       "ios": {
         "simulator": false,
-        "image": "latest"
+        "image": "auto"
       }
     }
   },
