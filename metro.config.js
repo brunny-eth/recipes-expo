@@ -7,4 +7,11 @@ config.transformer.babelTransformerPath = require.resolve('react-native-svg-tran
 config.resolver.assetExts = config.resolver.assetExts.filter(ext => ext !== 'svg');
 config.resolver.sourceExts.push('svg');
 
-module.exports = config; 
+// Ignore temporary agent worktrees (.claude/worktrees) so Metro doesn't see duplicate modules
+const existingBlockList = config.resolver.blockList;
+config.resolver.blockList = [
+  ...(Array.isArray(existingBlockList) ? existingBlockList : existingBlockList ? [existingBlockList] : []),
+  /[\/\\]\.claude[\/\\].*/,
+];
+
+module.exports = config;

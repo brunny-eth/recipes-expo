@@ -141,3 +141,4 @@ scripts/
 OleaApp/
 *.ipa
 *.symbols
+.claude/worktrees/
