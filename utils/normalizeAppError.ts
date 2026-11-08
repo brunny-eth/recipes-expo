@@ -62,6 +62,18 @@ export function normalizeAppError(error: unknown, opts: NormalizeAppErrorOptions
   const rawMessage = extractMessageFromUnknown(error);
   const { statusCode, stage, context } = opts;
 
+  // Server rate limit (429 / code RATE_LIMITED). Checked first so it isn't
+  // misclassified as an invalid-recipe or connectivity error.
+  if (statusCode === 429 || /RATE_LIMITED|too many requests/i.test(rawMessage)) {
+    return {
+      code: 'RATE_LIMITED',
+      title: 'Slow Down',
+      message: "You've made a lot of requests in a short time. Please wait a few minutes and try again.",
+      severity: 'warn',
+      retryable: true,
+    };
+  }
+
   // Context-first mapping for permissions (even if message doesn't include the word 'permission')
   if (context && /(camera|photo|photos|documents|media)/i.test(context)) {
     const requiresPermission: AppErrorNormalized['requiresPermission'] =

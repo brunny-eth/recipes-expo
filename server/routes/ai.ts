@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import logger from '../lib/logger';
+import { aiChatLimiter, aiEmbedLimiter } from '../lib/rateLimit';
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold, Content } from "@google/generative-ai";
 import OpenAI from 'openai';
 import { buildChatSystemPrompt } from '../llm/chatPrompts';
@@ -22,7 +23,7 @@ const openai = new OpenAI({ apiKey: openaiApiKey });
 const router = Router();
 
 // --- Gemini Chat Endpoint ---
-router.post('/chat', async (req: Request, res: Response) => {
+router.post('/chat', aiChatLimiter, async (req: Request, res: Response) => {
   const { userMessage, history, recipeContext } = req.body;
   const requestId = (req as any).id;
 
@@ -80,7 +81,7 @@ router.post('/chat', async (req: Request, res: Response) => {
 });
 
 // --- OpenAI Chat Endpoint ---
-router.post('/openai-chat', async (req: Request, res: Response) => {
+router.post('/openai-chat', aiChatLimiter, async (req: Request, res: Response) => {
   const { messages } = req.body;
   const requestId = (req as any).id;
 
@@ -112,7 +113,7 @@ router.post('/openai-chat', async (req: Request, res: Response) => {
 });
 
 // --- OpenAI Embedding Endpoint ---
-router.post('/embed', async (req: Request, res: Response) => {
+router.post('/embed', aiEmbedLimiter, async (req: Request, res: Response) => {
   const { text } = req.body;
   const requestId = (req as any).id;
 

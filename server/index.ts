@@ -14,6 +14,10 @@ import usersRouter from './routes/users'
 
 const app = express()
 
+// Behind Vercel's proxy: trust the first hop so req.ip is the real client IP
+// from x-forwarded-for (used by the rate limiters in lib/rateLimit.ts).
+app.set('trust proxy', 1)
+
 app.use(pinoHttp({ logger: baseLogger }))
 app.use(express.json())
 
