@@ -3,7 +3,7 @@ import { useRouter, useSegments, Stack, Redirect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
-import { View, AppState } from 'react-native';
+import { View, AppState, AppStateStatus } from 'react-native';
 import { Asset } from 'expo-asset';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -63,7 +63,7 @@ function RootLayoutNav() {
 
   // Track app_opened events
   useEffect(() => {
-    const handleAppStateChange = (nextAppState: string) => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (appState.match(/inactive|background/) && nextAppState === 'active') {
         // App has come to the foreground
         track('app_opened', { cold_start: false });

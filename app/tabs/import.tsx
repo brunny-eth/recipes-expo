@@ -310,7 +310,7 @@ export default function ImportScreen() {
           },
         });
         track('recipe_selected_from_modal', {
-          recipe_id: selectedMatch.recipe.id.toString(),
+          recipe_id: String(selectedMatch.recipe.id),
           title: selectedMatch.recipe.title,
           source: 'modal',
         });
@@ -720,7 +720,6 @@ export default function ImportScreen() {
       // Handle case where multiple similar recipes were found
       track('recipe_matches_found', {
         match_count: result.cachedMatches.length,
-        submission_id: localSubmissionId,
         user_id: session?.user?.id,
       });
 

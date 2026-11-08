@@ -29,6 +29,7 @@
   ],
   "exclude": [
     "server",
-    "scripts"
+    "scripts",
+    "vitest.config.ts"
   ]
 }

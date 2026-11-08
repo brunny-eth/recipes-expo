@@ -2382,33 +2382,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   } as TextStyle,
 
-  // Premium feature styles
-  premiumFeatureContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.xl,
-    paddingTop: SPACING.xxl,
-    paddingBottom: SPACING.xxl,
-    marginTop: SPACING.lg,
-  } as ViewStyle,
-  premiumFeatureTitle: {
-    ...bodyStrongText,
-    fontSize: FONT.size.screenTitle,
-    lineHeight: FONT.size.screenTitle + 8,
-    color: COLORS.textDark,
-    marginBottom: SPACING.md,
-    textAlign: 'center',
-  } as TextStyle,
-  premiumFeatureDescription: {
-    ...bodyText,
-    color: COLORS.textMuted,
-    textAlign: 'center',
-    lineHeight: 24,
-    fontSize: FONT.size.body,
-    maxWidth: 320,
-    marginBottom: SPACING.xl,
-  } as TextStyle,
   premiumFeatureContainer: {
     flex: 1,
     justifyContent: 'center',

@@ -23,7 +23,7 @@ type SavedFolder = {
   name: string;
   color: string;
   icon: string;
-  display_order: number;
+  display_order: number | null;
   recipe_count: number;
 };
 
