@@ -31,8 +31,6 @@ import {
   SHADOWS,
 } from '@/constants/theme';
 import {
-  scaleIngredient,
-  parseServingsValue,
   getScaledYieldText,
   parseAmountString,
   formatAmountNumber,
@@ -51,7 +49,6 @@ import {
 import {
   applyChangesToGroups,
   flattenIngredientGroups,
-  type AppliedChange,
 } from '@/domain/recipe/applyChanges';
 import {
   resolveFromRecipeDataParam,
@@ -59,6 +56,16 @@ import {
   patchForSharedRecipe,
   type SummaryLoadPatch,
 } from '@/domain/recipe/summaryLoad';
+import {
+  recipeDraftReducer,
+  initialRecipeDraft,
+  computeHasModifications,
+  countRemovals,
+  buildSubstitutionChange,
+  REMOVE_INGREDIENT,
+  MAX_REMOVALS,
+  type RecipeDraft,
+} from '@/domain/recipe/recipeDraft';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import { useHandleError } from '@/hooks/useHandleError';
 import { useSuccessModal } from '@/context/SuccessModalContext';
@@ -388,15 +395,20 @@ export default function RecipeSummaryScreen() {
   const [originalYieldValue, setOriginalYieldValue] = useState<number | null>(
     null,
   );
-  const [selectedScaleFactor, setSelectedScaleFactor] = useState<number>(1.0);
+  // Editable draft (ingredient changes + scale vs. baseline): see domain/recipe/recipeDraft.ts
+  const [draft, dispatchDraft] = React.useReducer(recipeDraftReducer, initialRecipeDraft);
+  const {
+    persistedChanges,
+    currentUnsavedChanges,
+    selectedScaleFactor,
+    baselineScaleFactor,
+    baselineAppliedChanges,
+  } = draft;
 
   const [substitutionModalVisible, setSubstitutionModalVisible] =
     useState(false);
   const [selectedIngredient, setSelectedIngredient] =
     useState<StructuredIngredient | null>(null);
-  // Separate persisted changes (loaded from DB, locked) from current unsaved changes (revertible)
-  const [persistedChanges, setPersistedChanges] = useState<AppliedChange[]>([]);
-  const [currentUnsavedChanges, setCurrentUnsavedChanges] = useState<AppliedChange[]>([]);
   const [isRewriting, setIsRewriting] = useState(false);
   const [isScalingInstructions, setIsScalingInstructions] = useState(false);
   // Track loading state specifically for the "Save for later" action so we don't disable the primary button.
@@ -415,10 +427,6 @@ export default function RecipeSummaryScreen() {
     useState<StructuredIngredient | null>(null);
   const [processedSubstitutionsForModal, setProcessedSubstitutionsForModal] =
     useState<SubstitutionSuggestion[] | null>(null);
-  const [lastRemoved, setLastRemoved] = useState<{
-    from: string;
-    to: string | null;
-  } | null>(null);
 
   // Dev log to correlate substitution modal with background modal flicker
   useEffect(() => {
@@ -450,11 +458,6 @@ export default function RecipeSummaryScreen() {
   // Track if recipe is already in mise with current modifications
   const [isAlreadyInMise, setIsAlreadyInMise] = useState(false);
 
-  // Track the baseline state when screen loads (for mise entry point)
-  const [baselineScaleFactor, setBaselineScaleFactor] = useState<number>(1);
-  // baselineScaleFactor should always be 1.0 (original recipe scale)
-  // selectedScaleFactor represents the current user-selected scale
-  const [baselineAppliedChanges, setBaselineAppliedChanges] = useState<AppliedChange[]>([]);
   
   // Store the unscaled ingredient groups to use as baseline for scaling calculations
   const [unscaledIngredientGroups, setUnscaledIngredientGroups] = useState<IngredientGroup[]>([]);
@@ -540,11 +543,13 @@ export default function RecipeSummaryScreen() {
     if ('originalYieldValue' in patch) setOriginalYieldValue(patch.originalYieldValue!);
     if ('imageLoadFailed' in patch) setImageLoadFailed(patch.imageLoadFailed!);
     if ('unscaledIngredientGroups' in patch) setUnscaledIngredientGroups(patch.unscaledIngredientGroups!);
-    if ('baselineScaleFactor' in patch) setBaselineScaleFactor(patch.baselineScaleFactor!);
-    if ('selectedScaleFactor' in patch) setSelectedScaleFactor(patch.selectedScaleFactor!);
-    if ('persistedChanges' in patch) setPersistedChanges(patch.persistedChanges!);
-    if ('currentUnsavedChanges' in patch) setCurrentUnsavedChanges(patch.currentUnsavedChanges!);
-    if ('baselineAppliedChanges' in patch) setBaselineAppliedChanges(patch.baselineAppliedChanges!);
+    const draftFields: Partial<RecipeDraft> = {};
+    if ('baselineScaleFactor' in patch) draftFields.baselineScaleFactor = patch.baselineScaleFactor!;
+    if ('selectedScaleFactor' in patch) draftFields.selectedScaleFactor = patch.selectedScaleFactor!;
+    if ('persistedChanges' in patch) draftFields.persistedChanges = patch.persistedChanges!;
+    if ('currentUnsavedChanges' in patch) draftFields.currentUnsavedChanges = patch.currentUnsavedChanges!;
+    if ('baselineAppliedChanges' in patch) draftFields.baselineAppliedChanges = patch.baselineAppliedChanges!;
+    if (Object.keys(draftFields).length > 0) dispatchDraft({ type: 'load', fields: draftFields });
   };
 
   // Loads the recipe for whichever entry point brought us here (deep-link slug, recipeData
@@ -1070,29 +1075,7 @@ export default function RecipeSummaryScreen() {
 
   // Update hasModifications when scaling factor or applied changes change
   useEffect(() => {
-    // Calculate hasModifications for both mise and saved entrypoints
-    const hasScaleChanges = selectedScaleFactor !== baselineScaleFactor;
-    const hasIngredientChanges = currentUnsavedChanges.length > 0 || 
-      persistedChanges.length !== baselineAppliedChanges.length || 
-      !persistedChanges.every((change, index) => {
-        const baselineChange = baselineAppliedChanges[index];
-        return baselineChange && 
-          change.from === baselineChange.from && 
-          JSON.stringify(change.to) === JSON.stringify(baselineChange.to);
-      });
-    
-    const newHasModifications = hasScaleChanges || hasIngredientChanges;
-    console.log('[DEBUG] hasModifications calculation (baseline comparison):', {
-      entryPoint,
-      selectedScaleFactor,
-      baselineScaleFactor,
-      hasScaleChanges,
-      currentUnsavedChangesCount: currentUnsavedChanges.length,
-      persistedChangesCount: persistedChanges.length,
-      baselineAppliedChangesCount: baselineAppliedChanges.length,
-      hasIngredientChanges,
-      newHasModifications,
-    });
+    const newHasModifications = computeHasModifications(draft);
     
     setHasModifications(newHasModifications);
   }, [selectedScaleFactor, currentUnsavedChanges, persistedChanges, entryPoint, baselineScaleFactor, baselineAppliedChanges]);
@@ -1119,7 +1102,7 @@ export default function RecipeSummaryScreen() {
     return extractAllergens(originalRecipe.ingredientGroups);
   }, [originalRecipe]);
 
-  const handleScaleFactorChange = (factor: number) => setSelectedScaleFactor(factor);
+  const handleScaleFactorChange = (factor: number) => dispatchDraft({ type: 'setScale', factor });
 
 
 
@@ -1210,132 +1193,26 @@ export default function RecipeSummaryScreen() {
     });
 
     InteractionManager.runAfterInteractions(() => {
-      if (substitution.name === 'Remove ingredient') {
-        const currentRemovals = [...persistedChanges, ...currentUnsavedChanges].filter((c) => !c.to).length;
-        console.log('[DEBUG] Removal limit check:', {
-          currentRemovals,
-          limit: 2,
-          willProceed: currentRemovals < 2,
-        });
-        if (currentRemovals >= 2) {
+      if (substitution.name === REMOVE_INGREDIENT) {
+        if (countRemovals({ persistedChanges, currentUnsavedChanges }) >= MAX_REMOVALS) {
           handleError('Limit Reached', 'You can only remove up to 2 ingredients.');
           return;
         }
       }
 
-      const isRemoval = substitution.name === 'Remove ingredient';
-      let originalNameForSub = ingredientToSubstitute.name;
-      // Only parse when it's a UI-generated display name like "olive oil (substituted for butter)".
-      // Natural language alternatives like "fresh cilantro or mint" must be kept as-is so the
-      // render-time match (c.from === baseIngredient.name) can find the right change.
-      if (ingredientToSubstitute.name.includes('(substituted for ')) {
-        const { substitutionText } = parseRecipeDisplayName(ingredientToSubstitute.name);
-        if (substitutionText) originalNameForSub = substitutionText;
-      }
-      
-      console.log('[DEBUG] Creating substitution change:', {
-        originalIngredient: {
-          name: ingredientToSubstitute.name,
-          amount: ingredientToSubstitute.amount,
-          unit: ingredientToSubstitute.unit,
-        },
-        substitution: {
-          name: substitution.name,
-          amount: substitution.amount,
-          unit: substitution.unit,
-          description: substitution.description,
-        },
-        originalNameForSub,
-        isRemoval,
-        entryPoint,
-        selectedScaleFactor,
-      });
-      
-      // Calculate the original (unscaled) amount for substitution
-      let originalSubstitutionAmount: string | null = null;
-      if (substitution.amount != null && selectedScaleFactor !== 1) {
-        const parsedAmount = parseAmountString(String(substitution.amount));
-        if (parsedAmount !== null) {
-          // Unscale the amount to get the original amount
-          const originalAmount = parsedAmount / selectedScaleFactor;
-          originalSubstitutionAmount = formatAmountNumber(originalAmount) || originalAmount.toString();
-        } else {
-          originalSubstitutionAmount = String(substitution.amount);
-        }
-      } else {
-        originalSubstitutionAmount = substitution.amount != null ? String(substitution.amount) : null;
-      }
-      
-      const newChange: AppliedChange = {
-        from: originalNameForSub,
-        to: isRemoval
-          ? null
-          : {
-              name: substitution.name,
-              amount: originalSubstitutionAmount, // Save the original unscaled amount
-              unit: substitution.unit ?? null,
-              preparation: substitution.description ?? null,
-              suggested_substitutions: null,
-            },
-      };
-
-      console.log('[DEBUG] Created newChange object:', {
-        isRemoval,
-        originalNameForSub,
-        substitutionName: substitution.name,
-        newChange,
-        willCreateRemoval: isRemoval ? 'YES - to: null' : 'NO - to: object',
-      });
-
-      console.log('[DEBUG] Final substitution change object (with unscaled amount):', {
-        newChange,
-        toIngredient: newChange.to,
-        scaledAmountFromModal: substitution.amount,
-        unscaledAmountSaved: newChange.to?.amount,
-        currentScaleFactor: selectedScaleFactor,
-        unitAfterConversion: newChange.to?.unit,
-      });
-
-      if (isRemoval) setLastRemoved({ from: newChange.from, to: null });
-
-      setCurrentUnsavedChanges((prev) => {
-        const existingChangeIndex = prev.findIndex((c) => c.from === originalNameForSub);
-        if (existingChangeIndex > -1) {
-          const updated = [...prev];
-          updated[existingChangeIndex] = newChange;
-          console.log('[DEBUG] Updated existing substitution:', {
-            index: existingChangeIndex,
-            oldChange: prev[existingChangeIndex],
-            newChange,
-          });
-          return updated;
-        }
-        const newUnsavedChanges = [...prev, newChange];
-        console.log('[DEBUG] Added new substitution/removal:', {
-          isRemoval,
-          ingredientName: originalNameForSub,
-          previousChanges: prev,
-          newChange,
-          allChanges: newUnsavedChanges,
-          previousCount: prev.length,
-          newCount: newUnsavedChanges.length,
-        });
-        return newUnsavedChanges;
-      });
+      // Change stores the 1× amount; see buildSubstitutionChange
+      const { change } = buildSubstitutionChange(ingredientToSubstitute, substitution, selectedScaleFactor);
+      dispatchDraft({ type: 'upsertChange', change });
     });
   };
 
-  const undoIngredientRemoval = React.useCallback(
-    (fullName: string) => {
-      const { baseName: originalName } = parseRecipeDisplayName(fullName);
-      setCurrentUnsavedChanges((prev) => prev.filter((change) => change.from !== originalName));
-      if (lastRemoved?.from === originalName) setLastRemoved(null);
-    },
-    [lastRemoved],
-  );
+  const undoIngredientRemoval = React.useCallback((fullName: string) => {
+    const { baseName: originalName } = parseRecipeDisplayName(fullName);
+    dispatchDraft({ type: 'revertChange', from: originalName });
+  }, []);
 
   const undoSubstitution = React.useCallback((originalName: string) => {
-    setCurrentUnsavedChanges((prev) => prev.filter((change) => change.from !== originalName));
+    dispatchDraft({ type: 'revertChange', from: originalName });
   }, []);
 
   // Use titleOverride if available (for mise recipes), otherwise use the recipe title
@@ -2588,17 +2465,11 @@ export default function RecipeSummaryScreen() {
       // Reset all baselines to 1× after successful save
       // Treat the newly saved data as the new 1× baseline to prevent double-scaling
       setUnscaledIngredientGroups(recipe?.ingredientGroups ? [...recipe.ingredientGroups] : []);
-      setBaselineScaleFactor(1);
-      setSelectedScaleFactor(1);
-      
+      // Unsaved changes become persisted; scale and changes become the new 1× baseline
+      dispatchDraft({ type: 'commitSaved' });
+
       // Reset modifications state after successful save
       setHasModifications(false);
-      setCurrentUnsavedChanges([]);
-      
-      // Update persistedChanges and baseline applied changes
-      const newPersistedChanges = [...persistedChanges, ...currentUnsavedChanges];
-      setPersistedChanges(newPersistedChanges);
-      setBaselineAppliedChanges(newPersistedChanges);
       
       console.log('[DEBUG] ✅ All baselines reset after save:', {
         unscaledGroupsCount: recipe?.ingredientGroups?.length || 0,
