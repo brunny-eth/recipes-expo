@@ -60,7 +60,7 @@ export const apiErrorMessages = {
   offline: "Please check your internet connection and try again.",
   interrupted: "The connection was interrupted before we finished. Please try again.",
   timeout: "This is taking longer than expected. Please try again.",
-  rate_limited: "Too many requests. Please wait a moment and try again.",
+  rate_limited: "You've made a lot of requests in a short time. Please wait a few minutes and try again.",
   invalid_response: "We got an unexpected response from our server. Please try again.",
   aborted: "The request was cancelled.",
   config: "Recipe service is temporarily unavailable. Please try again in a few moments.",
