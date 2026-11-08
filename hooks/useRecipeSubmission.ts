@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { detectInputType } from '../server/utils/detectInputType';
 import { normalizeUrl } from '../utils/normalizeUrl';
 import { supabase } from '../lib/supabaseClient';
@@ -13,6 +13,18 @@ import type {
   ValidationResult,
   CombinedParsedRecipe
 } from '../common/types';
+import { api, isApiError } from '../lib/api';
+import { useAnalytics } from '../utils/analytics';
+import {
+  decideParseRetry,
+  parseRetryReason,
+  parseRecipeResponseSchema,
+  PARSE_TIMEOUT_MS,
+} from '../utils/parseRetry';
+import { isAppActive, waitToRetry, watchBackgrounding } from '../utils/appStateWatch';
+
+/** Pause after returning to the foreground before re-running an interrupted parse. */
+const AUTO_RETRY_DELAY_MS = 1000;
 
 export interface SubmitRecipeOptions {
   isDishNameSearch?: boolean;
@@ -31,6 +43,14 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
   const [submissionState, setSubmissionState] = useState<SubmissionState>('idle');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { session } = useAuth();
+  const { track } = useAnalytics();
+  // Ref so submitRecipe's identity doesn't change with every render.
+  const trackRef = useRef(track);
+  trackRef.current = track;
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Cancel an in-flight parse if the owner unmounts.
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   const validateInput = useCallback((input: string): ValidationResult => {
     const trimmedInput = input.trim();
@@ -197,35 +217,73 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
 
         console.log('[useRecipeSubmission] Making backend request to parse endpoint');
 
-        const response = await fetch(`${backendUrl}/api/recipes/parse`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-            input: normalizedInput, 
-            isDishNameSearch,
-            userId: session?.user?.id ?? null
-          }),
-        });
+        // Aborted if the hook's owner unmounts mid-parse.
+        const controller = new AbortController();
+        abortRef.current = controller;
 
-        console.log('[useRecipeSubmission] Backend response status:', response.status);
-        console.log('[useRecipeSubmission] Backend response ok:', response.ok);
-
-        if (!response.ok) {
-          // For parsing endpoints, treat 4xx/5xx as parsing failures, not network errors
-          if (response.status === 400 || response.status === 422) {
-            throw new Error('Invalid input provided');
-          } else if (response.status === 500) {
-            throw new Error('Could not process the input provided');
-          } else {
-            // True network/service errors (503, 502, etc.)
-            const errorMessage = getNetworkErrorMessage(`HTTP ${response.status}`, response.status);
-            throw new Error(errorMessage);
+        let parseResult: any; // same as the old `await response.json()`
+        let autoRetries = 0;
+        for (;;) {
+          // Did the app leave the foreground while this request was in flight?
+          const backgrounding = watchBackgrounding();
+          try {
+            parseResult = await api('/api/recipes/parse', {
+              method: 'POST',
+              body: {
+                input: normalizedInput,
+                isDishNameSearch,
+                userId: session?.user?.id ?? null
+              },
+              schema: parseRecipeResponseSchema,
+              timeoutMs: PARSE_TIMEOUT_MS,
+              signal: controller.signal,
+            });
+            console.log('[useRecipeSubmission] Backend response ok:', true);
+            break;
+          } catch (e) {
+            const wasBackgrounded = backgrounding.wasBackgrounded();
+            const decision = decideParseRetry({
+              error: e,
+              attempt: autoRetries,
+              wasBackgrounded,
+              isAppActive: isAppActive(),
+            });
+            if (decision === 'show_error') {
+              if (isApiError(e, 'http')) {
+                const status = e.status;
+                console.log('[useRecipeSubmission] Backend response status:', status);
+                console.log('[useRecipeSubmission] Backend response ok:', false);
+                // For parsing endpoints, treat 4xx/5xx as parsing failures, not network errors
+                if (status === 400 || status === 422) {
+                  throw new Error('Invalid input provided');
+                } else if (status === 500) {
+                  throw new Error('Could not process the input provided');
+                } else {
+                  // True network/service errors (503, 502, etc.)
+                  const errorMessage = getNetworkErrorMessage(`HTTP ${status}`, status);
+                  throw new Error(errorMessage);
+                }
+              }
+              throw e;
+            }
+            // App backgrounded mid-parse (iOS dropped the socket): retry silently.
+            autoRetries += 1;
+            const retryProps = {
+              input_type: inputType,
+              attempt: autoRetries,
+              reason: parseRetryReason(e, wasBackgrounded),
+              error_kind: isApiError(e) ? e.kind : undefined,
+              was_backgrounded: wasBackgrounded,
+              wait_for_active: decision === 'retry_when_active',
+            };
+            console.log('[useRecipeSubmission] Auto-retrying interrupted parse:', retryProps);
+            try { await trackRef.current('parse_auto_retry', retryProps); } catch {}
+            // If aborted while waiting, the next api() call throws `aborted`.
+            await waitToRetry(controller.signal, AUTO_RETRY_DELAY_MS);
+          } finally {
+            backgrounding.stop();
           }
         }
-
-        const parseResult = await response.json();
 
         // Debug logging to understand what the backend returns
         console.log('[useRecipeSubmission] Backend request successful - parse result:', {
@@ -319,6 +377,12 @@ export function useRecipeSubmission(): UseRecipeSubmissionReturn {
         throw new Error('Unsupported input type');
       }
     } catch (error) {
+      // We cancelled (owner unmounted): nothing to show.
+      if (isApiError(error, 'aborted')) {
+        setSubmissionState('idle');
+        return { success: false, action: 'show_validation_error' };
+      }
+
       console.error('[useRecipeSubmission] Submission error:', error);
       
       // Capture current submission state before resetting it

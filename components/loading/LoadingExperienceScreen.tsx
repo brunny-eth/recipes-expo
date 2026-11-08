@@ -28,6 +28,18 @@ import ScreenHeader from '@/components/ScreenHeader';
 import { useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
+import { api, isApiError } from '@/lib/api';
+import {
+  decideParseRetry,
+  parseRetryReason,
+  parseRecipeResponseSchema,
+  ParseRecipeResponse,
+  PARSE_TIMEOUT_MS,
+} from '@/utils/parseRetry';
+import { isAppActive, waitToRetry, watchBackgrounding } from '@/utils/appStateWatch';
+
+/** Pause after returning to the foreground before re-running an interrupted parse. */
+const AUTO_RETRY_DELAY_MS = 1000;
 
 interface LoadingExperienceScreenProps {
   recipeInput: string;
@@ -63,6 +75,9 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
   const [hideChecklist, setHideChecklist] = useState(false);
   const handleError = useHandleError();
   const isMountedRef = useRef(true);
+  // Automatic retries used for the current recipeInput (see decideParseRetry).
+  const autoRetryCountRef = useRef(0);
+  const autoRetryInputRef = useRef<string | null>(null);
   const { track } = useAnalytics();
   
   // Animation values
@@ -232,13 +247,13 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
     }, 1000);
   };
 
-  const parseRecipe = async (): Promise<ParsedRecipe | null> => {
-    const baseBackendUrl = process.env.EXPO_PUBLIC_API_URL!;
-    
+  const parseRecipe = async (
+    signal: AbortSignal,
+    onAutoRetry: () => void,
+  ): Promise<ParsedRecipe | null> => {
     // Choose endpoint based on input type
     let endpoint: string;
-    let requestBody: any;
-    let headers: any = {};
+    let requestBody: FormData | Record<string, unknown>;
     
     if (isImage) {
       // Single image processing
@@ -287,93 +302,143 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
     } else {
       // URL/text processing (existing logic)
       endpoint = '/api/recipes/parse';
-      headers['Content-Type'] = 'application/json';
-      // Parse request with user authentication
-      requestBody = JSON.stringify({ 
+      // Parse request with user authentication (api() JSON-encodes this)
+      requestBody = {
         input: recipeInput, 
         forceNewParse,
         userId: session?.user?.id ?? null
-      });
+      };
     }
     
-    const backendUrl = `${baseBackendUrl}${endpoint}`;
+    // false when this attempt was cancelled or handed off to an auto-retry,
+    // so the checklist keeps running and nothing navigates.
+    let markFinished = true;
+    // Did the app leave the foreground while this request was in flight?
+    const backgrounding = watchBackgrounding();
 
     try {
       if (__DEV__) {
-        console.log(`[parseRecipe] Preparing to send request to: ${backendUrl}`);
+        console.log(`[parseRecipe] Preparing to send request to: ${endpoint}`);
         console.log('[parseRecipe] Input type:', inputType);
 
         // Environment variables loaded (values not logged for security)
       }
 
-      const response = await fetch(backendUrl, {
-        method: 'POST',
-        headers,
-        body: requestBody,
-      });
-
-      if (__DEV__) {
-        console.log(`[parseRecipe] Response Status: ${response.status}`);
+      let result: ParseRecipeResponse;
+      try {
+        result = await api(endpoint, {
+          method: 'POST',
+          body: requestBody,
+          schema: parseRecipeResponseSchema,
+          timeoutMs: PARSE_TIMEOUT_MS,
+          signal,
+        });
+      } finally {
+        backgrounding.stop();
       }
 
-      if (response.ok) {
-        const result = await response.json();
+      // Superseded by unmount/retry after the response arrived: drop it.
+      if (signal.aborted) {
+        markFinished = false;
+        return null;
+      }
+
+      if (__DEV__) {
+        console.log('[parseRecipe] Response JSON:', result);
+      }
+
+      // Handle video recipe source
+      if (result.source === 'link') {
+        // This is a success case where a link was followed from a caption.
+        // The user gets the recipe they wanted, so we can proceed.
+        // The source URL in the recipe data will correctly point to the blog post.
+      } else if (result.source === null && !result.recipe) {
+        // This is a specific failure case for videos where no recipe or link was found.
+        handleError(
+          'Could Not Find Recipe',
+          "We couldn't find a recipe in this video's caption or a link to one.",
+        undefined,
+        { onDismissCallback: handleBack }
+        );
+        return null; // Stop further processing
+      }
+
+      if (result.recipe) {
+        const recipe = result.recipe as unknown as ParsedRecipe;
+        setRecipeData(recipe);
+
+        // Track successful recipe parsing
         if (__DEV__) {
-          console.log('[parseRecipe] Response JSON:', result);
-        }
-
-        // Handle video recipe source
-        if (result.source === 'link') {
-          // This is a success case where a link was followed from a caption.
-          // The user gets the recipe they wanted, so we can proceed.
-          // The source URL in the recipe data will correctly point to the blog post.
-        } else if (result.source === null && !result.recipe) {
-          // This is a specific failure case for videos where no recipe or link was found.
-          handleError(
-            'Could Not Find Recipe',
-            "We couldn't find a recipe in this video's caption or a link to one.",
-          undefined,
-          { onDismissCallback: handleBack }
-          );
-          return null; // Stop further processing
-        }
-
-        if (result.recipe) {
-          setRecipeData(result.recipe);
-          
-          // Track successful recipe parsing
-          if (__DEV__) {
-            console.log('[POSTHOG] Tracking event: recipe_parsed', { 
-              input_type: inputType, 
-              success: true,
-              recipe_id: result.recipe.id?.toString()
-            });
-          }
-          await track('recipe_parsed', { 
+          console.log('[POSTHOG] Tracking event: recipe_parsed', {
             input_type: inputType, 
             success: true,
-            recipe_id: result.recipe.id?.toString()
+            recipe_id: recipe.id?.toString()
           });
-          
-          return result.recipe;
-        } else {
-          // Track failed recipe parsing
-          await track('recipe_parsed', { 
-            input_type: inputType, 
-            success: false
-          });
-          
-          // Show error modal globally
-          const userMessage = result.error 
-            ? processBackendError(result)
-            : "We received an incomplete response from the server. Please try again.";
-          if (isMountedRef.current) {
-            handleError('Oops!', userMessage, { stage: 'parsing' }, { onDismissCallback: handleBack });
-          }
         }
+        await track('recipe_parsed', {
+          input_type: inputType,
+          success: true,
+          recipe_id: recipe.id?.toString()
+        });
+          
+        return recipe;
       } else {
+        // Track failed recipe parsing
+        await track('recipe_parsed', {
+          input_type: inputType,
+          success: false
+        });
+          
+        // Show error modal globally
+        const userMessage = result.error
+          ? processBackendError(result)
+          : "We received an incomplete response from the server. Please try again.";
+        if (isMountedRef.current) {
+          handleError('Oops!', userMessage, { stage: 'parsing' }, { onDismissCallback: handleBack });
+        }
+      }
+    } catch (e: any) {
+      // We cancelled (unmount or a newer attempt): stay quiet.
+      if (isApiError(e, 'aborted') || signal.aborted) {
+        markFinished = false;
+        return null;
+      }
+
+      // App backgrounded mid-parse (iOS dropped the socket): retry silently.
+      const attempt = autoRetryCountRef.current;
+      const wasBackgrounded = backgrounding.wasBackgrounded();
+      const decision = decideParseRetry({
+        error: e,
+        attempt,
+        wasBackgrounded,
+        isAppActive: isAppActive(),
+      });
+      if (decision !== 'show_error') {
+        markFinished = false;
+        autoRetryCountRef.current = attempt + 1;
+        const retryProps = {
+          input_type: inputType,
+          attempt: attempt + 1,
+          reason: parseRetryReason(e, wasBackgrounded),
+          error_kind: isApiError(e) ? e.kind : undefined,
+          was_backgrounded: wasBackgrounded,
+          wait_for_active: decision === 'retry_when_active',
+        };
+        console.log('[parseRecipe] Auto-retrying interrupted parse:', retryProps);
+        try { await track('parse_auto_retry', retryProps); } catch {}
+        onAutoRetry();
+        return null;
+      }
+
+      if (isApiError(e, 'http')) {
+        // Non-2xx response: same handling as before the move to api().
+        const status = e.status;
         try {
-          const errorResponse = await response.json();
+          const errorResponse: any = e.body;
+          // Previously `await response.json()` threw for empty/non-JSON bodies.
+          if (errorResponse === null || typeof errorResponse !== 'object') {
+            throw new Error('Non-JSON error response');
+          }
           if (__DEV__) {
             console.log('[parseRecipe] Error response structure:', JSON.stringify(errorResponse, null, 2));
             console.log('[parseRecipe] Error response type:', typeof errorResponse);
@@ -389,7 +454,7 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
                                         processedMessage.includes('ingredients');
             const errorOptions = isRecipeSpecificError 
               ? { context: 'image_processing' } // Use context instead of stage
-              : { stage: 'parsing', statusCode: response.status };
+              : { stage: 'parsing', statusCode: status };
             
             // Track failed recipe parsing
             await track('recipe_parsed', { 
@@ -411,13 +476,14 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
             success: false
           });
           
-          const statusMessage = getNetworkErrorMessage(`HTTP ${response.status}`, response.status);
+          const statusMessage = getNetworkErrorMessage(`HTTP ${status}`, status);
           if (isMountedRef.current) {
-            handleError('Oops!', statusMessage, { statusCode: response.status }, { onDismissCallback: handleBack });
+            handleError('Oops!', statusMessage, { statusCode: status }, { onDismissCallback: handleBack });
           }
         }
+        return null;
       }
-    } catch (e: any) {
+
       // Track failed recipe parsing
       await track('recipe_parsed', { 
         input_type: inputType, 
@@ -428,20 +494,40 @@ const LoadingExperienceScreen: React.FC<LoadingExperienceScreenProps> = ({
         handleError('Oops!', e, undefined, { onDismissCallback: handleBack });
       }
     } finally {
-      setIsParsingFinished(true);
+      if (markFinished) {
+        setIsParsingFinished(true);
+      }
     }
     return null;
   };
 
   useEffect(() => {
-    let parsedRecipeResult: ParsedRecipe | null = null;
-    const runParse = async () => {
-      parsedRecipeResult = await parseRecipe();
+    // Auto-retry budget is per input; componentKey bumps (retries) keep it.
+    if (autoRetryInputRef.current !== recipeInput) {
+      autoRetryInputRef.current = recipeInput;
+      autoRetryCountRef.current = 0;
     }
-    runParse();
+
+    // Aborted on unmount and when a retry starts a new attempt, so a stale
+    // request can never set state or navigate.
+    const controller = new AbortController();
+
+    const onAutoRetry = () => {
+      // If the app is still in the background, wait until it's active again,
+      // then re-run the parse via the existing componentKey retry.
+      waitToRetry(controller.signal, AUTO_RETRY_DELAY_MS).then((ok) => {
+        if (ok && !controller.signal.aborted && isMountedRef.current) {
+          handleRetry();
+        }
+      });
+    };
+
+    parseRecipe(controller.signal, onAutoRetry);
 
     return () => {
-      // Cleanup if component unmounts during async operation
+      // Cleanup if component unmounts during async operation (also cancels a
+      // pending auto-retry wait/timer).
+      controller.abort();
     };
   }, [recipeInput, componentKey]);
 
