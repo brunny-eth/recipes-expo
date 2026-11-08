@@ -53,6 +53,12 @@ import {
   flattenIngredientGroups,
   type AppliedChange,
 } from '@/domain/recipe/applyChanges';
+import {
+  resolveFromRecipeDataParam,
+  patchForFetchedRecipe,
+  patchForSharedRecipe,
+  type SummaryLoadPatch,
+} from '@/domain/recipe/summaryLoad';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import { useHandleError } from '@/hooks/useHandleError';
 import { useSuccessModal } from '@/context/SuccessModalContext';
@@ -527,50 +533,34 @@ export default function RecipeSummaryScreen() {
     }
   }, [session?.access_token]); // Removed cookingContext dependency
 
-  // ✅ FIX: Modified useEffect to fetch by ID when recipeData is missing
+  // Applies a load patch from domain/recipe/summaryLoad: only keys present in the patch are set.
+  const applyLoadPatch = (patch: SummaryLoadPatch) => {
+    if ('recipe' in patch) setRecipe(patch.recipe!);
+    if ('originalRecipe' in patch) setOriginalRecipe(patch.originalRecipe!);
+    if ('originalYieldValue' in patch) setOriginalYieldValue(patch.originalYieldValue!);
+    if ('imageLoadFailed' in patch) setImageLoadFailed(patch.imageLoadFailed!);
+    if ('unscaledIngredientGroups' in patch) setUnscaledIngredientGroups(patch.unscaledIngredientGroups!);
+    if ('baselineScaleFactor' in patch) setBaselineScaleFactor(patch.baselineScaleFactor!);
+    if ('selectedScaleFactor' in patch) setSelectedScaleFactor(patch.selectedScaleFactor!);
+    if ('persistedChanges' in patch) setPersistedChanges(patch.persistedChanges!);
+    if ('currentUnsavedChanges' in patch) setCurrentUnsavedChanges(patch.currentUnsavedChanges!);
+    if ('baselineAppliedChanges' in patch) setBaselineAppliedChanges(patch.baselineAppliedChanges!);
+  };
+
+  // Loads the recipe for whichever entry point brought us here (deep-link slug, recipeData
+  // param, or recipe id). State resolution lives in domain/recipe/summaryLoad.ts.
   useEffect(() => {
     const loadRecipe = async () => {
       // Handle deep link slug first
       if (slug && !fetchedSlugs.has(slug)) {
         try {
           console.log('[Summary] Loading recipe from deep link slug:', slug);
-          console.log('[Summary] Fetch conditions:', {
-            hasSlug: !!slug,
-            alreadyFetched: fetchedSlugs.has(slug)
-          });
           setIsLoading(true);
-          
           // Mark this slug as fetched to prevent re-fetching
           setFetchedSlugs(prev => new Set(prev).add(slug));
-          
           const sharedRecipe = await fetchSharedRecipe(slug);
-          console.log('[Summary] fetchSharedRecipe result:', {
-            hasRecipe: !!sharedRecipe,
-            recipeId: sharedRecipe?.id,
-            recipeTitle: sharedRecipe?.title,
-            recipeKeys: sharedRecipe ? Object.keys(sharedRecipe) : []
-          });
-          
           if (sharedRecipe) {
-            setRecipe(sharedRecipe);
-            setOriginalRecipe(sharedRecipe); // Set original recipe for allergens detection
-            setImageLoadFailed(false);
-            
-            // Set the unscaled ingredient groups for scaling calculations
-            setUnscaledIngredientGroups(sharedRecipe.ingredientGroups ? [...sharedRecipe.ingredientGroups] : []);
-            setBaselineScaleFactor(1);
-            setSelectedScaleFactor(1);
-            
-            // Set original yield value for scaling
-            const yieldNum = parseServingsValue(sharedRecipe.recipeYield);
-            setOriginalYieldValue(yieldNum);
-            
-            console.log('[Summary] Successfully loaded shared recipe:', sharedRecipe.title);
-            console.log('[Summary] Set unscaled ingredient groups:', {
-              count: sharedRecipe.ingredientGroups?.length || 0,
-              groups: sharedRecipe.ingredientGroups?.map(g => g.name) || []
-            });
-            console.log('[Summary] Set original recipe for allergens detection');
+            applyLoadPatch(patchForSharedRecipe(sharedRecipe));
           } else {
             throw new Error('No recipe data found in share');
           }
@@ -582,251 +572,34 @@ export default function RecipeSummaryScreen() {
         }
         return;
       }
-      
-      if (params.recipeData) {
-        // Legacy path: parse recipeData from params
-        try {
-          const parsed = JSON.parse(params.recipeData as string);
-          if (!parsed || typeof parsed !== 'object' || Object.keys(parsed).length === 0) {
-            handleError('Error Loading Summary', 'Recipe data is invalid.');
-            setIsLoading(false);
-            return;
-          }
-          
-          // Debug: Log the recipe structure to see if sourceUrl exists
-          if (__DEV__) {
-            console.log('[DEBUG] Recipe data structure:', {
-              hasRecipe: !!parsed,
-              keys: Object.keys(parsed),
-              sourceUrl: parsed.sourceUrl,
-              hasSourceUrl: !!parsed.sourceUrl,
-              recipePreview: {
-                title: parsed.title,
-                sourceUrl: parsed.sourceUrl,
-                image: parsed.image,
-              },
-              // Add metadata debugging for fork detection
-              metadata: {
-                id: parsed.id,
-                parent_recipe_id: parsed.parent_recipe_id,
-                source_type: parsed.source_type,
-                isUserModified: !!(parsed.parent_recipe_id || parsed.source_type === 'user_modified'),
-              }
-            });
-          }
-          
-          setRecipe(parsed);
-          
-          // Reset image load failure state when new recipe is loaded
-          setImageLoadFailed(false);
-          
-          // Set original recipe data if available (for consistent scaling)
-          if (params.originalRecipeData) {
-            try {
-              const originalParsed = JSON.parse(params.originalRecipeData as string);
-              setOriginalRecipe(originalParsed);
-              const yieldNum = parseServingsValue(originalParsed.recipeYield);
-              setOriginalYieldValue(yieldNum);
-            } catch (originalError) {
-              console.error('[DEBUG] Error parsing original recipe data:', originalError);
-              // Fall back to using the current recipe as original
-              setOriginalRecipe(parsed);
-              const yieldNum = parseServingsValue(parsed.recipeYield);
-              setOriginalYieldValue(yieldNum);
-            }
-            
-            // Set fresh scaling baseline for saved/forked recipes
-            const isSavedEntrypoint = entryPoint === 'saved';
-            if (isSavedEntrypoint) {
-              console.log('[DEBUG] Setting fresh scaling baseline for saved recipe (with originalRecipeData)');
-              // Treat current server values as the unscaled baseline (1×) for this screen load
-              setUnscaledIngredientGroups(parsed.ingredientGroups ? [...parsed.ingredientGroups] : []);
-              setBaselineScaleFactor(1);
-              setSelectedScaleFactor(1);
-              console.log('[DEBUG] Fresh baseline set:', {
-                unscaledGroupsCount: parsed.ingredientGroups?.length || 0,
-                baselineScaleFactor: 1,
-                selectedScaleFactor: 1,
-              });
-            }
-          } else {
-            // For new recipes or when original data is not available, use current recipe as original
-            setOriginalRecipe(parsed);
-            const yieldNum = parseServingsValue(parsed.recipeYield);
-            setOriginalYieldValue(yieldNum);
-          }
 
-          // Set fresh scaling baseline for saved/forked recipes
-          const isSavedEntrypoint = entryPoint === 'saved';
-          if (isSavedEntrypoint) {
-            console.log('[DEBUG] Setting fresh scaling baseline for saved recipe');
-            // Treat current server values as the unscaled baseline (1×) for this screen load
-            setUnscaledIngredientGroups(parsed.ingredientGroups ? [...parsed.ingredientGroups] : []);
-            setBaselineScaleFactor(1);
-            setSelectedScaleFactor(1);
-            console.log('[DEBUG] Fresh baseline set:', {
-              unscaledGroupsCount: parsed.ingredientGroups?.length || 0,
-              baselineScaleFactor: 1,
-              selectedScaleFactor: 1,
-            });
-          }
-          
-          // Check if this is a saved recipe with existing applied changes
-          if (params.appliedChanges) {
-            if (__DEV__) {
-              console.log('[DEBUG] Found appliedChanges URL param:', params.appliedChanges);
-            }
-            try {
-              const savedAppliedChanges = JSON.parse(params.appliedChanges as string);
-              if (__DEV__) {
-                console.log('[DEBUG] Parsed appliedChanges from URL:', savedAppliedChanges);
-              }
-              
-              // Convert saved format to internal format
-              if (savedAppliedChanges.ingredientChanges) {
-                if (__DEV__) {
-                  // Converting ingredientChanges to internal format
-                }
-              
-                const convertedChanges: AppliedChange[] = savedAppliedChanges.ingredientChanges.map((change: any) => ({
-                  from: change.from,
-                  to: change.to ? {
-                    // Handle both old format (string) and new format (object)
-                    name: typeof change.to === 'string' ? change.to : change.to.name,
-                    amount: typeof change.to === 'string' ? null : change.to.amount,
-                    unit: typeof change.to === 'string' ? null : change.to.unit,
-                    preparation: typeof change.to === 'string' ? null : change.to.preparation,
-                    suggested_substitutions: null,
-                  } : null,
-                }));
-              
-                if (__DEV__) {
-                  console.log('[DEBUG] Converted appliedChanges:', {
-                    original: savedAppliedChanges.ingredientChanges,
-                    converted: convertedChanges,
-                    details: convertedChanges.map(change => ({
-                      from: change.from,
-                      to: change.to ? {
-                        name: change.to.name,
-                        amount: change.to.amount,
-                        unit: change.to.unit,
-                      } : null,
-                    })),
-                  });
-                }
-              
-                // These are changes loaded from the database, so they are persisted
-                setPersistedChanges(convertedChanges);
-                setCurrentUnsavedChanges([]); // No unsaved changes initially
-                // Set baseline for both mise and saved entrypoints
-                setBaselineScaleFactor(1.0);
-                setBaselineAppliedChanges(convertedChanges);
-              }
-              
-              // Calculate the actual scale factor from original recipe
-              let finalScaleFactor = 1.0;
-              if (savedAppliedChanges.scalingFactor && params.originalRecipeData) {
-                // For saved/mise recipes, calculate the current scale factor based on the current recipe yield vs original yield
-                const currentYieldNum = parseServingsValue(parsed.recipeYield);
-                let originalYieldNum = null;
-                
-                try {
-                  const originalParsed = JSON.parse(params.originalRecipeData as string);
-                  originalYieldNum = parseServingsValue(originalParsed?.recipeYield);
-                } catch (originalError) {
-                  console.error('[DEBUG] Error parsing original recipe for yield calculation:', originalError);
-                }
-                
-                if (currentYieldNum && originalYieldNum) {
-                  const actualScaleFactor = currentYieldNum / originalYieldNum;
-                  console.log('[DEBUG] Calculated actual scale factor:', { currentYieldNum, originalYieldNum, actualScaleFactor });
-                  finalScaleFactor = actualScaleFactor;
-                } else {
-                  // For saved recipes, ignore the old scaling factor since the saved data is already scaled
-                  if (entryPoint === 'saved') {
-                    console.log('[DEBUG] Saved recipe: could not calculate yield-based factor, using 1.0 as fresh baseline');
-                    finalScaleFactor = 1.0;
-                  } else {
-                    console.log('[DEBUG] Could not calculate yield-based scale factor, using saved factor:', savedAppliedChanges.scalingFactor);
-                    finalScaleFactor = savedAppliedChanges.scalingFactor;
-                  }
-                }
-              } else if (savedAppliedChanges.scalingFactor) {
-                // For saved recipes, ignore the old scaling factor since the saved data is already scaled
-                if (entryPoint === 'saved') {
-                  console.log('[DEBUG] Saved recipe: ignoring old scaling factor, using 1.0 as fresh baseline');
-                  finalScaleFactor = 1.0;
-                } else {
-                  console.log('[DEBUG] Using scaling factor from saved changes:', savedAppliedChanges.scalingFactor);
-                  finalScaleFactor = savedAppliedChanges.scalingFactor;
-                }
-              } else {
-                console.log('[DEBUG] No scaling factor in saved changes, defaulting to 1.0');
-                finalScaleFactor = 1.0;
-              }
-              
-              setSelectedScaleFactor(finalScaleFactor);
-              // Set baseline for both mise and saved entrypoints
-              // Baseline should always be 1.0 (original recipe scale), not the saved scale factor
-              setBaselineScaleFactor(1.0);
-            } catch (appliedChangesError: any) {
-              console.error('[DEBUG] Error parsing applied changes:', appliedChangesError);
-              setSelectedScaleFactor(1.0);
-              setPersistedChanges([]);
-              setCurrentUnsavedChanges([]);
-            }
-          } else {
-            console.log('[DEBUG] No appliedChanges URL param, defaulting to new recipe state');
-            // New recipe, no existing changes
-            setSelectedScaleFactor(1.0);
-            setPersistedChanges([]);
-            setCurrentUnsavedChanges([]);
-            console.log('[INGREDIENT_LOCKING] New recipe initialized:', {
-              entryPoint,
-              persistedChanges: [],
-              currentUnsavedChanges: [],
-              recipeTitle: parsed.title,
-            });
-            // Set baseline for both mise and saved entrypoints
-            setBaselineScaleFactor(1.0);
-            setBaselineAppliedChanges([]);
-          }
-        } catch (e: any) {
-          handleError('Error Loading Summary', e);
+      if (params.recipeData) {
+        // Legacy path: recipe passed as JSON in route params
+        const result = resolveFromRecipeDataParam({
+          recipeData: params.recipeData as string,
+          originalRecipeData: params.originalRecipeData as string | undefined,
+          appliedChanges: params.appliedChanges as string | undefined,
+          entryPoint,
+        });
+        applyLoadPatch(result.patch);
+        if (result.error) {
+          handleError(result.error.title, result.error.error as any);
         }
       } else if (numericId && !isNaN(numericId)) {
-        // ✅ FIX: New path: fetch recipe by ID
         console.log('[Summary] No recipeData, fetching by ID:', numericId);
         const fetchedRecipe = await fetchCanonicalById(numericId);
-        
         if (fetchedRecipe) {
-          setRecipe(fetchedRecipe);
-          setOriginalRecipe(fetchedRecipe);
-          const yieldNum = parseServingsValue(fetchedRecipe.recipeYield);
-          setOriginalYieldValue(yieldNum);
-          
-          // Set fresh scaling baseline for saved recipes
-          if (entryPoint === 'saved') {
-            console.log('[DEBUG] Setting fresh scaling baseline for fetched saved recipe');
-            setUnscaledIngredientGroups(fetchedRecipe.ingredientGroups ? [...fetchedRecipe.ingredientGroups] : []);
-            setBaselineScaleFactor(1);
-            setSelectedScaleFactor(1);
-          }
-          
-          // Reset image load failure state
-          setImageLoadFailed(false);
+          applyLoadPatch(patchForFetchedRecipe(fetchedRecipe, entryPoint));
         } else {
           handleError('Error Loading Summary', 'Failed to fetch recipe from server.');
         }
       } else {
-        // ✅ FIX: Show friendly error instead of throwing
         console.error('[Summary] Missing recipeId param');
         handleError('Missing Recipe ID', 'Please provide a valid recipe ID to view this recipe.');
       }
       setIsLoading(false);
     };
 
-    // ✅ FIX: Call the async function and handle errors properly
     loadRecipe().catch((error) => {
       console.error('[Summary] Error in loadRecipe:', error);
       handleError('Error Loading Summary', error);
