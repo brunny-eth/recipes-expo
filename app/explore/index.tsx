@@ -10,6 +10,17 @@ import { COLORS, SPACING, RADIUS } from '@/constants/theme';
 import { bodyStrongText, bodyText, screenTitleText, FONT, metaText } from '@/constants/typography';
 import { CombinedParsedRecipe as ParsedRecipe } from '@/common/types';
 import { useAnalytics } from '@/utils/analytics';
+import { api, isApiError } from '@/lib/api';
+import { normalizeAppError } from '@/utils/normalizeAppError';
+
+// Server returns an array of recipe_data objects with `id` merged in.
+const exploreRecipesSchema = {
+  parse(input: unknown): ParsedRecipe[] {
+    if (input == null) return [];
+    if (!Array.isArray(input)) throw new Error('Expected an array of recipes');
+    return input as ParsedRecipe[];
+  },
+};
 
 export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
@@ -47,17 +58,15 @@ export default function ExploreScreen() {
     if (!isRefresh) setIsLoading(true);
     setError(null);
     try {
-      const backendUrl = process.env.EXPO_PUBLIC_API_URL;
-      const response = await fetch(`${backendUrl}/api/recipes/explore-random`);
-      if (!response.ok) throw new Error('Failed to fetch explore recipes');
-      const data = await response.json();
-      setRecipes(data || []);
+      const data = await api('/api/recipes/explore-random', { schema: exploreRecipesSchema });
+      setRecipes(data);
       await Promise.all([
         AsyncStorage.setItem('libraryExploreLastFetched', Date.now().toString()),
-        AsyncStorage.setItem('libraryExploreRecipes', JSON.stringify(data || [])),
+        AsyncStorage.setItem('libraryExploreRecipes', JSON.stringify(data)),
       ]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load explore recipes');
+      if (isApiError(err)) setError(normalizeAppError(err).message);
+      else setError(err instanceof Error ? err.message : 'Failed to load explore recipes');
     } finally {
       if (!isRefresh) setIsLoading(false);
     }

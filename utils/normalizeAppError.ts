@@ -1,4 +1,5 @@
-import { getErrorMessage, getNetworkErrorMessage, getSubmissionErrorMessage } from './errorMessages';
+import { apiErrorMessages, getErrorMessage, getNetworkErrorMessage, getSubmissionErrorMessage } from './errorMessages';
+import { isApiError } from '../lib/apiError';
 import { ParseErrorCode } from '../common/types/errors';
 
 export type AppErrorSeverity = 'info' | 'warn' | 'error' | 'critical';
@@ -59,6 +60,41 @@ function extractMessageFromUnknown(error: unknown): string {
  * Uses existing helpers for copy mapping and augments with title/severity/codes.
  */
 export function normalizeAppError(error: unknown, opts: NormalizeAppErrorOptions = {}): AppErrorNormalized {
+  // Typed errors from lib/api.ts: classify by `kind`, not by message regex.
+  // (A raw "Network request failed" can mean "app was backgrounded", not "offline".)
+  if (isApiError(error)) {
+    const kind = error.kind;
+    if (kind !== 'http') {
+      const meta: Record<Exclude<typeof kind, 'http'>, Omit<AppErrorNormalized, 'message'>> = {
+        offline: { code: 'NETWORK_OFFLINE', title: 'Network Error', severity: 'warn', retryable: true },
+        interrupted: { code: 'NETWORK_INTERRUPTED', title: 'Connection Interrupted', severity: 'warn', retryable: true },
+        timeout: { code: 'TIMEOUT', title: 'Request Timed Out', severity: 'warn', retryable: true },
+        rate_limited: { code: 'RATE_LIMITED', title: 'Slow Down', severity: 'warn', retryable: true },
+        invalid_response: { code: 'INVALID_RESPONSE', title: 'Something Went Wrong', severity: 'error', retryable: true },
+        aborted: { code: 'REQUEST_ABORTED', title: 'Cancelled', severity: 'info', retryable: true },
+        config: { code: 'CONFIG_ERROR', title: 'Service Unavailable', severity: 'error', retryable: true },
+      };
+      return { ...meta[kind], message: apiErrorMessages[kind] };
+    }
+    if (error.status === 401) {
+      return {
+        code: 'AUTH_REQUIRED',
+        title: 'Authentication Required',
+        message: 'You need to be logged in to continue.',
+        severity: 'warn',
+        retryable: false,
+        requiresLogin: true,
+      };
+    }
+    // Other HTTP errors fall through to the existing message-based mapping
+    // (error.message is the server's error text, so stage/context mapping
+    // works as it does for callers that throw new Error(data.error) today).
+    // Without stage/context, use the status code for status-specific copy.
+    if (opts.statusCode === undefined && !opts.stage && !opts.context) {
+      opts = { ...opts, statusCode: error.status };
+    }
+  }
+
   const rawMessage = extractMessageFromUnknown(error);
   const { statusCode, stage, context } = opts;
 
