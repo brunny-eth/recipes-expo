@@ -15,6 +15,7 @@ import { CombinedParsedRecipe, RecipeData, Json, asRecipeData, asRecipeDataOrNul
 import { IngredientChange, buildVariationPrompt, VariationType } from '../llm/modificationPrompts';
 import { runDefaultLLM } from '../llm/adapters';
 import logger from '../lib/logger'; 
+import { recipeParseLimiter, recipeModifyLimiter } from '../lib/rateLimit';
 import { ParseErrorCode } from '../../common/types/errors';
 import { ImageData } from '../services/parseImageRecipe';
 
@@ -143,7 +144,7 @@ router.get('/', async (req: Request, res: Response) => {
 // It is critical to define static routes like this one *before* dynamic routes.
 // This ensures that a request to '/parse' is handled by this specific handler
 // instead of being mistakenly captured by a dynamic handler like '/:id'.
-router.post('/parse', async (req: Request, res: Response) => {
+router.post('/parse', recipeParseLimiter, async (req: Request, res: Response) => {
   // Log incoming request without sensitive body data
   logger.info({ requestId: (req as any).id, route: req.originalUrl, method: req.method }, '[parse] Incoming request');
   try {
@@ -212,7 +213,7 @@ router.post('/parse', async (req: Request, res: Response) => {
 
 // --- Image Parsing Route ---
 // Test with: curl -X POST -F "image=@/path/to/recipe.jpg" http://localhost:3000/api/recipes/parse-image
-router.post('/parse-image', upload.single('image'), async (req: Request, res: Response) => {
+router.post('/parse-image', recipeParseLimiter, upload.single('image'), async (req: Request, res: Response) => {
   const requestId = (req as any).id;
   
   logger.info({ 
@@ -318,7 +319,7 @@ router.post('/parse-image', upload.single('image'), async (req: Request, res: Re
 
 // --- Multi-Page Image Parsing Route ---
 // Test with: curl -X POST -F "images=@page1.jpg" -F "images=@page2.jpg" http://localhost:3000/api/recipes/parse-images
-router.post('/parse-images', (req: Request, res: Response, next: Function) => {
+router.post('/parse-images', recipeParseLimiter, (req: Request, res: Response, next: Function) => {
   // Custom multer error handling
   uploadMultiple.array('images', 10)(req, res, (err: any) => {
     if (err) {
@@ -493,7 +494,7 @@ router.get('/explore-random', async (req: Request, res: Response) => {
 
 
 // --- Unified Modify Instructions Endpoint ---
-router.post('/modify-instructions', async (req: Request, res: Response) => {
+router.post('/modify-instructions', recipeModifyLimiter, async (req: Request, res: Response) => {
   try {
     const { originalInstructions, substitutions, originalIngredients, scaledIngredients, scalingFactor, skipTitleUpdate } = req.body;
     const requestId = (req as any).id;
@@ -846,7 +847,7 @@ router.patch('/:id(\\d+)', async (req: Request, res: Response) => {
 
 // --- Recipe Variations Endpoint ---
 // POST /api/recipes/variations
-router.post('/variations', async (req: Request, res: Response) => {
+router.post('/variations', recipeModifyLimiter, async (req: Request, res: Response) => {
   const requestId = (req as any).id;
 
   try {

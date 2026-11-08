@@ -1,41 +1,18 @@
 import { Router, Request, Response } from 'express';
 import { supabaseAdmin } from '../lib/supabaseAdmin';
 import logger from '../lib/logger';
+import { createRateLimiter } from '../lib/rateLimit';
 
 const router = Router();
 
-// Simple in-memory rate limiter
-const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
-
-// Rate limiting middleware: 10 submissions per hour per email
-const rateLimitMiddleware = (req: Request, res: Response, next: Function) => {
-  const email = req.body.email || 'anonymous';
-  const now = Date.now();
-  const oneHour = 60 * 60 * 1000; // 1 hour in milliseconds
-  
-  const userLimit = rateLimitStore.get(email);
-  
-  if (!userLimit || now > userLimit.resetTime) {
-    // First request or reset time passed
-    rateLimitStore.set(email, { count: 1, resetTime: now + oneHour });
-    next();
-  } else if (userLimit.count < 10) {
-    // Under limit
-    userLimit.count++;
-    next();
-  } else {
-    // Over limit
-    logger.warn({ 
-      requestId: (req as any).id, 
-      email, 
-      route: req.originalUrl, 
-      method: req.method 
-    }, 'Rate limit exceeded for feedback submission');
-    res.status(429).json({ 
-      error: 'Too many feedback submissions. Please try again later.' 
-    });
-  }
-};
+// Rate limiting: 10 submissions per hour per email (see lib/rateLimit.ts for caveats)
+const rateLimitMiddleware = createRateLimiter({
+  name: 'feedback',
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  keyFn: (req) => req.body?.email || 'anonymous',
+  message: 'Too many feedback submissions. Please try again later.',
+});
 
 // Middleware to log all incoming requests to this router
 router.use((req, res, next) => {
