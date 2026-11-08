@@ -48,6 +48,11 @@ import {
   coerceToIngredientGroups,
   parseRecipeDisplayName,
 } from '@/utils/ingredientHelpers';
+import {
+  applyChangesToGroups,
+  flattenIngredientGroups,
+  type AppliedChange,
+} from '@/domain/recipe/applyChanges';
 import { useErrorModal } from '@/context/ErrorModalContext';
 import { useHandleError } from '@/hooks/useHandleError';
 import { useSuccessModal } from '@/context/SuccessModalContext';
@@ -78,11 +83,6 @@ import ScreenHeader from '@/components/ScreenHeader';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCooking } from '@/context/CookingContext';
 
-// Type for a change (substitution or removal)
-type AppliedChange = {
-  from: string;
-  to: StructuredIngredient | null;
-};
 
 // Helper function to convert time format from "10 minutes" to "10m"
 const formatTimeCondensed = (timeString: string): string => {
@@ -455,214 +455,22 @@ export default function RecipeSummaryScreen() {
 
   const scaledIngredientGroups = React.useMemo<IngredientGroup[]>(() => {
     // Use unscaledIngredientGroups as baseline if available, otherwise fall back to originalRecipe
-    const sourceIngredientGroups = unscaledIngredientGroups.length > 0 
-      ? unscaledIngredientGroups 
+    const sourceIngredientGroups = unscaledIngredientGroups.length > 0
+      ? unscaledIngredientGroups
       : originalRecipe?.ingredientGroups || [];
-    
-    if (sourceIngredientGroups.length === 0) return [];
-    
-    // Combine persisted and current changes for processing
-    const allAppliedChanges = [...persistedChanges, ...currentUnsavedChanges];
-    
-    if (__DEV__) {
-      // Scaling ingredients
-      console.log('[DEBUG] Scaling context:', {
-        entryPoint,
-        selectedScaleFactor,
-        persistedChangesCount: persistedChanges.length,
-        currentUnsavedChangesCount: currentUnsavedChanges.length,
-        allAppliedChangesCount: allAppliedChanges.length,
-        allAppliedChanges,
-        isViewingSavedRecipe,
-        originalRecipeTitle: originalRecipe?.title,
-      });
-    }
-    
-    const result = sourceIngredientGroups.map((group) => {
-      if (!group.ingredients || !Array.isArray(group.ingredients)) {
-        return { ...group, ingredients: [] };
-      }
-      
-      if (__DEV__) {
-        console.log('[DEBUG] Processing group:', {
-          groupName: group.name || 'Default',
-          ingredientCount: group.ingredients.length,
-        });
-      }
-      
-      // Always scale ingredients from the original recipe using the current selectedScaleFactor
-      const scaledIngredients = group.ingredients.map((ingredient) => {
-        if (__DEV__) {
-          console.log('[DEBUG] Scaling from original recipe:', {
-            ingredient: ingredient.name,
-            amount: ingredient.amount,
-            unit: ingredient.unit,
-            scaleFactor: selectedScaleFactor,
-            entryPoint
-          });
-        }
-        
-        const scaledIngredient = scaleIngredient(ingredient, selectedScaleFactor);
-        if (__DEV__) {
-          console.log('[DEBUG] After scaling:', {
-            ingredient: scaledIngredient.name,
-            amount: scaledIngredient.amount,
-            unit: scaledIngredient.unit,
-          });
-        }
-        
-        return scaledIngredient;
-      });
-
-      let finalIngredients = scaledIngredients;
-      if (allAppliedChanges.length > 0) {
-        if (__DEV__) {
-          // Applying substitutions to scaled ingredients
-        }
-        
-        if (isViewingSavedRecipe) {
-          // Clean display for saved recipes: filter out removed, cleanly replace substituted
-          finalIngredients = scaledIngredients
-            .map((baseIngredient) => {
-              // Parse the display name to get the original name without "(removed)" or "(substituted for X)" text
-              const { baseName: originalName } = parseRecipeDisplayName(baseIngredient.name);
-              const change = allAppliedChanges.find((c) => c.from === originalName);
-              
-                          if (__DEV__) {
-              // Checking ingredient for substitution
-            }
-              
-              if (change) {
-                if (change.to === null) {
-                  if (__DEV__) {
-                    // Marking ingredient for removal
-                  }
-                  // Mark for removal (will be filtered out)
-                  return null;
-                }
-                // Replace with substituted ingredient (no visual indicators)
-                // Scale the substitution amount based on current scale factor
-                let scaledSubstitutionAmount = change.to.amount;
-                if (change.to.amount && selectedScaleFactor !== 1) {
-                  const parsedAmount = parseAmountString(change.to.amount);
-                  if (parsedAmount !== null) {
-                    const scaledAmount = parsedAmount * selectedScaleFactor;
-                    scaledSubstitutionAmount = formatAmountNumber(scaledAmount) || scaledAmount.toString();
-                  }
-                }
-                
-                const substitutedIngredient = {
-                  ...change.to,
-                  amount: scaledSubstitutionAmount,
-                  // Keep the substituted ingredient's name as-is
-                };
-                if (__DEV__) {
-                  console.log('[DEBUG] Applying clean substitution with dynamic scaling:', {
-                    originalName,
-                    originalSubstitutionAmount: change.to.amount,
-                    currentScaleFactor: selectedScaleFactor,
-                    scaledSubstitutionAmount,
-                    substitutedIngredient,
-                  });
-                }
-                return substitutedIngredient;
-              }
-              if (__DEV__) {
-                console.log('[DEBUG] No substitution found, keeping original:', {
-                  name: baseIngredient.name,
-                  amount: baseIngredient.amount,
-                  unit: baseIngredient.unit,
-                });
-              }
-              return baseIngredient;
-            })
-            .filter((ingredient): ingredient is StructuredIngredient => ingredient !== null);
-        } else {
-          // Active editing: show visual indicators for user feedback
-          finalIngredients = scaledIngredients.map((baseIngredient) => {
-            const change = allAppliedChanges.find((c) => c.from === baseIngredient.name);
-            
-            if (__DEV__) {
-              // Checking ingredient for substitution
-            }
-            
-                          if (change) {
-                if (change.to === null) {
-                  if (__DEV__) {
-                  // Applying removal indicator
-                }
-                  return {
-                    ...baseIngredient,
-                    name: `${baseIngredient.name} (removed)`,
-                    amount: null,
-                    unit: null,
-                    suggested_substitutions: null,
-                  };
-                }
-                // Scale the substitution amount based on current scale factor
-                let scaledSubstitutionAmount = change.to.amount;
-                if (change.to.amount && selectedScaleFactor !== 1) {
-                  const parsedAmount = parseAmountString(change.to.amount);
-                  if (parsedAmount !== null) {
-                    const scaledAmount = parsedAmount * selectedScaleFactor;
-                    scaledSubstitutionAmount = formatAmountNumber(scaledAmount) || scaledAmount.toString();
-                  }
-                }
-                
-                const substitutedIngredient = {
-                  ...change.to,
-                  amount: scaledSubstitutionAmount,
-                  name: `${change.to.name} (substituted for ${change.from})`,
-                };
-                if (__DEV__) {
-                  console.log('[DEBUG] Applying substitution with indicator and dynamic scaling:', {
-                    originalName: baseIngredient.name,
-                    originalSubstitutionAmount: change.to.amount,
-                    currentScaleFactor: selectedScaleFactor,
-                    scaledSubstitutionAmount,
-                    substitutedIngredient,
-                  });
-                }
-                return substitutedIngredient;
-              }
-            if (__DEV__) {
-              console.log('[DEBUG] No substitution found, keeping original:', {
-                name: baseIngredient.name,
-                amount: baseIngredient.amount,
-                unit: baseIngredient.unit,
-              });
-            }
-            return baseIngredient;
-          });
-        }
-      }
-
-      if (__DEV__) {
-        // Final ingredients processed for group
-      }
-
-      return {
-        ...group,
-        ingredients: finalIngredients,
-      };
-    });
-    
-    if (__DEV__) {
-      // End scaling ingredients
-    }
-    return result;
+    return applyChangesToGroups(
+      sourceIngredientGroups,
+      [...persistedChanges, ...currentUnsavedChanges],
+      selectedScaleFactor,
+      isViewingSavedRecipe ? 'clean' : 'annotated',
+    );
   }, [originalRecipe, selectedScaleFactor, persistedChanges, currentUnsavedChanges, isViewingSavedRecipe, unscaledIngredientGroups]);
 
   // Keep scaledIngredients as a flat array for backward compatibility with existing code
-  const scaledIngredients = React.useMemo<StructuredIngredient[]>(() => {
-    const allIngredients: StructuredIngredient[] = [];
-    scaledIngredientGroups.forEach(group => {
-      if (group.ingredients && Array.isArray(group.ingredients)) {
-        allIngredients.push(...group.ingredients);
-      }
-    });
-    return allIngredients;
-  }, [scaledIngredientGroups]);
+  const scaledIngredients = React.useMemo<StructuredIngredient[]>(
+    () => flattenIngredientGroups(scaledIngredientGroups),
+    [scaledIngredientGroups],
+  );
 
   // ✅ FIX: Function to fetch canonical recipe by ID
   const fetchCanonicalById = useCallback(async (id: number) => {
