@@ -52,6 +52,21 @@ export function getErrorMessage(errorCode: ParseErrorCode, context?: string): st
 }
 
 /**
+ * User-facing copy for ApiError kinds from lib/api.ts.
+ * `interrupted` deliberately does NOT mention the user's internet connection:
+ * the device is online, the request was cut off (e.g. iOS backgrounding).
+ */
+export const apiErrorMessages = {
+  offline: "Please check your internet connection and try again.",
+  interrupted: "The connection was interrupted before we finished. Please try again.",
+  timeout: "This is taking longer than expected. Please try again.",
+  rate_limited: "Too many requests. Please wait a moment and try again.",
+  invalid_response: "We got an unexpected response from our server. Please try again.",
+  aborted: "The request was cancelled.",
+  config: "Recipe service is temporarily unavailable. Please try again in a few moments.",
+} as const;
+
+/**
  * Classifies and provides user-friendly messages for different types of errors
  */
 export function getNetworkErrorMessage(error: Error | string, statusCode?: number): string {

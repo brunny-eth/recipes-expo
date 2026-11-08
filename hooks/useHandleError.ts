@@ -1,5 +1,6 @@
 import { useErrorModal } from '@/context/ErrorModalContext';
 import { normalizeAppError, NormalizeAppErrorOptions } from '@/utils/normalizeAppError';
+import { isApiError } from '@/lib/apiError';
 
 /**
  * Custom hook to provide a generic error handling function.
@@ -24,6 +25,9 @@ export function useHandleError(defaultOptions?: NormalizeAppErrorOptions) {
     options?: NormalizeAppErrorOptions,
     ui?: UIOptions,
   ) => {
+    // A request we cancelled ourselves (unmount / user cancel) is not an error to show.
+    if (isApiError(error, 'aborted')) return;
+
     const normalized = normalizeAppError(error, { ...defaultOptions, ...options });
 
     console.error(`[Error] ${normalized.code} ${normalized.title}:`, normalized.message);
