@@ -1278,8 +1278,10 @@ export default function RecipeSummaryScreen() {
 
     let finalInstructions = recipe.instructions || [];
     let newTitle: string | null = null; // Capture new title from LLM if suggested
-    const needsScaling = selectedScaleFactor !== 1;
     const needsSubstitution = currentUnsavedChanges.length > 0;
+    // Only ingredient swaps go to the LLM. Scale-only is local: ingredients/yield are scaled
+    // below and steps are kept as-is, so Cook is instant.
+    const needsScaling = needsSubstitution && selectedScaleFactor !== 1;
 
     // --- Unified Instruction Modification (handles both substitutions and scaling) ---
     if (needsSubstitution || needsScaling) {
@@ -1581,41 +1583,45 @@ export default function RecipeSummaryScreen() {
         
         const backendUrl = process.env.EXPO_PUBLIC_API_URL!;
         
-        // Flatten all ingredients from ingredient groups for scaling
-        const allIngredients: StructuredIngredient[] = [];
-        if (recipe.ingredientGroups) {
-          recipe.ingredientGroups.forEach(group => {
-            if (group.ingredients && Array.isArray(group.ingredients)) {
-              allIngredients.push(...group.ingredients);
-            }
-          });
-        }
+        // Only ingredient swaps need the LLM to rewrite steps; scale-only saves instantly
+        // with the steps unchanged (ingredients and yield are scaled below).
+        if (needsSubstitution) {
+          // Flatten all ingredients from ingredient groups for scaling
+          const allIngredients: StructuredIngredient[] = [];
+          if (recipe.ingredientGroups) {
+            recipe.ingredientGroups.forEach(group => {
+              if (group.ingredients && Array.isArray(group.ingredients)) {
+                allIngredients.push(...group.ingredients);
+              }
+            });
+          }
 
-        const response = await fetch(`${backendUrl}/api/recipes/modify-instructions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            originalInstructions: recipe.instructions || [],
-            substitutions: currentUnsavedChanges.map((change) => ({
-              from: change.from,
-              to: change.to ? change.to.name : null,
-            })),
-            originalIngredients: allIngredients,
-            scaledIngredients: scaledIngredients || [],
-            scalingFactor: selectedScaleFactor,
-            skipTitleUpdate: !!params.titleOverride, // Skip title suggestions if title override exists
-          }),
-        });
+          const response = await fetch(`${backendUrl}/api/recipes/modify-instructions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              originalInstructions: recipe.instructions || [],
+              substitutions: currentUnsavedChanges.map((change) => ({
+                from: change.from,
+                to: change.to ? change.to.name : null,
+              })),
+              originalIngredients: allIngredients,
+              scaledIngredients: scaledIngredients || [],
+              scalingFactor: selectedScaleFactor,
+              skipTitleUpdate: !!params.titleOverride, // Skip title suggestions if title override exists
+            }),
+          });
         
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || `Modification failed (Status: ${response.status})`);
-        if (!result.modifiedInstructions) throw new Error('Invalid format for modified instructions.');
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || `Modification failed (Status: ${response.status})`);
+          if (!result.modifiedInstructions) throw new Error('Invalid format for modified instructions.');
         
-        finalInstructions = result.modifiedInstructions;
+          finalInstructions = result.modifiedInstructions;
         
-        // Capture new title if suggested by LLM
-        if (result.newTitle && result.newTitle.trim() !== '') {
-          newTitle = result.newTitle;
+          // Capture new title if suggested by LLM
+          if (result.newTitle && result.newTitle.trim() !== '') {
+            newTitle = result.newTitle;
+          }
         }
 
         setIsSavingForLater(false);
@@ -1883,7 +1889,9 @@ export default function RecipeSummaryScreen() {
       let finalInstructions = recipe.instructions || [];
       let newTitle: string | null = null;
 
-      if (hasModifications) {
+      // Only ingredient swaps need the LLM to rewrite steps. Scale-only cooks instantly:
+      // ingredients and yield are scaled below, steps are kept as-is.
+      if (needsSubstitution) {
         console.log('[Summary] Modifications detected, calling modify-instructions endpoint');
         
         // Check removal limit
@@ -2223,7 +2231,8 @@ export default function RecipeSummaryScreen() {
     try {
       // Check if we have modifications that need LLM processing
       const needsSubstitution = currentUnsavedChanges.length > 0;
-      const needsScaling = selectedScaleFactor !== 1;
+      // Only ingredient swaps go to the LLM; scale-only saves instantly with steps unchanged.
+      const needsScaling = needsSubstitution && selectedScaleFactor !== 1;
       
       let finalInstructions = recipe.instructions || [];
       let newTitle: string | null = null;
