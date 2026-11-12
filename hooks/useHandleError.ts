@@ -28,7 +28,14 @@ export function useHandleError(defaultOptions?: NormalizeAppErrorOptions) {
     // A request we cancelled ourselves (unmount / user cancel) is not an error to show.
     if (isApiError(error, 'aborted')) return;
 
-    const normalized = normalizeAppError(error, { ...defaultOptions, ...options });
+    // handleError('Limit Reached', 'You can only remove up to 2 ingredients.') — the caller wrote
+    // user-facing copy itself. Show it as-is; classifying it would replace the title with a
+    // generic one ("Something Went Wrong", "Validation Error"). Callers that pass options
+    // (e.g. import's context-aware messages) still go through normalization.
+    const isCallerCopy = typeof error === 'string' && !options && !defaultOptions;
+    const normalized = isCallerCopy
+      ? { code: 'CALLER_MESSAGE', title: fallbackTitle, message: error as string }
+      : normalizeAppError(error, { ...defaultOptions, ...options });
 
     console.error(`[Error] ${normalized.code} ${normalized.title}:`, normalized.message);
 

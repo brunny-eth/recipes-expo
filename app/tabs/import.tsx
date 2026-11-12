@@ -1471,11 +1471,16 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     height: '100%',
-    paddingVertical: INPUT_VPAD + 0.5, // Fine-tuned vertical centering
     color: COLORS.textDark,
     fontFamily: FONT.family.body, // Explicit font family
     fontSize: INPUT_FONT_SIZE, // Explicit font size
-    lineHeight: INPUT_LINE_HEIGHT, // Explicit line height - prevents ascender clipping
+    // iOS: a single-line TextInput with an explicit lineHeight/padding renders the placeholder
+    // and typed text at different baselines, so text "jiggles" down on the first keystroke.
+    // Let iOS center the line natively; keep the explicit metrics on Android only.
+    ...Platform.select({
+      ios: { paddingVertical: 0 },
+      default: { paddingVertical: INPUT_VPAD + 0.5, lineHeight: INPUT_LINE_HEIGHT },
+    }),
     fontWeight: '400', // Explicit font weight
     letterSpacing: 0, // Explicit letter spacing to prevent any glyph shifts
     textAlignVertical: 'center', // Ensure vertical centering

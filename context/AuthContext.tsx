@@ -83,6 +83,9 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
   
   // Track loading state in a ref to avoid closure issues in timeout
   const isLoadingRef = useRef(isLoading);
+  // True while signIn() runs. signIn sets isLoading=true, which the startup safety timeout
+  // below would otherwise mistake for a hung initialization and force-complete mid-sign-in.
+  const signInInProgressRef = useRef(false);
 
   useEffect(() => {
     showErrorRef.current = showError;
@@ -506,7 +509,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
     // ✅ Safety timeout: Force unblock after 5 seconds to prevent infinite loading
     const safetyTimeout = setTimeout(async () => {
       // Check current loading state via ref to avoid closure issues
-      if (mounted && isLoadingRef.current) {
+      if (mounted && isLoadingRef.current && !signInInProgressRef.current) {
         // Check session state at timeout
         const { data: s } = await supabase.auth.getSession();
         console.log('[AUTH] timeout check -> session exists?', !!s?.session);
@@ -547,6 +550,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
       existingSessionId: sessionId
     });
     setIsLoading(true);
+    signInInProgressRef.current = true;
 
     try { // Wrap the entire logic in a try-finally
       if (provider === 'apple') {
@@ -856,7 +860,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
               provider,
               timestamp: new Date().toISOString()
             });
-            handleError('Sign In Cancelled', 'You cancelled the sign-in process.');
+            // Backing out of sign-in is a normal choice, not an error — no popup.
             return false; // Indicate cancellation
           } else {
             logger.error('Web browser session unknown result type', { 
@@ -901,6 +905,7 @@ export const AuthProvider = ({ children }: PropsWithChildren) => {
         provider,
         timestamp: new Date().toISOString()
       });
+      signInInProgressRef.current = false;
       setIsLoading(false);
     }
   }, [handleUrl, showError, track]);

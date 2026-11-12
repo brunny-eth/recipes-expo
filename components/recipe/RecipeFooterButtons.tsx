@@ -135,9 +135,7 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
 
 
   const getMainButtonText = () => {
-    if (isRewriting || isSavingModifications) return ''; // Just show spinner, no text
-    if (isScalingInstructions) return 'Making sure everything lines up...';
-
+    // Progress is shown by the screen's WorkingOverlay; labels stay fixed so the bar never reflows.
     if (isAlreadyInMise) return 'Already in prep station';
 
     switch (entryPoint) {
@@ -262,19 +260,12 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
               onPress={getMainButtonHandler()}
               disabled={buttonDisabled}
             >
-              {(isRewriting || isScalingInstructions || isSavingModifications) ? (
-                <ActivityIndicator
-                  size="small"
-                  color="black"
-                />
-              ) : (
-                <Text style={[
-                  styles.miseButtonText,
-                  buttonDisabled && styles.plainButtonTextDisabled
-                ]}>
-                  {getMainButtonText()}
-                </Text>
-              )}
+              <Text style={[
+                styles.miseButtonText,
+                buttonDisabled && styles.plainButtonTextDisabled
+              ]}>
+                {getMainButtonText()}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -292,13 +283,6 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
           onPress={getMainButtonHandler()}
           disabled={buttonDisabled}
         >
-          {(isRewriting || isScalingInstructions || isSavingModifications) && (
-            <ActivityIndicator
-              size="small"
-              color="black"
-              style={{ marginRight: SPACING.xs }}
-            />
-          )}
           <Text style={[
             styles.plainButtonText,
             buttonDisabled && styles.plainButtonTextDisabled
@@ -314,18 +298,11 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
             onPress={handleSaveChanges}
             disabled={isSavingChanges}
           >
-            {isSavingChanges && (
-              <ActivityIndicator
-                size="small"
-                color="black"
-                style={{ marginRight: SPACING.xs }}
-              />
-            )}
             <Text style={[
               styles.plainButtonText,
               isSavingChanges && styles.plainButtonTextDisabled
             ]}>
-              {isSavingChanges ? 'Saving...' : 'Save'}
+              Save
             </Text>
           </TouchableOpacity>
         ) : (
@@ -334,18 +311,11 @@ const RecipeFooterButtons: React.FC<RecipeFooterButtonsProps> = ({
             onPress={handleSaveForLaterPress}
             disabled={isSavingForLater}
           >
-            {isSavingForLater && (
-              <ActivityIndicator
-                size="small"
-                color="black"
-                style={{ marginRight: SPACING.xs }}
-              />
-            )}
             <Text style={[
               styles.plainButtonText,
               isSavingForLater && styles.plainButtonTextDisabled
             ]}>
-              {isSavingForLater ? 'Saving...' : 'Save'}
+              Save
             </Text>
           </TouchableOpacity>
         )}

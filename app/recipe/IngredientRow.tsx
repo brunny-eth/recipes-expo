@@ -25,6 +25,7 @@ import {
   FONT,
 } from '@/constants/typography';
 import { abbreviateUnit } from '@/utils/format';
+import { formatDisplayAmount } from '@/utils/recipeUtils';
 import { parseRecipeDisplayName } from '@/utils/ingredientHelpers';
 
 type AppliedChange = {
@@ -125,6 +126,13 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
   // Show revert button only if there's an actual unsaved change and it's not locked
   const showRevertButton = hasUnsavedChange && !isLocked;
 
+  // Only offer "undo substitution" when there is an unsaved change it would actually revert.
+  // A saved recipe can carry "X (substituted for Y)" names with no matching change on this
+  // screen; showing the arrow there did nothing when tapped.
+  const canUndoSubstitution = appliedChanges.some(
+    (change) => change.from === originalNameForSub || change.from === ingredientToCheck
+  );
+
   // Debug logging to help track the locking behavior and substitutions
   const shouldShowSubstitutionOnTap =
     !substitutedFor &&
@@ -212,7 +220,7 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
             )}
             {(ingredient.amount || ingredient.unit) && (
               <Text style={styles.ingredientQuantityParenthetical}>
-                {` (${ingredient.amount || ''}${ingredient.unit ? ` ${abbreviateUnit(ingredient.unit)}` : ''})`}
+                {` (${formatDisplayAmount(ingredient.amount) || ''}${ingredient.unit ? ` ${abbreviateUnit(ingredient.unit)}` : ''})`}
               </Text>
             )}
           </Text>
@@ -234,7 +242,7 @@ const IngredientRow: React.FC<IngredientRowProps> = ({
           </TouchableOpacity>
         )}
 
-          {substitutedFor && !isRemoved && !isLocked && (
+          {substitutedFor && !isRemoved && !isLocked && canUndoSubstitution && (
           <TouchableOpacity
             style={styles.infoButton}
             onPress={() => undoSubstitution(originalNameForSub)}

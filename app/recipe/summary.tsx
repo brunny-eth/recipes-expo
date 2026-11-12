@@ -88,6 +88,7 @@ import CollapsibleSection from '@/components/CollapsibleSection';
 import IngredientList from '@/components/recipe/IngredientList';
 import ServingScaler from '@/components/recipe/ServingScaler';
 import FolderPickerModal from '@/components/FolderPickerModal';
+import WorkingOverlay from '@/components/WorkingOverlay';
 import RecipeFooterButtons from '@/components/recipe/RecipeFooterButtons';
 import RecipeVariationsModal, { VariationType } from '@/components/RecipeVariationsModal';
 
@@ -2842,52 +2843,35 @@ export default function RecipeSummaryScreen() {
         recipeTitle={recipe?.title ?? undefined}
       />
 
-      {/* Loading overlay when applying modifications */}
-      {isCookingNow && hasModifications && (
-        <View style={styles.loadingOverlayContainer}>
-          <View style={styles.loadingOverlayCard}>
-            <ActivityIndicator size="large" color={COLORS.textDark} style={{ marginBottom: SPACING.md }} />
-            <Text style={styles.loadingOverlayTitle}>Applying modifications</Text>
-            <Text style={styles.loadingOverlayMessage}>Updating recipe to match your changes...</Text>
-          </View>
-        </View>
-      )}
+      {/* One overlay for every long action (cook with changes, update in mise, save) */}
+      <WorkingOverlay
+        visible={
+          (isCookingNow && hasModifications) ||
+          isRewriting ||
+          isScalingInstructions ||
+          isSavingModifications ||
+          isSavingChanges ||
+          isSavingForLater
+        }
+        title={
+          (isSavingChanges || isSavingForLater) && !hasModifications && !isRewriting && !isScalingInstructions
+            ? 'Saving recipe'
+            : (isSavingChanges || isSavingForLater)
+              ? 'Saving your changes'
+              : 'Applying modifications'
+        }
+        message={
+          hasModifications || isRewriting || isScalingInstructions || isSavingModifications
+            ? 'Updating recipe to match your changes...'
+            : undefined
+        }
+      />
       </View>
     </PanGestureHandler>
   );
 }
 
 const styles = StyleSheet.create({
-  loadingOverlayContainer: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: OVERLAYS.medium,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 9999,
-  } as ViewStyle,
-  loadingOverlayCard: {
-    width: '80%',
-    maxWidth: 350,
-    backgroundColor: COLORS.white,
-    padding: SPACING.xl,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: '#000000',
-    alignItems: 'center',
-  } as ViewStyle,
-  loadingOverlayTitle: {
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 18,
-    color: COLORS.textDark,
-    marginBottom: SPACING.sm,
-    textAlign: 'center',
-  } as TextStyle,
-  loadingOverlayMessage: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    color: COLORS.textMuted,
-    textAlign: 'center',
-  } as TextStyle,
   header: {
     flex: 0,
     paddingHorizontal: 0,

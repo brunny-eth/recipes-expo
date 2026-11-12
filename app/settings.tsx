@@ -200,40 +200,24 @@ export default function AccountScreen() {
         contentContainerStyle={styles.scrollContent}
         style={styles.scrollView}
       >
-        {/* User Info Section - Just the login status at top */}
-        <View style={styles.userInfoContainer}>
-          {isAuthenticated ? (
-            <>
-              <Text style={styles.authStatusText}>
-                {`Logged in as ${session?.user?.email}`}
-              </Text>
-            </>
-          ) : (
-            <TouchableOpacity
-              onPress={() => router.push('/login')}
-              style={styles.loginButton}
-            >
+        {/* Who you are */}
+        {isAuthenticated ? (
+          <View style={styles.identityBlock}>
+            <Text style={styles.groupLabel}>SIGNED IN AS</Text>
+            <Text style={styles.identityEmail} numberOfLines={1}>{session?.user?.email}</Text>
+          </View>
+        ) : (
+          <View style={styles.identityBlock}>
+            <Text style={styles.signedOutBlurb}>Sign in to save recipes and keep your prep list in sync.</Text>
+            <TouchableOpacity onPress={() => router.push('/login')} style={styles.loginButton}>
               <Text style={styles.loginButtonText}>Log In or Sign Up</Text>
             </TouchableOpacity>
-          )}
-        </View>
+          </View>
+        )}
 
-        {/* Send Feedback Button - Right under Sign Out */}
-        <View style={styles.sendFeedbackButtonSection}>
-            <TouchableHighlight
-              style={styles.sendFeedbackButton}
-              onPress={handleToggleFeedback}
-              underlayColor="transparent"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <View style={styles.sendFeedbackButtonContent}>
-                <Text style={styles.sendFeedbackButtonText}>
-                  Send Feedback
-                </Text>
-              </View>
-            </TouchableHighlight>
-        </View>
-
+        {/* General */}
+        <View style={styles.group}>
+          <SettingsRow label="Send Feedback" onPress={handleToggleFeedback} trailing={showFeedbackForm ? '–' : '›'} />
         {/* Animated Feedback Form Section */}
         {showFeedbackForm && (
           <Animated.View 
@@ -279,78 +263,31 @@ export default function AccountScreen() {
             </TouchableHighlight>
           </Animated.View>
         )}
-
-        {/* Debug Section - Commented out for now */}
-        {/* {__DEV__ && (
-          <View style={styles.devSection}>
-            <TouchableOpacity
-              style={styles.devLinkRow}
-              onPress={() => router.push('/debug' as any)}
-            >
-              <Text style={styles.devLinkText}>Open Debug Menu</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.devLinkRow}
-              onPress={async () => {
-                try {
-                  await AsyncStorage.removeItem('hasLaunched');
-                  Alert.alert(
-                    'Welcome Screen Reset',
-                    'The welcome screen has been reset. The app will now reload.',
-                    [
-                      {
-                        text: 'OK',
-                        onPress: () => {
-                          Updates.reloadAsync();
-                        },
-                      },
-                    ],
-                  );
-                } catch (error) {
-                  console.error('Failed to reset welcome screen:', error);
-                  Alert.alert('Error', 'Failed to reset welcome screen');
-                }
-              }}
-            >
-              <Text style={styles.devLinkText}>Reset Welcome Screen</Text>
-            </TouchableOpacity>
-          </View>
-        )} */}
-
-        {/* Sign Out Section - Moved to bottom */}
-        {isAuthenticated && (
-          <View style={styles.signOutSection}>
-            <TouchableHighlight
-              style={styles.signOutButton}
+          <SettingsRow label="Privacy Policy" onPress={() => Linking.openURL('https://cookolea.com/privacy.html')} trailing="↗" />
+          <SettingsRow label="Terms of Service" onPress={() => Linking.openURL('https://cookolea.com/tos.html')} trailing="↗" />
+          {isAuthenticated && (
+            <SettingsRow
+              label={isSigningOut ? 'Signing Out...' : 'Sign Out'}
               onPress={handleSignOut}
-              underlayColor="transparent"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               disabled={isSigningOut}
-            >
-              <View style={styles.signOutButtonContent}>
-                <Text style={styles.signOutButtonText}>
-                  {isSigningOut ? 'Signing Out...' : 'Sign Out'}
-                </Text>
-              </View>
-            </TouchableHighlight>
+              last
+            />
+          )}
+        </View>
 
-            {/* Delete Account Button */}
-            <TouchableHighlight
-              style={styles.deleteAccountButton}
+        {isAuthenticated && (
+          <View style={styles.group}>
+            <SettingsRow
+              label={isDeletingAccount ? 'Deleting Account...' : 'Delete Account'}
               onPress={() => setShowDeleteModal(true)}
-              underlayColor="transparent"
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               disabled={isDeletingAccount}
-            >
-              <View style={styles.deleteAccountButtonContent}>
-                <Text style={styles.deleteAccountButtonText}>
-                  {isDeletingAccount ? 'Deleting Account...' : 'Delete Account'}
-                </Text>
-              </View>
-            </TouchableHighlight>
+              destructive
+              last
+            />
           </View>
         )}
 
+        <Text style={styles.versionText}>Version {appVersion}</Text>
        </ScrollView>
 
        {/* Delete Account Confirmation Modal */}
@@ -380,29 +317,90 @@ export default function AccountScreen() {
          />
        )}
 
-       {/* Fixed Bottom Legal Section - Above tabs */}
-       <View style={styles.fixedBottomLegalSection}>
-         <Text style={styles.versionText}>Version {appVersion}</Text>
-         <TouchableOpacity
-           style={styles.legalLink}
-           onPress={() => Linking.openURL('https://cookolea.com/privacy.html')}
-         >
-           <Text style={styles.legalLinkText}>Privacy Policy</Text>
-         </TouchableOpacity>
-         <TouchableOpacity
-           style={styles.legalLink}
-           onPress={() => Linking.openURL('https://cookolea.com/tos.html')}
-         >
-           <Text style={styles.legalLinkText}>Terms of Service</Text>
-         </TouchableOpacity>
-       </View>
-
       <BottomTabBar />
     </View>
   );
 }
 
+function SettingsRow({
+  label,
+  onPress,
+  trailing,
+  disabled,
+  destructive,
+  last,
+}: {
+  label: string;
+  onPress: () => void;
+  trailing?: string;
+  disabled?: boolean;
+  destructive?: boolean;
+  last?: boolean;
+}) {
+  return (
+    <TouchableOpacity
+      style={[styles.row, last && styles.rowLast]}
+      onPress={onPress}
+      disabled={disabled}
+      activeOpacity={0.6}
+    >
+      <Text style={[styles.rowLabel, destructive && styles.rowLabelDestructive, disabled && styles.rowLabelDisabled]}>
+        {label}
+      </Text>
+      {trailing ? <Text style={styles.rowTrailing}>{trailing}</Text> : null}
+    </TouchableOpacity>
+  );
+}
+
 const styles = StyleSheet.create({
+  identityBlock: {
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.lg,
+  } as ViewStyle,
+  groupLabel: {
+    ...bodyText,
+    fontSize: FONT.size.caption,
+    letterSpacing: 0.6,
+    color: COLORS.textMuted,
+    marginBottom: SPACING.xs,
+  } as TextStyle,
+  identityEmail: {
+    ...bodyStrongText,
+    color: COLORS.textDark,
+  } as TextStyle,
+  signedOutBlurb: {
+    ...bodyText,
+    color: COLORS.textMuted,
+    marginBottom: SPACING.md,
+  } as TextStyle,
+  group: {
+    borderTopWidth: BORDER_WIDTH.hairline,
+    borderTopColor: COLORS.divider,
+    marginBottom: SPACING.lg,
+  } as ViewStyle,
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: SPACING.base + 2,
+    borderBottomWidth: BORDER_WIDTH.hairline,
+    borderBottomColor: COLORS.divider,
+  } as ViewStyle,
+  rowLast: {} as ViewStyle,
+  rowLabel: {
+    ...bodyText,
+    color: COLORS.textDark,
+  } as TextStyle,
+  rowLabelDestructive: {
+    color: COLORS.error,
+  } as TextStyle,
+  rowLabelDisabled: {
+    opacity: 0.5,
+  } as TextStyle,
+  rowTrailing: {
+    ...bodyText,
+    color: COLORS.textMuted,
+  } as TextStyle,
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
@@ -441,8 +439,10 @@ const styles = StyleSheet.create({
     textAlign: 'left',
   } as TextStyle,
   feedbackSection: {
-    marginTop: SPACING.lg,
-    marginBottom: SPACING.xs,
+    paddingTop: SPACING.sm,
+    paddingBottom: SPACING.md,
+    borderBottomWidth: BORDER_WIDTH.hairline,
+    borderBottomColor: COLORS.divider,
   } as ViewStyle,
   signOutSection: {
     marginBottom: 0,
@@ -545,7 +545,7 @@ const styles = StyleSheet.create({
     color: '#666666', // Greyish color
     textAlign: 'left',
     fontSize: FONT.size.caption,
-    marginTop: 0,
+    marginTop: SPACING.xs,
     marginBottom: SPACING.xs,
   } as TextStyle,
   tagline: {
@@ -564,7 +564,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     borderRadius: RADIUS.sm,
     alignItems: 'center',
-    marginBottom: SPACING.lg,
   } as ViewStyle,
   loginButtonText: {
     ...bodyStrongText,

@@ -392,3 +392,14 @@ export function normalizeInstructionsToSteps(raw: any): InstructionStep[] {
   }
   return [];
 } 
+/**
+ * Display-only: turns a plain decimal amount ("0.33", "1.5") into the same fraction format
+ * scaled amounts use ("⅓", "1½"), so 1× and scaled views look alike. Anything that isn't a
+ * plain decimal ("1-2", "1 1/2", "to taste", "3") is returned unchanged.
+ */
+export const formatDisplayAmount = (amount: string | number | null | undefined): string | null => {
+  if (amount === null || amount === undefined) return null;
+  const str = String(amount).trim();
+  if (!/^\d*\.\d+$/.test(str)) return str;
+  return formatAmountNumber(Math.round(parseFloat(str) * 1000) / 1000) ?? str;
+};
