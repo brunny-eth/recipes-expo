@@ -2044,10 +2044,11 @@ export default function RecipeSummaryScreen() {
     }
 
     try {
-      // Check if we have modifications that need LLM processing
+      // Only ingredient swaps need the LLM (to rewrite the steps). A scale-only update is done
+      // locally — ingredients and yield are recomputed and saved in one quick request.
       const needsSubstitution = currentUnsavedChanges.length > 0;
-      const needsScaling = selectedScaleFactor !== 1;
-      
+      const needsScaling = needsSubstitution && selectedScaleFactor !== 1;
+
       let processedRecipeData = recipe;
       let finalInstructions = recipe.instructions || [];
       let newTitle: string | null = null;
@@ -2120,7 +2121,13 @@ export default function RecipeSummaryScreen() {
           substitutionsCount: currentUnsavedChanges.length,
         });
       } else {
-        console.log('[Summary] No modifications requiring LLM processing');
+        // Scale-only: no LLM. Steps are kept as-is; ingredients and yield reflect the new scale.
+        setIsSavingModifications(true);
+        processedRecipeData = {
+          ...recipe,
+          recipeYield: getScaledYieldText(originalRecipe?.recipeYield || recipe.recipeYield, selectedScaleFactor),
+          ingredientGroups: scaledIngredientGroups,
+        };
       }
 
       // Combine all changes for saving modifications
