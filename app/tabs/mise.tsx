@@ -1670,6 +1670,9 @@ export default function MiseScreen() {
         pathname: '/recipe/summary',
         params: {
           recipeId: item.prepared_recipe_data.id?.toString(),
+          // The prepared version holds this item's title, steps and changes; summary pairs it
+          // with the canonical recipe (fetched by recipeId) to show the modified recipe.
+          recipeData: JSON.stringify(item.prepared_recipe_data),
           entryPoint: 'mise',
           miseRecipeId: item.id,
           appliedChanges: item.applied_changes ? JSON.stringify(item.applied_changes) : undefined,

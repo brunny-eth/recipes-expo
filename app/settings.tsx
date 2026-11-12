@@ -208,7 +208,7 @@ export default function AccountScreen() {
           </View>
         ) : (
           <View style={styles.identityBlock}>
-            <Text style={styles.signedOutBlurb}>Sign in to save recipes and keep your prep list in sync.</Text>
+            <Text style={styles.signedOutBlurb}>Sign in to save recipes and see your prep work.</Text>
             <TouchableOpacity onPress={() => router.push('/login')} style={styles.loginButton}>
               <Text style={styles.loginButtonText}>Log In or Sign Up</Text>
             </TouchableOpacity>

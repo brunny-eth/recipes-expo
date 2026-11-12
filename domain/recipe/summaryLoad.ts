@@ -185,3 +185,33 @@ export function resolveFromRecipeDataParam(input: {
     return { patch, error: { title: 'Error Loading Summary', error: e } };
   }
 }
+
+/**
+ * Mise entry: a mise item stores the *prepared* recipe (changes and scale already baked into
+ * title, steps and ingredients) plus the applied changes — but not the 1× original. Rebuild
+ * the screen from the canonical recipe (as the original) + the stored changes, so ingredients
+ * are derived once (no double scaling) while title/steps come from the prepared version.
+ *
+ * The baseline scale is set to the stored scale: reopening a mise recipe is not a modification.
+ * If the canonical recipe could not be fetched, show the prepared recipe as-is at 1×.
+ */
+export function resolveMiseRecipe(input: {
+  preparedRecipeData: string;
+  canonicalRecipe: CombinedParsedRecipe | null;
+  appliedChanges?: string;
+}): SummaryLoadResult {
+  const { preparedRecipeData, canonicalRecipe, appliedChanges } = input;
+  if (!canonicalRecipe) {
+    return resolveFromRecipeDataParam({ recipeData: preparedRecipeData, entryPoint: 'mise' });
+  }
+  const result = resolveFromRecipeDataParam({
+    recipeData: preparedRecipeData,
+    originalRecipeData: JSON.stringify(canonicalRecipe),
+    appliedChanges,
+    entryPoint: 'mise',
+  });
+  if (!result.error && result.patch.selectedScaleFactor !== undefined) {
+    result.patch.baselineScaleFactor = result.patch.selectedScaleFactor;
+  }
+  return result;
+}

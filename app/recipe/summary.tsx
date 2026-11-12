@@ -52,6 +52,7 @@ import {
 } from '@/domain/recipe/applyChanges';
 import {
   resolveFromRecipeDataParam,
+  resolveMiseRecipe,
   patchForFetchedRecipe,
   patchForSharedRecipe,
   type SummaryLoadPatch,
@@ -579,7 +580,20 @@ export default function RecipeSummaryScreen() {
         return;
       }
 
-      if (params.recipeData) {
+      if (entryPoint === 'mise' && params.recipeData && numericId && !isNaN(numericId) && !params.originalRecipeData) {
+        // Mise: prepared recipe (changes baked in) + canonical original, so changes show and
+        // aren't double-applied. See resolveMiseRecipe.
+        const canonical = await fetchCanonicalById(numericId);
+        const result = resolveMiseRecipe({
+          preparedRecipeData: params.recipeData as string,
+          canonicalRecipe: canonical ?? null,
+          appliedChanges: params.appliedChanges as string | undefined,
+        });
+        applyLoadPatch(result.patch);
+        if (result.error) {
+          handleError(result.error.title, result.error.error as any);
+        }
+      } else if (params.recipeData) {
         // Legacy path: recipe passed as JSON in route params
         const result = resolveFromRecipeDataParam({
           recipeData: params.recipeData as string,

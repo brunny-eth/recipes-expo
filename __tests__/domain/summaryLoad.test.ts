@@ -3,9 +3,12 @@ import {
   resolveFromRecipeDataParam,
   patchForFetchedRecipe,
   patchForSharedRecipe,
+  resolveMiseRecipe,
   type SummaryLoadPatch,
 } from '@/domain/recipe/summaryLoad';
 import { parseServingsValue } from '@/utils/recipeUtils';
+import { applyChangesToGroups } from '@/domain/recipe/applyChanges';
+import { computeHasModifications, initialRecipeDraft } from '@/domain/recipe/recipeDraft';
 
 /**
  * ORACLE: verbatim copy (logging removed) of the `params.recipeData` branch of the loadRecipe
@@ -245,5 +248,50 @@ describe('patchForFetchedRecipe / patchForSharedRecipe', () => {
       recipe, originalRecipe: recipe, imageLoadFailed: false,
       unscaledIngredientGroups: groups, baselineScaleFactor: 1, selectedScaleFactor: 1, originalYieldValue: 4,
     });
+  });
+});
+
+describe('resolveMiseRecipe', () => {
+  const canonical: any = {
+    id: 77, title: 'Honey Roasted Carrots', recipeYield: '2 servings', instructions: ['Roast carrots'],
+    ingredientGroups: [{ name: 'Main', ingredients: [
+      { name: 'carrots', amount: '1', unit: 'lb' }, { name: 'honey', amount: '0.33', unit: 'cup' },
+    ] }],
+  };
+  // What summary saves to mise after "Update Recipe": parsnips for carrots, 2×, new title/steps.
+  const changes = { ingredientChanges: [{ from: 'carrots', to: { name: 'parsnips', amount: '1', unit: 'lb', preparation: null } }], scalingFactor: 2 };
+  const prepared = {
+    ...canonical, title: 'Honey Roasted Parsnips', recipeYield: '4 servings', instructions: ['Roast parsnips'],
+    ingredientGroups: applyChangesToGroups(canonical.ingredientGroups, [{ from: 'carrots', to: changes.ingredientChanges[0].to }], 2, 'annotated'),
+  };
+
+  it('shows the modified recipe: prepared title/steps, changes re-applied once to the 1× original', () => {
+    const { patch, error }: any = resolveMiseRecipe({
+      preparedRecipeData: JSON.stringify(prepared), canonicalRecipe: canonical, appliedChanges: JSON.stringify(changes),
+    });
+    expect(error).toBeUndefined();
+    expect(patch.recipe.title).toBe('Honey Roasted Parsnips');
+    expect(patch.recipe.instructions).toEqual(['Roast parsnips']);
+    expect(patch.originalRecipe).toEqual(canonical);
+    expect(patch.selectedScaleFactor).toBe(2);
+    const shown = applyChangesToGroups(patch.originalRecipe.ingredientGroups, patch.persistedChanges, patch.selectedScaleFactor, 'annotated');
+    expect(shown[0].ingredients.map((i: any) => [i.name, i.amount])).toEqual([
+      ['parsnips (substituted for carrots)', '2'],
+      ['honey', '⅔'],
+    ]);
+  });
+
+  it('reopening is not a modification (Update Recipe stays disabled)', () => {
+    const { patch }: any = resolveMiseRecipe({
+      preparedRecipeData: JSON.stringify(prepared), canonicalRecipe: canonical, appliedChanges: JSON.stringify(changes),
+    });
+    expect(computeHasModifications({ ...initialRecipeDraft, ...patch })).toBe(false);
+  });
+
+  it('falls back to the prepared recipe at 1× when the canonical fetch failed', () => {
+    const { patch }: any = resolveMiseRecipe({ preparedRecipeData: JSON.stringify(prepared), canonicalRecipe: null, appliedChanges: JSON.stringify(changes) });
+    expect(patch.recipe.title).toBe('Honey Roasted Parsnips');
+    expect(patch.selectedScaleFactor).toBe(1);
+    expect(patch.persistedChanges).toEqual([]);
   });
 });
